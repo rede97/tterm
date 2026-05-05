@@ -199,6 +199,11 @@ body {
   background: #1e1e1e !important;
 }
 
+/* force scrollbar track visible even when content fits */
+.terminal-instance .xterm .xterm-viewport {
+  overflow-y: scroll !important;
+}
+
 /* ── xterm scrollbar: always-visible thin groove ──────────────────── */
 
 .xterm-viewport::-webkit-scrollbar {
