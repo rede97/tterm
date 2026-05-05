@@ -15,6 +15,9 @@ interface Tab {
   fitAddon: FitAddon;
   element: HTMLElement;
   tabElement: HTMLElement;
+  xtermEl: HTMLElement;
+  charWidth: number;
+  charHeight: number;
 }
 
 const tabs: Map<string, Tab> = new Map();
@@ -38,12 +41,14 @@ function showSizeHint(cols: number, rows: number) {
   if (sizeHintTimer) clearTimeout(sizeHintTimer);
   sizeHintTimer = setTimeout(() => {
     sizeOverlay.classList.remove("visible");
-  }, 1500);
+  }, 1200);
 }
 
 function refitTab(tab: Tab) {
   tab.fitAddon.fit();
   const { cols, rows } = tab.terminal;
+  tab.charWidth = tab.xtermEl.clientWidth / cols;
+  tab.charHeight = tab.xtermEl.clientHeight / rows;
   invoke("pty_resize", { id: tab.id, cols, rows });
   showSizeHint(cols, rows);
 }
@@ -54,6 +59,7 @@ function createTerminal(): {
   terminal: Terminal;
   fitAddon: FitAddon;
   element: HTMLElement;
+  xtermEl: HTMLElement;
 } {
   const element = document.createElement("div");
   element.className = "terminal-instance";
@@ -92,7 +98,12 @@ function createTerminal(): {
   terminal.loadAddon(fitAddon);
   terminal.open(element);
 
-  return { terminal, fitAddon, element };
+  return {
+    terminal,
+    fitAddon,
+    element,
+    xtermEl: element.querySelector(".xterm") as HTMLElement,
+  };
 }
 
 // ── tab bar UI ─────────────────────────────────────────────────────
@@ -168,7 +179,7 @@ async function closeTab(id: string): Promise<void> {
 async function createTab(): Promise<void> {
   const id: string = await invoke("pty_spawn");
 
-  const { terminal, fitAddon, element } = createTerminal();
+  const { terminal, fitAddon, element, xtermEl } = createTerminal();
   const tabElement = createTabElement(id);
 
   terminal.onData((data) => {
@@ -183,6 +194,9 @@ async function createTab(): Promise<void> {
     fitAddon,
     element,
     tabElement,
+    xtermEl,
+    charWidth: 0,
+    charHeight: 0,
   });
 
   switchTab(id);
@@ -198,19 +212,34 @@ listen<PtyOutputPayload>("pty-output", (event) => {
   }
 });
 
-// ── window resize (debounced: fit only after resize stops) ─────────
+// ── window resize: live hint immediately, fit after debounce ───────
 
 let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
 window.addEventListener("resize", () => {
+  if (activeTabId === null) return;
+  const tab = tabs.get(activeTabId);
+  if (!tab) return;
+
+  // live size estimate — instant, no terminal reflow
+  if (tab.charWidth > 0) {
+    const rect = tab.element.getBoundingClientRect();
+    const availW = rect.width - 8;
+    const availH = rect.height - 8;
+    const estCols = Math.max(2, Math.floor(availW / tab.charWidth));
+    const estRows = Math.max(1, Math.floor(availH / tab.charHeight));
+    showSizeHint(estCols, estRows);
+  }
+
+  // defer actual fit + pty_resize until resize stops
   if (resizeTimer) clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     resizeTimer = null;
     if (activeTabId !== null) {
-      const tab = tabs.get(activeTabId);
-      if (tab) refitTab(tab);
+      const t = tabs.get(activeTabId);
+      if (t) refitTab(t);
     }
-  }, 200);
+  }, 150);
 });
 
 // ── new tab button ─────────────────────────────────────────────────
