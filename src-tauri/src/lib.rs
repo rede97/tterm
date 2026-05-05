@@ -134,6 +134,30 @@ fn pty_kill(state: tauri::State<AppState>, id: &str) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn window_minimize(window: tauri::Window) {
+    let _ = window.minimize();
+}
+
+#[tauri::command]
+fn window_toggle_maximize(window: tauri::Window) {
+    if window.is_maximized().unwrap_or(false) {
+        let _ = window.unmaximize();
+    } else {
+        let _ = window.maximize();
+    }
+}
+
+#[tauri::command]
+fn window_close(window: tauri::Window) {
+    let _ = window.close();
+}
+
+#[tauri::command]
+fn window_start_drag(window: tauri::Window) -> Result<(), String> {
+    window.start_dragging().map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -149,7 +173,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![pty_spawn, pty_write, pty_resize, pty_kill])
+        .invoke_handler(tauri::generate_handler![pty_spawn, pty_write, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

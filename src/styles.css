@@ -30,10 +30,89 @@ body {
 
 #tabs {
   display: flex;
-  flex: 1;
+  flex: 0 1 auto;
   overflow-x: auto;
   overflow-y: hidden;
   height: 100%;
+  min-width: 0;
+}
+
+#drag-spacer {
+  flex: 1;
+  height: 100%;
+}
+
+#new-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  min-width: 30px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: #cccccc;
+  font-size: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+#new-tab:hover {
+  background: #333333;
+  color: #ffffff;
+}
+
+#window-controls {
+  display: flex;
+  height: 100%;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.win-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: #cccccc;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.win-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+#btn-close:hover {
+  background: #e81123;
+  color: #ffffff;
+}
+
+/* ── window control SVG icons ─────────────────────────────────────── */
+
+.win-btn svg {
+  display: block;
+}
+
+#btn-maximize .ico-max {
+  display: block;
+}
+
+#btn-maximize .ico-restore {
+  display: none;
+}
+
+#btn-maximize.restore .ico-max {
+  display: none;
+}
+
+#btn-maximize.restore .ico-restore {
+  display: block;
 }
 
 #tabs::-webkit-scrollbar {
@@ -111,25 +190,6 @@ body {
   color: #ffffff;
 }
 
-#new-tab {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 100%;
-  border: none;
-  background: transparent;
-  color: #cccccc;
-  font-size: 18px;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-#new-tab:hover {
-  background: #333333;
-  color: #ffffff;
-}
-
 #terminal-container {
   flex: 1;
   position: relative;
@@ -154,6 +214,35 @@ body {
   /* isolate paint: prevent layout recalc from cascading into xterm canvas */
   contain: layout style paint;
   overflow: hidden;
+}
+
+/* ── xterm built-in scrollbar (VS Code–style, always visible) ───── */
+
+.terminal-instance .xterm .xterm-scrollable-element > .scrollbar {
+  width: 6px !important;
+  background: transparent;
+  border-radius: 3px;
+  transition: width 0.15s;
+}
+
+.terminal-instance .xterm .xterm-scrollable-element > .scrollbar:hover {
+  width: 10px !important;
+}
+
+.terminal-instance .xterm .xterm-scrollable-element > .scrollbar > .scra {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-radius: 3px !important;
+  transition: background-color 0.15s;
+}
+
+.terminal-instance .xterm .xterm-scrollable-element > .scrollbar:hover > .scra {
+  background: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* override xterm.js auto-hide: keep scrollbar always visible */
+.terminal-instance .xterm .xterm-scrollable-element > .invisible {
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
 /* ── size hint overlay ────────────────────────────────────────────── */
@@ -199,34 +288,21 @@ body {
   background: #1e1e1e !important;
 }
 
-/* force scrollbar track visible even when content fits */
-.terminal-instance .xterm .xterm-viewport {
-  overflow-y: scroll !important;
+/* hide all native scrollbars inside terminal — xterm DOM scrollbar replaces them */
+.terminal-instance ::-webkit-scrollbar,
+.terminal-instance ::-webkit-scrollbar-track,
+.terminal-instance ::-webkit-scrollbar-thumb,
+.terminal-instance ::-webkit-scrollbar-corner {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
-/* ── xterm scrollbar: always-visible thin groove ──────────────────── */
-
-.xterm-viewport::-webkit-scrollbar {
-  width: 10px;
-}
-
-.xterm-viewport::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 5px;
-}
-
-.xterm-viewport::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 5px;
-  border: 3px solid transparent;
-  background-clip: padding-box;
-  transition: border-width 0.15s, background-color 0.15s;
-  min-height: 30px;
-}
-
-.xterm-viewport::-webkit-scrollbar-thumb:hover {
-  border-width: 1px;
-  background-color: rgba(255, 255, 255, 0.3);
+.terminal-instance .xterm .xterm-viewport,
+.terminal-instance .xterm .xterm-screen,
+.terminal-instance .xterm {
+  overflow: hidden !important;
+  scrollbar-width: none;
 }
 
 /* Global scrollbar theme for consistency */
