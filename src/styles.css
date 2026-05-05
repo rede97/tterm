@@ -182,9 +182,14 @@ body {
    xterm.css loads as a JS import and may override our stylesheet rules. */
 .terminal-instance .xterm {
   height: 100%;
-  /* force independent compositing layer — prevents sub-pixel wobble */
+  /* force independent compositing layer */
   will-change: transform;
   transform: translateZ(0);
+  backface-visibility: hidden;
+  /* snap grid to top-left so leftover pixels collect at bottom/right,
+     preventing canvas vertical drift during resize */
+  align-content: start !important;
+  justify-content: start !important;
 }
 
 .terminal-instance .xterm,
