@@ -40,8 +40,17 @@ body {
   height: 3px;
 }
 
+#tabs::-webkit-scrollbar-track {
+  background: #252526;
+}
+
 #tabs::-webkit-scrollbar-thumb {
   background: #424242;
+  border-radius: 2px;
+}
+
+#tabs::-webkit-scrollbar-thumb:hover {
+  background: #555555;
 }
 
 .tab {
@@ -125,14 +134,65 @@ body {
   flex: 1;
   position: relative;
   overflow: hidden;
+  background: #1e1e1e;
 }
 
 .terminal-instance {
   width: 100%;
   height: 100%;
+  padding: 4px;
+  background: #1e1e1e;
 }
 
+/* Override xterm.js built-in black backgrounds — uses !important because
+   xterm.css loads as a JS import and may override our stylesheet rules. */
 .terminal-instance .xterm {
   height: 100%;
-  padding: 4px;
+}
+
+.terminal-instance .xterm,
+.terminal-instance .xterm .xterm-viewport,
+.terminal-instance .xterm .xterm-screen,
+.terminal-instance .xterm .xterm-decoration-overview-ruler {
+  background: #1e1e1e !important;
+}
+
+.xterm-viewport::-webkit-scrollbar {
+  width: 6px;
+}
+
+.xterm-viewport::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 3px;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: #555555;
+}
+
+/* Global scrollbar theme for consistency */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555555;
+}
+
+::-webkit-scrollbar-corner {
+  background: #1e1e1e;
 }
