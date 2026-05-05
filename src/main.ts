@@ -24,6 +24,32 @@ const terminalContainer = document.getElementById("terminal-container")!;
 const tabsContainer = document.getElementById("tabs")!;
 const newTabButton = document.getElementById("new-tab")!;
 
+// ── size hint overlay ──────────────────────────────────────────────
+
+const sizeOverlay = document.createElement("div");
+sizeOverlay.id = "size-overlay";
+terminalContainer.appendChild(sizeOverlay);
+
+let sizeHintTimer: ReturnType<typeof setTimeout> | null = null;
+
+function showSizeHint(cols: number, rows: number) {
+  sizeOverlay.textContent = `${cols} \xd7 ${rows}`;
+  sizeOverlay.classList.add("visible");
+  if (sizeHintTimer) clearTimeout(sizeHintTimer);
+  sizeHintTimer = setTimeout(() => {
+    sizeOverlay.classList.remove("visible");
+  }, 1500);
+}
+
+function refitTab(tab: Tab) {
+  tab.fitAddon.fit();
+  const { cols, rows } = tab.terminal;
+  invoke("pty_resize", { id: tab.id, cols, rows });
+  showSizeHint(cols, rows);
+}
+
+// ── terminal factory ───────────────────────────────────────────────
+
 function createTerminal(): {
   terminal: Terminal;
   fitAddon: FitAddon;
@@ -69,6 +95,8 @@ function createTerminal(): {
   return { terminal, fitAddon, element };
 }
 
+// ── tab bar UI ─────────────────────────────────────────────────────
+
 function createTabElement(id: string): HTMLElement {
   const tab = document.createElement("div");
   tab.className = "tab";
@@ -80,7 +108,7 @@ function createTabElement(id: string): HTMLElement {
 
   const closeBtn = document.createElement("button");
   closeBtn.className = "tab-close";
-  closeBtn.textContent = "×";
+  closeBtn.textContent = "\xd7";
   closeBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     closeTab(id);
@@ -111,7 +139,7 @@ function switchTab(id: string): void {
   if (tab) {
     tab.element.style.display = "";
     tab.tabElement.classList.add("active");
-    tab.fitAddon.fit();
+    refitTab(tab);
     tab.terminal.focus();
     activeTabId = id;
   }
@@ -147,10 +175,6 @@ async function createTab(): Promise<void> {
     invoke("pty_write", { id, data });
   });
 
-  terminal.onResize(({ cols, rows }) => {
-    invoke("pty_resize", { id, cols, rows });
-  });
-
   tabsContainer.appendChild(tabElement);
 
   tabs.set(id, {
@@ -164,6 +188,8 @@ async function createTab(): Promise<void> {
   switchTab(id);
 }
 
+// ── PTY output routing ─────────────────────────────────────────────
+
 listen<PtyOutputPayload>("pty-output", (event) => {
   const { id, data } = event.payload;
   const tab = tabs.get(id);
@@ -172,17 +198,27 @@ listen<PtyOutputPayload>("pty-output", (event) => {
   }
 });
 
+// ── window resize (debounced: fit only after resize stops) ─────────
+
+let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+
 window.addEventListener("resize", () => {
-  if (activeTabId !== null) {
-    const tab = tabs.get(activeTabId);
-    if (tab) {
-      tab.fitAddon.fit();
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    resizeTimer = null;
+    if (activeTabId !== null) {
+      const tab = tabs.get(activeTabId);
+      if (tab) refitTab(tab);
     }
-  }
+  }, 200);
 });
+
+// ── new tab button ─────────────────────────────────────────────────
 
 newTabButton.addEventListener("click", () => {
   createTab();
 });
+
+// ── initial tab ────────────────────────────────────────────────────
 
 createTab();

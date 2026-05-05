@@ -137,17 +137,54 @@ body {
   background: #1e1e1e;
 }
 
+/* ── xterm.js internal sizing reset ─────────────────────────────────
+   The global `box-sizing: border-box` conflicts with xterm.js's
+   CSS Grid layout which expects `content-box` for precise cell sizing. */
+
+.xterm,
+.xterm * {
+  box-sizing: content-box;
+}
+
 .terminal-instance {
   width: 100%;
   height: 100%;
   padding: 4px;
   background: #1e1e1e;
+  /* isolate paint: prevent layout recalc from cascading into xterm canvas */
+  contain: layout style paint;
+  overflow: hidden;
+}
+
+/* ── size hint overlay ────────────────────────────────────────────── */
+
+#size-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 6px 16px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #cccccc;
+  font-size: 13px;
+  border-radius: 4px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 10;
+}
+
+#size-overlay.visible {
+  opacity: 1;
 }
 
 /* Override xterm.js built-in black backgrounds — uses !important because
    xterm.css loads as a JS import and may override our stylesheet rules. */
 .terminal-instance .xterm {
   height: 100%;
+  /* force independent compositing layer — prevents sub-pixel wobble */
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 .terminal-instance .xterm,
