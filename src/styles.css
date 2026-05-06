@@ -281,14 +281,13 @@ body {
   justify-content: start !important;
 }
 
-.terminal-instance .xterm,
 .terminal-instance .xterm .xterm-viewport,
 .terminal-instance .xterm .xterm-screen,
-.terminal-instance .xterm .xterm-decoration-overview-ruler {
+.terminal-instance .xterm {
   background: #1e1e1e !important;
 }
 
-/* hide all native scrollbars inside terminal — xterm DOM scrollbar replaces them */
+/* hide native scrollbars inside terminal — xterm DOM scrollbar replaces them */
 .terminal-instance ::-webkit-scrollbar,
 .terminal-instance ::-webkit-scrollbar-track,
 .terminal-instance ::-webkit-scrollbar-thumb,
@@ -298,7 +297,12 @@ body {
   height: 0 !important;
 }
 
-.terminal-instance .xterm .xterm-viewport,
+/* keep viewport scrollable so terminal content isn't clipped;
+   native scrollbar hidden via ::-webkit-scrollbar rules above */
+.terminal-instance .xterm .xterm-viewport {
+  overflow-y: scroll !important;
+}
+
 .terminal-instance .xterm .xterm-screen,
 .terminal-instance .xterm {
   overflow: hidden !important;
