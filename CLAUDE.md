@@ -107,6 +107,10 @@ Maximize/restore icon toggle: `#btn-maximize` holds two Lucide icons (`.ico-max`
 
 xterm.js v6 uses a custom DOM scrollbar (`.xterm-scrollable-element > .scrollbar > .scra`), not native `::-webkit-scrollbar`. The `.xterm-viewport` must keep `overflow-y: scroll` for scrolling to work — setting `overflow: hidden` will clip terminal content. Native scrollbars inside `.terminal-instance` are hidden via `::-webkit-scrollbar { display: none }`, so only the styled DOM scrollbar is visible. The tab bar uses a wheel event listener to map vertical scroll → horizontal `scrollLeft`.
 
+## File editing
+
+Use **PowerShell** (`Set-Content` / `Get-Content`) for file edits. The Edit tool frequently fails to match strings in this repo because Read tool output may not byte-match the actual file content (tab/space rendering, line ending normalization). PowerShell text replacement is reliable. Only use the Edit tool for trivial single-line changes.
+
 ## Platform notes
 
 On Windows, the default shell is `cmd.exe`. On Unix, it's the user's `$SHELL` (fallback `/bin/sh`). `portable-pty` abstracts PTY resize and process handling across platforms. The Vite dev server binds `127.0.0.1` explicitly (not `::1`) because IPv6 loopback has connectivity issues on Windows. Windows Terminal settings are read from `%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_*\LocalState\settings.json` (also checks Preview and unpackaged paths). VS instances are discovered via `vswhere.exe` with a fallback to scanning common `Program Files` paths.

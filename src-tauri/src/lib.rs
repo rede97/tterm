@@ -6,32 +6,22 @@ use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
 
-#[cfg(target_os = "windows")]
-extern "system" {
-    fn ShellExecuteW(
-        hwnd: isize,
-        lpOperation: *const u16,
-        lpFile: *const u16,
-        lpParameters: *const u16,
-        lpDirectory: *const u16,
-        nShowCmd: i32,
-    ) -> isize;
-}
+pub mod elevated;
 
 #[derive(Clone, Serialize)]
-struct PtyOutput {
-    id: String,
-    data: Vec<u8>,
+pub(crate) struct PtyOutput {
+    pub(crate) id: String,
+    pub(crate) data: Vec<u8>,
 }
 
-struct PtySession {
-    master: Box<dyn MasterPty + Send>,
-    writer: Box<dyn Write + Send>,
+pub(crate) struct PtySession {
+    pub(crate) master: Option<Box<dyn MasterPty + Send>>,
+    pub(crate) writer: Box<dyn Write + Send>,
 }
 
-struct AppState {
-    sessions: Mutex<HashMap<String, PtySession>>,
-    next_id: Mutex<u32>,
+pub(crate) struct AppState {
+    pub(crate) sessions: Mutex<HashMap<String, PtySession>>,
+    pub(crate) next_id: Mutex<u32>,
 }
 
 fn get_shell() -> String {
@@ -92,7 +82,7 @@ fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder) -> R
     let sessions = app_handle.state::<AppState>();
     sessions.sessions.lock().unwrap().insert(
         id,
-        PtySession { master, writer },
+        PtySession { master: Some(master), writer },
     );
 
     Ok(())
@@ -181,9 +171,11 @@ struct VsInstallation {
 fn try_vswhere() -> Vec<VsInstallation> {
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         let vswhere = r"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe";
         let output = match std::process::Command::new(vswhere)
             .args(["-format", "json", "-products", "*", "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64"])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
             .output()
         {
             Ok(o) if o.status.success() => o,
@@ -226,9 +218,12 @@ fn try_common_vs_paths() -> Vec<VsInstallation> {
 
 #[tauri::command]
 fn find_vs_instances() -> Vec<VsInstallation> {
-    let r = try_vswhere();
+    // try fast file-based detection first (no subprocess spawn)
+    // vswhere.exe is a console app — spawning it from a GUI process
+    // (windows_subsystem = "windows") triggers Windows Terminal on Win11
+    let r = try_common_vs_paths();
     if !r.is_empty() { return r; }
-    try_common_vs_paths()
+    try_vswhere()
 }
 
 fn load_wt_settings_raw() -> Option<String> {
@@ -295,6 +290,13 @@ fn pty_spawn_ssh(state: tauri::State<AppState>, app: tauri::AppHandle, hostname:
 fn pty_write(state: tauri::State<AppState>, id: &str, data: &str) -> Result<(), String> {
     let mut sessions = state.sessions.lock().map_err(|e| e.to_string())?;
     if let Some(session) = sessions.get_mut(id) {
+        if session.master.is_none() {
+            // pipe session: prepend framing (type 0x00 + 4-byte LE length)
+            let msg_type = [0x00u8];
+            let len = (data.len() as u32).to_le_bytes();
+            session.writer.write_all(&msg_type).map_err(|e| e.to_string())?;
+            session.writer.write_all(&len).map_err(|e| e.to_string())?;
+        }
         session
             .writer
             .write_all(data.as_bytes())
@@ -306,17 +308,22 @@ fn pty_write(state: tauri::State<AppState>, id: &str, data: &str) -> Result<(), 
 
 #[tauri::command]
 fn pty_resize(state: tauri::State<AppState>, id: &str, cols: u16, rows: u16) -> Result<(), String> {
-    let sessions = state.sessions.lock().map_err(|e| e.to_string())?;
-    if let Some(session) = sessions.get(id) {
-        session
-            .master
-            .resize(PtySize {
-                rows,
-                cols,
-                pixel_width: 0,
-                pixel_height: 0,
-            })
-            .map_err(|e| e.to_string())?;
+    let mut sessions = state.sessions.lock().map_err(|e| e.to_string())?;
+    if let Some(session) = sessions.get_mut(id) {
+        if let Some(master) = &session.master {
+            master
+                .resize(PtySize {
+                    rows,
+                    cols,
+                    pixel_width: 0,
+                    pixel_height: 0,
+                })
+                .map_err(|e| e.to_string())?;
+        } else {
+            // pipe session: send resize message (type 0x01 + 4 byte sizes)
+            let msg = [0x01u8, cols as u8, (cols >> 8) as u8, rows as u8, (rows >> 8) as u8];
+            session.writer.write_all(&msg).map_err(|e| e.to_string())?;
+        }
     }
     Ok(())
 }
@@ -358,24 +365,11 @@ fn pty_spawn_elevated(state: tauri::State<AppState>, app: tauri::AppHandle, comm
 
     #[cfg(target_os = "windows")]
     {
-        // Launch elevated process via ShellExecuteW with "runas" verb → UAC prompt → new console window
-        use std::ffi::OsStr;
-        use std::os::windows::ffi::OsStrExt;
-
-        let op: Vec<u16> = OsStr::new("runas\0").encode_wide().collect();
-
-        let mut file: Vec<u16> = OsStr::new(&cmd_str).encode_wide().collect();
-        file.push(0); // null terminate for ShellExecuteW
-
-        let ret = unsafe { ShellExecuteW(0, op.as_ptr(), file.as_ptr(), std::ptr::null(), std::ptr::null(), 1) };
-        if ret as i32 <= 32 {
-            eprintln!("ShellExecuteW failed with code {}", ret);
-        }
+        return elevated::pty_spawn_elevated_windows(state, app, &cmd_str);
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        // Unix: sudo within PTY
         let mut builder = CommandBuilder::new("sudo");
         builder.arg(&cmd_str);
         let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
@@ -383,17 +377,8 @@ fn pty_spawn_elevated(state: tauri::State<AppState>, app: tauri::AppHandle, comm
         *next += 1;
         drop(next);
         spawn_pty(app, id.clone(), builder)?;
-        return Ok(id);
+        Ok(id)
     }
-
-    // On Windows: create a normal (non-elevated) tab so the user gets a usable shell
-    // The elevated terminal runs in its own console window
-    let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
-    let id = format!("tab-{}", *next);
-    *next += 1;
-    drop(next);
-    spawn_pty(app, id.clone(), CommandBuilder::new(&cmd_str))?;
-    Ok(id)
 }
 
 #[tauri::command]
