@@ -94,19 +94,26 @@ body {
 .profile-menu {
   position: fixed;
   z-index: 100;
-  min-width: 220px;
-  max-height: 360px;
-  overflow-y: auto;
   background: #252526;
   border: 1px solid #3e3e42;
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  padding: 4px 0;
   display: none;
 }
 
 .profile-menu.open {
-  display: block;
+  display: flex;
+}
+
+.profile-col {
+  min-width: 160px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.profile-col + .profile-col {
+  border-left: 1px solid #3e3e42;
 }
 
 .profile-section-title {
@@ -299,6 +306,7 @@ body {
   position: relative;
   overflow: hidden;
   background: #1e1e1e;
+  padding: 4px;
 }
 
 /* ── xterm.js internal sizing reset ─────────────────────────────────
@@ -313,7 +321,6 @@ body {
 .terminal-instance {
   width: 100%;
   height: 100%;
-  padding: 4px;
   background: #1e1e1e;
   /* isolate paint: prevent layout recalc from cascading into xterm canvas */
   contain: layout style paint;
@@ -379,9 +386,9 @@ body {
   will-change: transform;
   transform: translateZ(0);
   backface-visibility: hidden;
-  /* snap grid to top-left so leftover pixels collect at bottom/right,
-     preventing canvas vertical drift during resize */
-  align-content: start !important;
+  /* snap grid to bottom so leftover space collects at top (VS Code style);
+     keep content anchored at cursor line when grid slightly smaller */
+  align-content: end !important;
   justify-content: start !important;
 }
 

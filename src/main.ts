@@ -18,7 +18,21 @@ interface SshHost {
   user: string;
 }
 
+interface LocalProfile {
+  name: string;
+  command: string;
+}
+
+interface VsInstallation {
+  path: string;
+  version: string;
+  instance_id?: string | null;
+}
+
 let sshHosts: SshHost[] = [];
+let localProfiles: LocalProfile[] = [];
+let vsInstalls: VsInstallation[] = [];
+let defaultLocalProfile: string | null = null;
 
 interface Tab {
   id: string;
@@ -38,6 +52,13 @@ const terminalContainer = document.getElementById("terminal-container")!;
 const tabsContainer = document.getElementById("tabs")!;
 const newTabButton = document.getElementById("new-tab")!;
 
+// wheel → horizontal scroll on tab bar (no Shift needed)
+tabsContainer.addEventListener("wheel", (e) => {
+  if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+    tabsContainer.scrollLeft += e.deltaY;
+  }
+}, { passive: true });
+
 // ── size hint overlay ──────────────────────────────────────────────
 
 const sizeOverlay = document.createElement("div");
@@ -55,13 +76,55 @@ function showSizeHint(cols: number, rows: number) {
   }, 1200);
 }
 
-function refitTab(tab: Tab) {
-  tab.fitAddon.fit();
-  const { cols, rows } = tab.terminal;
-  tab.charWidth = tab.xtermEl.clientWidth / cols;
-  tab.charHeight = tab.xtermEl.clientHeight / rows;
-  invoke("pty_resize", { id: tab.id, cols, rows });
-  showSizeHint(cols, rows);
+function applyFit(tab: Tab): { cols: number; rows: number } {
+  const addon = tab.fitAddon as any;
+  const proposed: { cols: number; rows: number } | undefined = addon.proposeDimensions?.();
+  if (!proposed) {
+    tab.fitAddon.fit();
+    return { cols: tab.terminal.cols, rows: tab.terminal.rows };
+  }
+
+  const core = (tab.terminal as any)._core;
+  const dims = core._renderService.dimensions;
+  if (!dims || dims.css.cell.width === 0 || dims.css.cell.height === 0) {
+    return { cols: tab.terminal.cols, rows: tab.terminal.rows };
+  }
+
+  const charH = dims.css.cell.height;
+  const charW = dims.css.cell.width;
+  const toleranceV = Math.max(1, Math.round(charH * 0.1));
+  const toleranceH = Math.max(1, Math.round(charW * 0.1));
+
+  // available area — same calc as fit addon uses internally
+  const parent = tab.terminal.element!.parentElement!;
+  const parentStyle = getComputedStyle(parent);
+  const parentH = parseFloat(parentStyle.getPropertyValue("height"));
+  const xtermStyle = getComputedStyle(tab.terminal.element!);
+  const paddingV =
+    parseFloat(xtermStyle.paddingTop) + parseFloat(xtermStyle.paddingBottom);
+  const paddingH =
+    parseFloat(xtermStyle.paddingLeft) + parseFloat(xtermStyle.paddingRight);
+  const availableH = parentH - paddingV;
+  const availableW =
+    parseFloat(parentStyle.getPropertyValue("width")) - paddingH;
+
+  // proposed.rows = floor(availableH / charH) — always fits
+  let rows = proposed.rows;
+  if (tab.terminal.rows > proposed.rows) {
+    const overflow = tab.terminal.rows * charH - availableH;
+    if (overflow > 0 && overflow <= toleranceV) rows = tab.terminal.rows;
+  }
+
+  let cols = Math.max(2, proposed.cols);
+  if (tab.terminal.cols > proposed.cols) {
+    const overflow = tab.terminal.cols * charW - availableW;
+    if (overflow > 0 && overflow <= toleranceH) cols = tab.terminal.cols;
+  }
+
+  if (tab.terminal.rows !== rows || tab.terminal.cols !== cols)
+    tab.terminal.resize(cols, rows);
+
+  return { cols, rows };
 }
 
 // ── terminal factory ───────────────────────────────────────────────
@@ -162,7 +225,7 @@ function switchTab(id: string): void {
   if (tab) {
     tab.element.style.display = "";
     tab.tabElement.classList.add("active");
-    refitTab(tab);
+    applyFit(tab); // fit grid only, no IPC
     tab.terminal.focus();
     activeTabId = id;
   }
@@ -227,6 +290,11 @@ async function createSshTab(host: SshHost): Promise<void> {
   setupTab(id, host.name);
 }
 
+async function createCustomTab(command: string, label: string): Promise<void> {
+  const id: string = await invoke("pty_spawn", { command });
+  setupTab(id, label);
+}
+
 // ── PTY output routing ─────────────────────────────────────────────
 
 listen<PtyOutputPayload>("pty-output", (event) => {
@@ -237,7 +305,7 @@ listen<PtyOutputPayload>("pty-output", (event) => {
   }
 });
 
-// ── window resize: live hint immediately, fit after debounce ───────
+// ── window resize: fit grid immediately, defer PTY resize ──────────
 
 let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -246,31 +314,33 @@ window.addEventListener("resize", () => {
   const tab = tabs.get(activeTabId);
   if (!tab) return;
 
-  // live size estimate — instant, no terminal reflow
-  if (tab.charWidth > 0) {
-    const rect = tab.element.getBoundingClientRect();
-    const availW = rect.width - 8;
-    const availH = rect.height - 8;
-    const estCols = Math.max(2, Math.floor(availW / tab.charWidth));
-    const estRows = Math.max(1, Math.floor(availH / tab.charHeight));
-    showSizeHint(estCols, estRows);
-  }
+  const { cols, rows } = applyFit(tab);
+  const cw = tab.xtermEl.clientWidth / cols;
+  const ch = tab.xtermEl.clientHeight / rows;
+  if (cw > 0) tab.charWidth = cw;
+  if (ch > 0) tab.charHeight = ch;
+  showSizeHint(cols, rows);
 
-  // defer actual fit + pty_resize until resize stops
+  // defer PTY resize (expensive IPC) until resize stops
+  const tabId = tab.id;
   if (resizeTimer) clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     resizeTimer = null;
-    if (activeTabId !== null) {
-      const t = tabs.get(activeTabId);
-      if (t) refitTab(t);
+    const t = tabs.get(tabId);
+    if (t) {
+      invoke("pty_resize", { id: t.id, cols: t.terminal.cols, rows: t.terminal.rows });
     }
-  }, 150);
+  }, 250);
 });
 
 // ── new tab button + profile dropdown ──────────────────────────────
 
 newTabButton.addEventListener("click", () => {
-  createTab();
+  // explicit default → first profile → cmd.exe
+  const defName = defaultLocalProfile ?? localProfiles[0]?.name ?? null;
+  const p = defName ? localProfiles.find(x => x.name === defName) : null;
+  if (p) { createCustomTab(p.command, p.name); }
+  else { createTab(); }
 });
 
 const menuBtn = document.getElementById("new-tab-menu-btn")!;
@@ -281,8 +351,28 @@ document.body.appendChild(profileMenu);
 
 function positionMenu() {
   const rect = menuBtn.getBoundingClientRect();
-  profileMenu.style.left = (rect.right - profileMenu.offsetWidth) + "px";
+  profileMenu.style.left = (rect.left + rect.width / 2) + "px";
   profileMenu.style.top = rect.bottom + "px";
+}
+
+function flipMenu() {
+  const rect = menuBtn.getBoundingClientRect();
+  const mw = profileMenu.offsetWidth;
+  const mh = profileMenu.offsetHeight;
+  const pad = 4;
+
+  // center below button
+  let left = rect.left + rect.width / 2 - mw / 2;
+  let top = rect.bottom;
+
+  // clamp horizontal
+  if (left < pad) left = pad;
+  if (left + mw > window.innerWidth) left = window.innerWidth - mw - pad;
+  // flip vertical if overflow bottom
+  if (top + mh > window.innerHeight) top = Math.max(pad, rect.top - mh);
+
+  profileMenu.style.left = left + "px";
+  profileMenu.style.top = top + "px";
 }
 
 function createMenuItem(iconFn: any, label: string, detail: string, onClick: () => void): HTMLElement {
@@ -317,29 +407,39 @@ function createMenuItem(iconFn: any, label: string, detail: string, onClick: () 
 function populateMenu() {
   profileMenu.innerHTML = "";
 
-  // Local section
+  // Local column
+  const localCol = document.createElement("div");
+  localCol.className = "profile-col";
+
   const localTitle = document.createElement("div");
   localTitle.className = "profile-section-title";
   localTitle.textContent = "Local";
-  profileMenu.appendChild(localTitle);
+  localCol.appendChild(localTitle);
 
-  profileMenu.appendChild(createMenuItem(TerminalIcon, "Default shell", "", () => createTab()));
+  if (localProfiles.length > 0) {
+    for (const p of localProfiles) {
+      localCol.appendChild(createMenuItem(TerminalIcon, p.name, "", () => createCustomTab(p.command, p.name)));
+    }
+  } else {
+    localCol.appendChild(createMenuItem(TerminalIcon, "Default shell", "", () => createTab()));
+  }
+  profileMenu.appendChild(localCol);
 
-  // SSH section
+  // SSH column
   if (sshHosts.length > 0) {
-    const sep = document.createElement("div");
-    sep.className = "profile-separator";
-    profileMenu.appendChild(sep);
+    const sshCol = document.createElement("div");
+    sshCol.className = "profile-col";
 
     const sshTitle = document.createElement("div");
     sshTitle.className = "profile-section-title";
     sshTitle.textContent = "SSH";
-    profileMenu.appendChild(sshTitle);
+    sshCol.appendChild(sshTitle);
 
     for (const host of sshHosts) {
       const detail = `${host.user}@${host.hostname}:${host.port}`;
-      profileMenu.appendChild(createMenuItem(Globe, host.name, detail, () => createSshTab(host)));
+      sshCol.appendChild(createMenuItem(Globe, host.name, detail, () => createSshTab(host)));
     }
+    profileMenu.appendChild(sshCol);
   }
 }
 
@@ -351,6 +451,7 @@ menuBtn.addEventListener("click", (e) => {
     populateMenu();
     positionMenu();
     profileMenu.classList.add("open");
+    requestAnimationFrame(() => flipMenu());
   }
 });
 
@@ -362,7 +463,7 @@ document.addEventListener("click", (e) => {
 
 window.addEventListener("resize", () => {
   if (profileMenu.classList.contains("open")) {
-    positionMenu();
+    flipMenu();
   }
 });
 
@@ -449,13 +550,87 @@ btnClose.appendChild(createElement(X, { stroke: "currentColor", width: 14, heigh
 async function loadSshHosts() {
   try {
     sshHosts = await invoke<SshHost[]>("ssh_list_hosts");
-    console.log("SSH hosts:", sshHosts);
   } catch (e) {
     console.error("Failed to load SSH hosts:", e);
   }
 }
 
+// ── Windows Terminal profiles ──────────────────────────────────────
+
+function resolveVsProfile(name: string): string | null {
+  if (vsInstalls.length === 0) return null;
+  const vs = vsInstalls[0];
+  if (/developer command prompt/i.test(name)) {
+    return `%comspec% /k "${vs.path}\\Common7\\Tools\\VsDevCmd.bat"`;
+  }
+  if (/developer powershell/i.test(name)) {
+    const instanceId = vs.instance_id;
+    if (!instanceId) return null;
+    return `powershell.exe -NoExit -Command "& { Import-Module '${vs.path}\\Common7\\Tools\\Microsoft.VisualStudio.DevShell.dll'; Enter-VsDevShell -VsInstanceId ${instanceId} }"`;
+  }
+  return null;
+}
+
+function parseWtProfiles(raw: string) {
+  try {
+    const root = JSON.parse(raw);
+    const list: any[] = root?.profiles?.list;
+    if (!list) return;
+    localProfiles = [];
+    for (const item of list) {
+      if (item.hidden) continue;
+      const name = item.name;
+      if (!name) continue;
+      let command = item.commandline;
+      if (!command && /terminal\.visualstudio/i.test(item.source || "")) {
+        command = resolveVsProfile(name);
+      }
+      if (command) {
+        localProfiles.push({ name, command });
+      }
+    }
+  } catch (e) {
+    console.error("Failed to parse WT profiles:", e);
+  }
+}
+
+async function loadLocalProfiles() {
+  try {
+    vsInstalls = await invoke<VsInstallation[]>("find_vs_instances");
+  } catch (e) {
+    console.error("Failed to find VS instances:", e);
+  }
+  try {
+    const raw = await invoke<string | null>("read_wt_settings");
+    if (raw) parseWtProfiles(raw);
+  } catch (e) {
+    console.error("Failed to load WT profiles:", e);
+  }
+}
+
+// ── default profile ───────────────────────────────────────────────
+
+async function setDefaultProfile(name: string) {
+  defaultLocalProfile = name;
+  try { await invoke("write_config", { content: JSON.stringify({ defaultLocalProfile: name }) }); } catch {}
+}
+// exposed for settings page
+(window as any).setDefaultProfile = setDefaultProfile;
+
+async function loadConfig() {
+  try {
+    const raw = await invoke<string>("read_config");
+    const cfg = JSON.parse(raw);
+    if (cfg.defaultLocalProfile) defaultLocalProfile = cfg.defaultLocalProfile;
+  } catch {}
+}
+
 // ── initial tab ────────────────────────────────────────────────────
 
-createTab();
 loadSshHosts();
+Promise.all([loadLocalProfiles(), loadConfig()]).then(() => {
+  const defName = defaultLocalProfile ?? localProfiles[0]?.name ?? null;
+  const p = defName ? localProfiles.find(x => x.name === defName) : null;
+  if (p) createCustomTab(p.command, p.name);
+  else createTab();
+});

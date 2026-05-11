@@ -86,15 +86,178 @@ fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder) -> R
 }
 
 #[tauri::command]
-fn pty_spawn(state: tauri::State<AppState>, app: tauri::AppHandle) -> Result<String, String> {
+fn pty_spawn(state: tauri::State<AppState>, app: tauri::AppHandle, command: Option<String>) -> Result<String, String> {
     let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
     let id = format!("tab-{}", *next);
     *next += 1;
     drop(next);
 
+    if let Some(cmd) = command {
+        if !cmd.is_empty() {
+            let (exe, args) = parse_command(&cmd);
+            if args.is_empty() {
+                spawn_pty(app, id.clone(), CommandBuilder::new(&exe))?;
+            } else {
+                let mut builder = CommandBuilder::new(&exe);
+                for a in &args { builder.arg(a); }
+                spawn_pty(app, id.clone(), builder)?;
+            }
+            return Ok(id);
+        }
+    }
+
     let shell = get_shell();
     spawn_pty(app, id.clone(), CommandBuilder::new(&shell))?;
     Ok(id)
+}
+
+fn expand_env_str(s: &str) -> String {
+    let mut out = String::new();
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '%' {
+            let mut var = String::new();
+            for next in chars.by_ref() {
+                if next == '%' { break; }
+                var.push(next);
+            }
+            match std::env::var(&var) {
+                Ok(v) => out.push_str(&v),
+                Err(_) => { out.push('%'); out.push_str(&var); out.push('%'); }
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+fn parse_command(cmd_str: &str) -> (String, Vec<String>) {
+    let mut tokens: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    let mut in_quote = false;
+    for c in cmd_str.chars() {
+        match c {
+            '"' => in_quote = !in_quote,
+            ' ' if !in_quote => {
+                if !cur.is_empty() { tokens.push(cur.clone()); cur.clear(); }
+            }
+            _ => cur.push(c),
+        }
+    }
+    if !cur.is_empty() { tokens.push(cur); }
+
+    if tokens.is_empty() { return (cmd_str.to_string(), Vec::new()); }
+
+    let expanded: Vec<String> = tokens.into_iter().map(|t| expand_env_str(&t)).collect();
+    let mut i = expanded.into_iter();
+    let exe = i.next().unwrap();
+    let args: Vec<String> = i.collect();
+    (exe, args)
+}
+
+// ── Windows Terminal settings loader + VS instance discovery ────────
+
+#[derive(Clone, Serialize, Debug)]
+struct VsInstallation {
+    path: String,
+    version: String,
+    instance_id: Option<String>,
+}
+
+fn try_vswhere() -> Vec<VsInstallation> {
+    #[cfg(target_os = "windows")]
+    {
+        let vswhere = r"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe";
+        let output = match std::process::Command::new(vswhere)
+            .args(["-format", "json", "-products", "*", "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64"])
+            .output()
+        {
+            Ok(o) if o.status.success() => o,
+            _ => return vec![],
+        };
+        let text = String::from_utf8_lossy(&output.stdout);
+        let instances: Vec<serde_json::Value> = match serde_json::from_str(&text) {
+            Ok(v) => v,
+            _ => return vec![],
+        };
+        instances.into_iter().filter_map(|inst| {
+            let path = inst["installationPath"].as_str()?.to_string();
+            let version = inst["installationVersion"].as_str()?.to_string();
+            let instance_id = inst["instanceId"].as_str().map(|s| s.to_string());
+            Some(VsInstallation { path, version, instance_id })
+        }).collect()
+    }
+    #[cfg(not(target_os = "windows"))]
+    { vec![] }
+}
+
+fn try_common_vs_paths() -> Vec<VsInstallation> {
+    let mut result = vec![];
+    let roots = [
+        r"C:\Program Files\Microsoft Visual Studio",
+        r"C:\Program Files (x86)\Microsoft Visual Studio",
+    ];
+    for root in &roots {
+        for year in &["2024", "2022", "2019"] {
+            for edition in &["Community", "Professional", "Enterprise", "BuildTools"] {
+                let path = format!(r"{root}\{year}\{edition}");
+                if std::path::Path::new(&format!(r"{path}\Common7\Tools\VsDevCmd.bat")).exists() {
+                    result.push(VsInstallation { path, version: year.to_string(), instance_id: None });
+                }
+            }
+        }
+    }
+    result
+}
+
+#[tauri::command]
+fn find_vs_instances() -> Vec<VsInstallation> {
+    let r = try_vswhere();
+    if !r.is_empty() { return r; }
+    try_common_vs_paths()
+}
+
+fn load_wt_settings_raw() -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        let la = std::env::var("LOCALAPPDATA").ok()?;
+        let paths = [
+            format!("{}\\Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\settings.json", la),
+            format!("{}\\Packages\\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\\LocalState\\settings.json", la),
+            format!("{}\\Microsoft\\Windows Terminal\\settings.json", la),
+        ];
+        for p in &paths {
+            let path = std::path::Path::new(p);
+            if path.exists() {
+                if let Ok(c) = std::fs::read_to_string(path) {
+                    return Some(c);
+                }
+            }
+        }
+        None
+    }
+    #[cfg(not(target_os = "windows"))]
+    { None }
+}
+
+#[tauri::command]
+fn read_wt_settings() -> Option<String> {
+    load_wt_settings_raw()
+}
+
+#[tauri::command]
+fn read_config(app: tauri::AppHandle) -> String {
+    let config_dir = app.path().app_config_dir().unwrap_or_default();
+    let file = config_dir.join("config.json");
+    std::fs::read_to_string(file).unwrap_or_else(|_| "{}".into())
+}
+
+#[tauri::command]
+fn write_config(app: tauri::AppHandle, content: String) -> Result<(), String> {
+    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
+    std::fs::write(config_dir.join("config.json"), &content).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -303,7 +466,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, pty_write, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, ssh_list_hosts])
+        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, pty_write, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, ssh_list_hosts, read_wt_settings, find_vs_instances, read_config, write_config])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
