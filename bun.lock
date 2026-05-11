@@ -6,8 +6,10 @@
       "name": "tterm",
       "dependencies": {
         "@tauri-apps/api": "^2",
+        "@tauri-apps/plugin-dialog": "^2.7.1",
         "@tauri-apps/plugin-opener": "^2",
         "@xterm/addon-fit": "^0.11.0",
+        "@xterm/addon-search": "^0.16.0",
         "@xterm/xterm": "^6.0.0",
         "lucide": "^1.14.0",
       },
@@ -147,11 +149,15 @@
 
     "@tauri-apps/cli-win32-x64-msvc": ["@tauri-apps/cli-win32-x64-msvc@2.10.1", "https://registry.npmmirror.com/@tauri-apps/cli-win32-x64-msvc/-/cli-win32-x64-msvc-2.10.1.tgz", { "os": "win32", "cpu": "x64" }, "sha512-6Cn7YpPFwzChy0ERz6djKEmUehWrYlM+xTaNzGPgZocw3BD7OfwfWHKVWxXzdjEW2KfKkHddfdxK1XXTYqBRLg=="],
 
+    "@tauri-apps/plugin-dialog": ["@tauri-apps/plugin-dialog@2.7.1", "https://registry.npmmirror.com/@tauri-apps/plugin-dialog/-/plugin-dialog-2.7.1.tgz", { "dependencies": { "@tauri-apps/api": "^2.11.0" } }, "sha512-OK1UBXYt+ojcmxMktzzuyonYIFta8CmAASpX+CA+DTGK24KlHjhYI6x2iOJ/TjZF4N7/ACK1oFmEOjIY9IhzOQ=="],
+
     "@tauri-apps/plugin-opener": ["@tauri-apps/plugin-opener@2.5.3", "https://registry.npmmirror.com/@tauri-apps/plugin-opener/-/plugin-opener-2.5.3.tgz", { "dependencies": { "@tauri-apps/api": "^2.8.0" } }, "sha512-CCcUltXMOfUEArbf3db3kCE7Ggy1ExBEBl51Ko2ODJ6GDYHRp1nSNlQm5uNCFY5k7/ufaK5Ib3Du/Zir19IYQQ=="],
 
     "@types/estree": ["@types/estree@1.0.8", "https://registry.npmmirror.com/@types/estree/-/estree-1.0.8.tgz", {}, "sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w=="],
 
     "@xterm/addon-fit": ["@xterm/addon-fit@0.11.0", "https://registry.npmmirror.com/@xterm/addon-fit/-/addon-fit-0.11.0.tgz", {}, "sha512-jYcgT6xtVYhnhgxh3QgYDnnNMYTcf8ElbxxFzX0IZo+vabQqSPAjC3c1wJrKB5E19VwQei89QCiZZP86DCPF7g=="],
+
+    "@xterm/addon-search": ["@xterm/addon-search@0.16.0", "https://registry.npmmirror.com/@xterm/addon-search/-/addon-search-0.16.0.tgz", {}, "sha512-9OeuBFu0/uZJPu+9AHKY6g/w0Czyb/Ut0A5t79I4ULoU4IfU5BEpPFVGQxP4zTTMdfZEYkVIRYbHBX1xWwjeSA=="],
 
     "@xterm/xterm": ["@xterm/xterm@6.0.0", "https://registry.npmmirror.com/@xterm/xterm/-/xterm-6.0.0.tgz", {}, "sha512-TQwDdQGtwwDt+2cgKDLn0IRaSxYu1tSUjgKarSDkUM0ZNiSRXFpjxEsvc/Zgc5kq5omJ+V0a8/kIM2WD3sMOYg=="],
 

@@ -4,6 +4,19 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
+use tauri_plugin_dialog::DialogExt;
+
+#[cfg(target_os = "windows")]
+extern "system" {
+    fn ShellExecuteW(
+        hwnd: isize,
+        lpOperation: *const u16,
+        lpFile: *const u16,
+        lpParameters: *const u16,
+        lpDirectory: *const u16,
+        nShowCmd: i32,
+    ) -> isize;
+}
 
 #[derive(Clone, Serialize)]
 struct PtyOutput {
@@ -339,6 +352,66 @@ fn window_start_drag(window: tauri::Window) -> Result<(), String> {
     window.start_dragging().map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn pty_spawn_elevated(state: tauri::State<AppState>, app: tauri::AppHandle, command: Option<String>) -> Result<String, String> {
+    let cmd_str = command.clone().filter(|s| !s.is_empty()).unwrap_or_else(get_shell);
+
+    #[cfg(target_os = "windows")]
+    {
+        // Launch elevated process via ShellExecuteW with "runas" verb → UAC prompt → new console window
+        use std::ffi::OsStr;
+        use std::os::windows::ffi::OsStrExt;
+
+        let op: Vec<u16> = OsStr::new("runas\0").encode_wide().collect();
+
+        let mut file: Vec<u16> = OsStr::new(&cmd_str).encode_wide().collect();
+        file.push(0); // null terminate for ShellExecuteW
+
+        let ret = unsafe { ShellExecuteW(0, op.as_ptr(), file.as_ptr(), std::ptr::null(), std::ptr::null(), 1) };
+        if ret as i32 <= 32 {
+            eprintln!("ShellExecuteW failed with code {}", ret);
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // Unix: sudo within PTY
+        let mut builder = CommandBuilder::new("sudo");
+        builder.arg(&cmd_str);
+        let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
+        let id = format!("tab-{}", *next);
+        *next += 1;
+        drop(next);
+        spawn_pty(app, id.clone(), builder)?;
+        return Ok(id);
+    }
+
+    // On Windows: create a normal (non-elevated) tab so the user gets a usable shell
+    // The elevated terminal runs in its own console window
+    let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
+    let id = format!("tab-{}", *next);
+    *next += 1;
+    drop(next);
+    spawn_pty(app, id.clone(), CommandBuilder::new(&cmd_str))?;
+    Ok(id)
+}
+
+#[tauri::command]
+fn save_text_file(app: tauri::AppHandle, content: String) -> Result<(), String> {
+    let file = app.dialog()
+        .file()
+        .add_filter("Text", &["txt", "log"])
+        .set_file_name("terminal-output.txt")
+        .blocking_save_file();
+
+    if let Some(path) = file {
+        if let Some(p) = path.as_path() {
+            std::fs::write(p, &content).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
 // ── SSH config parsing ──────────────────────────────────────────────
 
 #[derive(Clone, Serialize, Debug)]
@@ -466,7 +539,8 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, pty_write, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, ssh_list_hosts, read_wt_settings, find_vs_instances, read_config, write_config])
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, pty_spawn_elevated, save_text_file, pty_write, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, ssh_list_hosts, read_wt_settings, find_vs_instances, read_config, write_config])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
