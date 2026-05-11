@@ -3,13 +3,22 @@ import { FitAddon } from "@xterm/addon-fit";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { createElement, Minus, Square, Copy, X } from "lucide";
+import { createElement, Minus, Square, Copy, X, Terminal as TerminalIcon, Globe } from "lucide";
 import "@xterm/xterm/css/xterm.css";
 
 interface PtyOutputPayload {
   id: string;
   data: number[];
 }
+
+interface SshHost {
+  name: string;
+  hostname: string;
+  port: number;
+  user: string;
+}
+
+let sshHosts: SshHost[] = [];
 
 interface Tab {
   id: string;
@@ -179,11 +188,10 @@ async function closeTab(id: string): Promise<void> {
   }
 }
 
-async function createTab(): Promise<void> {
-  const id: string = await invoke("pty_spawn");
-
+function setupTab(id: string, label: string): void {
   const { terminal, fitAddon, element, xtermEl } = createTerminal();
   const tabElement = createTabElement(id);
+  (tabElement.querySelector(".tab-label") as HTMLElement).textContent = label;
 
   terminal.onData((data) => {
     invoke("pty_write", { id, data });
@@ -203,6 +211,20 @@ async function createTab(): Promise<void> {
   });
 
   switchTab(id);
+}
+
+async function createTab(): Promise<void> {
+  const id: string = await invoke("pty_spawn");
+  setupTab(id, "Terminal");
+}
+
+async function createSshTab(host: SshHost): Promise<void> {
+  const id: string = await invoke("pty_spawn_ssh", {
+    hostname: host.hostname,
+    port: host.port,
+    user: host.user,
+  });
+  setupTab(id, host.name);
 }
 
 // ── PTY output routing ─────────────────────────────────────────────
@@ -245,10 +267,103 @@ window.addEventListener("resize", () => {
   }, 150);
 });
 
-// ── new tab button ─────────────────────────────────────────────────
+// ── new tab button + profile dropdown ──────────────────────────────
 
 newTabButton.addEventListener("click", () => {
   createTab();
+});
+
+const menuBtn = document.getElementById("new-tab-menu-btn")!;
+const profileMenu = document.createElement("div");
+profileMenu.id = "profile-menu";
+profileMenu.className = "profile-menu";
+document.body.appendChild(profileMenu);
+
+function positionMenu() {
+  const rect = menuBtn.getBoundingClientRect();
+  profileMenu.style.left = (rect.right - profileMenu.offsetWidth) + "px";
+  profileMenu.style.top = rect.bottom + "px";
+}
+
+function createMenuItem(iconFn: any, label: string, detail: string, onClick: () => void): HTMLElement {
+  const item = document.createElement("div");
+  item.className = "profile-item";
+
+  const iconWrap = document.createElement("span");
+  iconWrap.className = "item-icon";
+  iconWrap.appendChild(createElement(iconFn, { stroke: "currentColor", width: 14, height: 14 }));
+  item.appendChild(iconWrap);
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "item-label";
+  labelEl.textContent = label;
+  item.appendChild(labelEl);
+
+  if (detail) {
+    const detailEl = document.createElement("span");
+    detailEl.className = "item-detail";
+    detailEl.textContent = detail;
+    item.appendChild(detailEl);
+  }
+
+  item.addEventListener("click", () => {
+    profileMenu.classList.remove("open");
+    onClick();
+  });
+
+  return item;
+}
+
+function populateMenu() {
+  profileMenu.innerHTML = "";
+
+  // Local section
+  const localTitle = document.createElement("div");
+  localTitle.className = "profile-section-title";
+  localTitle.textContent = "Local";
+  profileMenu.appendChild(localTitle);
+
+  profileMenu.appendChild(createMenuItem(TerminalIcon, "Default shell", "", () => createTab()));
+
+  // SSH section
+  if (sshHosts.length > 0) {
+    const sep = document.createElement("div");
+    sep.className = "profile-separator";
+    profileMenu.appendChild(sep);
+
+    const sshTitle = document.createElement("div");
+    sshTitle.className = "profile-section-title";
+    sshTitle.textContent = "SSH";
+    profileMenu.appendChild(sshTitle);
+
+    for (const host of sshHosts) {
+      const detail = `${host.user}@${host.hostname}:${host.port}`;
+      profileMenu.appendChild(createMenuItem(Globe, host.name, detail, () => createSshTab(host)));
+    }
+  }
+}
+
+menuBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (profileMenu.classList.contains("open")) {
+    profileMenu.classList.remove("open");
+  } else {
+    populateMenu();
+    positionMenu();
+    profileMenu.classList.add("open");
+  }
+});
+
+document.addEventListener("click", (e) => {
+  if (profileMenu.classList.contains("open") && !profileMenu.contains(e.target as Node) && e.target !== menuBtn) {
+    profileMenu.classList.remove("open");
+  }
+});
+
+window.addEventListener("resize", () => {
+  if (profileMenu.classList.contains("open")) {
+    positionMenu();
+  }
 });
 
 // ── custom title bar controls ──────────────────────────────────────
@@ -329,6 +444,18 @@ icoRestore.classList.add("ico-restore");
 btnMaximize.appendChild(icoRestore);
 btnClose.appendChild(createElement(X, { stroke: "currentColor", width: 14, height: 14 }));
 
+// ── SSH hosts ───────────────────────────────────────────────────────
+
+async function loadSshHosts() {
+  try {
+    sshHosts = await invoke<SshHost[]>("ssh_list_hosts");
+    console.log("SSH hosts:", sshHosts);
+  } catch (e) {
+    console.error("Failed to load SSH hosts:", e);
+  }
+}
+
 // ── initial tab ────────────────────────────────────────────────────
 
 createTab();
+loadSshHosts();

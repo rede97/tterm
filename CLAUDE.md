@@ -52,6 +52,10 @@ Frontend → Backend: Tauri `invoke()` commands:
 | `pty_write` | `id`, `data` | write keystrokes to tab's PTY |
 | `pty_resize` | `id`, `cols`, `rows` | notify PTY of terminal resize |
 | `pty_kill` | `id` | kill tab's shell, remove session |
+| `window_minimize` | — | minimize the window |
+| `window_toggle_maximize` | — | toggle maximize/restore |
+| `window_close` | — | close the window |
+| `window_start_drag` | — | start window drag (called on mousemove after mousedown) |
 
 Backend → Frontend: Tauri events (`pty-output`)
 
@@ -66,6 +70,22 @@ Shell output goes PTY stdout → Rust reads → `pty-output` event → `term.wri
 
 - Frontend: `@xterm/xterm`, `@xterm/addon-fit`, `@tauri-apps/api`
 - Backend: `tauri` v2, `portable-pty` (cross-platform PTY)
+- Icons: `lucide` (MIT-licensed SVG icon library, stroke-based, consistent 2px weight)
+
+## Custom window decorations
+
+The app runs without native title bar (`decorations: false` in tauri.conf.json). The tab bar (`#tab-bar`) serves as the title bar with:
+- Tabs on the left, new-tab button adjacent to last tab
+- `#drag-spacer` with `data-tauri-drag-region` fills center
+- `#window-controls` (minimize/maximize/close) on the right with Lucide SVG icons
+
+Window dragging: `mousedown` on tab bar registers `mousemove` listener. Only if the mouse actually moves does it call `window_start_drag`. On `mouseup` without movement the listeners clean up — this defers drag so `dblclick` on the tab bar can still toggle maximize.
+
+Maximize/restore icon toggle: `#btn-maximize` holds two Lucide icons (`.ico-max` Square, `.ico-restore` Copy). The `updateMaximizeIcon()` function checks `appWindow.isMaximized()` and toggles the `.restore` CSS class, which swaps visibility via `display: none/block`.
+
+## xterm.js v6 scrollbar
+
+xterm.js v6 uses a custom DOM scrollbar (`.xterm-scrollable-element > .scrollbar > .scra`), not native `::-webkit-scrollbar`. The `.xterm-viewport` must keep `overflow-y: scroll` for scrolling to work — setting `overflow: hidden` will clip terminal content. Native scrollbars inside `.terminal-instance` are hidden via `::-webkit-scrollbar { display: none }`, so only the styled DOM scrollbar is visible.
 
 ## Platform notes
 
