@@ -22,6 +22,14 @@ export let sshHosts: SshHost[] = [];
 export let localProfiles: LocalProfile[] = [];
 export let vsInstalls: VsInstallation[] = [];
 export let defaultLocalProfile: string | null = null;
+export let configFontFamily = "'JetBrains Mono', Consolas, monospace";
+export let configFontSize = 14;
+export let configWindowX: number | null = null;
+export let configWindowY: number | null = null;
+export let configWindowWidth: number | null = null;
+export let configWindowHeight: number | null = null;
+export let hiddenProfiles: string[] = [];
+export let configLoaded = false;
 
 // ── SSH hosts ───────────────────────────────────────────────────────
 
@@ -70,7 +78,7 @@ function addProfile(item: any) {
   if (!command && !item.source) {
     command = name;
   }
-  if (command && !localProfiles.some(p => p.name === name)) {
+  if (command && !localProfiles.some(p => p.name === name) && !hiddenProfiles.includes(name)) {
     localProfiles.push({ name, command });
   }
 }
@@ -120,19 +128,45 @@ export async function loadLocalProfiles() {
   }
 }
 
-// ── default profile ───────────────────────────────────────────────
+// ── config persistence ─────────────────────────────────────────────
 
-export async function setDefaultProfile(name: string) {
-  defaultLocalProfile = name;
-  try { await invoke("write_config", { content: JSON.stringify({ defaultLocalProfile: name }) }); } catch {}
+function readConfigValues(cfg: any) {
+  if (cfg.defaultLocalProfile) defaultLocalProfile = cfg.defaultLocalProfile;
+  if (typeof cfg.fontFamily === "string") configFontFamily = cfg.fontFamily;
+  if (typeof cfg.fontSize === "number" && cfg.fontSize >= 10 && cfg.fontSize <= 32) configFontSize = cfg.fontSize;
+  if (typeof cfg.windowX === "number") configWindowX = cfg.windowX;
+  if (typeof cfg.windowY === "number") configWindowY = cfg.windowY;
+  if (typeof cfg.windowWidth === "number") configWindowWidth = cfg.windowWidth;
+  if (typeof cfg.windowHeight === "number") configWindowHeight = cfg.windowHeight;
+  if (Array.isArray(cfg.hiddenProfiles)) hiddenProfiles = cfg.hiddenProfiles;
 }
-// exposed for settings page
-(window as any).setDefaultProfile = setDefaultProfile;
 
 export async function loadConfig() {
   try {
     const raw = await invoke<string>("read_config");
     const cfg = JSON.parse(raw);
-    if (cfg.defaultLocalProfile) defaultLocalProfile = cfg.defaultLocalProfile;
-  } catch {}
+    readConfigValues(cfg);
+    return cfg;
+  } catch {
+    configLoaded = true;
+    return {};
+  }
 }
+
+export async function saveConfig(partial: Record<string, unknown>) {
+  // merge with existing config so we never lose keys
+  let existing: any = {};
+  try {
+    const raw = await invoke<string>("read_config");
+    existing = JSON.parse(raw);
+  } catch {}
+  const merged = { ...existing, ...partial };
+  readConfigValues(merged);
+  try { await invoke("write_config", { content: JSON.stringify(merged) }); } catch {}
+}
+
+export async function setDefaultProfile(name: string) {
+  await saveConfig({ defaultLocalProfile: name });
+}
+// exposed for settings page
+(window as any).setDefaultProfile = setDefaultProfile;
