@@ -8,7 +8,7 @@ Prefer **Bun** over npm/node for all package scripts (faster installs, faster de
 
 ## Project
 
-A multi-tab desktop terminal emulator built with Tauri v2. The frontend is vanilla TypeScript + Vite using xterm.js to render terminals. The Rust backend spawns native shells via PTY (pseudo-terminal) and pipes I/O between each shell and its corresponding tab.
+A multi-tab desktop terminal emulator (TTerm) built with Tauri v2. The frontend is vanilla TypeScript + Vite using xterm.js to render terminals. The Rust backend spawns native shells via PTY (pseudo-terminal) and pipes I/O between each shell and its corresponding tab.
 
 ## Commands
 
@@ -28,19 +28,23 @@ There are no tests or linters configured yet.
 ### Frontend (`src/`, `index.html`)
 
 - `index.html` — `#tab-bar` (tabs, new-tab button, drag-spacer, window controls) + `#terminal-container`
-- `src/main.ts` — `Tab` interface, `tabs: Map<string, Tab>`. On load: fetches SSH hosts, Windows Terminal profiles, VS instances, and config. Routes `pty-output` events by `payload.id` to the correct terminal instance.
+- `src/main.ts` — `Tab` interface (with `needsResize` flag), `tabs: Map<string, Tab>`, terminal factory, tab bar UI, context menu, window controls, resize handling
+- `src/profiles.ts` — extracted profile/config module: types (`SshHost`, `LocalProfile`, `VsInstallation`), state (`sshHosts`, `localProfiles`, `vsInstalls`, `defaultLocalProfile`), WT profile parsing (settings.json + fragment extensions), config persistence
 - `src/styles.css` — VS Code-style tab bar (#252526), dark terminal theme (#1e1e1e), unified scrollbar styling
 
 ### Backend (`src-tauri/`)
 
 - `src-tauri/src/main.rs` — entry point, calls `tterm_lib::run()`
-- `src-tauri/src/lib.rs` — Tauri builder setup, PTY session management, SSH config parsing, VS instance discovery, config persistence
+- `src-tauri/src/lib.rs` — Tauri builder setup, PTY session management, SSH config parsing, VS instance discovery, WT fragment loading, config persistence
+- `src-tauri/build.rs` — standard `tauri_build::build()`
+- `src-tauri/tauri.conf.json` — product name "TTerm", window config (no decorations), NSIS installer, icon paths
 
 ### PTY session model (`lib.rs`)
 
-- `AppState` holds `HashMap<String, PtySession>` + `next_id` counter
+- `AppState` holds `HashMap<String, PtySession>` + `next_id` counter + `initial_cwd: Option<PathBuf>` (set via `--working-directory` CLI arg)
 - `PtySession` stores the PTY `master` (for resize) and `writer` (for write)
 - Each tab spawns a dedicated shell process and background read thread
+- `apply_initial_cwd()` sets the working directory on CommandBuilder before spawn
 
 ### Communication model
 
@@ -58,10 +62,12 @@ Frontend → Backend: Tauri `invoke()` commands:
 | `window_close` | — | close the window |
 | `window_start_drag` | — | start window drag |
 | `read_wt_settings` | — | return raw Windows Terminal settings.json content |
+| `read_wt_fragments` | — | return raw fragment extension JSONs from WT fragment dirs |
 | `find_vs_instances` | — | discover VS installations via vswhere/known paths |
 | `read_config` | — | read app config from `{app_config_dir}/config.json` |
 | `write_config` | `content` | write JSON string to app config file |
 | `ssh_list_hosts` | — | parse `~/.ssh/config`, return host list |
+| `save_text_file` | `content` | save text to file via native save dialog |
 
 Backend → Frontend: Tauri events (`pty-output`)
 
@@ -74,23 +80,38 @@ Shell output goes PTY stdout → Rust reads → `pty-output` event → `term.wri
 
 ## Key dependencies
 
-- Frontend: `@xterm/xterm`, `@xterm/addon-fit`, `@tauri-apps/api`
+- Frontend: `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-search`, `@tauri-apps/api`
 - Backend: `tauri` v2, `portable-pty` (cross-platform PTY), `serde`, `serde_json`
 - Icons: `lucide` (MIT-licensed SVG icon library, stroke-based, consistent 2px weight)
+- Icon generation: `sharp` (devDependency, used to rasterize `src/assets/tterm.svg` into platform icon formats)
 
 ## Profile loading flow
 
 1. **SSH** — Rust reads `~/.ssh/config`, parses Host entries with wildcard inheritance
-2. **Windows Terminal profiles** — Rust reads WT's `settings.json` (raw content), sends to frontend. Frontend parses `profiles.list`, handles `source: "Windows.Terminal.VisualStudio"` by resolving via vswhere-discovered VS instances
+2. **Windows Terminal profiles** — Rust reads WT's `settings.json` (raw content) + fragment extension files from:
+   - `%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_*\LocalState\Fragments\<ext>\*.json`
+   - `%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\<ext>\*.json`
+   - `%ProgramData%\Microsoft\Windows Terminal\Fragments\<ext>\*.json`
+   
+   Frontend parses both sources. Profiles with `commandline` are used directly. For profiles without `commandline`:
+   - `source: "Windows.Terminal.VisualStudio"` → resolved via vswhere-discovered VS instances
+   - `source: "Windows.Terminal.Wsl"` → `wsl.exe -d "<name>"`
+   - `source` containing "Azure" → **skipped entirely**
+   - Unrecognized sources with no `commandline` → dropped (fragments should provide the real commandline)
+
 3. **Default profile** — Config persisted in `{app_config_dir}/config.json`. Priority: user-set default → first profile → cmd.exe fallback
 
 ## Profile dropdown menu
 
-Two-column layout (Local | SSH) with a vertical divider. Centered below the new-tab menu button, flips on overflow. Each profile item has a Lucide icon, label, optional detail text, and click-to-launch.
+Two-column layout (Local | SSH) with a vertical divider. Centered on the new-tab menu button, clamped to viewport edges on overflow. Each profile item has a Lucide icon, label, optional detail text, and click-to-launch.
+
+## Lazy resize
+
+`Tab.needsResize` flag avoids resize-all-lag when switching tabs. On window resize: all tabs marked dirty, only active tab fitted + PTY-resized (flag cleared). On tab switch: if the entered tab has `needsResize`, `applyFit()` + `pty_resize` fires, flag cleared. Only 2 tabs ever resize per switch — the one left and the one entered.
 
 ## Fit tolerance (resize flicker prevention)
 
-`applyFit()` uses `proposeDimensions()` (read-only) to get suggested dimensions, applies 10% char-height tolerance before shrinking rows/cols. This prevents grid resize oscillation from sub-pixel overflow. On tab switch, only `applyFit` is called (no PTY resize IPC) — size hint overlay only appears on window resize.
+`applyFit()` uses `proposeDimensions()` (read-only) to get suggested dimensions, applies 10% char-height tolerance before shrinking rows/cols. This prevents grid resize oscillation from sub-pixel overflow.
 
 ## Custom window decorations
 
@@ -111,6 +132,20 @@ xterm.js v6 uses a custom DOM scrollbar (`.xterm-scrollable-element > .scrollbar
 
 Use **PowerShell** (`Set-Content` / `Get-Content`) for file edits. The Edit tool frequently fails to match strings in this repo because Read tool output may not byte-match the actual file content (tab/space rendering, line ending normalization). PowerShell text replacement is reliable. Only use the Edit tool for trivial single-line changes.
 
+## Icon generation
+
+App icon source is `src/assets/tterm.svg`. To regenerate platform icons after editing the SVG:
+
+```sh
+node -e "
+const sharp = require('sharp');
+const fs = require('fs');
+const svg = fs.readFileSync('src/assets/tterm.svg');
+const dir = 'src-tauri/icons';
+const targets = [[32,'32x32.png'],[128,'128x128.png'],[256,'128x128@2x.png'],[512,'icon.png'],[30,'Square30x30Logo.png'],[44,'Square44x44Logo.png'],[71,'Square71x71Logo.png'],[89,'Square89x89Logo.png'],[107,'Square107x107Logo.png'],[142,'Square142x142Logo.png'],[150,'Square150x150Logo.png'],[284,'Square284x284Logo.png'],[310,'Square310x310Logo.png'],[100,'StoreLogo.png']];
+(async()=>{for(const[s,n]of targets)await sharp(svg).resize(s,s).png().toFile(dir+'/'+n);const icoS=[16,24,32,48,64,128,256],p=await Promise.all(icoS.map(s=>sharp(svg).resize(s,s).png().toBuffer()));let h=Buffer.alloc(6),o=6+16*icoS.length;h.writeUInt16LE(0,0);h.writeUInt16LE(1,2);h.writeUInt16LE(icoS.length,4);let bufs=[h];for(let i=0;i<icoS.length;i++){let e=Buffer.alloc(16);e.writeUInt8(icoS[i]>=256?0:icoS[i],0);e.writeUInt8(icoS[i]>=256?0:icoS[i],1);e.writeUInt16LE(1,4);e.writeUInt16LE(32,6);e.writeUInt32LE(p[i].length,8);e.writeUInt32LE(o,12);o+=p[i].length;bufs.push(e)}for(const x of p)bufs.push(x);fs.writeFileSync(dir+'/icon.ico',Buffer.concat(bufs));fs.copyFileSync(dir+'/icon.png',dir+'/icon.icns')})();
+```
+
 ## Platform notes
 
-On Windows, the default shell is `cmd.exe`. On Unix, it's the user's `$SHELL` (fallback `/bin/sh`). `portable-pty` abstracts PTY resize and process handling across platforms. The Vite dev server binds `127.0.0.1` explicitly (not `::1`) because IPv6 loopback has connectivity issues on Windows. Windows Terminal settings are read from `%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_*\LocalState\settings.json` (also checks Preview and unpackaged paths). VS instances are discovered via `vswhere.exe` with a fallback to scanning common `Program Files` paths.
+On Windows, the default shell is `cmd.exe`. On Unix, it's the user's `$SHELL` (fallback `/bin/sh`). `portable-pty` abstracts PTY resize and process handling across platforms. The Vite dev server binds `127.0.0.1` explicitly (not `::1`) because IPv6 loopback has connectivity issues on Windows. `AppState.initial_cwd` is populated from the `--working-directory` CLI argument (passed by Windows Terminal integration). VS instances are discovered via `vswhere.exe` with a fallback to scanning common `Program Files` paths.

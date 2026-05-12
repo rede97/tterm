@@ -2,6 +2,7 @@ use portable_pty::{native_pty_system, CommandBuilder, PtySize, MasterPty};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
+use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
@@ -21,6 +22,7 @@ pub(crate) struct PtySession {
 pub(crate) struct AppState {
     pub(crate) sessions: Mutex<HashMap<String, PtySession>>,
     pub(crate) next_id: Mutex<u32>,
+    pub(crate) initial_cwd: Option<PathBuf>,
 }
 
 fn get_shell() -> String {
@@ -87,6 +89,14 @@ fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder) -> R
     Ok(())
 }
 
+fn apply_initial_cwd(cmd: &mut CommandBuilder, cwd: Option<&PathBuf>) {
+    if let Some(cwd) = cwd {
+        if cwd.is_dir() {
+            cmd.cwd(cwd);
+        }
+    }
+}
+
 #[tauri::command]
 fn pty_spawn(state: tauri::State<AppState>, app: tauri::AppHandle, command: Option<String>) -> Result<String, String> {
     let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
@@ -98,10 +108,13 @@ fn pty_spawn(state: tauri::State<AppState>, app: tauri::AppHandle, command: Opti
         if !cmd.is_empty() {
             let (exe, args) = parse_command(&cmd);
             if args.is_empty() {
-                spawn_pty(app, id.clone(), CommandBuilder::new(&exe))?;
+                let mut builder = CommandBuilder::new(&exe);
+                apply_initial_cwd(&mut builder, state.initial_cwd.as_ref());
+                spawn_pty(app, id.clone(), builder)?;
             } else {
                 let mut builder = CommandBuilder::new(&exe);
                 for a in &args { builder.arg(a); }
+                apply_initial_cwd(&mut builder, state.initial_cwd.as_ref());
                 spawn_pty(app, id.clone(), builder)?;
             }
             return Ok(id);
@@ -109,8 +122,20 @@ fn pty_spawn(state: tauri::State<AppState>, app: tauri::AppHandle, command: Opti
     }
 
     let shell = get_shell();
-    spawn_pty(app, id.clone(), CommandBuilder::new(&shell))?;
+    let mut builder = CommandBuilder::new(&shell);
+    apply_initial_cwd(&mut builder, state.initial_cwd.as_ref());
+    spawn_pty(app, id.clone(), builder)?;
     Ok(id)
+}
+
+fn launch_working_directory() -> Option<PathBuf> {
+    let mut args = std::env::args_os().skip(1);
+    while let Some(arg) = args.next() {
+        if arg == "--working-directory" {
+            return args.next().map(PathBuf::from).filter(|path| path.is_dir());
+        }
+    }
+    None
 }
 
 fn expand_env_str(s: &str) -> String {
@@ -549,6 +574,7 @@ pub fn run() {
             app.manage(AppState {
                 sessions: Mutex::new(HashMap::new()),
                 next_id: Mutex::new(1),
+                initial_cwd: launch_working_directory(),
             });
 
             Ok(())

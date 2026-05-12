@@ -15,7 +15,7 @@ TTerm strips away the excess. Three priorities: **fast controls**, **clean termi
 - **Multi-tab terminal** — unlimited tabs supporting local shells (cmd.exe / PowerShell) and SSH connections
 - **SSH config integration** — auto-parses `~/.ssh/config` for one-click remote host connections
 - **Windows Terminal import** — reads WT `settings.json` to reuse existing profiles, including VS Developer Prompt / PowerShell
-- **Admin mode** — hold Shift when clicking a profile to launch elevated, or right-click a tab to duplicate as admin
+- **Third-party shell integration** — auto-discovers Git Bash, MSYS2, and other shells from Windows Terminal fragment extensions
 - **Tab context menu** — right-click to rename, recolor, duplicate, export text, close right/other tabs
 - **In-terminal search** — Ctrl+Shift+F to open the find bar
 - **Custom window decorations** — no native title bar; VS Code-style tab bar with integrated window controls
