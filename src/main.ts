@@ -7,34 +7,12 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getVersion } from "@tauri-apps/api/app";
 import { createElement, Minus, Square, Copy, X, Terminal as TerminalIcon, Globe } from "lucide";
 import "@xterm/xterm/css/xterm.css";
+import { SshHost, sshHosts, localProfiles, defaultLocalProfile, loadSshHosts, loadLocalProfiles, loadConfig } from "./profiles";
 
 interface PtyOutputPayload {
   id: string;
   data: number[];
 }
-
-interface SshHost {
-  name: string;
-  hostname: string;
-  port: number;
-  user: string;
-}
-
-interface LocalProfile {
-  name: string;
-  command: string;
-}
-
-interface VsInstallation {
-  path: string;
-  version: string;
-  instance_id?: string | null;
-}
-
-let sshHosts: SshHost[] = [];
-let localProfiles: LocalProfile[] = [];
-let vsInstalls: VsInstallation[] = [];
-let defaultLocalProfile: string | null = null;
 
 type TabType = "local" | "ssh";
 
@@ -53,6 +31,7 @@ interface Tab {
   sshHost?: SshHost;
   label: string;
   color?: string;
+  needsResize: boolean;
 }
 
 const tabs: Map<string, Tab> = new Map();
@@ -353,6 +332,13 @@ function switchTab(id: string): void {
     tab.tabElement.classList.add("active");
     tab.terminal.focus();
     activeTabId = id;
+
+    // lazy resize: apply only when flagged (avoids resize-all-lag)
+    if (tab.needsResize) {
+      const { cols, rows } = applyFit(tab);
+      tab.needsResize = false;
+      invoke("pty_resize", { id: tab.id, cols, rows });
+    }
   }
 }
 
@@ -416,6 +402,7 @@ function setupTab(id: string, label: string, type: TabType, command?: string, ss
     command,
     sshHost,
     label,
+    needsResize: false,
   });
 
   hideWelcome();
@@ -462,23 +449,26 @@ listen<PtyOutputPayload>("pty-output", (event) => {
   }
 });
 
-// ── window resize: fit grid immediately, defer PTY resize ──────────
+// ── window resize: fit grid immediately, defer PTY resize, mark all tabs dirty ──
 
 let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
 window.addEventListener("resize", () => {
+  // mark all tabs dirty for lazy resize on switch
+  for (const t of tabs.values()) t.needsResize = true;
+
   if (activeTabId === null) return;
   const tab = tabs.get(activeTabId);
   if (!tab) return;
 
   const { cols, rows } = applyFit(tab);
+  tab.needsResize = false;
   const cw = tab.xtermEl.clientWidth / cols;
   const ch = tab.xtermEl.clientHeight / rows;
   if (cw > 0) tab.charWidth = cw;
   if (ch > 0) tab.charHeight = ch;
   showSizeHint(cols, rows);
 
-  // defer PTY resize (expensive IPC) until resize stops
   const tabId = tab.id;
   if (resizeTimer) clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
@@ -511,29 +501,28 @@ function positionMenu() {
   profileMenu.style.top = rect.bottom + "px";
 }
 
-const newTabGroup = document.getElementById("new-tab-group")!;
-
 function flipMenu() {
-  const groupRect = newTabGroup.getBoundingClientRect();
+  const btnRect = menuBtn.getBoundingClientRect();
   const mw = profileMenu.offsetWidth;
   const mh = profileMenu.offsetHeight;
   const pad = 4;
 
-  let left = groupRect.left;
-  let top = groupRect.bottom;
+  // center menu on button
+  let left = btnRect.left + btnRect.width / 2 - mw / 2;
+  let top = btnRect.bottom;
 
+  // clamp to viewport
   if (left < pad) left = pad;
   if (left + mw > window.innerWidth) left = window.innerWidth - mw - pad;
-  if (top + mh > window.innerHeight) top = Math.max(pad, groupRect.top - mh);
+  if (top + mh > window.innerHeight) top = Math.max(pad, btnRect.top - mh);
 
   profileMenu.style.left = left + "px";
   profileMenu.style.top = top + "px";
 }
 
-function createMenuItem(iconFn: any, label: string, detail: string, onClick: () => void, onAdminClick?: () => void): HTMLElement {
+function createMenuItem(iconFn: any, label: string, detail: string, onClick: () => void): HTMLElement {
   const item = document.createElement("div");
   item.className = "profile-item";
-  if (onAdminClick) item.classList.add("admin-available");
 
   const iconWrap = document.createElement("span");
   iconWrap.className = "item-icon";
@@ -554,8 +543,7 @@ function createMenuItem(iconFn: any, label: string, detail: string, onClick: () 
 
   item.addEventListener("click", () => {
     profileMenu.classList.remove("open");
-    if (isShiftDown && onAdminClick) onAdminClick();
-    else onClick();
+    onClick();
   });
 
   return item;
@@ -574,10 +562,10 @@ function populateMenu() {
 
   if (localProfiles.length > 0) {
     for (const p of localProfiles) {
-      localCol.appendChild(createMenuItem(TerminalIcon, p.name, "", () => createCustomTab(p.command, p.name), () => createAdminTab(p.command)));
+      localCol.appendChild(createMenuItem(TerminalIcon, p.name, "", () => createCustomTab(p.command, p.name)));
     }
   } else {
-    localCol.appendChild(createMenuItem(TerminalIcon, "Default shell", "", () => createTab(), () => createAdminTab()));
+    localCol.appendChild(createMenuItem(TerminalIcon, "Default shell", "", () => createTab()));
   }
   profileMenu.appendChild(localCol);
 
@@ -606,7 +594,6 @@ menuBtn.addEventListener("click", (e) => {
     populateMenu();
     positionMenu();
     profileMenu.classList.add("open");
-    if (isShiftDown) profileMenu.classList.add("shift-held");
     requestAnimationFrame(() => flipMenu());
   }
 });
@@ -707,7 +694,6 @@ function populateContextMenu(tabId: string) {
   // ── Actions ──
   addMenuAction("重命名", () => renameTab(tabId));
   addMenuAction("复制选项卡", () => duplicateTab(tabId));
-  addMenuAction("以管理员身份复制", () => duplicateAdminTab(tabId));
   addMenuAction("导出文本", () => exportTab(tabId));
   addMenuAction("查找", () => {
     switchTab(tabId);
@@ -798,15 +784,6 @@ function duplicateTab(id: string) {
   }
 }
 
-async function duplicateAdminTab(id: string) {
-  const tab = tabs.get(id);
-  if (!tab) return;
-  const cmd = tab.type === "local" ? tab.command : undefined;
-  const label = tab.label;
-  const tabId: string = await invoke("pty_spawn_elevated", { command: cmd || null });
-  setupTab(tabId, `${label} (Admin)`, "local", cmd);
-}
-
 function exportTab(id: string) {
   const tab = tabs.get(id);
   if (!tab) return;
@@ -844,38 +821,7 @@ function refreshTabBadges() {
   });
 }
 
-let isShiftDown = false;
-
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Shift" && !isShiftDown) {
-    isShiftDown = true;
-    if (profileMenu.classList.contains("open")) {
-      profileMenu.classList.add("shift-held");
-    }
-  }
-});
-
-document.addEventListener("keyup", (e) => {
-  if (e.key === "Shift") {
-    isShiftDown = false;
-    profileMenu.classList.remove("shift-held");
-  }
-});
-
-// blur loses modifier state
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
-    isShiftDown = false;
-    profileMenu.classList.remove("shift-held");
-  }
-});
-
-async function createAdminTab(command?: string): Promise<void> {
-  const id: string = await invoke("pty_spawn_elevated", { command: command ?? null });
-  setupTab(id, command ? `${command} (Admin)` : "Admin", "local", command);
-}
-
-// ── custom title bar controls ──────────────────────────────────────
+//── custom title bar controls ──────────────────────────────────────
 
 const appWindow = getCurrentWindow();
 const btnMaximize = document.getElementById("btn-maximize")!;
@@ -957,86 +903,6 @@ const icoRestore = createElement(Copy, { stroke: "currentColor", width: 14, heig
 icoRestore.classList.add("ico-restore");
 btnMaximize.appendChild(icoRestore);
 btnClose.appendChild(createElement(X, { stroke: "currentColor", width: 14, height: 14 }));
-
-// ── SSH hosts ───────────────────────────────────────────────────────
-
-async function loadSshHosts() {
-  try {
-    sshHosts = await invoke<SshHost[]>("ssh_list_hosts");
-  } catch (e) {
-    console.error("Failed to load SSH hosts:", e);
-  }
-}
-
-// ── Windows Terminal profiles ──────────────────────────────────────
-
-function resolveVsProfile(name: string): string | null {
-  if (vsInstalls.length === 0) return null;
-  const vs = vsInstalls[0];
-  if (/developer command prompt/i.test(name)) {
-    return `%comspec% /k "${vs.path}\\Common7\\Tools\\VsDevCmd.bat"`;
-  }
-  if (/developer powershell/i.test(name)) {
-    const instanceId = vs.instance_id;
-    if (!instanceId) return null;
-    return `powershell.exe -NoExit -Command "& { Import-Module '${vs.path}\\Common7\\Tools\\Microsoft.VisualStudio.DevShell.dll'; Enter-VsDevShell -VsInstanceId ${instanceId} }"`;
-  }
-  return null;
-}
-
-function parseWtProfiles(raw: string) {
-  try {
-    const root = JSON.parse(raw);
-    const list: any[] = root?.profiles?.list;
-    if (!list) return;
-    localProfiles = [];
-    for (const item of list) {
-      if (item.hidden) continue;
-      const name = item.name;
-      if (!name) continue;
-      let command = item.commandline;
-      if (!command && /terminal\.visualstudio/i.test(item.source || "")) {
-        command = resolveVsProfile(name);
-      }
-      if (command) {
-        localProfiles.push({ name, command });
-      }
-    }
-  } catch (e) {
-    console.error("Failed to parse WT profiles:", e);
-  }
-}
-
-async function loadLocalProfiles() {
-  try {
-    vsInstalls = await invoke<VsInstallation[]>("find_vs_instances");
-  } catch (e) {
-    console.error("Failed to find VS instances:", e);
-  }
-  try {
-    const raw = await invoke<string | null>("read_wt_settings");
-    if (raw) parseWtProfiles(raw);
-  } catch (e) {
-    console.error("Failed to load WT profiles:", e);
-  }
-}
-
-// ── default profile ───────────────────────────────────────────────
-
-async function setDefaultProfile(name: string) {
-  defaultLocalProfile = name;
-  try { await invoke("write_config", { content: JSON.stringify({ defaultLocalProfile: name }) }); } catch {}
-}
-// exposed for settings page
-(window as any).setDefaultProfile = setDefaultProfile;
-
-async function loadConfig() {
-  try {
-    const raw = await invoke<string>("read_config");
-    const cfg = JSON.parse(raw);
-    if (cfg.defaultLocalProfile) defaultLocalProfile = cfg.defaultLocalProfile;
-  } catch {}
-}
 
 // ── initial tab ────────────────────────────────────────────────────
 

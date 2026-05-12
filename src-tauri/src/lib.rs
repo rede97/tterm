@@ -6,7 +6,6 @@ use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
 
-pub mod elevated;
 
 #[derive(Clone, Serialize)]
 pub(crate) struct PtyOutput {
@@ -218,12 +217,15 @@ fn try_common_vs_paths() -> Vec<VsInstallation> {
 
 #[tauri::command]
 fn find_vs_instances() -> Vec<VsInstallation> {
-    // try fast file-based detection first (no subprocess spawn)
-    // vswhere.exe is a console app — spawning it from a GUI process
-    // (windows_subsystem = "windows") triggers Windows Terminal on Win11
-    let r = try_common_vs_paths();
-    if !r.is_empty() { return r; }
-    try_vswhere()
+    // try vswhere first (CREATE_NO_WINDOW prevents console window / WT popup)
+    let mut result = try_vswhere();
+    // merge file-based results, filling gaps
+    for vs in try_common_vs_paths() {
+        if !result.iter().any(|r| r.path == vs.path) {
+            result.push(vs);
+        }
+    }
+    result
 }
 
 fn load_wt_settings_raw() -> Option<String> {
@@ -249,9 +251,58 @@ fn load_wt_settings_raw() -> Option<String> {
     { None }
 }
 
+fn load_wt_fragments() -> Vec<String> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut result = Vec::new();
+        let la = match std::env::var("LOCALAPPDATA") { Ok(v) => v.clone() , Err(_) => return result };
+        let pd = match std::env::var("ProgramData") { Ok(v) => v, Err(_) => return result };
+        let frag_dirs = [
+            format!("{}\\Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\Fragments", la),
+            format!("{}\\Packages\\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\\LocalState\\Fragments", la),
+            format!("{}\\Microsoft\\Windows Terminal\\Fragments", la),
+            format!("{pd}\\Microsoft\\Windows Terminal\\Fragments"),
+        ];
+        for d in &frag_dirs {
+            let dir = std::path::Path::new(d);
+            if !dir.is_dir() { continue; }
+            // fragments are in subdirectories (e.g. Git/git-bash.json)
+            if let Ok(entries) = std::fs::read_dir(dir) {
+                for entry in entries.flatten() {
+                    let p = entry.path();
+                    if p.is_dir() {
+                        if let Ok(sub) = std::fs::read_dir(&p) {
+                            for f in sub.flatten() {
+                                let fp = f.path();
+                                if fp.extension().map_or(false, |e| e == "json") {
+                                    if let Ok(c) = std::fs::read_to_string(&fp) {
+                                        result.push(c);
+                                    }
+                                }
+                            }
+                        }
+                    } else if p.extension().map_or(false, |e| e == "json") {
+                        if let Ok(c) = std::fs::read_to_string(&p) {
+                            result.push(c);
+                        }
+                    }
+                }
+            }
+        }
+        result
+    }
+    #[cfg(not(target_os = "windows"))]
+    { Vec::new() }
+}
+
 #[tauri::command]
 fn read_wt_settings() -> Option<String> {
     load_wt_settings_raw()
+}
+
+#[tauri::command]
+fn read_wt_fragments() -> Vec<String> {
+    load_wt_fragments()
 }
 
 #[tauri::command]
@@ -357,28 +408,6 @@ fn window_close(window: tauri::Window) {
 #[tauri::command]
 fn window_start_drag(window: tauri::Window) -> Result<(), String> {
     window.start_dragging().map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn pty_spawn_elevated(state: tauri::State<AppState>, app: tauri::AppHandle, command: Option<String>) -> Result<String, String> {
-    let cmd_str = command.clone().filter(|s| !s.is_empty()).unwrap_or_else(get_shell);
-
-    #[cfg(target_os = "windows")]
-    {
-        return elevated::pty_spawn_elevated_windows(state, app, &cmd_str);
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        let mut builder = CommandBuilder::new("sudo");
-        builder.arg(&cmd_str);
-        let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
-        let id = format!("tab-{}", *next);
-        *next += 1;
-        drop(next);
-        spawn_pty(app, id.clone(), builder)?;
-        Ok(id)
-    }
 }
 
 #[tauri::command]
@@ -525,7 +554,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, pty_spawn_elevated, save_text_file, pty_write, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, ssh_list_hosts, read_wt_settings, find_vs_instances, read_config, write_config])
+        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, save_text_file, pty_write, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, ssh_list_hosts, read_wt_settings, read_wt_fragments, find_vs_instances, read_config, write_config])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
