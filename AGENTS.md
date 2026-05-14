@@ -21,7 +21,7 @@ No tests or linters are configured.
 - **`src/tab.ts`** — `TerminalTab` class. Each tab owns: terminal, xterm, DOM, color, index (`index`), search state (`searchQuery`), context menu handler. Key methods:
   - `show()` — `display:""`, add `active`, `terminal.focus()`
   - `hide()` — `display:"none"`, remove `active`, set `needsResize = true`
-  - `fit()` — proposeDimensions + 10% tolerance + resize
+  - `fit()` — proposeDimensions + 20% tolerance + resize
   - `fitDeferred()` — double-rAF fit; aborts if `element.style.display === "none"`
   - `setColor()`, `rename()`, `destroy()` — self-explanatory
 
@@ -48,12 +48,16 @@ No tests or linters are configured.
 | `src/main.ts` | Init `TabManager`, PTY listener, settings button, calls all `init*()` |
 | `src/profiles.ts` | SSH/WT profiles, config persistence, font defaults |
 | `src/settings.ts` | Settings page (sidebar layout), `createSettingsContent()`, feedback/reset/apply |
-| `src/window.ts` | Window controls, drag, maximize/restore, position saved on resize (NOT close) |
+| `src/window.ts` | Window controls, drag, maximize/restore icon |
 | `src/search.ts` | Search bar; per-tab `searchQuery` save/restore via `TerminalTab` |
 | `src/profilemenu.ts` | New-tab dropdown (Local / SSH columns) |
 | `src/contextmenu.ts` | Two menus: `showTabContextMenu` and `showTerminalContextMenu` |
 
-### Backend (`src-tauri/src/lib.rs`)
+### Backend (`src-tauri/`)
+
+- `src-tauri/src/lib.rs` — Tauri builder, PTY management, SSH parsing, WT loading, config I/O, plugin registration
+- `src-tauri/capabilities/default.json` — permissions (core, window, opener, window-state)
+- Plugins: `tauri-plugin-window-state` (auto save/restore window size, position, maximize), `tauri-plugin-dialog`, `tauri-plugin-opener`
 
 Commands: `pty_spawn`, `pty_spawn_ssh`, `pty_write`, `pty_resize`, `pty_kill`, `window_minimize`, `window_toggle_maximize`, `window_close`, `window_start_drag`, `ssh_list_hosts`, `read_wt_settings`, `read_wt_fragments`, `find_vs_instances`, `read_config`, `write_config`, `save_text_file`.
 
@@ -61,9 +65,13 @@ Backend → Frontend: `pty-output` event `{ id, data: number[] }`.
 
 ## Critical gotchas
 
-### Window close
-- **Never** add `appWindow.onCloseRequested` with async handler — if it hangs, window won't close.
-- Close button uses event delegation on `#tab-bar` checking `btn.id` via `switch`.
+### Window state
+- Handled entirely by `tauri-plugin-window-state` plugin. Do NOT write custom save/restore code.
+- Plugin saves: position, inner size, maximized state. Restores on launch automatically.
+- `appWindow.onCloseRequested` is NOT used — plugin handles persistence internally.
+
+### Window drag permission
+- `window_start_drag` requires `"core:window:allow-start-dragging"` in `capabilities/default.json`.
 
 ### Right-click behavior (split menus)
 Two separate context menus, triggered differently:
@@ -77,6 +85,7 @@ Two separate context menus, triggered differently:
 - Terminal right-click uses **capture phase** (`addEventListener(…, true)`) so it fires before xterm.js internal handler.
 - Copy uses `execCommand("copy")` + hidden textarea (NOT `navigator.clipboard.writeText`) to avoid browser clipboard permission prompt.
 - Tab right-click does NOT require Shift — fires on regular right-click.
+- Global `document.addEventListener("contextmenu", e => e.preventDefault())` blocks all browser native context menus.
 
 ### Terminal rendering
 - **Never** add `will-change: transform` or `transform: translateZ(0)` on `.terminal-instance .xterm` — forces GPU compositing layer, causes sub-pixel gaps between monospace glyphs.
@@ -94,7 +103,7 @@ Two separate context menus, triggered differently:
 - Footer: `[feedback text] … … [▲ Reset] [Apply]`. Apply turns gray on save, re-enables on any input change. Reset dropdown: "Reset Changes" (reload from disk), "Reset All" (clear config file).
 
 ### Fit tolerance
-`fit()` uses 10% char-height tolerance. `Math.max(2, proposed.cols)` min 2 columns.
+`fit()` uses 20% char-height/width tolerance. `Math.max(2, proposed.cols)` min 2 columns.
 
 ### Search state
 Per-tab: `TerminalTab.searchQuery` saved on `closeFind` and `input` event, restored on `openFind`.

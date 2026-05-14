@@ -343,23 +343,15 @@ export class TabManager {
     const active = this.activeTab;
     if (!active) return;
 
-    const { cols, rows } = active.fit();
-    active.needsResize = false;
-    const cw = active.xtermEl.clientWidth / cols;
-    const ch = active.xtermEl.clientHeight / rows;
-    if (cw > 0) active.charWidth = cw;
-    if (ch > 0) active.charHeight = ch;
-    this._showSizeHint(cols, rows);
-
-    const tabId = active.id;
     if (this._resizeTimer) clearTimeout(this._resizeTimer);
     this._resizeTimer = setTimeout(() => {
       this._resizeTimer = null;
-      const t = this.tabs.get(tabId);
-      if (t) {
-        invoke("pty_resize", { id: t.id, cols: t.terminal.cols, rows: t.terminal.rows });
-      }
-    }, 250);
+      if (active.element.style.display === "none") return;
+      const { cols, rows } = active.fit();
+      active.needsResize = false;
+      this._showSizeHint(cols, rows);
+      invoke("pty_resize", { id: active.id, cols, rows });
+    }, 150);
   }
 
   // ── new-tab button ───────────────────────────────────────────────

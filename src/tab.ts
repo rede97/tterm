@@ -6,6 +6,27 @@ import { invoke } from "@tauri-apps/api/core";
 import { TabType } from "./types";
 import { SshHost, configFontFamily, configFontSize } from "./profiles";
 
+/**
+ * Hysteresis comparator — like a Schmitt trigger in circuits.
+ * Prevents oscillation by only changing output when the input crosses
+ * a threshold.
+ *
+ *   floatVal  — continuous value (e.g. 107.3 cols would fit)
+ *   current   — current discrete value  (e.g. 107 cols)
+ *   shrinkTh  — shrink when (float - current) < shrinkTh
+ *   growTh    — grow   when (float - current) > growTh
+ *   min       — floor clamp
+ */
+function hysteresis(
+  floatVal: number, current: number,
+  shrinkTh: number, growTh: number, min: number,
+): number {
+  const gap = floatVal - current;
+  if (gap < shrinkTh) return Math.max(min, Math.floor(floatVal));
+  if (gap > growTh)   return Math.max(min, Math.floor(floatVal));
+  return current;
+}
+
 export class TerminalTab {
   id: string;
   terminal: Terminal;
@@ -113,50 +134,41 @@ export class TerminalTab {
     this.needsResize = true;
   }
 
+  /**
+   * Pure calculation: how many rows/cols fit in the current container.
+   * No dead zone, no oscillation — just available space / char size.
+   */
   fit(): { cols: number; rows: number } {
-    const addon = this.fitAddon as any;
-    const proposed: { cols: number; rows: number } | undefined = addon.proposeDimensions?.();
-    if (!proposed) {
-      this.fitAddon.fit();
-      return { cols: this.terminal.cols, rows: this.terminal.rows };
+    if (!this.charWidth || !this.charHeight) {
+      // first time — measure from xterm
+      const core = (this.terminal as any)._core;
+      const dims = core._renderService.dimensions;
+      if (dims && dims.css.cell.width > 0) {
+        this.charWidth = dims.css.cell.width;
+        this.charHeight = dims.css.cell.height;
+      } else {
+        return { cols: this.terminal.cols, rows: this.terminal.rows };
+      }
     }
 
-    const core = (this.terminal as any)._core;
-    const dims = core._renderService.dimensions;
-    if (!dims || dims.css.cell.width === 0 || dims.css.cell.height === 0) {
-      return { cols: this.terminal.cols, rows: this.terminal.rows };
-    }
+    const parent = this.element.parentElement!;
+    const ps = getComputedStyle(parent);
+    const parentH = parseFloat(ps.height);
+    const parentW = parseFloat(ps.width);
 
-    const charH = dims.css.cell.height;
-    const charW = dims.css.cell.width;
-    const toleranceV = Math.max(1, Math.round(charH * 0.2));
-    const toleranceH = Math.max(1, Math.round(charW * 0.2));
+    const xs = getComputedStyle(this.terminal.element!);
+    let padH = parseFloat(xs.paddingLeft) + parseFloat(xs.paddingRight);
+    const vp = this.terminal.element!.querySelector(".xterm-viewport");
+    if (vp) padH += parseFloat(getComputedStyle(vp).paddingRight) || 0;
+    const padV = parseFloat(xs.paddingTop) + parseFloat(xs.paddingBottom);
 
-    const parent = this.terminal.element!.parentElement!;
-    const parentStyle = getComputedStyle(parent);
-    const parentH = parseFloat(parentStyle.getPropertyValue("height"));
-    const xtermStyle = getComputedStyle(this.terminal.element!);
-    const paddingV =
-      parseFloat(xtermStyle.paddingTop) + parseFloat(xtermStyle.paddingBottom);
-    const paddingH =
-      parseFloat(xtermStyle.paddingLeft) + parseFloat(xtermStyle.paddingRight);
-    const availableH = parentH - paddingV;
-    const availableW =
-      parseFloat(parentStyle.getPropertyValue("width")) - paddingH;
+    const floatCols = (parentW - padH) / this.charWidth;
+    const floatRows = (parentH - padV) / this.charHeight;
 
-    let rows = proposed.rows;
-    if (this.terminal.rows > proposed.rows) {
-      const overflow = this.terminal.rows * charH - availableH;
-      if (overflow > 0 && overflow <= toleranceV) rows = this.terminal.rows;
-    }
+    const cols = hysteresis(floatCols, this.terminal.cols, -0.2, 0.9, 2);
+    const rows = hysteresis(floatRows, this.terminal.rows, -0.2, 0.9, 2);
 
-    let cols = Math.max(2, proposed.cols);
-    if (this.terminal.cols > proposed.cols) {
-      const overflow = this.terminal.cols * charW - availableW;
-      if (overflow > 0 && overflow <= toleranceH) cols = this.terminal.cols;
-    }
-
-    if (this.terminal.rows !== rows || this.terminal.cols !== cols)
+    if (this.terminal.cols !== cols || this.terminal.rows !== rows)
       this.terminal.resize(cols, rows);
 
     return { cols, rows };
