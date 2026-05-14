@@ -129,8 +129,8 @@ export class TerminalTab {
 
     const charH = dims.css.cell.height;
     const charW = dims.css.cell.width;
-    const toleranceV = Math.max(1, Math.round(charH * 0.1));
-    const toleranceH = Math.max(1, Math.round(charW * 0.1));
+    const toleranceV = Math.max(1, Math.round(charH * 0.2));
+    const toleranceH = Math.max(1, Math.round(charW * 0.2));
 
     const parent = this.terminal.element!.parentElement!;
     const parentStyle = getComputedStyle(parent);
