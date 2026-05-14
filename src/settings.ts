@@ -1,4 +1,5 @@
-import { localProfiles, configFontFamily, configFontSize, hiddenProfiles, saveConfig } from "./profiles";
+import { localProfiles, configFontFamily, configFontSize, hiddenProfiles, saveConfig, loadConfig } from "./profiles";
+import { invoke } from "@tauri-apps/api/core";
 
 let _onSettingsChanged: (() => void) | null = null;
 export function onSettingsChangedFn(): (() => void) | null { return _onSettingsChanged; }
@@ -22,25 +23,28 @@ export function createSettingsContent(): HTMLElement {
   const root = document.createElement("div");
   root.className = "settings-page";
 
-  // ── Tabs ──
-  const tabBar = document.createElement("div");
-  tabBar.className = "settings-tabs";
+  // ── Sidebar ──
+  const sidebar = document.createElement("div");
+  sidebar.className = "settings-sidebar";
 
-  const tabGeneral = document.createElement("button");
-  tabGeneral.className = "settings-tab active";
-  tabGeneral.textContent = "General";
-  tabGeneral.dataset.panel = "general";
+  const navGeneral = document.createElement("button");
+  navGeneral.className = "settings-nav-item active";
+  navGeneral.textContent = "General";
+  navGeneral.dataset.panel = "general";
 
-  const tabWt = document.createElement("button");
-  tabWt.className = "settings-tab";
-  tabWt.textContent = "Windows Terminal";
-  tabWt.dataset.panel = "wt";
+  const navWt = document.createElement("button");
+  navWt.className = "settings-nav-item";
+  navWt.textContent = "Windows Terminal";
+  navWt.dataset.panel = "wt";
 
-  tabBar.appendChild(tabGeneral);
-  tabBar.appendChild(tabWt);
-  root.appendChild(tabBar);
+  sidebar.appendChild(navGeneral);
+  sidebar.appendChild(navWt);
+  root.appendChild(sidebar);
 
-  // ── General panel ──
+  // ── Body ──
+  const body = document.createElement("div");
+  body.className = "settings-body";
+
   const panelGeneral = document.createElement("div");
   panelGeneral.className = "settings-panel-content";
   panelGeneral.dataset.panel = "general";
@@ -66,21 +70,104 @@ export function createSettingsContent(): HTMLElement {
       </div>
     </div>
   `;
-  root.appendChild(panelGeneral);
+  body.appendChild(panelGeneral);
 
-  // ── WT panel ──
   const panelWt = document.createElement("div");
   panelWt.className = "settings-panel-content";
   panelWt.dataset.panel = "wt";
   panelWt.style.display = "none";
   renderWtPanel(panelWt);
-  root.appendChild(panelWt);
+  body.appendChild(panelWt);
 
-  // tab switching
-  const tabs = root.querySelectorAll(".settings-tab");
-  tabs.forEach(t => {
+  // Footer
+  const footer = document.createElement("div");
+  footer.className = "settings-footer";
+
+  const feedback = document.createElement("span");
+  feedback.className = "settings-feedback";
+  footer.appendChild(feedback);
+
+  const spacer = document.createElement("div");
+  spacer.style.flex = "1";
+  footer.appendChild(spacer);
+
+  // Reset button with dropdown
+  const resetWrap = document.createElement("div");
+  resetWrap.className = "settings-reset-wrap";
+
+  const resetBtn = document.createElement("button");
+  resetBtn.className = "settings-reset-btn";
+  resetBtn.innerHTML = "&#9650;";
+  resetBtn.title = "Reset";
+
+  const resetMenu = document.createElement("div");
+  resetMenu.className = "settings-reset-menu";
+
+  const resetChanges = document.createElement("button");
+  resetChanges.textContent = "Reset Changes";
+  resetChanges.addEventListener("click", async () => {
+    await loadConfig();
+    refreshForm(root);
+    (resetMenu as HTMLElement).style.display = "none";
+    feedback.textContent = "Reverted to saved config";
+    feedback.className = "settings-feedback settings-feedback-info";
+    setTimeout(() => { feedback.textContent = ""; }, 2000);
+  });
+  resetMenu.appendChild(resetChanges);
+
+  const resetAll = document.createElement("button");
+  resetAll.textContent = "Reset All";
+  resetAll.addEventListener("click", async () => {
+    await invoke("write_config", { content: "{}" });
+    await loadConfig();
+    refreshForm(root);
+    (resetMenu as HTMLElement).style.display = "none";
+    feedback.textContent = "All settings cleared";
+    feedback.className = "settings-feedback settings-feedback-info";
+    setTimeout(() => { feedback.textContent = ""; }, 2000);
+  });
+  resetMenu.appendChild(resetAll);
+
+  resetBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    resetMenu.style.display = resetMenu.style.display === "block" ? "none" : "block";
+  });
+
+  document.addEventListener("click", () => {
+    resetMenu.style.display = "none";
+  });
+
+  resetWrap.appendChild(resetBtn);
+  resetWrap.appendChild(resetMenu);
+  footer.appendChild(resetWrap);
+
+  // Apply button
+  const applyBtn = document.createElement("button");
+  applyBtn.className = "settings-btn";
+  applyBtn.textContent = "Apply";
+  applyBtn.addEventListener("click", async () => {
+    await applySettings(root);
+    applyBtn.classList.add("applied");
+    feedback.textContent = "Config saved";
+    feedback.className = "settings-feedback settings-feedback-ok";
+    setTimeout(() => { feedback.textContent = ""; }, 2500);
+  });
+  footer.appendChild(applyBtn);
+
+  body.appendChild(footer);
+  root.appendChild(body);
+
+  // Enable Apply on any input change
+  root.querySelectorAll("input, select").forEach(el => {
+    el.addEventListener("input", () => applyBtn.classList.remove("applied"));
+    el.addEventListener("change", () => applyBtn.classList.remove("applied"));
+  });
+
+  // sidebar navigation
+  const navItems = root.querySelectorAll(".settings-nav-item");
+  navItems.forEach(t => {
     t.addEventListener("click", () => {
-      tabs.forEach(x => x.classList.remove("active"));
+      navItems.forEach(x => x.classList.remove("active"));
       t.classList.add("active");
       const name = (t as HTMLElement).dataset.panel!;
       root.querySelectorAll(".settings-panel-content").forEach(p => {
@@ -89,17 +176,23 @@ export function createSettingsContent(): HTMLElement {
     });
   });
 
-  // apply button
-  const footer = document.createElement("div");
-  footer.className = "settings-footer";
-  const btn = document.createElement("button");
-  btn.className = "settings-btn";
-  btn.textContent = "Apply";
-  btn.addEventListener("click", () => applySettings(root));
-  footer.appendChild(btn);
-  root.appendChild(footer);
-
   return root;
+}
+
+function refreshForm(root: HTMLElement) {
+  const fontEl = root.querySelector("#set-font-family") as HTMLInputElement;
+  const sizeEl = root.querySelector("#set-font-size") as HTMLInputElement;
+  const profileEl = root.querySelector("#set-default-profile") as HTMLSelectElement;
+  const checks = root.querySelectorAll<HTMLInputElement>(".wt-profile-check");
+
+  if (fontEl) fontEl.value = configFontFamily;
+  if (sizeEl) sizeEl.value = String(configFontSize);
+  if (profileEl && profileEl.options.length > 0) {
+    profileEl.value = localProfiles[0]?.name ?? "";
+  }
+  checks.forEach(c => {
+    c.checked = !hiddenProfiles.includes(c.value);
+  });
 }
 
 function renderWtPanel(container: HTMLElement) {

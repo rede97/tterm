@@ -567,6 +567,7 @@ fn ssh_list_hosts() -> Result<Vec<SshHost>, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .setup(|app| {
             // verify PTY system is available
             let _pty_sys = native_pty_system();

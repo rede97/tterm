@@ -1,5 +1,4 @@
-import { appState } from "./state";
-import { closeTab, setTabColor, renameTab, duplicateTab, exportTab, closeTabsRight, closeOtherTabs, switchTab } from "./tabs";
+import { tabManager } from "./tabmanager";
 import { openFind } from "./search";
 
 const TAB_COLORS = [
@@ -35,67 +34,7 @@ function addMenuAction(label: string, fn: () => void): HTMLElement {
   return el;
 }
 
-function populateContextMenu(tabId: string) {
-  contextMenu.innerHTML = "";
-
-  const colorItem = document.createElement("div");
-  colorItem.className = "menu-item has-submenu";
-  const colorLabel = document.createElement("span");
-  colorLabel.textContent = "更改选项卡颜色";
-  colorItem.appendChild(colorLabel);
-  const arrow = document.createElement("span");
-  arrow.className = "menu-arrow";
-  arrow.textContent = "›";
-  colorItem.appendChild(arrow);
-  contextMenu.appendChild(colorItem);
-
-  const colorSub = document.createElement("div");
-  colorSub.className = "color-submenu";
-  const colorGrid = document.createElement("div");
-  colorGrid.className = "color-grid";
-  for (const c of TAB_COLORS) {
-    const swatch = document.createElement("div");
-    swatch.className = "color-swatch";
-    swatch.style.background = c;
-    swatch.addEventListener("click", (e) => {
-      e.stopPropagation();
-      setTabColor(tabId, c);
-      closeContextMenu();
-    });
-    colorGrid.appendChild(swatch);
-  }
-  const clearBtn = document.createElement("div");
-  clearBtn.className = "color-clear";
-  clearBtn.textContent = "清除颜色";
-  clearBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    setTabColor(tabId, undefined);
-    closeContextMenu();
-  });
-  colorSub.appendChild(colorGrid);
-  colorSub.appendChild(clearBtn);
-  colorItem.appendChild(colorSub);
-
-  colorItem.addEventListener("mouseenter", () => colorSub.classList.add("open"));
-  colorItem.addEventListener("mouseleave", () => colorSub.classList.remove("open"));
-
-  addMenuAction("重命名", () => renameTab(tabId));
-  addMenuAction("复制选项卡", () => duplicateTab(tabId));
-  addMenuAction("导出文本", () => exportTab(tabId));
-  addMenuAction("查找", () => {
-    switchTab(tabId);
-    openFind(tabId);
-  });
-
-  addMenuSeparator();
-
-  addMenuAction("关闭", () => closeTab(tabId));
-  addMenuAction("关闭右侧", () => closeTabsRight(tabId));
-  addMenuAction("关闭其他标签", () => closeOtherTabs(tabId));
-}
-
-export function showContextMenu(tabId: string, x: number, y: number) {
-  populateContextMenu(tabId);
+function showAt(x: number, y: number) {
   contextMenu.style.left = x + "px";
   contextMenu.style.top = y + "px";
   contextMenu.classList.add("open");
@@ -112,6 +51,108 @@ export function showContextMenu(tabId: string, x: number, y: number) {
   });
 }
 
+// ── Tab context menu (shift+right-click on tab bar) ──
+
+export function showTabContextMenu(tabId: string, x: number, y: number) {
+  contextMenu.innerHTML = "";
+
+  // Color submenu
+  const colorItem = document.createElement("div");
+  colorItem.className = "menu-item has-submenu";
+  const colorLabel = document.createElement("span");
+  colorLabel.textContent = "Change Tab Color";
+  colorItem.appendChild(colorLabel);
+  const arrow = document.createElement("span");
+  arrow.className = "menu-arrow";
+  arrow.textContent = "\u203a";
+  colorItem.appendChild(arrow);
+  contextMenu.appendChild(colorItem);
+
+  const colorSub = document.createElement("div");
+  colorSub.className = "color-submenu";
+  const colorGrid = document.createElement("div");
+  colorGrid.className = "color-grid";
+  for (const c of TAB_COLORS) {
+    const swatch = document.createElement("div");
+    swatch.className = "color-swatch";
+    swatch.style.background = c;
+    swatch.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const t = tabManager.get(tabId);
+      if (t) t.setColor(c);
+      closeContextMenu();
+    });
+    colorGrid.appendChild(swatch);
+  }
+  const clearColorBtn = document.createElement("div");
+  clearColorBtn.className = "color-clear";
+  clearColorBtn.textContent = "Reset Color";
+  clearColorBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const t = tabManager.get(tabId);
+    if (t) t.setColor(undefined);
+    closeContextMenu();
+  });
+  colorSub.appendChild(colorGrid);
+  colorSub.appendChild(clearColorBtn);
+  colorItem.appendChild(colorSub);
+
+  colorItem.addEventListener("mouseenter", () => colorSub.classList.add("open"));
+  colorItem.addEventListener("mouseleave", () => colorSub.classList.remove("open"));
+
+  addMenuAction("Rename", () => tabManager.renameTab(tabId));
+  addMenuAction("Duplicate Tab", () => tabManager.duplicateTab(tabId));
+
+  addMenuSeparator();
+
+  addMenuAction("Close", () => tabManager.closeTab(tabId));
+  addMenuAction("Close Right", () => tabManager.closeTabsRight(tabId));
+  addMenuAction("Close Others", () => tabManager.closeOtherTabs(tabId));
+
+  showAt(x, y);
+}
+
+// ── Terminal content menu (shift+right-click on terminal area) ──
+
+export function showTerminalContextMenu(tabId: string, x: number, y: number) {
+  contextMenu.innerHTML = "";
+
+  addMenuAction("Copy", () => {
+    const t = tabManager.get(tabId);
+    if (!t) return;
+    const sel = t.terminal.getSelection();
+    if (sel) {
+      const ta = document.createElement("textarea");
+      ta.value = sel;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+  });
+
+  addMenuAction("Paste", () => {
+    const t = tabManager.get(tabId);
+    if (!t) return;
+    navigator.clipboard.readText().then(text => {
+      if (text) t.terminal.paste(text);
+    }).catch(() => {});
+  });
+
+  addMenuSeparator();
+
+  addMenuAction("Clear", () => tabManager.clearTab(tabId));
+  addMenuAction("Find", () => {
+    tabManager.switchTo(tabId);
+    openFind(tabId);
+  });
+  addMenuAction("Export Text", () => tabManager.exportTab(tabId));
+
+  showAt(x, y);
+}
+
 export function initContextMenu() {
   document.addEventListener("click", (e) => {
     if (contextMenu.classList.contains("open") && !contextMenu.contains(e.target as Node)) {
@@ -123,9 +164,9 @@ export function initContextMenu() {
     if (e.key === "Escape" && contextMenu.classList.contains("open")) {
       closeContextMenu();
     }
-    if (e.key === "F" && e.ctrlKey && e.shiftKey && appState.activeTabId) {
+    if (e.key === "F" && e.ctrlKey && e.shiftKey && tabManager.activeTabId) {
       e.preventDefault();
-      openFind(appState.activeTabId);
+      openFind(tabManager.activeTabId);
     }
   });
 }

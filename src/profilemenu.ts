@@ -1,6 +1,6 @@
 import { createElement, Terminal as TerminalIcon, Globe } from "lucide";
 import { sshHosts, localProfiles } from "./profiles";
-import { createTab, createSshTab, createCustomTab } from "./tabs";
+import { tabManager } from "./tabmanager";
 
 const menuBtn = document.getElementById("new-tab-menu-btn")!;
 
@@ -74,10 +74,10 @@ function populateMenu() {
 
   if (localProfiles.length > 0) {
     for (const p of localProfiles) {
-      localCol.appendChild(createMenuItem(TerminalIcon, p.name, "", () => createCustomTab(p.command, p.name)));
+      localCol.appendChild(createMenuItem(TerminalIcon, p.name, "", () => tabManager.createLocalTab(p.command, p.name)));
     }
   } else {
-    localCol.appendChild(createMenuItem(TerminalIcon, "Default shell", "", () => createTab()));
+    localCol.appendChild(createMenuItem(TerminalIcon, "Default shell", "", () => tabManager.createLocalTab()));
   }
   profileMenu.appendChild(localCol);
 
@@ -92,7 +92,7 @@ function populateMenu() {
 
     for (const host of sshHosts) {
       const detail = `${host.user}@${host.hostname}:${host.port}`;
-      sshCol.appendChild(createMenuItem(Globe, host.name, detail, () => createSshTab(host)));
+      sshCol.appendChild(createMenuItem(Globe, host.name, detail, () => tabManager.createSshTab(host)));
     }
     profileMenu.appendChild(sshCol);
   }

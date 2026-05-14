@@ -347,6 +347,7 @@ body {
   /* isolate paint: prevent layout recalc from cascading into xterm canvas */
   contain: layout style paint;
   overflow: hidden;
+  outline: none;
 }
 
 /* ── xterm built-in scrollbar (VS Code–style, always visible) ───── */
@@ -400,14 +401,16 @@ body {
   opacity: 1;
 }
 
+/* override focus outline on xterm hidden textarea (Chrome draws dashed border) */
+.terminal-instance .xterm textarea:focus,
+.terminal-instance .xterm .xterm-helper-textarea:focus {
+  outline: none !important;
+}
+
 /* Override xterm.js built-in black backgrounds — uses !important because
    xterm.css loads as a JS import and may override our stylesheet rules. */
 .terminal-instance .xterm {
   height: 100%;
-  /* force independent compositing layer */
-  will-change: transform;
-  transform: translateZ(0);
-  backface-visibility: hidden;
   /* snap grid to bottom so leftover space collects at top (VS Code style);
      keep content anchored at cursor line when grid slightly smaller */
   align-content: end !important;
@@ -690,37 +693,56 @@ body {
   width: 100%;
   height: 100%;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   background: #1e1e1e;
   overflow: hidden;
 }
 
-.settings-tabs {
-  display: flex;
-  border-bottom: 1px solid #3e3e42;
-  padding: 0 16px;
+/* ── sidebar ── */
+
+.settings-sidebar {
+  width: 200px;
+  min-width: 200px;
+  background: #252526;
+  border-right: 1px solid #3e3e42;
+  padding: 12px 0;
   flex-shrink: 0;
+  overflow-y: auto;
 }
 
-.settings-tab {
+.settings-nav-item {
+  display: block;
+  width: 100%;
   padding: 8px 16px;
   background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
-  color: #888888;
+  border-left: 3px solid transparent;
+  color: #cccccc;
   font-size: 13px;
   font-family: inherit;
   cursor: pointer;
   outline: none;
+  text-align: left;
 }
 
-.settings-tab:hover {
-  color: #cccccc;
-}
-
-.settings-tab.active {
+.settings-nav-item:hover {
+  background: #2a2d2e;
   color: #ffffff;
-  border-bottom-color: #0078d4;
+}
+
+.settings-nav-item.active {
+  background: #37373d;
+  color: #ffffff;
+  border-left-color: #0078d4;
+}
+
+/* ── body ── */
+
+.settings-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .settings-panel-content {
@@ -841,8 +863,80 @@ body {
   padding: 12px 24px;
   border-top: 1px solid #3e3e42;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
+}
+
+.settings-feedback {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.settings-feedback-ok {
+  color: #4ec9b0;
+}
+
+.settings-feedback-info {
+  color: #569cd6;
+}
+
+.settings-reset-wrap {
+  position: relative;
+}
+
+.settings-reset-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #555555;
+  border-radius: 4px;
+  background: #3c3c3c;
+  color: #cccccc;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-reset-btn:hover {
+  background: #4a4a4a;
+  color: #ffffff;
+}
+
+.settings-reset-menu {
+  display: none;
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  margin-bottom: 4px;
+  background: #252526;
+  border: 1px solid #3e3e42;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 20;
+  min-width: 160px;
+  padding: 4px 0;
+}
+
+.settings-reset-menu button {
+  display: block;
+  width: 100%;
+  padding: 6px 16px;
+  background: transparent;
+  border: none;
+  color: #cccccc;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  text-align: left;
+}
+
+.settings-reset-menu button:hover {
+  background: #094771;
+  color: #ffffff;
 }
 
 .settings-btn {
@@ -859,4 +953,10 @@ body {
 
 .settings-btn:hover {
   background: #1a8ad4;
+}
+
+.settings-btn.applied {
+  background: #555555;
+  color: #888888;
+  cursor: default;
 }

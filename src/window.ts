@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createElement, Minus, Square, Copy, X } from "lucide";
-import { saveConfig, configWindowX, configWindowY, configWindowWidth, configWindowHeight } from "./profiles";
 
 const appWindow = getCurrentWindow();
 
@@ -90,29 +89,6 @@ function injectIcons() {
   btnClose.appendChild(createElement(X, { stroke: "currentColor", width: 14, height: 14 }));
 }
 
-// ── window state ────────────────────────────────────────────────────
-
-export async function saveWindowState() {
-  try {
-    const pos = await appWindow.outerPosition();
-    const size = await appWindow.outerSize();
-    await saveConfig({ windowX: pos.x, windowY: pos.y, windowWidth: size.width, windowHeight: size.height });
-  } catch {}
-}
-
-export async function restoreWindowState() {
-  try {
-    if (configWindowX !== null && configWindowY !== null) {
-      await appWindow.setPosition({ x: configWindowX, y: configWindowY } as any);
-    }
-    if (configWindowWidth !== null && configWindowHeight !== null) {
-      const w = Math.max(800, configWindowWidth);
-      const h = Math.max(600, configWindowHeight);
-      await appWindow.setSize({ width: w, height: h } as any);
-    }
-  } catch {}
-}
-
 // ── init ────────────────────────────────────────────────────────────
 
 export function initWindowControls() {
@@ -121,14 +97,7 @@ export function initWindowControls() {
   injectIcons();
   updateMaximizeIcon();
 
-  let windowStateTimer: ReturnType<typeof setTimeout> | null = null;
   appWindow.onResized(() => {
     updateMaximizeIcon();
-    if (windowStateTimer) clearTimeout(windowStateTimer);
-    windowStateTimer = setTimeout(() => saveWindowState(), 1000);
-  });
-
-  appWindow.onCloseRequested(async () => {
-    await saveWindowState();
   });
 }

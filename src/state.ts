@@ -1,6 +1,4 @@
-import { Tab } from "./types";
-
-export const appState = {
-  tabs: new Map<string, Tab>(),
-  activeTabId: null as string | null,
-};
+// Tab state is now managed by TabManager (src/tabmanager.ts)
+import { tabManager } from "./tabmanager";
+export { tabManager };
+export const appState = tabManager;

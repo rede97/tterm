@@ -1,4 +1,4 @@
-import { appState } from "./state";
+import { tabManager } from "./tabmanager";
 
 // ── DOM ──────────────────────────────────────────────────────────────
 
@@ -30,37 +30,40 @@ searchBar.appendChild(searchClose);
 
 // ── functions ────────────────────────────────────────────────────────
 
-export function closeFind() {
-  searchBar.style.display = "none";
+function currentTab() {
   const tabId = searchInput.dataset.tabId;
-  if (tabId) {
-    const tab = appState.tabs.get(tabId);
-    if (tab) tab.terminal.focus();
-  }
+  return tabId ? tabManager.get(tabId) : undefined;
+}
+
+export function closeFind() {
+  // save query back to tab
+  const tab = currentTab();
+  if (tab) tab.searchQuery = searchInput.value;
+
+  searchBar.style.display = "none";
+  if (tab) tab.terminal.focus();
 }
 
 function doFindNext() {
-  const tabId = searchInput.dataset.tabId;
-  const tab = appState.tabs.get(tabId || "");
+  const tab = currentTab();
   if (!tab?.searchAddon || !searchInput.value) return;
   const found = tab.searchAddon.findNext(searchInput.value);
   searchResults.textContent = found ? "" : "无结果";
 }
 
 function doFindPrev() {
-  const tabId = searchInput.dataset.tabId;
-  const tab = appState.tabs.get(tabId || "");
+  const tab = currentTab();
   if (!tab?.searchAddon || !searchInput.value) return;
   const found = tab.searchAddon.findPrevious(searchInput.value);
   searchResults.textContent = found ? "" : "无结果";
 }
 
 export function openFind(tabId: string) {
-  const tab = appState.tabs.get(tabId);
+  const tab = tabManager.get(tabId);
   if (!tab?.searchAddon) return;
 
   searchInput.dataset.tabId = tabId;
-  searchInput.value = "";
+  searchInput.value = tab.searchQuery;
   searchResults.textContent = "";
   searchBar.style.display = "flex";
   searchInput.focus();
@@ -71,6 +74,11 @@ export function openFind(tabId: string) {
 export function initSearchBar() {
   const container = document.getElementById("terminal-container")!;
   container.appendChild(searchBar);
+
+  searchInput.addEventListener("input", () => {
+    const tab = currentTab();
+    if (tab) tab.searchQuery = searchInput.value;
+  });
 
   searchInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
