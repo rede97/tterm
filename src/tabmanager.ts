@@ -14,21 +14,17 @@ export class TabManager {
   readonly tabsContainer: HTMLElement;
   readonly terminalContainer: HTMLElement;
   private readonly _welcomeEl: HTMLElement;
-  private readonly _sizeOverlay: HTMLElement;
 
   private _resizeTimer: ReturnType<typeof setTimeout> | null = null;
-  private _sizeHintTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     tabsContainer: HTMLElement,
     terminalContainer: HTMLElement,
     welcomeEl: HTMLElement,
-    sizeOverlay: HTMLElement,
   ) {
     this.tabsContainer = tabsContainer;
     this.terminalContainer = terminalContainer;
     this._welcomeEl = welcomeEl;
-    this._sizeOverlay = sizeOverlay;
 
     window.addEventListener("resize", () => this._onResize());
   }
@@ -308,6 +304,7 @@ export class TabManager {
   }
 
   private _closeSettings(restore: boolean): void {
+    console.log("[_closeSettings] restore:", restore, "settingsEl:", !!this.settingsEl);
     if (this.settingsEl) {
       this.settingsEl.remove();
       this.settingsEl = null;
@@ -321,6 +318,7 @@ export class TabManager {
     this.settingsOpen = false;
 
     if (restore && this.activeTabId) {
+      console.log("[_closeSettings] restoring tab:", this.activeTabId);
       const tab = this.tabs.get(this.activeTabId);
       if (tab) {
         tab.show();
@@ -349,9 +347,8 @@ export class TabManager {
       if (active.element.style.display === "none") return;
       const { cols, rows } = active.fit();
       active.needsResize = false;
-      this._showSizeHint(cols, rows);
       invoke("pty_resize", { id: active.id, cols, rows });
-    }, 150);
+    }, 10);
   }
 
   // ── new-tab button ───────────────────────────────────────────────
@@ -370,27 +367,17 @@ export class TabManager {
 
   private _hideWelcome(): void { this._welcomeEl.style.display = "none"; }
   private _showWelcome(): void { this._welcomeEl.style.display = "flex"; }
-
-  private _showSizeHint(cols: number, rows: number): void {
-    this._sizeOverlay.textContent = `${cols} \xd7 ${rows}`;
-    this._sizeOverlay.classList.add("visible");
-    if (this._sizeHintTimer) clearTimeout(this._sizeHintTimer);
-    this._sizeHintTimer = setTimeout(() => {
-      this._sizeOverlay.classList.remove("visible");
-    }, 1200);
-  }
 }
 
 // ── singleton ─────────────────────────────────────────────────────────
 
-export const tabManager = new TabManager(null!, null!, null!, null!);
+export const tabManager = new TabManager(null!, null!, null!);
 
 export function initTabManager(
   tabsContainer: HTMLElement,
   terminalContainer: HTMLElement,
   welcomeEl: HTMLElement,
-  sizeOverlay: HTMLElement,
 ): TabManager {
-  Object.assign(tabManager, { tabsContainer, terminalContainer, _welcomeEl: welcomeEl, _sizeOverlay: sizeOverlay });
+  Object.assign(tabManager, { tabsContainer, terminalContainer, _welcomeEl: welcomeEl });
   return tabManager;
 }

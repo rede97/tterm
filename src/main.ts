@@ -31,11 +31,6 @@ tabsContainer.addEventListener("wheel", (e) => {
 // block all browser native context menus
 document.addEventListener("contextmenu", e => e.preventDefault());
 
-// ── size hint overlay ──────────────────────────────────────────────
-
-const sizeOverlay = document.createElement("div");
-sizeOverlay.id = "size-overlay";
-terminalContainer.appendChild(sizeOverlay);
 
 // ── welcome screen ─────────────────────────────────────────────────
 
@@ -55,7 +50,7 @@ welcomeEl.appendChild(welcomeVersion);
 
 // ── init TabManager ────────────────────────────────────────────────
 
-initTabManager(tabsContainer, terminalContainer, welcomeEl, sizeOverlay);
+initTabManager(tabsContainer, terminalContainer, welcomeEl);
 
 // ── PTY output routing ─────────────────────────────────────────────
 

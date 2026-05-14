@@ -357,6 +357,10 @@ body {
   background: transparent;
   border-radius: 3px;
   transition: width 0.15s;
+  position: absolute;
+  right: 0;
+  z-index: 10;
+  pointer-events: auto;
 }
 
 .terminal-instance .xterm .xterm-scrollable-element > .scrollbar:hover {
@@ -437,15 +441,16 @@ body {
    native scrollbar hidden via ::-webkit-scrollbar rules above */
 .terminal-instance .xterm .xterm-viewport {
   overflow-y: scroll !important;
-  padding-right: 6px; /* safe space for overlay scrollbar */
 }
 
 .terminal-instance .xterm .xterm-screen {
   padding-right: 6px; /* safe space for overlay scrollbar */
+  z-index: 0;
 }
 
 .terminal-instance .xterm .xterm-scrollable-element {
   padding-right: 0 !important;
+  position: relative;
 }
 
 .terminal-instance .xterm .xterm-screen,

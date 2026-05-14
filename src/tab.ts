@@ -158,8 +158,9 @@ export class TerminalTab {
 
     const xs = getComputedStyle(this.terminal.element!);
     let padH = parseFloat(xs.paddingLeft) + parseFloat(xs.paddingRight);
-    const vp = this.terminal.element!.querySelector(".xterm-viewport");
-    if (vp) padH += parseFloat(getComputedStyle(vp).paddingRight) || 0;
+    // xterm-screen padding-right = scrollbar safe area
+    const scr = this.terminal.element!.querySelector(".xterm-screen");
+    if (scr) padH += parseFloat(getComputedStyle(scr).paddingRight) || 0;
     const padV = parseFloat(xs.paddingTop) + parseFloat(xs.paddingBottom);
 
     const floatCols = (parentW - padH) / this.charWidth;
