@@ -1,4 +1,12 @@
-# TTerm
+<p align="center">
+  <img src="https://raw.githubusercontent.com/rede97/tterm/main/src/assets/tterm.svg" width="128" alt="TTerm" />
+</p>
+
+<h1 align="center">TTerm</h1>
+
+<p align="center">
+  <a href="https://github.com/rede97/tterm/actions/workflows/ci.yml"><img src="https://github.com/rede97/tterm/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+</p>
 
 A Windows terminal emulator built with Tauri v2 + xterm.js. Optimized for small binary size, high performance, and low resource usage. Focuses on the terminal content, not flashy UI.
 
@@ -62,6 +70,7 @@ bun run tauri build
 - [ ] Split panes
 - [ ] Custom color scheme configuration UI
 - [ ] Session recording and replay
+- [ ] OSC 9;4 terminal progress bar in tab title
 
 ## License
 

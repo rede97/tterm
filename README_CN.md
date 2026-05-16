@@ -1,4 +1,12 @@
-# TTerm
+<p align="center">
+  <img src="https://raw.githubusercontent.com/rede97/tterm/main/src/assets/tterm.svg" width="128" alt="TTerm" />
+</p>
+
+<h1 align="center">TTerm</h1>
+
+<p align="center">
+  <a href="https://github.com/rede97/tterm/actions/workflows/ci.yml"><img src="https://github.com/rede97/tterm/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+</p>
 
 基于 Tauri v2 + xterm.js 构建的 Windows 终端模拟器。追求小体积、高性能、低资源占用，专注于终端内容本身而非华而不实的界面。
 
@@ -62,6 +70,7 @@ bun run tauri build
 - [ ] 分屏显示
 - [ ] 自定义配色方案配置界面
 - [ ] 终端会话录制与回放
+- [ ] OSC 9;4 终端标签页进度条
 
 ## 许可
 

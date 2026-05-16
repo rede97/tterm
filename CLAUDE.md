@@ -210,6 +210,19 @@ const targets = [[32,'32x32.png'],[128,'128x128.png'],[256,'128x128@2x.png'],[51
 
 On Windows, the default shell is `cmd.exe`. On Unix, it's the user's `$SHELL` (fallback `/bin/sh`). Vite dev server binds `127.0.0.1` explicitly (not `::1`) because IPv6 loopback has connectivity issues on Windows. `AppState.initial_cwd` is populated from the `--working-directory` CLI argument (passed by Windows Terminal integration). VS instances are discovered via `vswhere.exe` with a fallback to scanning common `Program Files` paths.
 
+## Shell tools: Bash vs PowerShell
+
+This is **Windows**, so both shells are available — but they are NOT interchangeable. **Match syntax to the tool you call:**
+
+| Tool | Shell | Syntax |
+|---|---|---|
+| `Bash` | bash (git-bash) | POSIX: `tail -n`, `grep`, `sed`, `cat`, `&&`, `$VAR`, `2>/dev/null` |
+| `PowerShell` | powershell.exe | PS: `Get-Content`, `Select-Object`, `Get-ChildItem`, `;`, `$env:VAR`, `2>$null` |
+
+**Never** use PowerShell cmdlets (`Get-Content`, `Select-Object`, `Select-String`) inside a `Bash` tool call — they will fail with "command not found". Similarly, never use bash syntax (`&&`, `tail`, `grep`) inside a `PowerShell` tool call.
+
+If in doubt, prefer the dedicated tools (Read, Write, Edit, Grep, Glob) over shell commands.
+
 ## File editing
 
 Use **PowerShell** (`Set-Content` / `Get-Content`) for file edits. The Edit tool frequently fails to match strings in this repo because Read tool output may not byte-match the actual file content (tab/space rendering, line ending normalization). PowerShell text replacement is reliable. Only use the Edit tool for trivial single-line changes.

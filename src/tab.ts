@@ -52,6 +52,7 @@ export class TerminalTab {
     container.appendChild(this.element);
 
     this.terminal = new Terminal({
+      allowProposedApi: true,
       cursorBlink: true,
       fontSize: configFontSize,
       fontFamily: configFontFamily,
@@ -86,6 +87,14 @@ export class TerminalTab {
     this.terminal.loadAddon(this.searchAddon);
     if (configRenderer === "webgl") this.terminal.loadAddon(new WebglAddon());
     this.terminal.open(this.element);
+
+    this.terminal.onTitleChange((title: string) => {
+      if (title) {
+        this.label = title;
+        const labelEl = this.tabElement.querySelector(".tab-label") as HTMLElement;
+        if (labelEl) labelEl.textContent = title;
+      }
+    });
 
     this.xtermEl = this.element.querySelector(".xterm") as HTMLElement;
 
