@@ -106,21 +106,21 @@ Backend → Frontend: `pty-output` event `{ id: string, data: number[] }`.
    Frontend parses both sources. Profiles with `commandline` are used directly. For profiles without `commandline`:
    - `source: "Windows.Terminal.VisualStudio"` → resolved via vswhere-discovered VS instances
    - `source: "Windows.Terminal.Wsl"` → `wsl.exe -d "<name>"`
-   - `source` containing "Azure" → **skipped entirely**
+   - `source` containing "Azure" → `wt.exe -p "<name>"` (resolved via WT itself)
    - Unrecognized sources with no `commandline` → dropped (fragments should provide the real commandline)
 
 3. **Default profile** — Config persisted in `{app_config_dir}/config.json`. Priority: user-set default → first profile → cmd.exe fallback
 
 ## Profile dropdown menu
 
-Two-column layout (Local | SSH) with a vertical divider. Centered on the new-tab menu button, clamped to viewport edges on overflow. Each profile item has a Lucide icon, label, optional detail text, and click-to-launch.
+Two-column layout (Local | SSH) with a vertical divider. Centered on the new-tab menu button, clamped to viewport edges on overflow. Each profile item has a Lucide icon, label, optional detail text, and click-to-launch. Hidden profiles (toggled off in Settings > Profile) are excluded from this menu.
 
 ## Right-click behavior (split menus)
 
 | Trigger | Action |
 |---|---|
-| Right-click on **tab** | Tab operations (Change Color, Rename, Duplicate, Close, Close Right, Close Others) |
-| **Shift+right-click** on terminal | Content operations (Copy, Paste, Clear, Find, Export Text) |
+| Right-click on **tab** | Tab operations (New Tab, Open in New Window, Change Color, Rename, Duplicate, Close, Close Right, Close Others) |
+| **Shift+right-click** on terminal | Content operations (Copy, Copy as HTML, Paste, Clear, Find, Export Text, New Tab, Open in New Window) |
 | Right-click on terminal (no shift) | Copy if selected (`execCommand("copy")`), Paste if not (`clipboard.readText`) |
 
 - Terminal right-click uses **capture phase** (`addEventListener(…, true)`) to fire before xterm.js internal handler.
@@ -158,8 +158,9 @@ hysteresis(floatVal, current, th_low, th_high, min=2)
 - Layout: **sidebar** (`flex-direction: row`). `.settings-sidebar` left (200px, `#252526`), `.settings-body` right.
 - Settings tab created in `_openSettings()`, removed from DOM on close. `data-tab-id="#settings"` excluded from badge counting.
 - `toggleSettings()` opens only (no-op if open). Close via: tab close button, or switching to any terminal tab.
-- Two panels: General (font family/size, default profile) and Windows Terminal (profile visibility toggles).
-- Footer: `[feedback text] … … [▲ Reset] [Apply]`. Apply saves config, turns gray on save, re-enables on any input change. Reset dropdown: "Reset Changes" (reload from disk), "Reset All" (clear config file).
+- Three panels: General (renderer, scrollback, paste options, terminal bell, tab width, data), Appearance (font family/size), Profile (default profile, imported WT profile visibility toggles).
+- Footer: `[feedback text] … … [Revert] [Apply]`. Apply saves config, turns gray on save, re-enables on any input change. Revert reloads config from disk.
+- Profile panel shows ALL imported profiles including hidden ones (unchecked). Hidden profiles are filtered from the new-tab dropdown only.
 
 ## Custom window decorations
 
@@ -210,3 +211,16 @@ On Windows, the default shell is `cmd.exe`. On Unix, it's the user's `$SHELL` (f
 ## File editing
 
 Use **PowerShell** (`Set-Content` / `Get-Content`) for file edits. The Edit tool frequently fails to match strings in this repo because Read tool output may not byte-match the actual file content (tab/space rendering, line ending normalization). PowerShell text replacement is reliable. Only use the Edit tool for trivial single-line changes.
+
+## Git commits
+
+Never use PowerShell here-strings (`@'...'@`) for commit messages — they inject a leading `@` and newline. Use a plain double-quoted message:
+
+```sh
+git commit -m "type: short description
+
+- bullet point
+- bullet point
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
+```
