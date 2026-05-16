@@ -1,4 +1,4 @@
-import { listen } from "@tauri-apps/api/event";
+﻿import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { createElement, Cog } from "lucide";
 import "@xterm/xterm/css/xterm.css";
@@ -14,14 +14,15 @@ import {
   localProfiles, defaultLocalProfile,
   loadSshHosts, loadLocalProfiles, loadConfig,
   configFontFamily, configFontSize, configScrollback,
+  configTabWidthMode,
 } from "./profiles";
 
-// ── DOM refs ──────────────────────────────────────────────────────
+// -- DOM refs ---
 
 const terminalContainer = document.getElementById("terminal-container")!;
 const tabsContainer = document.getElementById("tabs")!;
 
-// scroll — wheel on tab bar → horizontal scroll
+// scroll wheel on tab bar ->horizontal scroll
 tabsContainer.addEventListener("wheel", (e) => {
   if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
     tabsContainer.scrollLeft += e.deltaY;
@@ -32,7 +33,7 @@ tabsContainer.addEventListener("wheel", (e) => {
 document.addEventListener("contextmenu", e => e.preventDefault());
 
 
-// ── welcome screen ─────────────────────────────────────────────────
+// -- welcome screen --
 
 const welcomeEl = document.createElement("div");
 welcomeEl.id = "welcome";
@@ -48,11 +49,11 @@ const welcomeVersion = document.createElement("div");
 welcomeVersion.className = "welcome-version";
 welcomeEl.appendChild(welcomeVersion);
 
-// ── init TabManager ────────────────────────────────────────────────
+// -- init TabManager ---
 
 initTabManager(tabsContainer, terminalContainer, welcomeEl);
 
-// ── PTY output routing ─────────────────────────────────────────────
+// -- PTY output routing ---
 
 listen<PtyOutputPayload>("pty-output", (event) => {
   const { id, data } = event.payload;
@@ -62,7 +63,7 @@ listen<PtyOutputPayload>("pty-output", (event) => {
   }
 });
 
-// ── settings ───────────────────────────────────────────────────────
+// -- settings --
 
 tabManager.setSettingsFactory(createSettingsContent);
 
@@ -79,9 +80,20 @@ setOnSettingsChanged(async () => {
     tab.terminal.options.fontSize = configFontSize;
     tab.terminal.options.scrollback = configScrollback;
   }
+  applyTabWidthMode();
 });
 
-// ── init feature modules ───────────────────────────────────────────
+function applyTabWidthMode(): void {
+  if (configTabWidthMode === "equal") {
+    tabsContainer.classList.add("tabs-equal");
+    tabsContainer.classList.remove("tabs-adaptive");
+  } else {
+    tabsContainer.classList.add("tabs-adaptive");
+    tabsContainer.classList.remove("tabs-equal");
+  }
+}
+
+// -- init feature modules --
 
 tabManager.initNewTabButton();
 initSearchBar();
@@ -89,7 +101,7 @@ initProfileMenu();
 initContextMenu();
 initWindowControls();
 
-// ── initial tab ────────────────────────────────────────────────────
+// -- initial tab --
 
 getVersion().then(v => { welcomeVersion.textContent = "v" + v; }).catch(() => {});
 
@@ -97,6 +109,7 @@ loadSshHosts();
 loadConfig().then(() => {
   return loadLocalProfiles();
 }).then(async () => {
+  applyTabWidthMode();
   const defName = defaultLocalProfile ?? localProfiles[0]?.name ?? null;
   const p = defName ? localProfiles.find(x => x.name === defName) : null;
   if (p) await tabManager.createLocalTab(p.command, p.name);
@@ -104,3 +117,5 @@ loadConfig().then(() => {
 }).catch(() => {
   welcomeEl.style.display = "flex";
 });
+
+

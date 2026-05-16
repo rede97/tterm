@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+﻿import { invoke } from "@tauri-apps/api/core";
 import { SshHost, localProfiles, defaultLocalProfile } from "./profiles";
 import { TerminalTab } from "./tab";
 
@@ -29,7 +29,7 @@ export class TabManager {
     window.addEventListener("resize", () => this._onResize());
   }
 
-  // ── tab creation ─────────────────────────────────────────────────
+  // -- tab creation --
 
   private _createTabElement(tab: TerminalTab): HTMLElement {
     const el = document.createElement("div");
@@ -109,7 +109,7 @@ export class TabManager {
     return tab;
   }
 
-  // ── switch / close ───────────────────────────────────────────────
+  // -- switch / close --
 
   switchTo(id: string): void {
     const wasSettingsOpen = this.settingsOpen;
@@ -203,7 +203,7 @@ export class TabManager {
     });
   }
 
-  // ── tab features ─────────────────────────────────────────────────
+  // -- tab features --
 
   renameTab(id: string): void {
     const tab = this.tabs.get(id);
@@ -256,7 +256,7 @@ export class TabManager {
     for (const tid of ids) this.closeTab(tid);
   }
 
-  // ── settings ─────────────────────────────────────────────────────
+  // -- settings --
 
   setSettingsFactory(fn: () => HTMLElement): void {
     this._createSettingsContent = fn;
@@ -334,7 +334,7 @@ export class TabManager {
     this._closeSettings(restore ?? true);
   }
 
-  // ── resize ───────────────────────────────────────────────────────
+  // -- resize --
 
   private _onResize(): void {
     for (const t of this.tabs.values()) t.needsResize = true;
@@ -352,7 +352,7 @@ export class TabManager {
     }, 10);
   }
 
-  // ── new-tab button ───────────────────────────────────────────────
+  // -- new-tab button --
 
   initNewTabButton(): void {
     const btn = document.getElementById("new-tab")!;
@@ -364,13 +364,13 @@ export class TabManager {
     });
   }
 
-  // ── helpers ──────────────────────────────────────────────────────
+  // -- helpers ---
 
   private _hideWelcome(): void { this._welcomeEl.style.display = "none"; }
   private _showWelcome(): void { this._welcomeEl.style.display = "flex"; }
 }
 
-// ── singleton ─────────────────────────────────────────────────────────
+// -- singleton ---
 
 export const tabManager = new TabManager(null!, null!, null!);
 
@@ -382,3 +382,5 @@ export function initTabManager(
   Object.assign(tabManager, { tabsContainer, terminalContainer, _welcomeEl: welcomeEl });
   return tabManager;
 }
+
+

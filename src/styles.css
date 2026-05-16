@@ -1,4 +1,4 @@
-* {
+﻿* {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -91,7 +91,7 @@ body {
   color: #ffffff;
 }
 
-/* ── profile dropdown menu ───────────────────────────────────────── */
+/* -- profile dropdown menu -- */
 
 .profile-menu {
   position: fixed;
@@ -207,7 +207,7 @@ body {
   color: #ffffff;
 }
 
-/* ── window control SVG icons ─────────────────────────────────────── */
+/* -- window control SVG icons -- */
 
 .win-btn svg {
   display: block;
@@ -258,6 +258,20 @@ body {
   cursor: pointer;
   user-select: none;
   flex-shrink: 0;
+}
+
+/* Equal width: all tabs same size */
+.tabs-equal .tab {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+}
+
+/* Adaptive width: tabs fit title */
+.tabs-adaptive .tab {
+  flex: 0 0 auto;
+  min-width: 80px;
+  max-width: 250px;
 }
 
 .tab.active {
@@ -331,7 +345,7 @@ body {
   padding: 2px;
 }
 
-/* ── xterm.js internal sizing reset ─────────────────────────────────
+/* -- xterm.js internal sizing reset ---
    The global `box-sizing: border-box` conflicts with xterm.js's
    CSS Grid layout which expects `content-box` for precise cell sizing. */
 
@@ -350,7 +364,7 @@ body {
   outline: none;
 }
 
-/* ── xterm built-in scrollbar (VS Code–style, always visible) ───── */
+/* -- xterm built-in scrollbar (VS Code style, always visible) --- */
 
 .terminal-instance .xterm .xterm-scrollable-element > .scrollbar {
   width: 4px !important;
@@ -383,7 +397,7 @@ body {
   pointer-events: auto !important;
 }
 
-/* ── size hint overlay ────────────────────────────────────────────── */
+/* -- size hint overlay -- */
 
 #size-overlay {
   position: absolute;
@@ -411,7 +425,7 @@ body {
   outline: none !important;
 }
 
-/* Override xterm.js built-in black backgrounds — uses !important because
+/* Override xterm.js built-in black backgrounds -- uses !important because
    xterm.css loads as a JS import and may override our stylesheet rules. */
 .terminal-instance .xterm {
   height: 100%;
@@ -427,7 +441,7 @@ body {
   background: #1e1e1e !important;
 }
 
-/* hide native scrollbars inside terminal — xterm DOM scrollbar replaces them */
+/* hide native scrollbars inside terminal -- xterm DOM scrollbar replaces them */
 .terminal-instance ::-webkit-scrollbar,
 .terminal-instance ::-webkit-scrollbar-track,
 .terminal-instance ::-webkit-scrollbar-thumb,
@@ -482,7 +496,7 @@ body {
   background: #1e1e1e;
 }
 
-/* ── tab context menu ──────────────────────────────────────────────── */
+/* -- tab context menu -- */
 
 .tab-context-menu {
   position: fixed;
@@ -533,7 +547,7 @@ body {
   margin: 4px 0;
 }
 
-/* ── color submenu ─────────────────────────────────────────────────── */
+/* -- color submenu -- */
 
 .color-submenu {
   display: none;
@@ -587,7 +601,7 @@ body {
   color: #ffffff;
 }
 
-/* ── search bar ────────────────────────────────────────────────────── */
+/* -- search bar -- */
 
 #search-bar {
   position: absolute;
@@ -646,7 +660,7 @@ body {
   text-align: center;
 }
 
-/* ── welcome screen (no tabs) ─────────────────────────────────────── */
+/* -- welcome screen (no tabs) -- */
 
 #welcome {
   position: absolute;
@@ -679,7 +693,7 @@ body {
   user-select: none;
 }
 
-/* ── settings button ────────────────────────────────────────────────── */
+/* -- settings button -- */
 
 #settings-btn {
   display: flex;
@@ -701,7 +715,7 @@ body {
   color: #ffffff;
 }
 
-/* ── settings page ──────────────────────────────────────────────────── */
+/* -- settings page -- */
 
 .settings-page {
   width: 100%;
@@ -712,7 +726,7 @@ body {
   overflow: hidden;
 }
 
-/* ── sidebar ── */
+/* -- sidebar -- */
 
 .settings-sidebar {
   width: 200px;
@@ -750,7 +764,7 @@ body {
   border-left-color: #0078d4;
 }
 
-/* ── body ── */
+/* -- body -- */
 
 .settings-body {
   flex: 1;
@@ -778,10 +792,63 @@ body {
   margin-bottom: 12px;
 }
 
+.settings-subsection {
+  margin-bottom: 18px;
+}
+
+.settings-subsection-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #999999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.settings-item {
+  margin-bottom: 18px;
+}
+
+.settings-item-title {
+  font-size: 13px;
+  color: #cccccc;
+  margin-bottom: 4px;
+}
+
+.settings-item-desc {
+  font-size: 11px;
+  color: #888888;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.settings-about-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.settings-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.settings-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-item-control {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
 .settings-row {
   display: flex;
   align-items: center;
-  margin-bottom: 8px;
   gap: 12px;
 }
 
@@ -821,7 +888,7 @@ body {
 }
 
 .settings-input-narrow {
-  max-width: 80px;
+  max-width: 120px;
 }
 
 .settings-select {
@@ -1026,3 +1093,5 @@ body {
   background: rgba(255, 255, 255, 0.06);
   color: #f08c62;
 }
+
+

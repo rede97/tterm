@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+﻿import { invoke } from "@tauri-apps/api/core";
 
 export interface SshHost {
   name: string;
@@ -26,12 +26,14 @@ export let configFontFamily = "'JetBrains Mono', Consolas, monospace";
 export let configFontSize = 14;
 export let hiddenProfiles: string[] = [];
 export let configPasteWarning = true;
+export let configPasteTrim = true;
 export let configTerminalBell = false;
 export let configRenderer = "webgl";
-export let configScrollback = 1000;
+export let configScrollback = 20000;
+export let configTabWidthMode = "equal";
 export let configLoaded = false;
 
-// ── SSH hosts ───────────────────────────────────────────────────────
+// -- SSH hosts --
 
 export async function loadSshHosts() {
   try {
@@ -41,7 +43,7 @@ export async function loadSshHosts() {
   }
 }
 
-// ── Windows Terminal profiles ──────────────────────────────────────
+// -- Windows Terminal profiles --
 
 function resolveVsProfile(name: string): string | null {
   if (vsInstalls.length === 0) return null;
@@ -129,7 +131,7 @@ export async function loadLocalProfiles() {
   }
 }
 
-// ── config persistence ─────────────────────────────────────────────
+// -- config persistence ---
 
 function readConfigValues(cfg: any) {
   if (cfg.defaultLocalProfile) defaultLocalProfile = cfg.defaultLocalProfile;
@@ -137,9 +139,11 @@ function readConfigValues(cfg: any) {
   if (typeof cfg.fontSize === "number" && cfg.fontSize >= 10 && cfg.fontSize <= 32) configFontSize = cfg.fontSize;
   if (Array.isArray(cfg.hiddenProfiles)) hiddenProfiles = cfg.hiddenProfiles;
   if (typeof cfg.pasteWarning === "boolean") configPasteWarning = cfg.pasteWarning;
+  if (typeof cfg.pasteTrim === "boolean") configPasteTrim = cfg.pasteTrim;
   if (typeof cfg.terminalBell === "boolean") configTerminalBell = cfg.terminalBell;
   if (typeof cfg.renderer === "string") configRenderer = cfg.renderer;
   if (typeof cfg.scrollback === "number" && cfg.scrollback >= 100 && cfg.scrollback <= 100000) configScrollback = cfg.scrollback;
+  if (typeof cfg.tabWidthMode === "string") configTabWidthMode = cfg.tabWidthMode;
 }
 
 export function getDefaultConfig(): Record<string, unknown> {
@@ -147,9 +151,11 @@ export function getDefaultConfig(): Record<string, unknown> {
     fontFamily: "'JetBrains Mono', Consolas, monospace",
     fontSize: 14,
     pasteWarning: true,
+    pasteTrim: true,
     terminalBell: false,
     renderer: "webgl",
-    scrollback: 1000,
+    scrollback: 20000,
+    tabWidthMode: "equal",
     hiddenProfiles: [],
   };
 }
@@ -186,5 +192,16 @@ export async function saveConfig(partial: Record<string, unknown>) {
 export async function setDefaultProfile(name: string) {
   await saveConfig({ defaultLocalProfile: name });
 }
+export function trimPasteContent(text: string): string {
+  if (!configPasteTrim) return text;
+  return text
+    .trim()
+    .split("\n")
+    .filter(line => line.trim() !== "")
+    .join("\n");
+}
+
 // exposed for settings page
 (window as any).setDefaultProfile = setDefaultProfile;
+
+

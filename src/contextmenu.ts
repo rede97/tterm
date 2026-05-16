@@ -1,5 +1,6 @@
 import { tabManager } from "./tabmanager";
 import { openFind } from "./search";
+import { trimPasteContent } from "./profiles";
 
 const TAB_COLORS = [
   "#e06c75", "#d19a66", "#e5c07b", "#98c379",
@@ -11,27 +12,10 @@ contextMenu.id = "tab-context-menu";
 contextMenu.className = "tab-context-menu";
 document.body.appendChild(contextMenu);
 
+let currentTabId = "";
+
 function closeContextMenu() {
   contextMenu.classList.remove("open");
-}
-
-function addMenuSeparator() {
-  const sep = document.createElement("div");
-  sep.className = "menu-separator";
-  contextMenu.appendChild(sep);
-}
-
-function addMenuAction(label: string, fn: () => void): HTMLElement {
-  const el = document.createElement("div");
-  el.className = "menu-item";
-  el.textContent = label;
-  el.addEventListener("click", (e) => {
-    e.stopPropagation();
-    fn();
-    closeContextMenu();
-  });
-  contextMenu.appendChild(el);
-  return el;
 }
 
 function showAt(x: number, y: number) {
@@ -51,105 +35,184 @@ function showAt(x: number, y: number) {
   });
 }
 
-// ── Tab context menu (shift+right-click on tab bar) ──
+function mkItem(label: string, action: string): HTMLElement {
+  const el = document.createElement("div");
+  el.className = "menu-item";
+  el.textContent = label;
+  el.dataset.action = action;
+  return el;
+}
 
-export function showTabContextMenu(tabId: string, x: number, y: number) {
-  contextMenu.innerHTML = "";
+function mkSeparator(): HTMLElement {
+  const el = document.createElement("div");
+  el.className = "menu-separator";
+  return el;
+}
 
-  // Color submenu
-  const colorItem = document.createElement("div");
-  colorItem.className = "menu-item has-submenu";
-  const colorLabel = document.createElement("span");
-  colorLabel.textContent = "Change Tab Color";
-  colorItem.appendChild(colorLabel);
-  const arrow = document.createElement("span");
-  arrow.className = "menu-arrow";
-  arrow.textContent = "\u203a";
-  colorItem.appendChild(arrow);
-  contextMenu.appendChild(colorItem);
+// -- Tab context menu group --
+const tabMenuGroup = document.createElement("div");
+tabMenuGroup.dataset.group = "tab";
 
-  const colorSub = document.createElement("div");
-  colorSub.className = "color-submenu";
-  const colorGrid = document.createElement("div");
-  colorGrid.className = "color-grid";
-  for (const c of TAB_COLORS) {
-    const swatch = document.createElement("div");
-    swatch.className = "color-swatch";
-    swatch.style.background = c;
-    swatch.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const t = tabManager.get(tabId);
-      if (t) t.setColor(c);
-      closeContextMenu();
-    });
-    colorGrid.appendChild(swatch);
-  }
-  const clearColorBtn = document.createElement("div");
-  clearColorBtn.className = "color-clear";
-  clearColorBtn.textContent = "Reset Color";
-  clearColorBtn.addEventListener("click", (e) => {
+tabMenuGroup.appendChild(mkItem("New Tab", "new-tab"));
+tabMenuGroup.appendChild(mkItem("Open in New Window", "new-window"));
+tabMenuGroup.appendChild(mkSeparator());
+
+// Color submenu
+const colorItem = document.createElement("div");
+colorItem.className = "menu-item has-submenu";
+const colorLabel = document.createElement("span");
+colorLabel.textContent = "Change Tab Color";
+colorItem.appendChild(colorLabel);
+const arrow = document.createElement("span");
+arrow.className = "menu-arrow";
+arrow.textContent = "›";
+colorItem.appendChild(arrow);
+tabMenuGroup.appendChild(colorItem);
+
+const colorSub = document.createElement("div");
+colorSub.className = "color-submenu";
+const colorGrid = document.createElement("div");
+colorGrid.className = "color-grid";
+for (const c of TAB_COLORS) {
+  const swatch = document.createElement("div");
+  swatch.className = "color-swatch";
+  swatch.style.background = c;
+  swatch.dataset.color = c;
+  colorGrid.appendChild(swatch);
+}
+const clearColorBtn = document.createElement("div");
+clearColorBtn.className = "color-clear";
+clearColorBtn.textContent = "Reset Color";
+clearColorBtn.dataset.action = "reset-color";
+colorSub.appendChild(colorGrid);
+colorSub.appendChild(clearColorBtn);
+colorItem.appendChild(colorSub);
+
+colorItem.addEventListener("mouseenter", () => colorSub.classList.add("open"));
+colorItem.addEventListener("mouseleave", () => colorSub.classList.remove("open"));
+
+tabMenuGroup.appendChild(mkItem("Rename", "rename"));
+tabMenuGroup.appendChild(mkItem("Duplicate Tab", "duplicate"));
+tabMenuGroup.appendChild(mkSeparator());
+tabMenuGroup.appendChild(mkItem("Close", "close"));
+tabMenuGroup.appendChild(mkItem("Close Right", "close-right"));
+tabMenuGroup.appendChild(mkItem("Close Others", "close-others"));
+
+contextMenu.appendChild(tabMenuGroup);
+
+// -- Terminal content menu group --
+const termMenuGroup = document.createElement("div");
+termMenuGroup.dataset.group = "term";
+
+termMenuGroup.appendChild(mkItem("Copy", "copy"));
+termMenuGroup.appendChild(mkItem("Paste", "paste"));
+termMenuGroup.appendChild(mkSeparator());
+termMenuGroup.appendChild(mkItem("Clear", "clear"));
+termMenuGroup.appendChild(mkItem("Find", "find"));
+termMenuGroup.appendChild(mkItem("Export Text", "export"));
+
+contextMenu.appendChild(termMenuGroup);
+
+// -- Delegated click handler --
+contextMenu.addEventListener("click", (e) => {
+  const target = e.target as HTMLElement;
+
+  // Color swatch
+  if (target.classList.contains("color-swatch") && target.dataset.color) {
     e.stopPropagation();
-    const t = tabManager.get(tabId);
-    if (t) t.setColor(undefined);
+    const t = tabManager.get(currentTabId);
+    if (t) t.setColor(target.dataset.color);
     closeContextMenu();
-  });
-  colorSub.appendChild(colorGrid);
-  colorSub.appendChild(clearColorBtn);
-  colorItem.appendChild(colorSub);
+    return;
+  }
 
-  colorItem.addEventListener("mouseenter", () => colorSub.classList.add("open"));
-  colorItem.addEventListener("mouseleave", () => colorSub.classList.remove("open"));
+  // Menu item with data-action
+  const item = target.closest("[data-action]") as HTMLElement | null;
+  if (!item) return;
+  e.stopPropagation();
+  const action = item.dataset.action!;
+  dispatch(action);
+  closeContextMenu();
+});
 
-  addMenuAction("Rename", () => tabManager.renameTab(tabId));
-  addMenuAction("Duplicate Tab", () => tabManager.duplicateTab(tabId));
+function dispatch(action: string) {
+  const tabId = currentTabId;
+  switch (action) {
+    case "new-tab":
+      tabManager.createLocalTab();
+      break;
+    case "new-window":
+      import("@tauri-apps/api/core").then(m => m.invoke("open_new_window").catch(console.error));
+      break;
+    case "reset-color": {
+      const t = tabManager.get(tabId);
+      if (t) t.setColor(undefined);
+      break;
+    }
+    case "rename":
+      tabManager.renameTab(tabId);
+      break;
+    case "duplicate":
+      tabManager.duplicateTab(tabId);
+      break;
+    case "close":
+      tabManager.closeTab(tabId);
+      break;
+    case "close-right":
+      tabManager.closeTabsRight(tabId);
+      break;
+    case "close-others":
+      tabManager.closeOtherTabs(tabId);
+      break;
+    case "copy": {
+      const t = tabManager.get(tabId);
+      if (!t) break;
+      const sel = t.terminal.getSelection();
+      if (sel) {
+        const ta = document.createElement("textarea");
+        ta.value = sel;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      break;
+    }
+    case "paste": {
+      const t = tabManager.get(tabId);
+      if (!t) break;
+      navigator.clipboard.readText().then(text => {
+        if (text) t.terminal.paste(trimPasteContent(text));
+      }).catch(() => {});
+      break;
+    }
+    case "clear":
+      tabManager.clearTab(tabId);
+      break;
+    case "find":
+      tabManager.switchTo(tabId);
+      openFind(tabId);
+      break;
+    case "export":
+      tabManager.exportTab(tabId);
+      break;
+  }
+}
 
-  addMenuSeparator();
-
-  addMenuAction("Close", () => tabManager.closeTab(tabId));
-  addMenuAction("Close Right", () => tabManager.closeTabsRight(tabId));
-  addMenuAction("Close Others", () => tabManager.closeOtherTabs(tabId));
-
+// -- Public API --
+export function showTabContextMenu(tabId: string, x: number, y: number) {
+  currentTabId = tabId;
+  tabMenuGroup.style.display = "";
+  termMenuGroup.style.display = "none";
   showAt(x, y);
 }
 
-// ── Terminal content menu (shift+right-click on terminal area) ──
-
 export function showTerminalContextMenu(tabId: string, x: number, y: number) {
-  contextMenu.innerHTML = "";
-
-  addMenuAction("Copy", () => {
-    const t = tabManager.get(tabId);
-    if (!t) return;
-    const sel = t.terminal.getSelection();
-    if (sel) {
-      const ta = document.createElement("textarea");
-      ta.value = sel;
-      ta.style.position = "fixed";
-      ta.style.left = "-9999px";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-    }
-  });
-
-  addMenuAction("Paste", () => {
-    const t = tabManager.get(tabId);
-    if (!t) return;
-    navigator.clipboard.readText().then(text => {
-      if (text) t.terminal.paste(text);
-    }).catch(() => {});
-  });
-
-  addMenuSeparator();
-
-  addMenuAction("Clear", () => tabManager.clearTab(tabId));
-  addMenuAction("Find", () => {
-    tabManager.switchTo(tabId);
-    openFind(tabId);
-  });
-  addMenuAction("Export Text", () => tabManager.exportTab(tabId));
-
+  currentTabId = tabId;
+  tabMenuGroup.style.display = "none";
+  termMenuGroup.style.display = "";
   showAt(x, y);
 }
 

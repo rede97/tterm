@@ -1,20 +1,20 @@
-import { Terminal } from "@xterm/xterm";
+﻿import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { invoke } from "@tauri-apps/api/core";
 import { TabType } from "./types";
-import { SshHost, configFontFamily, configFontSize, configRenderer, configScrollback } from "./profiles";
+import { SshHost, configFontFamily, configFontSize, configRenderer, configScrollback, trimPasteContent } from "./profiles";
 
 /**
- * Hysteresis comparator — clamps current to an acceptable range derived
+ * Hysteresis comparator clamps current to an acceptable range derived
  * from floatVal, preventing oscillation during resize.
  *
- *   floatVal  — continuous value (e.g. 107.3 cols would fit)
- *   current   — current discrete value  (e.g. 107 cols)
- *   th_low    — fraction of char needed below floor to accept floor
- *   th_high   — fraction of char needed above floor to accept ceil
- *   min       — floor clamp (default 2)
+ *   floatVal  continuous value (e.g. 107.3 cols would fit)
+ *   current   current discrete value  (e.g. 107 cols)
+ *   th_low    fraction of char needed below floor to accept floor
+ *   th_high   fraction of char needed above floor to accept ceil
+ *   min       floor clamp (default 2)
  */
 function hysteresis(
   floatVal: number, current: number, th_low: number, th_high: number, min = 2
@@ -112,7 +112,7 @@ export class TerminalTab {
         this.terminal.clearSelection();
       } else {
         navigator.clipboard.readText().then(t => {
-          if (t) this.terminal.paste(t);
+          if (t) this.terminal.paste(trimPasteContent(t));
         }).catch(() => { });
       }
     }, true);
@@ -132,7 +132,7 @@ export class TerminalTab {
 
   /**
    * Pure calculation: how many rows/cols fit in the current container.
-   * No dead zone, no oscillation — just available space / char size.
+   * No dead zone, no oscillation just available space / char size.
    */
   fit(): { cols: number; rows: number } {
     const core = (this.terminal as any)._core;
@@ -208,3 +208,5 @@ export class TerminalTab {
     import("./contextmenu").then(m => m.showTerminalContextMenu(this.id, x, y));
   }
 }
+
+

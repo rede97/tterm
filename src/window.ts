@@ -1,10 +1,10 @@
-import { invoke } from "@tauri-apps/api/core";
+﻿import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createElement, Minus, Square, Copy, X } from "lucide";
 
 const appWindow = getCurrentWindow();
 
-// ── maximize icon ───────────────────────────────────────────────────
+// -- maximize icon ----
 
 const btnMaximize = document.getElementById("btn-maximize")!;
 
@@ -18,7 +18,7 @@ async function updateMaximizeIcon() {
   } catch (_) {}
 }
 
-// ── drag ────────────────────────────────────────────────────────────
+// -- drag ----
 
 function initDrag() {
   const tabBar = document.getElementById("tab-bar")!;
@@ -43,7 +43,7 @@ function initDrag() {
   });
 }
 
-// ── window control buttons ──────────────────────────────────────────
+// -- window control buttons ----
 
 function initWindowButtons() {
   const tabBar = document.getElementById("tab-bar")!;
@@ -73,7 +73,7 @@ function initWindowButtons() {
   });
 }
 
-// ── icons ───────────────────────────────────────────────────────────
+// -- icons ---
 
 function injectIcons() {
   const btnMinimize = document.getElementById("btn-minimize")!;
@@ -89,7 +89,7 @@ function injectIcons() {
   btnClose.appendChild(createElement(X, { stroke: "currentColor", width: 14, height: 14 }));
 }
 
-// ── init ────────────────────────────────────────────────────────────
+// -- init ----
 
 export function initWindowControls() {
   initDrag();
@@ -101,3 +101,5 @@ export function initWindowControls() {
     updateMaximizeIcon();
   });
 }
+
+

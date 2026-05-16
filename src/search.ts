@@ -1,6 +1,6 @@
-import { tabManager } from "./tabmanager";
+﻿import { tabManager } from "./tabmanager";
 
-// ── DOM ──────────────────────────────────────────────────────────────
+// -- DOM --
 
 const searchBar = document.createElement("div");
 searchBar.id = "search-bar";
@@ -12,11 +12,11 @@ searchInput.placeholder = "Find...";
 searchBar.appendChild(searchInput);
 
 const searchPrev = document.createElement("button");
-searchPrev.textContent = "▲";
+searchPrev.textContent = "^";
 searchBar.appendChild(searchPrev);
 
 const searchNext = document.createElement("button");
-searchNext.textContent = "▼";
+searchNext.textContent = "^";
 searchBar.appendChild(searchNext);
 
 const searchResults = document.createElement("span");
@@ -24,11 +24,11 @@ searchResults.id = "search-results";
 searchBar.appendChild(searchResults);
 
 const searchClose = document.createElement("button");
-searchClose.textContent = "✕";
+searchClose.textContent = "x";
 searchClose.className = "search-close";
 searchBar.appendChild(searchClose);
 
-// ── functions ────────────────────────────────────────────────────────
+// -- functions --
 
 function currentTab() {
   const tabId = searchInput.dataset.tabId;
@@ -69,7 +69,7 @@ export function openFind(tabId: string) {
   searchInput.focus();
 }
 
-// ── init ─────────────────────────────────────────────────────────────
+// -- init --
 
 export function initSearchBar() {
   const container = document.getElementById("terminal-container")!;
@@ -94,3 +94,6 @@ export function initSearchBar() {
   searchPrev.addEventListener("click", doFindPrev);
   searchClose.addEventListener("click", closeFind);
 }
+
+
+
