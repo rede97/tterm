@@ -43,16 +43,20 @@ jobs:
           echo "path=$exe" >> $env:GITHUB_OUTPUT
           echo "name=$($exe.Name)" >> $env:GITHUB_OUTPUT
 
-      - name: Extract tag body to file
+      - name: Extract tag message to file
         shell: pwsh
         run: |
-          $body = git tag -l --format='%(contents:body)' $env:GITHUB_REF_NAME
-          if ([string]::IsNullOrWhiteSpace($body)) {
-            $body = git tag -l --format='%(contents)' $env:GITHUB_REF_NAME
-            Write-Host "WARNING: body was empty, falling back to full contents"
+          $raw = git cat-file tag $env:GITHUB_REF_NAME
+          # Tag object format: headers (object/type/tag/tagger), blank line, message
+          $inBody = $false
+          $lines = @()
+          foreach ($line in ($raw -split "`n")) {
+            if ($inBody) { $lines += $line }
+            elseif ($line -eq '') { $inBody = $true }
           }
-          $body | Out-File -FilePath release-notes.md -Encoding utf8
-          Write-Host "Release notes length: $($body.Length) chars"
+          $body = $lines -join "`n"
+          $body | Out-File -FilePath release-notes.md -Encoding utf8 -NoNewline
+          Write-Host "Release notes: $($lines.Count) lines, $($body.Length) chars"
 
       - name: Create release
         uses: softprops/action-gh-release@v2
