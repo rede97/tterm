@@ -110,7 +110,7 @@ export function createSettingsContent(): HTMLElement {
 
   // reset all settings
   panelGeneral.querySelector("#set-reset-all")!.addEventListener("click", async () => {
-    await invoke("write_config", { content: "{}" });
+    await invoke("delete_config");
     await loadConfig();
     refreshForm(root);
     feedback.textContent = "All settings cleared";

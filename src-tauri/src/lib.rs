@@ -345,6 +345,16 @@ fn write_config(app: tauri::AppHandle, content: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn delete_config(app: tauri::AppHandle) -> Result<(), String> {
+    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    let file = config_dir.join("config.json");
+    if file.exists() {
+        std::fs::remove_file(&file).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn pty_spawn_ssh(state: tauri::State<AppState>, app: tauri::AppHandle, hostname: String, port: u16, user: String) -> Result<String, String> {
     let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
     let id = format!("tab-{}", *next);
@@ -591,7 +601,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, save_text_file, pty_write, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, ssh_list_hosts, open_config_dir, read_wt_settings, read_wt_fragments, find_vs_instances, read_config, write_config])
+        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, save_text_file, pty_write, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, ssh_list_hosts, open_config_dir, read_wt_settings, read_wt_fragments, find_vs_instances, read_config, write_config, delete_config])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
