@@ -4,47 +4,71 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Runtime
 
-Prefer **Bun** over npm/node for all package scripts (faster installs, faster dev server). The project still supports npm as fallback, but `bun run` is the default.
+Use **Bun** (`bun run <script>`). Fall back to `npm run` if unavailable.
+
+```sh
+bun run build        # tsc typecheck + vite build (always do this before committing)
+bun run tauri dev    # full Tauri app in dev mode
+bun run tauri build  # production binary
+```
+
+No tests or linters are configured.
 
 ## Project
 
 A multi-tab desktop terminal emulator (TTerm) built with Tauri v2. The frontend is vanilla TypeScript + Vite using xterm.js to render terminals. The Rust backend spawns native shells via PTY (pseudo-terminal) and pipes I/O between each shell and its corresponding tab.
 
-## Commands
-
-```sh
-bun run dev          # Start Vite dev server (frontend only)
-bun run build        # Typecheck + build frontend
-bun run tauri dev    # Start full Tauri app in dev mode
-bun run tauri build  # Build production Tauri binary
-```
-
-Use `bun` for running scripts; fall back to `npm run` if bun is unavailable.
-
-There are no tests or linters configured yet.
-
 ## Architecture
 
-### Frontend (`src/`, `index.html`)
+### Tab system (`src/tab.ts`, `src/tabmanager.ts`)
 
-- `index.html` — `#tab-bar` (tabs, new-tab button, drag-spacer, window controls) + `#terminal-container`
-- `src/main.ts` — `Tab` interface (with `needsResize` flag), `tabs: Map<string, Tab>`, terminal factory, tab bar UI, context menu, window controls, resize handling
-- `src/profiles.ts` — extracted profile/config module: types (`SshHost`, `LocalProfile`, `VsInstallation`), state (`sshHosts`, `localProfiles`, `vsInstalls`, `defaultLocalProfile`), WT profile parsing (settings.json + fragment extensions), config persistence
-- `src/styles.css` — VS Code-style tab bar (#252526), dark terminal theme (#1e1e1e), unified scrollbar styling
+- **`src/tab.ts`** — `TerminalTab` class. Each tab owns: terminal, xterm, DOM, color, index (`index`), search state (`searchQuery`), context menu handler. Key methods:
+  - `show()` — `display:""`, add `active`, `terminal.focus()`
+  - `hide()` — `display:"none"`, remove `active`, set `needsResize = true`
+  - `fit()` — hysteresis-based calculation, returns `{ cols, rows }` and resizes terminal
+  - `fitDeferred()` — double-rAF fit; aborts if hidden. Calls `pty_resize` on complete.
+  - `setColor()`, `rename()`, `destroy()` — self-explanatory
+
+- **`src/tabmanager.ts`** — `TabManager` class (singleton: `tabManager`). Owns tab Map, active tab, settings, resize, new-tab button.
+  - `switchTo(id)` — closes settings first if open; if same tab was hidden by settings, re-shows it
+  - `toggleSettings()` — opens only (no-op if already open); close via tab close button or terminal tab click
+  - `refreshBadges()` — queries `.tab[data-tab-id^="tab-"]` (skips `#settings`); sets `tab.index` per tab
+  - `closeTab(id)` — kills PTY, destroys terminal, switches to neighbor (skipping settings tab), refreshes badges
+
+- **`src/state.ts`** — `appState` as alias for `tabManager`. Do NOT add new state here.
+- **`src/terminal.ts`** — ORPHANED (no imports). Old `createTerminal`/`applyFit`/`showSizeHint`; kept for reference.
+- **`src/tabs.ts`** — DELETED. Migrated to `tab.ts` + `tabmanager.ts`.
+
+### Circular dependencies: DO NOT introduce
+
+- `tab.ts` must NEVER import `tabmanager.ts`. `fitDeferred()` uses `this` only.
+- `contextmenu.ts` imports `tabManager`; `tabmanager.ts` and `tab.ts` dynamically import `contextmenu.ts` (no cycle).
+
+### Other frontend modules
+
+| File | Role |
+|---|---|
+| `src/main.ts` | Init `TabManager`, PTY listener, settings button, welcome screen, calls all `init*()` |
+| `src/profiles.ts` | SSH/WT profiles, config persistence, font defaults |
+| `src/settings.ts` | Settings page (sidebar layout), `createSettingsContent()`, feedback/reset/apply |
+| `src/window.ts` | Window controls (min/max/close), drag handling, maximize/restore icon toggle |
+| `src/search.ts` | Search bar; per-tab `searchQuery` save/restore via `TerminalTab` |
+| `src/profilemenu.ts` | New-tab dropdown (Local / SSH columns) |
+| `src/contextmenu.ts` | Two menus: `showTabContextMenu` (tab bar right-click) and `showTerminalContextMenu` (shift+right-click on terminal) |
+| `src/types.ts` | `PtyOutputPayload`, `TabType`, `Tab` interface |
 
 ### Backend (`src-tauri/`)
 
+- `src-tauri/src/lib.rs` — Tauri builder, PTY management, SSH config parsing, WT profile/fragment loading, config I/O, plugin registration
 - `src-tauri/src/main.rs` — entry point, calls `tterm_lib::run()`
-- `src-tauri/src/lib.rs` — Tauri builder setup, PTY session management, SSH config parsing, VS instance discovery, WT fragment loading, config persistence
-- `src-tauri/build.rs` — standard `tauri_build::build()`
-- `src-tauri/tauri.conf.json` — product name "TTerm", window config (no decorations), NSIS installer, icon paths
+- `src-tauri/capabilities/default.json` — permissions (core, window, opener, window-state)
+- Plugins: `tauri-plugin-window-state` (auto save/restore window size, position, maximize), `tauri-plugin-dialog`, `tauri-plugin-opener`
 
-### PTY session model (`lib.rs`)
+### PTY session model
 
 - `AppState` holds `HashMap<String, PtySession>` + `next_id` counter + `initial_cwd: Option<PathBuf>` (set via `--working-directory` CLI arg)
 - `PtySession` stores the PTY `master` (for resize) and `writer` (for write)
 - Each tab spawns a dedicated shell process and background read thread
-- `apply_initial_cwd()` sets the working directory on CommandBuilder before spawn
 
 ### Communication model
 
@@ -69,21 +93,7 @@ Frontend → Backend: Tauri `invoke()` commands:
 | `ssh_list_hosts` | — | parse `~/.ssh/config`, return host list |
 | `save_text_file` | `content` | save text to file via native save dialog |
 
-Backend → Frontend: Tauri events (`pty-output`)
-
-| event | payload | purpose |
-|---|---|---|
-| `pty-output` | `{ id: string, data: number[] }` | shell output routed to correct tab |
-
-User keystrokes go `xterm.js` → `pty_write` invoke → Rust writes to PTY stdin.
-Shell output goes PTY stdout → Rust reads → `pty-output` event → `term.write()`.
-
-## Key dependencies
-
-- Frontend: `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-search`, `@tauri-apps/api`
-- Backend: `tauri` v2, `portable-pty` (cross-platform PTY), `serde`, `serde_json`
-- Icons: `lucide` (MIT-licensed SVG icon library, stroke-based, consistent 2px weight)
-- Icon generation: `sharp` (devDependency, used to rasterize `src/assets/tterm.svg` into platform icon formats)
+Backend → Frontend: `pty-output` event `{ id: string, data: number[] }`.
 
 ## Profile loading flow
 
@@ -92,7 +102,7 @@ Shell output goes PTY stdout → Rust reads → `pty-output` event → `term.wri
    - `%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_*\LocalState\Fragments\<ext>\*.json`
    - `%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\<ext>\*.json`
    - `%ProgramData%\Microsoft\Windows Terminal\Fragments\<ext>\*.json`
-   
+
    Frontend parses both sources. Profiles with `commandline` are used directly. For profiles without `commandline`:
    - `source: "Windows.Terminal.VisualStudio"` → resolved via vswhere-discovered VS instances
    - `source: "Windows.Terminal.Wsl"` → `wsl.exe -d "<name>"`
@@ -105,13 +115,51 @@ Shell output goes PTY stdout → Rust reads → `pty-output` event → `term.wri
 
 Two-column layout (Local | SSH) with a vertical divider. Centered on the new-tab menu button, clamped to viewport edges on overflow. Each profile item has a Lucide icon, label, optional detail text, and click-to-launch.
 
-## Lazy resize
+## Right-click behavior (split menus)
 
-`Tab.needsResize` flag avoids resize-all-lag when switching tabs. On window resize: all tabs marked dirty, only active tab fitted + PTY-resized (flag cleared). On tab switch: if the entered tab has `needsResize`, `applyFit()` + `pty_resize` fires, flag cleared. Only 2 tabs ever resize per switch — the one left and the one entered.
+| Trigger | Action |
+|---|---|
+| Right-click on **tab** | Tab operations (Change Color, Rename, Duplicate, Close, Close Right, Close Others) |
+| **Shift+right-click** on terminal | Content operations (Copy, Paste, Clear, Find, Export Text) |
+| Right-click on terminal (no shift) | Copy if selected (`execCommand("copy")`), Paste if not (`clipboard.readText`) |
 
-## Fit tolerance (resize flicker prevention)
+- Terminal right-click uses **capture phase** (`addEventListener(…, true)`) to fire before xterm.js internal handler.
+- Copy uses `execCommand("copy")` + hidden textarea (NOT `navigator.clipboard.writeText`) to avoid browser clipboard permission prompt.
+- Global `document.addEventListener("contextmenu", e => e.preventDefault())` blocks all browser native context menus.
 
-`applyFit()` uses `proposeDimensions()` (read-only) to get suggested dimensions, applies 10% char-height tolerance before shrinking rows/cols. This prevents grid resize oscillation from sub-pixel overflow.
+## Terminal rendering gotchas
+
+- **Never** add `will-change: transform` or `transform: translateZ(0)` on `.terminal-instance .xterm` — forces GPU compositing layer, causes sub-pixel gaps between monospace glyphs.
+- **Always** keep `outline: none !important` on `.terminal-instance .xterm textarea:focus` — Chrome draws dashed focus ring on xterm's hidden textarea.
+
+## Tab switching & resize
+
+- `TerminalTab.hide()` always sets `needsResize = true`. `show()` does NOT fit.
+- `TabManager.switchTo()` handles `wasSettingsOpen`: if same tab was hidden by settings, re-shows it.
+- Window resize: all tabs marked dirty; only active tab fitted immediately (debounced 10ms).
+
+## Fit & hysteresis
+
+`TerminalTab.fit()` uses a hysteresis function (`src/tab.ts:18`) that computes an acceptable integer range from `floatVal` and clamps current to it:
+
+```
+hysteresis(floatVal, current, th_low, th_high, min=2)
+```
+
+- **Cols**: `th_low=0.8, th_high=0.9` — grows only when fractional part > 90% of a char
+- **Rows**: `th_low=0.98, th_high=1.0` — never grows past floor; shrinks immediately
+- Pure function: no reference to `floatVal - current` gap. Avoids oscillation from intermediate resize animation frames.
+- `min=2` floor clamp prevents degenerate grid.
+
+`fitDeferred()` uses double-rAF; aborts if terminal is hidden (`display: none`).
+
+## Settings page
+
+- Layout: **sidebar** (`flex-direction: row`). `.settings-sidebar` left (200px, `#252526`), `.settings-body` right.
+- Settings tab created in `_openSettings()`, removed from DOM on close. `data-tab-id="#settings"` excluded from badge counting.
+- `toggleSettings()` opens only (no-op if open). Close via: tab close button, or switching to any terminal tab.
+- Two panels: General (font family/size, default profile) and Windows Terminal (profile visibility toggles).
+- Footer: `[feedback text] … … [▲ Reset] [Apply]`. Apply saves config, turns gray on save, re-enables on any input change. Reset dropdown: "Reset Changes" (reload from disk), "Reset All" (clear config file).
 
 ## Custom window decorations
 
@@ -124,13 +172,22 @@ Window dragging: `mousedown` on tab bar registers `mousemove` listener. Only if 
 
 Maximize/restore icon toggle: `#btn-maximize` holds two Lucide icons (`.ico-max` Square, `.ico-restore` Copy). The `updateMaximizeIcon()` function checks `appWindow.isMaximized()` and toggles the `.restore` CSS class, which swaps visibility via `display: none/block`.
 
-## xterm.js v6 scrollbar
+Window state save/restore is handled entirely by `tauri-plugin-window-state`. Do NOT write custom save/restore code.
 
-xterm.js v6 uses a custom DOM scrollbar (`.xterm-scrollable-element > .scrollbar > .scra`), not native `::-webkit-scrollbar`. The `.xterm-viewport` must keep `overflow-y: scroll` for scrolling to work — setting `overflow: hidden` will clip terminal content. Native scrollbars inside `.terminal-instance` are hidden via `::-webkit-scrollbar { display: none }`, so only the styled DOM scrollbar is visible. The tab bar uses a wheel event listener to map vertical scroll → horizontal `scrollLeft`.
+## xterm.js scrollbar
 
-## File editing
+Custom DOM scrollbar (`.xterm-scrollable-element > .scrollbar > .scra`). 4px wide, `1px` from window right edge (via `#terminal-container` padding). Idle opacity 0.08, hover expands to 10px width with 0.6 opacity. `.xterm-viewport` MUST keep `overflow-y: scroll`. xterm grid bottom-aligned (`align-content: end`).
 
-Use **PowerShell** (`Set-Content` / `Get-Content`) for file edits. The Edit tool frequently fails to match strings in this repo because Read tool output may not byte-match the actual file content (tab/space rendering, line ending normalization). PowerShell text replacement is reliable. Only use the Edit tool for trivial single-line changes.
+## Search state
+
+Per-tab: `TerminalTab.searchQuery` saved on close and input events, restored on open.
+
+## Key dependencies
+
+- Frontend: `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-search`, `@xterm/addon-webgl`, `@tauri-apps/api`
+- Backend: `tauri` v2, `portable-pty` (cross-platform PTY), `serde`, `serde_json`
+- Icons: `lucide` (MIT-licensed SVG icon library, stroke-based, consistent 2px weight)
+- Icon generation: `sharp` (devDependency, rasterize `src/assets/tterm.svg` into platform icon formats)
 
 ## Icon generation
 
@@ -148,4 +205,8 @@ const targets = [[32,'32x32.png'],[128,'128x128.png'],[256,'128x128@2x.png'],[51
 
 ## Platform notes
 
-On Windows, the default shell is `cmd.exe`. On Unix, it's the user's `$SHELL` (fallback `/bin/sh`). `portable-pty` abstracts PTY resize and process handling across platforms. The Vite dev server binds `127.0.0.1` explicitly (not `::1`) because IPv6 loopback has connectivity issues on Windows. `AppState.initial_cwd` is populated from the `--working-directory` CLI argument (passed by Windows Terminal integration). VS instances are discovered via `vswhere.exe` with a fallback to scanning common `Program Files` paths.
+On Windows, the default shell is `cmd.exe`. On Unix, it's the user's `$SHELL` (fallback `/bin/sh`). Vite dev server binds `127.0.0.1` explicitly (not `::1`) because IPv6 loopback has connectivity issues on Windows. `AppState.initial_cwd` is populated from the `--working-directory` CLI argument (passed by Windows Terminal integration). VS instances are discovered via `vswhere.exe` with a fallback to scanning common `Program Files` paths.
+
+## File editing
+
+Use **PowerShell** (`Set-Content` / `Get-Content`) for file edits. The Edit tool frequently fails to match strings in this repo because Read tool output may not byte-match the actual file content (tab/space rendering, line ending normalization). PowerShell text replacement is reliable. Only use the Edit tool for trivial single-line changes.
