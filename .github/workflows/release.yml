@@ -43,19 +43,21 @@ jobs:
           echo "path=$exe" >> $env:GITHUB_OUTPUT
           echo "name=$($exe.Name)" >> $env:GITHUB_OUTPUT
 
-      - name: Extract tag message to file
+      - name: Extract release notes from CHANGELOG.md
         shell: pwsh
         run: |
-          git fetch -f origin "refs/tags/${env:GITHUB_REF_NAME}:refs/tags/${env:GITHUB_REF_NAME}" --no-tags
-          $raw = git cat-file tag $env:GITHUB_REF_NAME
-          # Tag object format: headers (object/type/tag/tagger), blank line, message
-          $inBody = $false
+          $changelog = Get-Content CHANGELOG.md -Raw
+          $inSection = $false
           $lines = @()
-          foreach ($line in ($raw -split "`n")) {
-            if ($inBody) { $lines += $line }
-            elseif ($line -eq '') { $inBody = $true }
+          foreach ($line in ($changelog -split "`n")) {
+            if ($line -match '^## v') {
+              if ($inSection) { break }
+              $inSection = $true
+              continue
+            }
+            if ($inSection) { $lines += $line }
           }
-          $body = $lines -join "`n"
+          $body = ($lines -join "`n").Trim()
           $body | Out-File -FilePath release-notes.md -Encoding utf8 -NoNewline
           Write-Host "Release notes: $($lines.Count) lines, $($body.Length) chars"
 
