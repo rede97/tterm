@@ -25,6 +25,8 @@ export let defaultLocalProfile: string | null = null;
 export let configFontFamily = "'JetBrains Mono', Consolas, monospace";
 export let configFontSize = 14;
 export let hiddenProfiles: string[] = [];
+export let configPasteWarning = true;
+export let configTerminalBell = false;
 export let configLoaded = false;
 
 // ── SSH hosts ───────────────────────────────────────────────────────
@@ -130,6 +132,8 @@ function readConfigValues(cfg: any) {
   if (typeof cfg.fontFamily === "string") configFontFamily = cfg.fontFamily;
   if (typeof cfg.fontSize === "number" && cfg.fontSize >= 10 && cfg.fontSize <= 32) configFontSize = cfg.fontSize;
   if (Array.isArray(cfg.hiddenProfiles)) hiddenProfiles = cfg.hiddenProfiles;
+  if (typeof cfg.pasteWarning === "boolean") configPasteWarning = cfg.pasteWarning;
+  if (typeof cfg.terminalBell === "boolean") configTerminalBell = cfg.terminalBell;
 }
 
 export async function loadConfig() {

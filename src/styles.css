@@ -953,6 +953,22 @@ body {
   color: #ffffff;
 }
 
+.settings-value {
+  color: #cccccc;
+  font-size: 13px;
+}
+
+.settings-link {
+  color: #4da6ff;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.settings-link:hover {
+  color: #6bb8ff;
+  text-decoration: underline;
+}
+
 .settings-btn {
   padding: 6px 20px;
   background: #0078d4;
@@ -973,4 +989,40 @@ body {
   background: #555555;
   color: #888888;
   cursor: default;
+}
+
+.settings-btn-revert {
+  background: #3c3c3c;
+  color: #cccccc;
+}
+
+.settings-btn-revert:hover {
+  background: #4a4a4a;
+  color: #ffffff;
+}
+
+.settings-link-btn {
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #4da6ff;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+}
+
+.settings-link-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #6bb8ff;
+}
+
+.settings-link-btn-danger {
+  color: #e8734a;
+}
+
+.settings-link-btn-danger:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f08c62;
 }

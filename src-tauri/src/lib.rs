@@ -563,6 +563,16 @@ fn ssh_list_hosts() -> Result<Vec<SshHost>, String> {
     Ok(parse_ssh_config(&content))
 }
 
+#[tauri::command]
+fn open_config_dir(app: tauri::AppHandle) -> Result<(), String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    #[cfg(target_os = "windows")]
+    { std::process::Command::new("explorer").arg(&dir).spawn().map_err(|e| e.to_string())?; }
+    #[cfg(not(target_os = "windows"))]
+    { std::process::Command::new("open").arg(&dir).spawn().map_err(|e| e.to_string())?; }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -581,7 +591,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, save_text_file, pty_write, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, ssh_list_hosts, read_wt_settings, read_wt_fragments, find_vs_instances, read_config, write_config])
+        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, save_text_file, pty_write, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, ssh_list_hosts, open_config_dir, read_wt_settings, read_wt_fragments, find_vs_instances, read_config, write_config])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
