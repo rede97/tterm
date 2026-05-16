@@ -8,7 +8,7 @@ searchBar.style.display = "none";
 
 const searchInput = document.createElement("input");
 searchInput.type = "text";
-searchInput.placeholder = "查找...";
+searchInput.placeholder = "Find...";
 searchBar.appendChild(searchInput);
 
 const searchPrev = document.createElement("button");
@@ -48,14 +48,14 @@ function doFindNext() {
   const tab = currentTab();
   if (!tab?.searchAddon || !searchInput.value) return;
   const found = tab.searchAddon.findNext(searchInput.value);
-  searchResults.textContent = found ? "" : "无结果";
+  searchResults.textContent = found ? "" : "No results";
 }
 
 function doFindPrev() {
   const tab = currentTab();
   if (!tab?.searchAddon || !searchInput.value) return;
   const found = tab.searchAddon.findPrevious(searchInput.value);
-  searchResults.textContent = found ? "" : "无结果";
+  searchResults.textContent = found ? "" : "No results";
 }
 
 export function openFind(tabId: string) {

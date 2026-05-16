@@ -29,12 +29,12 @@ export function createSettingsContent(): HTMLElement {
 
   const navGeneral = document.createElement("button");
   navGeneral.className = "settings-nav-item active";
-  navGeneral.textContent = "General";
+  navGeneral.textContent = "Appearance";
   navGeneral.dataset.panel = "general";
 
   const navWt = document.createElement("button");
   navWt.className = "settings-nav-item";
-  navWt.textContent = "Windows Terminal";
+  navWt.textContent = "Profile";
   navWt.dataset.panel = "wt";
 
   sidebar.appendChild(navGeneral);
@@ -59,14 +59,6 @@ export function createSettingsContent(): HTMLElement {
       <div class="settings-row">
         <label class="settings-label">Size</label>
         <input type="number" id="set-font-size" class="settings-input settings-input-narrow" value="${configFontSize}" min="10" max="32" step="1" />
-      </div>
-    </div>
-    <div class="settings-section">
-      <div class="settings-section-title">Default Profile</div>
-      <div class="settings-row">
-        <select id="set-default-profile" class="settings-select">
-          ${localProfiles.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("")}
-        </select>
       </div>
     </div>
   `;
@@ -198,8 +190,16 @@ function refreshForm(root: HTMLElement) {
 function renderWtPanel(container: HTMLElement) {
   container.innerHTML = `
     <div class="settings-section">
+      <div class="settings-section-title">Default Profile</div>
+      <div class="settings-row">
+        <select id="set-default-profile" class="settings-select">
+          ${localProfiles.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+    <div class="settings-section">
       <div class="settings-row settings-row-header">
-        <span>Profiles loaded from Windows Terminal</span>
+        <span>Imported Profiles</span>
         <span class="settings-hint">Uncheck to hide</span>
       </div>
       ${localProfiles.map(p => {
