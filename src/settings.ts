@@ -198,10 +198,8 @@ function renderWtPanel(container: HTMLElement) {
       </div>
     </div>
     <div class="settings-section">
-      <div class="settings-row settings-row-header">
-        <span>Imported Profiles</span>
-        <span class="settings-hint">Uncheck to hide</span>
-      </div>
+      <div class="settings-section-title">Imported Profiles</div>
+      <div class="settings-hint">Uncheck to hide</div>
       ${localProfiles.map(p => {
         const checked = !hiddenProfiles.includes(p.name);
         return `<label class="settings-toggle-row">

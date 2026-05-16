@@ -60,7 +60,6 @@ function resolveVsProfile(name: string): string | null {
 function addProfile(item: any) {
   if (item.hidden) return;
   const src = (item.source || "") as string;
-  if (/azure/i.test(src)) return;
   const name: string | null | undefined = item.name;
   if (!name) return;
   let command: string | null | undefined = item.commandline;
