@@ -1,4 +1,4 @@
-import { localProfiles, configFontFamily, configFontSize, hiddenProfiles, configPasteWarning, configTerminalBell, saveConfig, loadConfig } from "./profiles";
+import { localProfiles, configFontFamily, configFontSize, hiddenProfiles, configPasteWarning, configTerminalBell, configRenderer, saveConfig, loadConfig } from "./profiles";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -70,6 +70,13 @@ export function createSettingsContent(): HTMLElement {
     </div>
     <div class="settings-section">
       <div class="settings-section-title">Terminal</div>
+      <div class="settings-row">
+        <label class="settings-label">Renderer</label>
+        <select id="set-renderer" class="settings-select">
+          <option value="webgl" ${configRenderer === "webgl" ? "selected" : ""}>WebGL</option>
+          <option value="canvas" ${configRenderer === "canvas" ? "selected" : ""}>Canvas</option>
+        </select>
+      </div>
       <label class="settings-toggle-row">
         <input type="checkbox" id="set-paste-warning" ${configPasteWarning ? "checked" : ""} />
         <span>Multi-line paste warning</span>
@@ -225,6 +232,8 @@ function refreshForm(root: HTMLElement) {
   }
   if (pasteWarnEl) pasteWarnEl.checked = configPasteWarning;
   if (bellEl) bellEl.checked = configTerminalBell;
+  const rendererEl = root.querySelector("#set-renderer") as HTMLSelectElement;
+  if (rendererEl) rendererEl.value = configRenderer;
   checks.forEach(c => {
     c.checked = !hiddenProfiles.includes(c.value);
   });
@@ -269,6 +278,8 @@ async function applySettings(root: HTMLElement) {
   if (profileEl) partial.defaultLocalProfile = profileEl.value;
   if (pasteWarnEl) partial.pasteWarning = pasteWarnEl.checked;
   if (bellEl) partial.terminalBell = bellEl.checked;
+  const rendererEl = root.querySelector("#set-renderer") as HTMLSelectElement;
+  if (rendererEl) partial.renderer = rendererEl.value;
 
   const hidden: string[] = [];
   checks.forEach(c => { if (!c.checked) hidden.push(c.value); });

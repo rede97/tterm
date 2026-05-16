@@ -27,6 +27,7 @@ export let configFontSize = 14;
 export let hiddenProfiles: string[] = [];
 export let configPasteWarning = true;
 export let configTerminalBell = false;
+export let configRenderer = "webgl";
 export let configLoaded = false;
 
 // ── SSH hosts ───────────────────────────────────────────────────────
@@ -70,6 +71,8 @@ function addProfile(item: any) {
       command = resolveVsProfile(name);
     } else if (/terminal\.wsl/i.test(src)) {
       command = `wsl.exe -d "${name}"`;
+    } else if (/terminal\.azure/i.test(src)) {
+      command = `wt.exe -p "${name}"`;
     }
   }
   if (!command && !item.source) {
@@ -134,6 +137,18 @@ function readConfigValues(cfg: any) {
   if (Array.isArray(cfg.hiddenProfiles)) hiddenProfiles = cfg.hiddenProfiles;
   if (typeof cfg.pasteWarning === "boolean") configPasteWarning = cfg.pasteWarning;
   if (typeof cfg.terminalBell === "boolean") configTerminalBell = cfg.terminalBell;
+  if (typeof cfg.renderer === "string") configRenderer = cfg.renderer;
+}
+
+export function getDefaultConfig(): Record<string, unknown> {
+  return {
+    fontFamily: "'JetBrains Mono', Consolas, monospace",
+    fontSize: 14,
+    pasteWarning: true,
+    terminalBell: false,
+    renderer: "webgl",
+    hiddenProfiles: [],
+  };
 }
 
 export async function loadConfig() {
@@ -141,6 +156,12 @@ export async function loadConfig() {
     const raw = await invoke<string>("read_config");
     const cfg = JSON.parse(raw);
     readConfigValues(cfg);
+    const isEmpty = Object.keys(cfg).length === 0;
+    if (isEmpty) {
+      const defaults = getDefaultConfig();
+      readConfigValues(defaults);
+      await saveConfig(defaults);
+    }
     return cfg;
   } catch {
     configLoaded = true;

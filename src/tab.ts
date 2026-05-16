@@ -4,7 +4,7 @@ import { SearchAddon } from "@xterm/addon-search";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { invoke } from "@tauri-apps/api/core";
 import { TabType } from "./types";
-import { SshHost, configFontFamily, configFontSize } from "./profiles";
+import { SshHost, configFontFamily, configFontSize, configRenderer } from "./profiles";
 
 /**
  * Hysteresis comparator — clamps current to an acceptable range derived
@@ -83,7 +83,7 @@ export class TerminalTab {
     this.terminal.loadAddon(this.fitAddon);
     this.searchAddon = new SearchAddon();
     this.terminal.loadAddon(this.searchAddon);
-    this.terminal.loadAddon(new WebglAddon());
+    if (configRenderer === "webgl") this.terminal.loadAddon(new WebglAddon());
     this.terminal.open(this.element);
 
     this.xtermEl = this.element.querySelector(".xterm") as HTMLElement;
