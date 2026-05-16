@@ -8,6 +8,8 @@ on:
 jobs:
   release:
     runs-on: windows-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     permissions:
       contents: write
     steps:
@@ -41,18 +43,20 @@ jobs:
           echo "path=$exe" >> $env:GITHUB_OUTPUT
           echo "name=$($exe.Name)" >> $env:GITHUB_OUTPUT
 
-      - name: Extract tag body
-        id: tag
-        shell: bash
+      - name: Extract tag body to file
+        shell: pwsh
         run: |
-          body=$(git tag -l --format='%(contents:body)' ${{ github.ref_name }})
-          echo "body<<EOF" >> $GITHUB_OUTPUT
-          echo "$body" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          $body = git tag -l --format='%(contents:body)' $env:GITHUB_REF_NAME
+          if ([string]::IsNullOrWhiteSpace($body)) {
+            $body = git tag -l --format='%(contents)' $env:GITHUB_REF_NAME
+            Write-Host "WARNING: body was empty, falling back to full contents"
+          }
+          $body | Out-File -FilePath release-notes.md -Encoding utf8
+          Write-Host "Release notes length: $($body.Length) chars"
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.find.outputs.path }}
           name: ${{ github.ref_name }}
-          body: ${{ steps.tag.outputs.body }}
+          body_path: release-notes.md
