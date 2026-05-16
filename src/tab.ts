@@ -7,24 +7,21 @@ import { TabType } from "./types";
 import { SshHost, configFontFamily, configFontSize } from "./profiles";
 
 /**
- * Hysteresis comparator — like a Schmitt trigger in circuits.
- * Prevents oscillation by only changing output when the input crosses
- * a threshold.
+ * Hysteresis comparator — clamps current to an acceptable range derived
+ * from floatVal, preventing oscillation during resize.
  *
  *   floatVal  — continuous value (e.g. 107.3 cols would fit)
  *   current   — current discrete value  (e.g. 107 cols)
- *   shrinkTh  — shrink when (float - current) < shrinkTh
- *   growTh    — grow   when (float - current) > growTh
- *   min       — floor clamp
+ *   th_low    — fraction of char needed below floor to accept floor
+ *   th_high   — fraction of char needed above floor to accept ceil
+ *   min       — floor clamp (default 2)
  */
 function hysteresis(
-  floatVal: number, current: number,
-  shrinkTh: number, growTh: number, min: number,
+  floatVal: number, current: number, th_low: number, th_high: number, min = 2
 ): number {
-  const gap = floatVal - current;
-  if (gap < shrinkTh) return Math.max(min, Math.floor(floatVal));
-  if (gap > growTh)   return Math.max(min, Math.floor(floatVal));
-  return current;
+  const lo = Math.max(min, Math.floor(floatVal + (1.0 - th_low)));
+  const hi = Math.ceil(floatVal - th_high);
+  return Math.min(hi, Math.max(lo, current));
 }
 
 export class TerminalTab {
@@ -35,8 +32,6 @@ export class TerminalTab {
   element: HTMLElement;
   tabElement!: HTMLElement;
   xtermEl: HTMLElement;
-  charWidth = 0;
-  charHeight = 0;
   type: TabType;
   command?: string;
   sshHost?: SshHost;
@@ -117,7 +112,7 @@ export class TerminalTab {
       } else {
         navigator.clipboard.readText().then(t => {
           if (t) this.terminal.paste(t);
-        }).catch(() => {});
+        }).catch(() => { });
       }
     }, true);
   }
@@ -139,17 +134,10 @@ export class TerminalTab {
    * No dead zone, no oscillation — just available space / char size.
    */
   fit(): { cols: number; rows: number } {
-    if (!this.charWidth || !this.charHeight) {
-      // first time — measure from xterm
-      const core = (this.terminal as any)._core;
-      const dims = core._renderService.dimensions;
-      if (dims && dims.css.cell.width > 0) {
-        this.charWidth = dims.css.cell.width;
-        this.charHeight = dims.css.cell.height;
-      } else {
-        return { cols: this.terminal.cols, rows: this.terminal.rows };
-      }
-    }
+    const core = (this.terminal as any)._core;
+    const dims = core._renderService.dimensions;
+    const charWidth = dims.css.cell.width;
+    const charHeight = dims.css.cell.height;
 
     const parent = this.element.parentElement!;
     const ps = getComputedStyle(parent);
@@ -163,11 +151,13 @@ export class TerminalTab {
     if (scr) padH += parseFloat(getComputedStyle(scr).paddingRight) || 0;
     const padV = parseFloat(xs.paddingTop) + parseFloat(xs.paddingBottom);
 
-    const floatCols = (parentW - padH) / this.charWidth;
-    const floatRows = (parentH - padV) / this.charHeight;
+    const floatCols = (parentW - padH) / charWidth;
+    const floatRows = (parentH - padV) / charHeight;
 
-    const cols = hysteresis(floatCols, this.terminal.cols, -0.2, 0.9, 2);
-    const rows = hysteresis(floatRows, this.terminal.rows, -0.2, 0.9, 2);
+    const cols = hysteresis(floatCols, this.terminal.cols, 0.8, 0.9);
+    const rows = hysteresis(floatRows, this.terminal.rows, 0.98, 1.0);
+    const diff = floatRows - this.terminal.rows;
+    console.log(`--padV: ${padV} f_rows: ${floatRows} term_row: ${this.terminal.rows} diff: ${diff}`);
 
     if (this.terminal.cols !== cols || this.terminal.rows !== rows)
       this.terminal.resize(cols, rows);
@@ -180,10 +170,8 @@ export class TerminalTab {
       requestAnimationFrame(() => {
         if (this.element.style.display === "none") return;
         const { cols, rows } = this.fit();
-        this.charWidth = this.xtermEl.clientWidth / cols;
-        this.charHeight = this.xtermEl.clientHeight / rows;
         this.needsResize = false;
-        invoke("pty_resize", { id: this.id, cols, rows }).catch(() => {});
+        invoke("pty_resize", { id: this.id, cols, rows }).catch(() => { });
       });
     });
   }

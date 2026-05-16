@@ -136,8 +136,6 @@ export class TabManager {
 
     if (next.needsResize) {
       const { cols, rows } = next.fit();
-      next.charWidth = next.xtermEl.clientWidth / cols;
-      next.charHeight = next.xtermEl.clientHeight / rows;
       next.needsResize = false;
       invoke("pty_resize", { id: next.id, cols, rows });
     }
@@ -304,21 +302,24 @@ export class TabManager {
   }
 
   private _closeSettings(restore: boolean): void {
-    console.log("[_closeSettings] restore:", restore, "settingsEl:", !!this.settingsEl);
     if (this.settingsEl) {
       this.settingsEl.remove();
       this.settingsEl = null;
     }
     if (this.settingsTabEl) {
-      this.settingsTabEl.classList.remove("active");
-      const sCloseBtn = this.settingsTabEl.querySelector(".tab-close") as HTMLElement;
-      if (sCloseBtn) sCloseBtn.style.opacity = "";
+      if (restore) {
+        this.settingsTabEl.remove();
+        this.settingsTabEl = null;
+      } else {
+        this.settingsTabEl.classList.remove("active");
+        const sCloseBtn = this.settingsTabEl.querySelector(".tab-close") as HTMLElement;
+        if (sCloseBtn) sCloseBtn.style.opacity = "";
+      }
     }
 
     this.settingsOpen = false;
 
     if (restore && this.activeTabId) {
-      console.log("[_closeSettings] restoring tab:", this.activeTabId);
       const tab = this.tabs.get(this.activeTabId);
       if (tab) {
         tab.show();

@@ -328,7 +328,7 @@ body {
   position: relative;
   overflow: hidden;
   background: #1e1e1e;
-  padding: 4px;
+  padding: 2px;
 }
 
 /* ── xterm.js internal sizing reset ─────────────────────────────────
@@ -353,9 +353,9 @@ body {
 /* ── xterm built-in scrollbar (VS Code–style, always visible) ───── */
 
 .terminal-instance .xterm .xterm-scrollable-element > .scrollbar {
-  width: 6px !important;
+  width: 4px !important;
   background: transparent;
-  border-radius: 3px;
+  border-radius: 2px;
   transition: width 0.15s;
   position: absolute;
   right: 0;
@@ -369,7 +369,7 @@ body {
 
 .terminal-instance .xterm .xterm-scrollable-element > .scrollbar > .scra {
   background: rgba(255, 255, 255, 0.15) !important;
-  border-radius: 3px !important;
+  border-radius: 2px !important;
   transition: background-color 0.15s;
 }
 
