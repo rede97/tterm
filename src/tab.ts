@@ -4,7 +4,7 @@ import { SearchAddon } from "@xterm/addon-search";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { invoke } from "@tauri-apps/api/core";
 import { TabType } from "./types";
-import { SshHost, configFontFamily, configFontSize, configRenderer } from "./profiles";
+import { SshHost, configFontFamily, configFontSize, configRenderer, configScrollback } from "./profiles";
 
 /**
  * Hysteresis comparator — clamps current to an acceptable range derived
@@ -55,6 +55,7 @@ export class TerminalTab {
       cursorBlink: true,
       fontSize: configFontSize,
       fontFamily: configFontFamily,
+      scrollback: configScrollback,
       theme: {
         background: "#1e1e1e",
         foreground: "#d4d4d4",

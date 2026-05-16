@@ -13,7 +13,7 @@ import { createSettingsContent, setOnSettingsChanged } from "./settings";
 import {
   localProfiles, defaultLocalProfile,
   loadSshHosts, loadLocalProfiles, loadConfig,
-  configFontFamily, configFontSize,
+  configFontFamily, configFontSize, configScrollback,
 } from "./profiles";
 
 // ── DOM refs ──────────────────────────────────────────────────────
@@ -77,6 +77,7 @@ setOnSettingsChanged(async () => {
   for (const tab of tabManager.tabs.values()) {
     tab.terminal.options.fontFamily = configFontFamily;
     tab.terminal.options.fontSize = configFontSize;
+    tab.terminal.options.scrollback = configScrollback;
   }
 });
 

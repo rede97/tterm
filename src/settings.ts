@@ -1,4 +1,4 @@
-import { localProfiles, configFontFamily, configFontSize, hiddenProfiles, configPasteWarning, configTerminalBell, configRenderer, saveConfig, loadConfig } from "./profiles";
+import { localProfiles, configFontFamily, configFontSize, hiddenProfiles, configPasteWarning, configTerminalBell, configRenderer, configScrollback, saveConfig, loadConfig } from "./profiles";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -76,6 +76,10 @@ export function createSettingsContent(): HTMLElement {
           <option value="webgl" ${configRenderer === "webgl" ? "selected" : ""}>WebGL</option>
           <option value="canvas" ${configRenderer === "canvas" ? "selected" : ""}>Canvas</option>
         </select>
+      </div>
+      <div class="settings-row">
+        <label class="settings-label">Scrollback</label>
+        <input type="number" id="set-scrollback" class="settings-input settings-input-narrow" value="${configScrollback}" min="100" max="100000" step="100" />
       </div>
       <label class="settings-toggle-row">
         <input type="checkbox" id="set-paste-warning" ${configPasteWarning ? "checked" : ""} />
@@ -234,6 +238,8 @@ function refreshForm(root: HTMLElement) {
   if (bellEl) bellEl.checked = configTerminalBell;
   const rendererEl = root.querySelector("#set-renderer") as HTMLSelectElement;
   if (rendererEl) rendererEl.value = configRenderer;
+  const scrollbackEl = root.querySelector("#set-scrollback") as HTMLInputElement;
+  if (scrollbackEl) scrollbackEl.value = String(configScrollback);
   checks.forEach(c => {
     c.checked = !hiddenProfiles.includes(c.value);
   });
@@ -280,6 +286,8 @@ async function applySettings(root: HTMLElement) {
   if (bellEl) partial.terminalBell = bellEl.checked;
   const rendererEl = root.querySelector("#set-renderer") as HTMLSelectElement;
   if (rendererEl) partial.renderer = rendererEl.value;
+  const scrollbackEl = root.querySelector("#set-scrollback") as HTMLInputElement;
+  if (scrollbackEl) partial.scrollback = Math.max(100, Math.min(100000, parseInt(scrollbackEl.value, 10) || 1000));
 
   const hidden: string[] = [];
   checks.forEach(c => { if (!c.checked) hidden.push(c.value); });

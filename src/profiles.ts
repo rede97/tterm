@@ -28,6 +28,7 @@ export let hiddenProfiles: string[] = [];
 export let configPasteWarning = true;
 export let configTerminalBell = false;
 export let configRenderer = "webgl";
+export let configScrollback = 1000;
 export let configLoaded = false;
 
 // ── SSH hosts ───────────────────────────────────────────────────────
@@ -138,6 +139,7 @@ function readConfigValues(cfg: any) {
   if (typeof cfg.pasteWarning === "boolean") configPasteWarning = cfg.pasteWarning;
   if (typeof cfg.terminalBell === "boolean") configTerminalBell = cfg.terminalBell;
   if (typeof cfg.renderer === "string") configRenderer = cfg.renderer;
+  if (typeof cfg.scrollback === "number" && cfg.scrollback >= 100 && cfg.scrollback <= 100000) configScrollback = cfg.scrollback;
 }
 
 export function getDefaultConfig(): Record<string, unknown> {
@@ -147,6 +149,7 @@ export function getDefaultConfig(): Record<string, unknown> {
     pasteWarning: true,
     terminalBell: false,
     renderer: "webgl",
+    scrollback: 1000,
     hiddenProfiles: [],
   };
 }
