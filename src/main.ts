@@ -7,7 +7,6 @@ import { PtyOutputPayload } from "./types";
 import { tabManager, initTabManager } from "./tabmanager";
 import { initSearchBar } from "./search";
 import { initProfileMenu } from "./profilemenu";
-import { initContextMenu } from "./contextmenu";
 import { initWindowControls } from "./window";
 import { createSettingsContent, setOnSettingsChanged } from "./settings";
 import {
@@ -98,7 +97,7 @@ function applyTabWidthMode(): void {
 tabManager.initNewTabButton();
 initSearchBar();
 initProfileMenu();
-initContextMenu();
+import("./contextmenu").then(m => m.initContextMenu());
 initWindowControls();
 
 // -- initial tab --
