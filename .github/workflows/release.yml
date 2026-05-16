@@ -39,9 +39,18 @@ jobs:
           echo "path=$exe" >> $env:GITHUB_OUTPUT
           echo "name=$($exe.Name)" >> $env:GITHUB_OUTPUT
 
+      - name: Extract tag body
+        id: tag
+        shell: bash
+        run: |
+          body=$(git tag -l --format='%(contents:body)' ${{ github.ref_name }})
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$body" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.find.outputs.path }}
-          name: ${{ steps.find.outputs.name }}
-          generate_release_notes: true
+          name: ${{ github.ref_name }}
+          body: ${{ steps.tag.outputs.body }}
