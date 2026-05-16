@@ -1,5 +1,5 @@
 import { createElement, Terminal as TerminalIcon, Globe } from "lucide";
-import { sshHosts, localProfiles } from "./profiles";
+import { sshHosts, localProfiles, hiddenProfiles } from "./profiles";
 import { tabManager } from "./tabmanager";
 
 const menuBtn = document.getElementById("new-tab-menu-btn")!;
@@ -74,6 +74,7 @@ function populateMenu() {
 
   if (localProfiles.length > 0) {
     for (const p of localProfiles) {
+      if (hiddenProfiles.includes(p.name)) continue;
       localCol.appendChild(createMenuItem(TerminalIcon, p.name, "", () => tabManager.createLocalTab(p.command, p.name)));
     }
   } else {

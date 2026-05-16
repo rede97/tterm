@@ -52,6 +52,7 @@ function mkSeparator(): HTMLElement {
 // -- Tab context menu group --
 const tabMenuGroup = document.createElement("div");
 tabMenuGroup.dataset.group = "tab";
+tabMenuGroup.style.display = "none";
 
 tabMenuGroup.appendChild(mkItem("New Tab", "new-tab"));
 tabMenuGroup.appendChild(mkItem("Open in New Window", "new-window"));
@@ -103,13 +104,18 @@ contextMenu.appendChild(tabMenuGroup);
 // -- Terminal content menu group --
 const termMenuGroup = document.createElement("div");
 termMenuGroup.dataset.group = "term";
+termMenuGroup.style.display = "none";
 
 termMenuGroup.appendChild(mkItem("Copy", "copy"));
+termMenuGroup.appendChild(mkItem("Copy as HTML", "copy-html"));
 termMenuGroup.appendChild(mkItem("Paste", "paste"));
 termMenuGroup.appendChild(mkSeparator());
 termMenuGroup.appendChild(mkItem("Clear", "clear"));
 termMenuGroup.appendChild(mkItem("Find", "find"));
 termMenuGroup.appendChild(mkItem("Export Text", "export"));
+termMenuGroup.appendChild(mkSeparator());
+termMenuGroup.appendChild(mkItem("New Tab", "new-tab"));
+termMenuGroup.appendChild(mkItem("Open in New Window", "new-window"));
 
 contextMenu.appendChild(termMenuGroup);
 
@@ -177,6 +183,20 @@ function dispatch(action: string) {
         ta.select();
         document.execCommand("copy");
         document.body.removeChild(ta);
+      }
+      break;
+    }
+    case "copy-html": {
+      const t = tabManager.get(tabId);
+      if (!t) break;
+      const sel = t.terminal.getSelection();
+      if (sel) {
+        const html = `<pre style="font-family:'JetBrains Mono',Consolas,monospace;font-size:13px;color:#d4d4d4;background:#1e1e1e;padding:8px;margin:0;overflow:auto;white-space:pre-wrap;word-wrap:break-word;">${sel.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`;
+        const blob = new Blob([html], { type: "text/html" });
+        const plain = new Blob([sel], { type: "text/plain" });
+        navigator.clipboard.write([
+          new ClipboardItem({ "text/plain": plain, "text/html": blob }),
+        ]).catch(() => {});
       }
       break;
     }

@@ -81,7 +81,7 @@ function addProfile(item: any) {
   if (!command && !item.source) {
     command = name;
   }
-  if (command && !localProfiles.some(p => p.name === name) && !hiddenProfiles.includes(name)) {
+  if (command && !localProfiles.some(p => p.name === name)) {
     localProfiles.push({ name, command });
   }
 }
