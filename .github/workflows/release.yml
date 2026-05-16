@@ -46,7 +46,7 @@ jobs:
       - name: Extract tag message to file
         shell: pwsh
         run: |
-          git fetch origin "refs/tags/${env:GITHUB_REF_NAME}:refs/tags/${env:GITHUB_REF_NAME}" --no-tags
+          git fetch -f origin "refs/tags/${env:GITHUB_REF_NAME}:refs/tags/${env:GITHUB_REF_NAME}" --no-tags
           $raw = git cat-file tag $env:GITHUB_REF_NAME
           # Tag object format: headers (object/type/tag/tagger), blank line, message
           $inBody = $false
