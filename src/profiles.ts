@@ -1,10 +1,17 @@
 ﻿import { invoke } from "@tauri-apps/api/core";
 
-export interface SshHost {
-  name: string;
-  hostname: string;
-  port: number;
-  user: string;
+// SshHost is a simple KV map: { name, hostname, user, port, forwardagent, ... }
+// All values are strings. Frontend owns all parsing + generation.
+// Keys preserve original SSH config casing (e.g. "ForwardAgent" not "forwardagent").
+export type SshHost = { name: string } & Record<string, string>;
+
+export function hostProp(h: SshHost, key: string): string | undefined {
+  if (h[key] !== undefined) return h[key];
+  const lower = key.toLowerCase();
+  for (const k of Object.keys(h)) {
+    if (k.toLowerCase() === lower) return h[k];
+  }
+  return undefined;
 }
 
 export interface LocalProfile {
@@ -31,13 +38,70 @@ export let configTerminalBell = false;
 export let configRenderer = "webgl";
 export let configScrollback = 20000;
 export let configTabWidthMode = "equal";
+export let hiddenSshHosts: string[] = [];
 export let configLoaded = false;
 
-// -- SSH hosts --
+// -- SSH hosts (frontend-owned parsing) --
+
+function parseSshConfig(raw: string): SshHost[] {
+  const hosts: SshHost[] = [];
+  let current: SshHost | null = null;
+  const preProps: Record<string, string> = {};
+  let wildcardProps: Record<string, string> = {};
+
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const spaceIdx = trimmed.search(/\s/);
+    if (spaceIdx === -1) continue;
+    const rawKey = trimmed.slice(0, spaceIdx);
+    const key = rawKey.toLowerCase();
+    const value = trimmed.slice(spaceIdx + 1).trim();
+
+    if (key === "host") {
+      if (current) {
+        const names = (current as any).__names || [current.name];
+        for (const n of names) {
+          const h: SshHost = { name: n, ...wildcardProps, ...preProps };
+          for (const [k, v] of Object.entries(current)) {
+            if (k !== "name" && !(k as any).startsWith("__")) h[k] = v;
+          }
+          hosts.push(h);
+        }
+      }
+      const names = value.split(/\s+/);
+      current = { name: names[0], __names: names } as any;
+    } else if (current) {
+      (current as any)[rawKey] = value;
+    } else {
+      preProps[rawKey] = value;
+    }
+  }
+  // flush last host
+  if (current) {
+    const names = (current as any).__names || [current.name];
+    for (const n of names) {
+      const h: SshHost = { name: n, ...wildcardProps, ...preProps };
+      for (const [k, v] of Object.entries(current)) {
+        if (k !== "name" && !(k as any).startsWith("__")) h[k] = v;
+      }
+      if (n === "*") {
+        wildcardProps = { ...h };
+        delete (wildcardProps as any).name;
+        delete (wildcardProps as any).__names;
+      } else {
+        hosts.push(h);
+      }
+    }
+  }
+  for (const h of hosts) { delete (h as any).__names; }
+  return hosts;
+}
 
 export async function loadSshHosts() {
   try {
-    sshHosts = await invoke<SshHost[]>("ssh_list_hosts");
+    const raw = await invoke<string>("ssh_read_config_raw");
+    if (raw) sshHosts = parseSshConfig(raw);
   } catch (e) {
     console.error("Failed to load SSH hosts:", e);
   }
@@ -144,6 +208,7 @@ function readConfigValues(cfg: any) {
   if (typeof cfg.renderer === "string") configRenderer = cfg.renderer;
   if (typeof cfg.scrollback === "number" && cfg.scrollback >= 100 && cfg.scrollback <= 100000) configScrollback = cfg.scrollback;
   if (typeof cfg.tabWidthMode === "string") configTabWidthMode = cfg.tabWidthMode;
+  if (Array.isArray(cfg.hiddenSshHosts)) hiddenSshHosts = cfg.hiddenSshHosts;
 }
 
 export function getDefaultConfig(): Record<string, unknown> {
@@ -157,6 +222,7 @@ export function getDefaultConfig(): Record<string, unknown> {
     scrollback: 20000,
     tabWidthMode: "equal",
     hiddenProfiles: [],
+    hiddenSshHosts: [],
   };
 }
 

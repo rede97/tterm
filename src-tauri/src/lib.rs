@@ -470,15 +470,8 @@ fn save_text_file(app: tauri::AppHandle, content: String) -> Result<(), String> 
     Ok(())
 }
 
-// ── SSH config parsing ──────────────────────────────────────────────
-
-#[derive(Clone, Serialize, Debug)]
-struct SshHost {
-    name: String,
-    hostname: String,
-    port: u16,
-    user: String,
-}
+// ── SSH config I/O ──────────────────────────────────────────────────
+// Rust only reads/writes raw text. All parsing is done in the frontend.
 
 fn ssh_config_path() -> Option<std::path::PathBuf> {
     #[cfg(target_os = "windows")]
@@ -491,95 +484,13 @@ fn ssh_config_path() -> Option<std::path::PathBuf> {
     }
 }
 
-#[derive(Default)]
-struct ParsedHost {
-    names: Vec<String>,
-    hostname: Option<String>,
-    port: Option<u16>,
-    user: Option<String>,
-}
-
-fn parse_ssh_config(content: &str) -> Vec<SshHost> {
-    let mut hosts: Vec<ParsedHost> = Vec::new();
-    let mut current: Option<ParsedHost> = None;
-    let mut pre_host_props = ParsedHost::default();
-    let mut wildcard: Option<ParsedHost> = None;
-
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            continue;
-        }
-        let (key, value) = match trimmed.split_once(char::is_whitespace) {
-            Some((k, v)) => (k.to_lowercase(), v.trim().to_string()),
-            None => continue,
-        };
-
-        match key.as_str() {
-            "host" => {
-                let prev = current.replace(ParsedHost {
-                    names: value.split_whitespace().map(|s| s.to_string()).collect(),
-                    ..Default::default()
-                });
-                if let Some(p) = prev {
-                    if p.names.iter().any(|n| n == "*") {
-                        wildcard = Some(p);
-                    } else {
-                        hosts.push(p);
-                    }
-                }
-            }
-            "hostname" => {
-                let target = current.as_mut().unwrap_or(&mut pre_host_props);
-                target.hostname = Some(value);
-            }
-            "user" => {
-                let target = current.as_mut().unwrap_or(&mut pre_host_props);
-                target.user = Some(value);
-            }
-            "port" => {
-                let target = current.as_mut().unwrap_or(&mut pre_host_props);
-                target.port = value.parse().ok();
-            }
-            _ => {}
-        }
-    }
-
-    // save last host
-    if let Some(p) = current {
-        if p.names.iter().any(|n| n == "*") {
-            wildcard = Some(p);
-        } else {
-            hosts.push(p);
-        }
-    }
-
-    // merge defaults: pre_host_props < wildcard < per-host props
-    hosts.into_iter().map(|h| {
-        let hostname = h.hostname
-            .or_else(|| wildcard.as_ref().and_then(|w| w.hostname.clone()))
-            .or(pre_host_props.hostname.clone())
-            .unwrap_or_else(|| h.names[0].clone());
-        let port = h.port
-            .or_else(|| wildcard.as_ref().and_then(|w| w.port))
-            .or(pre_host_props.port)
-            .unwrap_or(22);
-        let user = h.user
-            .or_else(|| wildcard.as_ref().and_then(|w| w.user.clone()))
-            .or(pre_host_props.user.clone())
-            .unwrap_or_else(|| "root".into());
-        SshHost { name: h.names.join(" "), hostname, port, user }
-    }).collect()
-}
-
 #[tauri::command]
-fn ssh_list_hosts() -> Result<Vec<SshHost>, String> {
+fn ssh_read_config_raw() -> Result<String, String> {
     let config_path = ssh_config_path().ok_or("Cannot determine home directory")?;
     if !config_path.exists() {
-        return Ok(Vec::new());
+        return Ok(String::new());
     }
-    let content = std::fs::read_to_string(&config_path).map_err(|e| e.to_string())?;
-    Ok(parse_ssh_config(&content))
+    std::fs::read_to_string(&config_path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -590,6 +501,44 @@ fn open_config_dir(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(not(target_os = "windows"))]
     { std::process::Command::new("open").arg(&dir).spawn().map_err(|e| e.to_string())?; }
     Ok(())
+}
+
+#[tauri::command]
+fn open_ssh_config() -> Result<(), String> {
+    let path = ssh_config_path().ok_or("Cannot determine home directory")?;
+    let path_str = path.to_string_lossy().to_string();
+    #[cfg(target_os = "windows")]
+    { std::process::Command::new("notepad").arg(&path_str).spawn().map_err(|e| e.to_string())?; }
+    #[cfg(not(target_os = "windows"))]
+    { std::process::Command::new("open").arg(&path_str).spawn().map_err(|e| e.to_string())?; }
+    Ok(())
+}
+
+#[tauri::command]
+fn ssh_clear_known_hosts(hostname: String) -> Result<String, String> {
+    let output = std::process::Command::new("ssh-keygen")
+        .args(["-R", &hostname])
+        .output()
+        .map_err(|e| format!("Failed to run ssh-keygen: {}", e))?;
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    if output.status.success() {
+        Ok(format!("{}{}", stdout, stderr))
+    } else {
+        Err(stderr)
+    }
+}
+
+
+#[tauri::command]
+fn ssh_save_config(content: String) -> Result<String, String> {
+    let config_path = ssh_config_path().ok_or("Cannot determine SSH config path")?;
+    if config_path.exists() {
+        let backup = config_path.with_extension("config.tt.bak");
+        std::fs::copy(&config_path, &backup).map_err(|e| format!("Failed to backup: {}", e))?;
+    }
+    std::fs::write(&config_path, &content).map_err(|e| e.to_string())?;
+    Ok("SSH config saved. Original backed up to config.tt.bak".into())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -610,7 +559,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, save_text_file, pty_write, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, open_new_window, ssh_list_hosts, open_config_dir, read_wt_settings, read_wt_fragments, find_vs_instances, read_config, write_config, delete_config])
+        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, save_text_file, pty_write, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, open_new_window, ssh_read_config_raw, open_config_dir, open_ssh_config, ssh_clear_known_hosts, ssh_save_config, read_wt_settings, read_wt_fragments, find_vs_instances, read_config, write_config, delete_config])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

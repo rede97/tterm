@@ -1,5 +1,5 @@
 import { createElement, Terminal as TerminalIcon, Globe } from "lucide";
-import { sshHosts, localProfiles, hiddenProfiles } from "./profiles";
+import { sshHosts, localProfiles, hiddenProfiles, hiddenSshHosts, hostProp } from "./profiles";
 import { tabManager } from "./tabmanager";
 
 const menuBtn = document.getElementById("new-tab-menu-btn")!;
@@ -92,7 +92,8 @@ function populateMenu() {
     sshCol.appendChild(sshTitle);
 
     for (const host of sshHosts) {
-      const detail = `${host.user}@${host.hostname}:${host.port}`;
+      if (hiddenSshHosts.includes(host.name)) continue;
+      const detail = `${hostProp(host, "user") || "root"}@${hostProp(host, "hostname") || host.name}:${hostProp(host, "port") || "22"}`;
       sshCol.appendChild(createMenuItem(Globe, host.name, detail, () => tabManager.createSshTab(host)));
     }
     profileMenu.appendChild(sshCol);

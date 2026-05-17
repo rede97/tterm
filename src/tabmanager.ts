@@ -1,5 +1,5 @@
 ﻿import { invoke } from "@tauri-apps/api/core";
-import { SshHost, localProfiles, defaultLocalProfile } from "./profiles";
+import { SshHost, localProfiles, defaultLocalProfile, hostProp } from "./profiles";
 import { TerminalTab } from "./tab";
 
 export class TabManager {
@@ -93,9 +93,9 @@ export class TabManager {
 
   async createSshTab(host: SshHost): Promise<TerminalTab> {
     const id: string = await invoke("pty_spawn_ssh", {
-      hostname: host.hostname,
-      port: host.port,
-      user: host.user,
+      hostname: hostProp(host, "hostname") || host.name,
+      port: parseInt(hostProp(host, "port") || "22", 10),
+      user: hostProp(host, "user") || "root",
     });
     const tab = new TerminalTab(id, "ssh", host.name, this.terminalContainer);
     tab.sshHost = host;
