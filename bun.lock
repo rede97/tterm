@@ -5,7 +5,13 @@
     "": {
       "name": "tterm",
       "dependencies": {
+        "@fontsource/cascadia-mono": "^5.2.3",
+        "@fontsource/fira-mono": "^5.2.7",
+        "@fontsource/ibm-plex-mono": "^5.2.7",
         "@fontsource/jetbrains-mono": "^5.2.8",
+        "@fontsource/roboto-mono": "^5.2.9",
+        "@fontsource/source-code-pro": "^5.2.7",
+        "@fontsource/ubuntu-mono": "^5.2.8",
         "@tauri-apps/api": "^2",
         "@tauri-apps/plugin-dialog": "^2.7.1",
         "@tauri-apps/plugin-opener": "^2",
@@ -15,6 +21,8 @@
         "@xterm/addon-webgl": "^0.19.0",
         "@xterm/xterm": "^6.0.0",
         "lucide": "^1.14.0",
+        "nf-droid-sans-mono": "^2.1.1",
+        "nf-ubuntu-mono": "^2.1.0",
       },
       "devDependencies": {
         "@tauri-apps/cli": "^2",
@@ -79,7 +87,19 @@
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.25.12", "https://registry.npmmirror.com/@esbuild/win32-x64/-/win32-x64-0.25.12.tgz", { "os": "win32", "cpu": "x64" }, "sha512-alJC0uCZpTFrSL0CCDjcgleBXPnCrEAhTBILpeAp7M/OFgoqtAetfBzX0xM00MUsVVPpVjlPuMbREqnZCXaTnA=="],
 
+    "@fontsource/cascadia-mono": ["@fontsource/cascadia-mono@5.2.3", "https://registry.npmmirror.com/@fontsource/cascadia-mono/-/cascadia-mono-5.2.3.tgz", {}, "sha512-x7+4yi0tct8zGJJdDjm734Bv8tHQrZKX/xMErGFBlVPotlTAfAnkGh95zeVp8d5Vol5hADr57kRQ2IZtVvFctg=="],
+
+    "@fontsource/fira-mono": ["@fontsource/fira-mono@5.2.7", "https://registry.npmmirror.com/@fontsource/fira-mono/-/fira-mono-5.2.7.tgz", {}, "sha512-wYrAn6i3nH6luqQBZxtWUpl4UTUvs9AEbEeZxksPMwIqyjRRaxHTNW3c2VfM50gabS2IS7pT8lVWS2USB4ukYA=="],
+
+    "@fontsource/ibm-plex-mono": ["@fontsource/ibm-plex-mono@5.2.7", "https://registry.npmmirror.com/@fontsource/ibm-plex-mono/-/ibm-plex-mono-5.2.7.tgz", {}, "sha512-MKAb8qV+CaiMQn2B0dIi1OV3565NYzp3WN5b4oT6LTkk+F0jR6j0ZN+5BKJiIhffDC3rtBULsYZE65+0018z9w=="],
+
     "@fontsource/jetbrains-mono": ["@fontsource/jetbrains-mono@5.2.8", "https://registry.npmmirror.com/@fontsource/jetbrains-mono/-/jetbrains-mono-5.2.8.tgz", {}, "sha512-6w8/SG4kqvIMu7xd7wt6x3idn1Qux3p9N62s6G3rfldOUYHpWcc2FKrqf+Vo44jRvqWj2oAtTHrZXEP23oSKwQ=="],
+
+    "@fontsource/roboto-mono": ["@fontsource/roboto-mono@5.2.9", "https://registry.npmmirror.com/@fontsource/roboto-mono/-/roboto-mono-5.2.9.tgz", {}, "sha512-iIeSyrRGoM15uIWqXslW1K9UFnUYfnCFNrNoWjXE0huO1L+hM0Jst0KNLuRc7P21xPpGL0bZouzYSX0Em9eyWg=="],
+
+    "@fontsource/source-code-pro": ["@fontsource/source-code-pro@5.2.7", "https://registry.npmmirror.com/@fontsource/source-code-pro/-/source-code-pro-5.2.7.tgz", {}, "sha512-7papq9TH94KT+S5VSY8cU7tFmwuGkIe3qxXRMscuAXH6AjMU+KJI75f28FzgBVDrlMfA0jjlTV4/x5+H5o/5EQ=="],
+
+    "@fontsource/ubuntu-mono": ["@fontsource/ubuntu-mono@5.2.8", "https://registry.npmmirror.com/@fontsource/ubuntu-mono/-/ubuntu-mono-5.2.8.tgz", {}, "sha512-N4nT8+GYWWcDODVSBLU4f3PycZQH9YIF6SypDI0rti3HrLqcXFS9u6wMvAd9vx1FmjAQkYv7Ld9CZ8XYTEOD0A=="],
 
     "@img/colour": ["@img/colour@1.1.0", "https://registry.npmmirror.com/@img/colour/-/colour-1.1.0.tgz", {}, "sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ=="],
 
@@ -234,6 +254,10 @@
     "lucide": ["lucide@1.14.0", "https://registry.npmmirror.com/lucide/-/lucide-1.14.0.tgz", {}, "sha512-IoRC3lHwemJWvsXKcHK90hkgY4h1HGztBL63w2XwFtIu8gFDPp4/kiuqVtlN3vaM9bxsLQ4ZUBJfGsbKFaB2IA=="],
 
     "nanoid": ["nanoid@3.3.11", "https://registry.npmmirror.com/nanoid/-/nanoid-3.3.11.tgz", { "bin": "bin/nanoid.cjs" }, "sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w=="],
+
+    "nf-droid-sans-mono": ["nf-droid-sans-mono@2.1.1", "https://registry.npmmirror.com/nf-droid-sans-mono/-/nf-droid-sans-mono-2.1.1.tgz", {}, "sha512-4uOAnYGnGGVqHAYaSh49TA81OzDtuZXv9Vc8kWSTl3VK+6PwQCNqRT0tt/eb2hetRqfYp2T+4x0LMzX49n3fdg=="],
+
+    "nf-ubuntu-mono": ["nf-ubuntu-mono@2.1.0", "https://registry.npmmirror.com/nf-ubuntu-mono/-/nf-ubuntu-mono-2.1.0.tgz", {}, "sha512-GGDSnrWWM5xXnLkO4Q/MwZeZ1CFvvdb/4Zm3LOXVzI4GunNiGliNOCBlvZaBXztYTz4VC0tVX9Prcu6oEt5RWg=="],
 
     "picocolors": ["picocolors@1.1.1", "https://registry.npmmirror.com/picocolors/-/picocolors-1.1.1.tgz", {}, "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="],
 
