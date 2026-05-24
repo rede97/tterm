@@ -1,3 +1,28 @@
+## v0.1.4
+
+New Features
+
+- Font management system with built-in & system font picker, live xterm preview, drag-free reorder
+- Nerd Font built-in typefaces (DroidSansMono NF, UbuntuMono NF)
+- Noto Sans SC/JP/KR as default CJK fallback fonts for pan-CJK coverage
+- SSH config editor in Settings: host visibility toggles, expand details, edit, save, clear known hosts
+- Settings lazy-loading via dynamic import for faster startup (~20KB smaller main bundle)
+- Window title updates from terminal (onTitleChange)
+- Korean and Japanese preview samples in font picker
+
+Fixes
+
+- Fix first-tab wide character spacing caused by web font loading race
+- Fix Reset All / Revert not syncing in-memory font stack
+- Fix terminal not auto-resizing after font changes in settings
+
+Improvements
+
+- Four-panel settings layout (General, Appearance, Profile, SSH)
+- Preview terminal with scrollback buffer and custom scrollbar
+- Profile visibility toggles for both WT profiles and SSH hosts
+- README icon and CI badge
+
 ## v0.1.3
 
 New Features
