@@ -1,4 +1,5 @@
 ﻿import { localProfiles, configFontFamily, configFontSize, hiddenProfiles, configPasteWarning, configPasteTrim, configTerminalBell, configRenderer, configScrollback, configTabWidthMode, saveConfig, loadConfig, sshHosts, loadSshHosts, hiddenSshHosts, SshHost, hostProp } from "./profiles";
+import { buildFontFamily, updateFontStack, parseFontFamily } from "./fontconfig";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -6,20 +7,6 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 let _onSettingsChanged: (() => void) | null = null;
 export function onSettingsChangedFn(): (() => void) | null { return _onSettingsChanged; }
 export function setOnSettingsChanged(fn: (() => void) | null) { _onSettingsChanged = fn; }
-
-const FONT_SUGGESTIONS = [
-  "JetBrains Mono",
-  "Cascadia Code",
-  "Cascadia Mono",
-  "Consolas",
-  "Fira Code",
-  "Source Code Pro",
-  "Hack",
-  "MesloLGS NF",
-  "Ubuntu Mono",
-  "DejaVu Sans Mono",
-  "monospace",
-];
 
 export function createSettingsContent(): HTMLElement {
   const root = document.createElement("div");
@@ -191,6 +178,7 @@ export function createSettingsContent(): HTMLElement {
   panelGeneral.querySelector("#set-reset-all")!.addEventListener("click", async () => {
     await invoke("delete_config");
     await loadConfig();
+    updateFontStack(parseFontFamily(configFontFamily));
     refreshForm(root);
     feedback.textContent = "All settings cleared";
     feedback.className = "settings-feedback settings-feedback-info";
@@ -208,11 +196,10 @@ export function createSettingsContent(): HTMLElement {
       <div class="settings-item settings-item-row">
         <div class="settings-item-info">
           <div class="settings-item-title">Font Family</div>
-          <div class="settings-item-desc">Font used for terminal text. Choose a monospace font for best results.</div>
+          <div class="settings-item-desc" id="set-font-family-desc">${esc(configFontFamily)}</div>
         </div>
         <div class="settings-item-control">
-          <input type="text" id="set-font-family" class="settings-input" value="${esc(configFontFamily)}" list="font-family-list" />
-          <datalist id="font-family-list">${FONT_SUGGESTIONS.map(f => `<option value="${esc(f)}">`).join("")}</datalist>
+          <button id="set-font-config" class="settings-link-btn">Configure</button>
         </div>
       </div>
       <div class="settings-item settings-item-row">
@@ -227,6 +214,23 @@ export function createSettingsContent(): HTMLElement {
     </div>
   `;
   body.appendChild(panelAppearance);
+
+  // Font config button — opens font picker
+  panelAppearance.querySelector("#set-font-config")!.addEventListener("click", () => {
+    import("./fontpicker").then(m => {
+      m.showFontPickerDialog((stack) => {
+        updateFontStack(stack);
+        saveConfig({ fontFamily: buildFontFamily(stack) });
+        const desc = root.querySelector("#set-font-family-desc");
+        if (desc) desc.textContent = buildFontFamily(stack);
+        if (_onSettingsChanged) _onSettingsChanged();
+        const fb = root.querySelector(".settings-feedback")!;
+        fb.textContent = "Font updated";
+        fb.className = "settings-feedback settings-feedback-ok";
+        setTimeout(() => { fb.textContent = ""; }, 2000);
+      });
+    });
+  });
 
   // Profile panel
   const panelProfile = document.createElement("div");
@@ -262,6 +266,7 @@ export function createSettingsContent(): HTMLElement {
   revertBtn.textContent = "Revert";
   revertBtn.addEventListener("click", async () => {
     await loadConfig();
+    updateFontStack(parseFontFamily(configFontFamily));
     refreshForm(root);
     feedback.textContent = "Reverted to saved config";
     feedback.className = "settings-feedback settings-feedback-info";
@@ -308,14 +313,14 @@ export function createSettingsContent(): HTMLElement {
 }
 
 function refreshForm(root: HTMLElement) {
-  const fontEl = root.querySelector("#set-font-family") as HTMLInputElement;
+  const fontDesc = root.querySelector("#set-font-family-desc");
   const sizeEl = root.querySelector("#set-font-size") as HTMLInputElement;
   const profileEl = root.querySelector("#set-default-profile") as HTMLSelectElement;
   const pasteWarnEl = root.querySelector("#set-paste-warning") as HTMLInputElement;
   const bellEl = root.querySelector("#set-bell") as HTMLInputElement;
   const checks = root.querySelectorAll<HTMLInputElement>(".wt-profile-check");
 
-  if (fontEl) fontEl.value = configFontFamily;
+  if (fontDesc) fontDesc.textContent = configFontFamily;
   if (sizeEl) sizeEl.value = String(configFontSize);
   if (profileEl && profileEl.options.length > 0) {
     profileEl.value = localProfiles[0]?.name ?? "";
@@ -568,7 +573,6 @@ function wireSshEvents(container: HTMLElement, workingHosts: SshHost[], rerender
 }
 
 async function applySettings(root: HTMLElement) {
-  const fontEl = root.querySelector("#set-font-family") as HTMLInputElement;
   const sizeEl = root.querySelector("#set-font-size") as HTMLInputElement;
   const profileEl = root.querySelector("#set-default-profile") as HTMLSelectElement;
   const pasteWarnEl = root.querySelector("#set-paste-warning") as HTMLInputElement;
@@ -576,7 +580,6 @@ async function applySettings(root: HTMLElement) {
   const checks = root.querySelectorAll<HTMLInputElement>(".wt-profile-check");
 
   const partial: Record<string, unknown> = {};
-  if (fontEl) partial.fontFamily = fontEl.value;
   if (sizeEl) partial.fontSize = Math.max(10, Math.min(32, parseInt(sizeEl.value, 10) || 14));
   if (profileEl) partial.defaultLocalProfile = profileEl.value;
   if (pasteWarnEl) partial.pasteWarning = pasteWarnEl.checked;

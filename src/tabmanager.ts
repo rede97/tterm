@@ -352,6 +352,21 @@ export class TabManager {
     }, 10);
   }
 
+  // Public resize trigger — called after font/config changes that affect cell metrics.
+  triggerResize(): void {
+    for (const t of this.tabs.values()) t.needsResize = true;
+    const active = this.activeTab;
+    if (!active) return;
+    if (this._resizeTimer) clearTimeout(this._resizeTimer);
+    this._resizeTimer = setTimeout(() => {
+      this._resizeTimer = null;
+      if (active.element.style.display === "none") return;
+      const { cols, rows } = active.fit();
+      active.needsResize = false;
+      invoke("pty_resize", { id: active.id, cols, rows });
+    }, 10);
+  }
+
   // -- new-tab button --
 
   initNewTabButton(): void {

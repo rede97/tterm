@@ -1,29 +1,9 @@
 import { Terminal } from "@xterm/xterm";
-import { BUILTIN_FONTS, NERDFONT_BUILTIN, FontDef, fontStack, buildFontFamily } from "./fontconfig";
+import { FitAddon } from "@xterm/addon-fit";
+import { BUILTIN_FONTS, NERDFONT_BUILTIN, FontDef, fontStack, buildFontFamily, systemFontDefs } from "./fontconfig";
+import { configFontSize } from "./profiles";
 
 const NERDFONT_URL = "https://www.nerdfonts.com/";
-
-let _systemFonts: string[] = [];
-let _resolveSystemFonts: ((fonts: string[]) => void) | null = null;
-
-export function setSystemFonts(fonts: string[]) {
-  _systemFonts = fonts;
-  if (_resolveSystemFonts) {
-    _resolveSystemFonts(fonts);
-    _resolveSystemFonts = null;
-  }
-}
-
-function systemFontDefs(): FontDef[] {
-  const builtinFamilies = new Set(
-    [...BUILTIN_FONTS, ...NERDFONT_BUILTIN].map(f => f.family.toLowerCase())
-  );
-  return _systemFonts
-    .filter(name => !builtinFamilies.has(name.toLowerCase()))
-    .map(name => ({ family: name, label: name, source: "system" as const }));
-}
-
-// ---------- sample text for preview ----------
 
 const PREVIEW_CONTENT = [
   "\x1b[32muser@host\x1b[0m:\x1b[34m~/projects\x1b[0m$ ls -la",
@@ -38,15 +18,13 @@ const PREVIEW_CONTENT = [
   "",
   "abcdefghijklmnopqrstuvwxyz 0123456789",
   "Hello, 世界！你好，世界！",
+  "한국어: 안녕하세요 세계! 日本語: こんにちは世界！",
   "       ← Nerd Font icons",
 ].join("\r\n");
-
-// ---------- dialog ----------
 
 export function showFontPickerDialog(
   onApply: (stack: string[]) => void
 ): void {
-  // remove existing
   const existing = document.querySelector(".font-picker-overlay");
   if (existing) existing.remove();
 
@@ -76,7 +54,7 @@ export function showFontPickerDialog(
           </div>
         </div>
         <div class="fp-selected-section">
-          <div class="fp-selected-title">Font Fallback Chain (drag to reorder)</div>
+          <div class="fp-selected-title">Font Fallback Chain</div>
           <div class="fp-selected-list" id="fp-selected"></div>
         </div>
         <div class="fp-preview-section">
@@ -94,8 +72,9 @@ export function showFontPickerDialog(
 
   // --- state ---
   let selected: string[] = [...fontStack];
-  let draggedIdx = -1;
+  let previewFont: string | null = null; // font selected for individual preview
   let previewTerminal: Terminal | null = null;
+  let previewFitAddon: FitAddon | null = null;
 
   // --- render lists ---
   const builtinList = overlay.querySelector("#fp-builtin")!;
@@ -106,26 +85,50 @@ export function showFontPickerDialog(
   const systemCount = overlay.querySelector(".fp-system-count")!;
   const previewContainer = overlay.querySelector<HTMLElement>("#fp-preview")!;
 
-  function isSelected(family: string): boolean {
+  function isInUse(family: string): boolean {
     return selected.some(s => s.toLowerCase() === family.toLowerCase());
   }
 
-  function renderFontItem(f: FontDef, listEl: Element, sel: boolean): HTMLElement {
+  function renderFontItem(f: FontDef, listEl: Element): HTMLElement {
     const row = document.createElement("div");
-    row.className = `fp-font-item${sel ? " selected" : ""}`;
+    row.className = "fp-font-item";
     row.dataset.family = f.family;
+    const inUse = isInUse(f.family);
+    const isPreview = previewFont?.toLowerCase() === f.family.toLowerCase();
+    if (isPreview) row.classList.add("preview-selected");
+
     let badge = "";
     if (f.source === "nerdfont") badge = `<span class="fp-badge nf">NF</span>`;
     else if (f.source === "builtin") badge = `<span class="fp-badge builtin">in</span>`;
-    row.innerHTML = `<span class="fp-font-name">${f.label}</span>${badge}`;
-    row.addEventListener("click", () => {
-      if (isSelected(f.family)) {
+
+    row.innerHTML = `
+      <span class="fp-font-name">${f.label}</span>${badge}
+      <button class="fp-font-add${inUse ? " in-use" : ""}" title="Add to font list">+</button>
+    `;
+
+    // click font name → select for preview
+    row.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      if (target.closest(".fp-font-add")) return;
+      if (previewFont?.toLowerCase() === f.family.toLowerCase()) {
+        previewFont = null;
+      } else {
+        previewFont = f.family;
+      }
+      refreshAll();
+    });
+
+    // + button → add/remove from used list
+    row.querySelector(".fp-font-add")!.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (isInUse(f.family)) {
         selected = selected.filter(s => s.toLowerCase() !== f.family.toLowerCase());
       } else {
         selected = [...selected, f.family];
       }
       refreshAll();
     });
+
     listEl.appendChild(row);
     return row;
   }
@@ -133,16 +136,18 @@ export function showFontPickerDialog(
   function renderSelectedItem(family: string, idx: number): HTMLElement {
     const row = document.createElement("div");
     row.className = "fp-selected-item";
-    row.draggable = true;
     row.dataset.family = family;
 
     const def = [...BUILTIN_FONTS, ...NERDFONT_BUILTIN, ...systemFontDefs()]
       .find(f => f.family.toLowerCase() === family.toLowerCase());
 
     row.innerHTML = `
-      <span class="fp-drag-handle">≡</span>
       <span class="fp-selected-name">${def?.label ?? family}</span>
       <span class="fp-remove-btn" data-family="${family}">×</span>
+      <span class="fp-move-btns">
+        <button class="fp-move-btn fp-move-up" ${idx === 0 ? "disabled" : ""}>▲</button>
+        <button class="fp-move-btn fp-move-down" ${idx === selected.length - 1 ? "disabled" : ""}>▼</button>
+      </span>
     `;
 
     row.querySelector(".fp-remove-btn")!.addEventListener("click", (e) => {
@@ -151,16 +156,20 @@ export function showFontPickerDialog(
       refreshAll();
     });
 
-    row.addEventListener("dragstart", () => { draggedIdx = idx; row.classList.add("dragging"); });
-    row.addEventListener("dragend", () => { draggedIdx = -1; row.classList.remove("dragging"); });
-    row.addEventListener("dragover", (e) => { e.preventDefault(); row.classList.add("drag-over"); });
-    row.addEventListener("dragleave", () => { row.classList.remove("drag-over"); });
-    row.addEventListener("drop", (e) => {
-      e.preventDefault();
-      row.classList.remove("drag-over");
-      if (draggedIdx >= 0 && draggedIdx !== idx) {
-        const [item] = selected.splice(draggedIdx, 1);
-        selected.splice(idx, 0, item);
+    row.querySelector(".fp-move-up")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (idx > 0) {
+        const [item] = selected.splice(idx, 1);
+        selected.splice(idx - 1, 0, item);
+        refreshAll();
+      }
+    });
+
+    row.querySelector(".fp-move-down")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (idx < selected.length - 1) {
+        const [item] = selected.splice(idx, 1);
+        selected.splice(idx + 1, 0, item);
         refreshAll();
       }
     });
@@ -170,9 +179,7 @@ export function showFontPickerDialog(
 
   function refreshLists() {
     const query = searchInput.value.trim().toLowerCase();
-    const selSet = new Set(selected.map(s => s.toLowerCase()));
 
-    // built-in
     builtinList.innerHTML = "";
     let allBuiltin = [...BUILTIN_FONTS, ...NERDFONT_BUILTIN];
     if (query) {
@@ -180,16 +187,15 @@ export function showFontPickerDialog(
         f.family.toLowerCase().includes(query) || f.label.toLowerCase().includes(query)
       );
     }
-    allBuiltin.forEach(f => renderFontItem(f, builtinList, selSet.has(f.family.toLowerCase())));
+    allBuiltin.forEach(f => renderFontItem(f, builtinList));
 
-    // system
     systemList.innerHTML = "";
     let sysFonts = systemFontDefs();
     systemCount.textContent = sysFonts.length > 0 ? `(${sysFonts.length})` : "(loading...)";
     if (query) {
       sysFonts = sysFonts.filter(f => f.family.toLowerCase().includes(query));
     }
-    sysFonts.forEach(f => renderFontItem(f, systemList, selSet.has(f.family.toLowerCase())));
+    sysFonts.forEach(f => renderFontItem(f, systemList));
   }
 
   function refreshSelected() {
@@ -200,13 +206,19 @@ export function showFontPickerDialog(
   }
 
   function updatePreview() {
-    if (!previewTerminal) return;
-    const css = buildFontFamily(selected);
-    previewTerminal.options.fontFamily = css;
-    previewFontLabel.textContent = css;
+    if (!previewTerminal || !previewFitAddon) return;
+    if (previewFont) {
+      const css = `'${previewFont}', monospace`;
+      previewTerminal.options.fontFamily = css;
+      previewFontLabel.textContent = previewFont;
+    } else {
+      const css = buildFontFamily(selected);
+      previewTerminal.options.fontFamily = css;
+      previewFontLabel.textContent = css;
+    }
 
-    // re-render sample
     previewTerminal.reset();
+    previewFitAddon.fit();
     previewTerminal.writeln(PREVIEW_CONTENT);
   }
 
@@ -220,9 +232,9 @@ export function showFontPickerDialog(
   function initPreview() {
     const term = new Terminal({
       cursorBlink: false,
-      fontSize: 12,
+      fontSize: configFontSize,
       fontFamily: buildFontFamily(selected),
-      scrollback: 0,
+      scrollback: 5000,
       disableStdin: true,
       theme: {
         background: "#1e1e1e",
@@ -246,9 +258,13 @@ export function showFontPickerDialog(
         brightWhite: "#ffffff",
       },
     });
+    const fitAddon = new FitAddon();
+    term.loadAddon(fitAddon);
     term.open(previewContainer);
+    fitAddon.fit();
     term.writeln(PREVIEW_CONTENT);
     previewTerminal = term;
+    previewFitAddon = fitAddon;
     previewFontLabel.textContent = buildFontFamily(selected);
   }
 

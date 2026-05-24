@@ -541,6 +541,59 @@ fn ssh_save_config(content: String) -> Result<String, String> {
     Ok("SSH config saved. Original backed up to config.tt.bak".into())
 }
 
+// -- Serial port enumeration ---
+
+#[derive(Clone, Serialize)]
+struct SerialPortInfo {
+    name: String,
+    driver: String,
+    manufacturer: String,
+    product: String,
+    vid: String,
+    pid: String,
+}
+
+#[tauri::command]
+fn serial_list_ports() -> Vec<SerialPortInfo> {
+    serial_enumerator::get_serial_list()
+        .into_iter()
+        .map(|p| {
+            let (vid, pid) = p.usb_info.map_or((String::new(), String::new()), |u| (u.vid, u.pid));
+            SerialPortInfo {
+                name: p.name,
+                driver: p.driver.unwrap_or_default(),
+                manufacturer: p.vendor.unwrap_or_default(),
+                product: p.product.unwrap_or_default(),
+                vid,
+                pid,
+            }
+        })
+        .collect()
+}
+
+// -- System font enumeration ---
+
+#[tauri::command]
+fn list_system_fonts() -> Vec<String> {
+    use winreg::enums::*;
+    use winreg::RegKey;
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let mut names: Vec<String> = Vec::new();
+    if let Ok(key) = hklm.open_subkey(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts") {
+        for v in key.enum_values().filter_map(|r| r.ok()) {
+            let family = v.0;
+            if family.ends_with(" (TrueType)") {
+                names.push(family.replace(" (TrueType)", ""));
+            } else if family.ends_with(" (OpenType)") {
+                names.push(family.replace(" (OpenType)", ""));
+            }
+        }
+    }
+    names.sort();
+    names.dedup();
+    names
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -559,7 +612,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, save_text_file, pty_write, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, open_new_window, ssh_read_config_raw, open_config_dir, open_ssh_config, ssh_clear_known_hosts, ssh_save_config, read_wt_settings, read_wt_fragments, find_vs_instances, read_config, write_config, delete_config])
+        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, save_text_file, pty_write, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, open_new_window, ssh_read_config_raw, open_config_dir, open_ssh_config, ssh_clear_known_hosts, ssh_save_config, read_wt_settings, read_wt_fragments, find_vs_instances, read_config, write_config, delete_config, serial_list_ports, list_system_fonts])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -392,9 +392,46 @@ body {
 }
 
 /* override xterm.js auto-hide: keep scrollbar always visible */
-.terminal-instance .xterm .xterm-scrollable-element > .invisible {
+.terminal-instance .xterm .xterm-scrollable-element > .invisible,
+.fp-preview-terminal .xterm .xterm-scrollable-element > .invisible {
   opacity: 1 !important;
   pointer-events: auto !important;
+}
+
+/* font picker preview terminal scrollbar */
+.fp-preview-terminal .xterm .xterm-scrollable-element > .scrollbar {
+  width: 4px !important;
+  background: transparent;
+  border-radius: 2px;
+  transition: width 0.15s;
+  position: absolute;
+  right: 0;
+  z-index: 10;
+  pointer-events: auto;
+}
+.fp-preview-terminal .xterm .xterm-scrollable-element > .scrollbar:hover {
+  width: 10px !important;
+}
+.fp-preview-terminal .xterm .xterm-scrollable-element > .scrollbar > .scra {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-radius: 2px !important;
+  transition: background-color 0.15s;
+}
+.fp-preview-terminal .xterm .xterm-scrollable-element > .scrollbar:hover > .scra {
+  background: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* preview terminal: hide native scrollbar, enable xterm DOM scrollbar */
+.fp-preview-terminal ::-webkit-scrollbar,
+.fp-preview-terminal ::-webkit-scrollbar-track,
+.fp-preview-terminal ::-webkit-scrollbar-thumb,
+.fp-preview-terminal ::-webkit-scrollbar-corner {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.fp-preview-terminal .xterm .xterm-viewport {
+  overflow-y: scroll !important;
 }
 
 /* -- size hint overlay -- */
@@ -1094,4 +1131,362 @@ body {
   color: #f08c62;
 }
 
+/* ===== Font Picker ===== */
 
+.font-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.font-picker {
+  width: 720px;
+  max-height: 85vh;
+  min-height: 560px;
+  background: #252526;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.font-picker-header {
+  padding: 14px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px solid #3a3a3a;
+  user-select: none;
+}
+
+.font-picker-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fp-search-row {
+  margin-bottom: 2px;
+}
+
+.fp-search {
+  width: 100%;
+  padding: 7px 10px;
+  background: #3a3a3a;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  color: #d4d4d4;
+  font-size: 13px;
+  outline: none;
+}
+
+.fp-search:focus {
+  border-color: #6bb8ff;
+}
+
+.fp-search::placeholder {
+  color: #888;
+}
+
+.fp-lists {
+  display: flex;
+  gap: 14px;
+}
+
+.fp-list-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.fp-list-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  margin-bottom: 6px;
+  user-select: none;
+}
+
+.fp-system-count {
+  color: #666;
+  font-weight: normal;
+}
+
+.fp-list {
+  height: 200px;
+  overflow-y: auto;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+}
+
+.fp-list:empty::after {
+  content: "No results";
+  display: block;
+  padding: 10px 12px;
+  color: #666;
+  font-size: 12px;
+}
+
+.fp-font-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid #2a2a2a;
+  font-size: 13px;
+}
+
+.fp-font-item:last-child {
+  border-bottom: none;
+}
+
+.fp-font-item:hover {
+  background: #2a2a2a;
+}
+
+.fp-font-item.preview-selected {
+  background: #0e639c;
+  color: #fff;
+}
+
+.fp-font-item.preview-selected .fp-badge {
+  color: #fff;
+}
+
+.fp-font-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.fp-font-add {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #4a4a4a;
+  border: none;
+  border-radius: 3px;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.fp-font-add:hover {
+  background: #6a6a6a;
+  color: #fff;
+}
+
+.fp-font-add.in-use {
+  background: #0e639c;
+  color: #fff;
+}
+
+.fp-badge {
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.fp-badge.nf {
+  background: #7c3aed;
+  color: #fff;
+}
+
+.fp-badge.builtin {
+  background: #4a4a4a;
+  color: #ccc;
+}
+
+.fp-nf-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6bb8ff;
+  text-decoration: none;
+}
+
+.fp-nf-link:hover {
+  text-decoration: underline;
+}
+
+/* -- Selected (used) list -- */
+
+.fp-selected-section {
+  margin-top: 2px;
+}
+
+.fp-selected-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  margin-bottom: 6px;
+  user-select: none;
+}
+
+.fp-selected-list {
+  min-height: 34px;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.fp-selected-list:empty::after {
+  content: "No fonts selected. Add fonts from the lists above.";
+  display: block;
+  padding: 8px 10px;
+  color: #666;
+  font-size: 12px;
+}
+
+.fp-selected-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  margin: 2px;
+  background: #2a2a2a;
+  border-radius: 3px;
+  user-select: none;
+}
+
+.fp-selected-name {
+  flex: 1;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fp-move-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.fp-move-btn {
+  width: 22px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #3a3a3a;
+  border: none;
+  border-radius: 2px;
+  color: #888;
+  cursor: pointer;
+  font-size: 8px;
+  line-height: 1;
+  padding: 0;
+}
+
+.fp-move-btn:hover:not(:disabled) {
+  background: #4a4a4a;
+  color: #fff;
+}
+
+.fp-move-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.fp-remove-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: #888;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.fp-remove-btn:hover {
+  background: #4a4a4a;
+  color: #f44747;
+}
+
+/* -- Preview -- */
+
+.fp-preview-section {
+  margin-top: 2px;
+}
+
+.fp-preview-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  margin-bottom: 6px;
+  user-select: none;
+}
+
+.fp-preview-terminal {
+  height: 180px;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* -- Footer -- */
+
+.font-picker-footer {
+  padding: 12px 20px;
+  border-top: 1px solid #3a3a3a;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.fp-btn {
+  padding: 6px 16px;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  background: #3a3a3a;
+  color: #d4d4d4;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.fp-btn:hover {
+  background: #4a4a4a;
+}
+
+.fp-btn-apply {
+  background: #0e639c;
+  border-color: #0e639c;
+}
+
+.fp-btn-apply:hover {
+  background: #1177bb;
+}
+
+/* Disable ligatures in terminal */
+.terminal-instance .xterm {
+  font-feature-settings: "calt" off, "liga" off;
+}

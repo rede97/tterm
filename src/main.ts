@@ -1,8 +1,17 @@
 ﻿import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { createElement, Cog } from "lucide";
 import "@xterm/xterm/css/xterm.css";
 import "@fontsource/jetbrains-mono";
+import "@fontsource/fira-mono";
+import "@fontsource/cascadia-mono";
+import "@fontsource/source-code-pro";
+import "@fontsource/ibm-plex-mono";
+import "@fontsource/roboto-mono";
+import "@fontsource/ubuntu-mono";
+import "./assets/fonts/nerd-fonts.css";
+import { parseFontFamily, updateFontStack, setSystemFonts } from "./fontconfig";
 import { PtyOutputPayload } from "./types";
 import { tabManager, initTabManager } from "./tabmanager";
 import { initSearchBar } from "./search";
@@ -80,6 +89,7 @@ setOnSettingsChanged(async () => {
     tab.terminal.options.scrollback = configScrollback;
   }
   applyTabWidthMode();
+  tabManager.triggerResize();
 });
 
 function applyTabWidthMode(): void {
@@ -105,7 +115,14 @@ initWindowControls();
 getVersion().then(v => { welcomeVersion.textContent = "v" + v; }).catch(() => {});
 
 loadSshHosts();
+
+// Load system fonts in background (non-blocking)
+invoke<string[]>("list_system_fonts").then(fonts => {
+  setSystemFonts(fonts);
+}).catch(() => {});
+
 loadConfig().then(() => {
+  updateFontStack(parseFontFamily(configFontFamily));
   return loadLocalProfiles();
 }).then(async () => {
   applyTabWidthMode();

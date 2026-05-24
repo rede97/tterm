@@ -1,4 +1,5 @@
 ﻿import { invoke } from "@tauri-apps/api/core";
+import { buildFontFamily, defaultFontStack } from "./fontconfig";
 
 // SshHost is a simple KV map: { name, hostname, user, port, forwardagent, ... }
 // All values are strings. Frontend owns all parsing + generation.
@@ -213,7 +214,7 @@ function readConfigValues(cfg: any) {
 
 export function getDefaultConfig(): Record<string, unknown> {
   return {
-    fontFamily: "'JetBrains Mono', Consolas, monospace",
+    fontFamily: buildFontFamily(defaultFontStack()),
     fontSize: 14,
     pasteWarning: true,
     pasteTrim: true,
