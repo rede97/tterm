@@ -17,7 +17,7 @@ import { tabManager, initTabManager } from "./tabmanager";
 import { initSearchBar } from "./search";
 import { initProfileMenu } from "./profilemenu";
 import { initWindowControls } from "./window";
-import { createSettingsContent, setOnSettingsChanged } from "./settings";
+import { setOnSettingsChanged } from "./settings-events";
 import {
   localProfiles, defaultLocalProfile,
   loadSshHosts, loadLocalProfiles, loadConfig,
@@ -73,7 +73,10 @@ listen<PtyOutputPayload>("pty-output", (event) => {
 
 // -- settings --
 
-tabManager.setSettingsFactory(createSettingsContent);
+tabManager.setSettingsFactory(async () => {
+  const m = await import("./settings");
+  return m.createSettingsContent();
+});
 
 const settingsBtn = document.getElementById("settings-btn")!;
 settingsBtn.appendChild(createElement(Cog, { stroke: "currentColor", width: 16, height: 16 }));

@@ -166,8 +166,6 @@ export class TerminalTab {
 
     const cols = hysteresis(floatCols, this.terminal.cols, 0.8, 0.9);
     const rows = hysteresis(floatRows, this.terminal.rows, 0.98, 1.0);
-    const diff = floatRows - this.terminal.rows;
-    console.log(`--padV: ${padV} f_rows: ${floatRows} term_row: ${this.terminal.rows} diff: ${diff}`);
 
     if (this.terminal.cols !== cols || this.terminal.rows !== rows)
       this.terminal.resize(cols, rows);

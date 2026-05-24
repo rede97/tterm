@@ -9,7 +9,7 @@ export class TabManager {
 
   private settingsEl: HTMLElement | null = null;
   private settingsTabEl: HTMLElement | null = null;
-  private _createSettingsContent: (() => HTMLElement) | null = null;
+  private _createSettingsContent: (() => Promise<HTMLElement>) | null = null;
 
   readonly tabsContainer: HTMLElement;
   readonly terminalContainer: HTMLElement;
@@ -83,6 +83,8 @@ export class TabManager {
     if (command) { tab.command = command; }
     this._register(tab);
 
+    await this._ensureFontsReady(tab);
+
     this._hideWelcome();
     this.switchTo(id);
     tab.fitDeferred();
@@ -101,12 +103,24 @@ export class TabManager {
     tab.sshHost = host;
     this._register(tab);
 
+    await this._ensureFontsReady(tab);
+
     this._hideWelcome();
     this.switchTo(id);
     tab.fitDeferred();
     this.refreshBadges();
 
     return tab;
+  }
+
+  // Wait for web fonts to load, then force xterm to re-measure character cells.
+  // Without this, the first tab opened measures with a fallback font and caches
+  // wrong glyph metrics, causing wide character spacing until next resize.
+  private async _ensureFontsReady(tab: TerminalTab): Promise<void> {
+    await document.fonts.ready;
+    const ff = tab.terminal.options.fontFamily;
+    tab.terminal.options.fontFamily = "";
+    tab.terminal.options.fontFamily = ff;
   }
 
   // -- switch / close --
@@ -258,7 +272,7 @@ export class TabManager {
 
   // -- settings --
 
-  setSettingsFactory(fn: () => HTMLElement): void {
+  setSettingsFactory(fn: () => Promise<HTMLElement>): void {
     this._createSettingsContent = fn;
   }
 
@@ -267,7 +281,7 @@ export class TabManager {
     this._openSettings();
   }
 
-  private _openSettings(): void {
+  private async _openSettings(): Promise<void> {
     if (this.settingsEl || !this._createSettingsContent) return;
 
     this.settingsOpen = true;
@@ -297,7 +311,7 @@ export class TabManager {
     const sCloseBtn = this.settingsTabEl.querySelector(".tab-close") as HTMLElement;
     if (sCloseBtn) sCloseBtn.style.opacity = "1";
 
-    this.settingsEl = this._createSettingsContent();
+    this.settingsEl = await this._createSettingsContent();
     this.terminalContainer.appendChild(this.settingsEl);
   }
 

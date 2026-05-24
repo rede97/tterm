@@ -4,9 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
-let _onSettingsChanged: (() => void) | null = null;
-export function onSettingsChangedFn(): (() => void) | null { return _onSettingsChanged; }
-export function setOnSettingsChanged(fn: (() => void) | null) { _onSettingsChanged = fn; }
+import { settingsChangedFn } from "./settings-events";
 
 export function createSettingsContent(): HTMLElement {
   const root = document.createElement("div");
@@ -223,7 +221,8 @@ export function createSettingsContent(): HTMLElement {
         saveConfig({ fontFamily: buildFontFamily(stack) });
         const desc = root.querySelector("#set-font-family-desc");
         if (desc) desc.textContent = buildFontFamily(stack);
-        if (_onSettingsChanged) _onSettingsChanged();
+        const cb = settingsChangedFn();
+        if (cb) cb();
         const fb = root.querySelector(".settings-feedback")!;
         fb.textContent = "Font updated";
         fb.className = "settings-feedback settings-feedback-ok";
@@ -598,7 +597,8 @@ async function applySettings(root: HTMLElement) {
   partial.hiddenProfiles = hidden;
 
   await saveConfig(partial);
-  if (_onSettingsChanged) _onSettingsChanged();
+  const cb = settingsChangedFn();
+  if (cb) cb();
 }
 
 function esc(s: string): string {

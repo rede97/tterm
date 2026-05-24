@@ -56,6 +56,9 @@ A multi-tab desktop terminal emulator (TTerm) built with Tauri v2. The frontend 
 | `src/window.ts` | Window controls (min/max/close), drag handling, maximize/restore icon toggle |
 | `src/search.ts` | Search bar; per-tab `searchQuery` save/restore via `TerminalTab` |
 | `src/profilemenu.ts` | New-tab dropdown (Local / SSH columns) |
+| `src/fontconfig.ts` | Font definitions, default stack, system font enumeration, buildFontFamily/parseFontFamily |
+| `src/fontpicker.ts` | Font picker modal; dynamically imported by settings.ts, never statically imported |
+| `src/settings-events.ts` | Shared `setOnSettingsChanged` callback; used by both main.ts and settings.ts (lazy-loaded) |
 | `src/contextmenu.ts` | Two menus: `showTabContextMenu` (tab bar right-click) and `showTerminalContextMenu` (shift+right-click on terminal) |
 | `src/types.ts` | `PtyOutputPayload`, `TabType`, `Tab` interface |
 
@@ -93,7 +96,15 @@ Frontend → Backend: Tauri `invoke()` commands:
 | `read_config` | — | read app config from `{app_config_dir}/config.json` |
 | `write_config` | `content` | write JSON string to app config file |
 | `ssh_list_hosts` | — | parse `~/.ssh/config`, return host list |
+| `ssh_read_config_raw` | — | return raw `~/.ssh/config` content |
+| `ssh_save_config` | `content` | write raw SSH config string to `~/.ssh/config` |
+| `ssh_clear_known_hosts` | `hostname` | run `ssh-keygen -R <hostname>` |
+| `open_ssh_config` | — | open `~/.ssh/config` in system editor |
+| `open_config_dir` | — | open `{app_config_dir}` in file explorer |
+| `delete_config` | — | delete `config.json` (used by Reset All) |
 | `save_text_file` | `content` | save text to file via native save dialog |
+| `list_system_fonts` | — | enumerate installed fonts from Windows registry |
+| `serial_list_ports` | — | enumerate serial ports |
 
 Backend → Frontend: `pty-output` event `{ id: string, data: number[] }`.
 
@@ -129,10 +140,39 @@ Two-column layout (Local | SSH) with a vertical divider. Centered on the new-tab
 - Copy uses `execCommand("copy")` + hidden textarea (NOT `navigator.clipboard.writeText`) to avoid browser clipboard permission prompt.
 - Global `document.addEventListener("contextmenu", e => e.preventDefault())` blocks all browser native context menus.
 
+## Font system
+
+### Font stack model
+
+- `fontconfig.ts` holds the current `fontStack: string[]` — an ordered list of font families (no CSS quoting).
+- `buildFontFamily(fonts)` converts to CSS `font-family` value: quotes font names with spaces, appends `monospace` as implicit final fallback.
+- `parseFontFamily(css)` reverses this: strips quotes, removes `monospace`.
+- **`monospace` is never stored in config or displayed in the picker** — it's always appended by `buildFontFamily()` at the CSS boundary.
+
+### Default font stack
+
+`defaultFontStack()` → `["JetBrains Mono", "Noto Sans SC", "Noto Sans JP", "Noto Sans KR", "Consolas"]`
+
+Noto Sans fonts are per-script variants (SC = Simplified Chinese, JP = Japanese, KR = Korean) — NOT a single "Noto Sans CJK" family. These provide CJK character fallback for the preview samples.
+
+### Font picker
+
+- `showFontPickerDialog(onApply)` in `fontpicker.ts` — dynamically imported by settings.ts when user clicks "Configure".
+- Two source columns: Built-in (BUILTIN_FONTS + NERDFONT_BUILTIN) and System (enumerated from registry).
+- Click a font name → preview that single font in the xterm preview area. Click again → preview full stack.
+- "+" button adds/removes font from the used list.
+- ▲/▼ buttons reorder priority (NOT HTML5 drag — doesn't work reliably in WebView).
+- Preview terminal uses `configFontSize` (not hardcoded), `scrollback: 5000`, custom scrollbar matching main terminal.
+
+### Initial value consistency
+
+`configFontFamily` (profiles.ts module-level init) and `getDefaultConfig()` MUST produce the same value. Always use `buildFontFamily(defaultFontStack())` for both to avoid drift.
+
 ## Terminal rendering gotchas
 
 - **Never** add `will-change: transform` or `transform: translateZ(0)` on `.terminal-instance .xterm` — forces GPU compositing layer, causes sub-pixel gaps between monospace glyphs.
 - **Always** keep `outline: none !important` on `.terminal-instance .xterm textarea:focus` — Chrome draws dashed focus ring on xterm's hidden textarea.
+- **Web font loading race**: xterm.js measures character cell dimensions during `terminal.open()`. If @fontsource web fonts haven't loaded yet, xterm caches wrong glyph metrics (usually too wide). Fix: `_ensureFontsReady()` in tabmanager.ts waits for `document.fonts.ready` then toggles fontFamily to force re-measure, all before `switchTo()` shows the tab. Without this, the first tab renders with wide character spacing until the next window resize.
 
 ## Tab switching & resize
 
@@ -157,12 +197,15 @@ hysteresis(floatVal, current, th_low, th_high, min=2)
 
 ## Settings page
 
+- Settings module (`src/settings.ts`, ~620 lines) is **lazy-loaded** via `import("./settings")` when the user first clicks the Settings button. The `TabManager` factory accepts `() => Promise<HTMLElement>` and `_openSettings()` is async.
+- Callback pattern: `setOnSettingsChanged` lives in `src/settings-events.ts` (tiny shared module, eagerly loaded). Both main.ts and settings.ts import from it — avoids circular dependencies while keeping the callback channel light.
 - Layout: **sidebar** (`flex-direction: row`). `.settings-sidebar` left (200px, `#252526`), `.settings-body` right.
 - Settings tab created in `_openSettings()`, removed from DOM on close. `data-tab-id="#settings"` excluded from badge counting.
 - `toggleSettings()` opens only (no-op if open). Close via: tab close button, or switching to any terminal tab.
-- Three panels: General (renderer, scrollback, paste options, terminal bell, tab width, data), Appearance (font family/size), Profile (default profile, imported WT profile visibility toggles).
+- Four panels: General (renderer, scrollback, paste options, terminal bell, tab width, data), Appearance (font family/size), Profile (default profile, imported WT profile visibility toggles), SSH (host visibility, expand, save, clear known hosts).
 - Footer: `[feedback text] … … [Revert] [Apply]`. Apply saves config, turns gray on save, re-enables on any input change. Revert reloads config from disk.
 - Profile panel shows ALL imported profiles including hidden ones (unchecked). Hidden profiles are filtered from the new-tab dropdown only.
+- SSH config parsing/generation is entirely frontend-owned (profiles.ts `parseSshConfig`/`generateSshConfig`). Rust only handles raw file I/O. Keys preserve original SSH config casing (e.g. `ForwardAgent` not `forwardagent`).
 
 ## Custom window decorations
 
