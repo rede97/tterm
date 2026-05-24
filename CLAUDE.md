@@ -292,25 +292,15 @@ Before creating a release tag, ensure the build output has zero warnings (includ
 - `src-tauri/Cargo.toml` — `version = "X.Y.Z"`
 - `package.json` — `"version": "X.Y.Z"`
 
-**Tag and release** — create an annotated tag with release notes. The release workflow extracts the tag body as the GitHub Release description:
+**Tag and release** — add a `## vX.Y.Z` section to CHANGELOG.md (top of file, above previous version) with release notes. Then bump version, commit, and tag. The release workflow extracts the first `## v` section from CHANGELOG.md as the GitHub Release description:
 
 ```sh
-git tag -a vX.Y.Z -m "vX.Y.Z
-
-New Features
-
-- feature one
-- feature two
-
-Fixes
-
-- fix one
-
-Improvements
-
-- improvement one"
+# 1. Add release notes to CHANGELOG.md first, then:
+git tag -a vX.Y.Z -m "vX.Y.Z"
 git push origin main
 git push origin vX.Y.Z
 ```
 
-The release workflow (`.github/workflows/release.yml`) triggers on `v*` tag push, builds the NSIS/MSI installers via Tauri, and creates a GitHub Release with the tag annotation as the body. Key detail: `actions/checkout` must use `fetch-depth: 0` to fetch the annotated tag object.
+IMPORTANT: The tag MUST point to a commit that includes the updated CHANGELOG.md. If you commit the version bump first then update CHANGELOG afterward, the tag will be on the wrong commit and the release will have stale notes.
+
+The release workflow (`.github/workflows/release.yml`) triggers on `v*` tag push, builds the NSIS/MSI installers via Tauri, and creates a GitHub Release with the first `## v` section of CHANGELOG.md as the body.
