@@ -4,14 +4,17 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::sync::mpsc::{sync_channel, RecvTimeoutError};
+use std::time::Instant;
 use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
+use base64::Engine as _;
 
 
 #[derive(Clone, Serialize)]
 pub(crate) struct PtyOutput {
     pub(crate) id: String,
-    pub(crate) data: Vec<u8>,
+    pub(crate) data: String, // base64-encoded bytes — 3x smaller than JSON number array
 }
 
 pub(crate) struct PtySession {
@@ -58,24 +61,66 @@ fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder) -> R
     let mut reader = master.try_clone_reader().map_err(|e| e.to_string())?;
     let writer = master.take_writer().map_err(|e| e.to_string())?;
 
-    // background thread: read PTY output → emit to frontend with tab id
+    // background threads: read PTY → channel → batcher (5ms window) → emit
+    // Two-thread pipeline matches VS Code's approach: reader pushes into a
+    // channel, batcher drains available chunks with a short coalescing window
+    // before emitting a single merged base64 event.  This avoids per-chunk
+    // IPC overhead that causes flicker during rapid terminal output.
     let emit_id = id.clone();
     let emit_handle = app_handle.clone();
+    let (tx, rx) = sync_channel::<Vec<u8>>(128);
+
+    // Reader thread: blocking reads from PTY, push raw chunks into channel
     std::thread::spawn(move || {
-        let mut buf = [0u8; 4096];
+        let mut buf = [0u8; 16384];
         loop {
             match reader.read(&mut buf) {
                 Ok(0) => break,
                 Ok(n) => {
-                    let _ = emit_handle.emit(
-                        "pty-output",
-                        PtyOutput {
-                            id: emit_id.clone(),
-                            data: buf[..n].to_vec(),
-                        },
-                    );
+                    if tx.send(buf[..n].to_vec()).is_err() {
+                        break;
+                    }
                 }
                 Err(_) => break,
+            }
+        }
+    });
+
+    // Batcher thread: 5ms coalescing window (matches VS Code's strategy).
+    // All chunks within the window merge into a single emit, reducing IPC
+    // event count and xterm.js partial-render passes.
+    std::thread::spawn(move || {
+        let mut pending: Vec<u8> = Vec::with_capacity(65536);
+        loop {
+            let first = match rx.recv() {
+                Ok(data) => data,
+                Err(_) => break,
+            };
+            let deadline = Instant::now() + std::time::Duration::from_millis(11);
+            pending.extend_from_slice(&first);
+
+            // Drain all chunks arriving within the 5ms coalescing window
+            loop {
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    break;
+                }
+                match rx.recv_timeout(remaining) {
+                    Ok(more) => pending.extend_from_slice(&more),
+                    Err(RecvTimeoutError::Timeout) => break,
+                    Err(RecvTimeoutError::Disconnected) => break,
+                }
+            }
+
+            if !pending.is_empty() {
+                let _ = emit_handle.emit(
+                    "pty-output",
+                    PtyOutput {
+                        id: emit_id.clone(),
+                        data: base64::engine::general_purpose::STANDARD.encode(&pending),
+                    },
+                );
+                pending.clear();
             }
         }
     });

@@ -62,12 +62,21 @@ welcomeEl.appendChild(welcomeVersion);
 initTabManager(tabsContainer, terminalContainer, welcomeEl);
 
 // -- PTY output routing ---
+// data arrives as base64-encoded bytes.  Batching is handled on the Rust
+// side (11ms coalescing window), so here we just decode and write directly.
+
+function _b64decode(b64: string): Uint8Array {
+  const raw = atob(b64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
 
 listen<PtyOutputPayload>("pty-output", (event) => {
   const { id, data } = event.payload;
   const tab = tabManager.get(id);
   if (tab) {
-    tab.terminal.write(new Uint8Array(data));
+    tab.terminal.write(_b64decode(data));
   }
 });
 

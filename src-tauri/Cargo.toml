@@ -27,4 +27,5 @@ tauri-plugin-dialog = "2.7.1"
 tauri-plugin-window-state = "2.4.1"
 winreg = "0.52"
 serial_enumerator = "0.2"
+base64 = "0.22"
 

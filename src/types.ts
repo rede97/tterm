@@ -5,7 +5,7 @@ import { SshHost } from "./profiles";
 
 export interface PtyOutputPayload {
   id: string;
-  data: number[];
+  data: string; // base64-encoded PTY bytes
 }
 
 export type TabType = "local" | "ssh";
