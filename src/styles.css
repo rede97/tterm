@@ -492,6 +492,7 @@ body {
    native scrollbar hidden via ::-webkit-scrollbar rules above */
 .terminal-instance .xterm .xterm-viewport {
   overflow-y: scroll !important;
+  overflow-x: hidden !important;
 }
 
 .terminal-instance .xterm .xterm-screen {
