@@ -1,3 +1,15 @@
+## v0.1.5
+
+Fixes
+
+- Fix horizontal scroll drift: overflow-y:scroll on xterm viewport implicitly forces overflow-x:auto,
+  causing accessibility tree row elements to trigger unwanted horizontal scrollLeft that clips
+  terminal content on the left side
+- Fix IME candidate window position drift: align-content:center created a vertical offset between
+  JavaScript-computed cursor coordinates and actual visual grid position, causing the IME composition
+  window to appear above the real cursor. Switched to align-content:end (bottom-aligned grid) matching
+  VS Code's approach
+
 ## v0.1.4
 
 New Features
