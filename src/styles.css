@@ -468,7 +468,7 @@ body {
   height: 100%;
   /* snap grid to bottom so leftover space collects at top (VS Code style);
      keep content anchored at cursor line when grid slightly smaller */
-  align-content: center !important;
+  align-content: end !important;
   justify-content: start !important;
 }
 
