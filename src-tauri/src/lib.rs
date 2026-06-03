@@ -2,13 +2,13 @@ use portable_pty::{native_pty_system, CommandBuilder, PtySize, MasterPty};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
-use tungstenite::accept;
-use tungstenite::Message as WsMessage;
+use futures_util::{SinkExt, StreamExt};
+use tokio_tungstenite::accept_async;
+use tokio_tungstenite::tungstenite::Message as WsMessage;
 
 #[derive(Clone, Serialize)]
 pub(crate) struct WsConnectResult {
@@ -58,56 +58,82 @@ fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder) -> R
 
     let master = pty_pair.master;
     let mut reader = master.try_clone_reader().map_err(|e| e.to_string())?;
-    let writer = master.take_writer().map_err(|e| e.to_string())?;
+    let writer: Box<dyn Write + Send> = master.take_writer().map_err(|e| e.to_string())?;
 
-    // Start local WS server on random port
-    let listener = TcpListener::bind("127.0.0.1:0")
+    // Bind WebSocket server on random port
+    let listener = std::net::TcpListener::bind("127.0.0.1:0")
         .map_err(|e| format!("Failed to bind local WS: {}", e))?;
+    listener.set_nonblocking(true)
+        .map_err(|e| format!("set_nonblocking: {}", e))?;
     let port = listener.local_addr()
         .map_err(|e| format!("Failed to get port: {}", e))?.port();
 
-    // Accept + relay threads
-    std::thread::spawn(move || {
-        let (stream, _) = match listener.accept() { Ok(c) => c, Err(_) => return };
-        let ws_local = match accept(stream) { Ok(ws) => Arc::new(Mutex::new(ws)), Err(_) => return };
+    let rt = tauri::async_runtime::handle();
+    // NFC: rt.spawn consumes `rt`, clone for reuse
+    rt.clone().spawn(async move {
+        let stream = match tokio::net::TcpListener::from_std(listener) {
+            Ok(tl) => match tl.accept().await {
+                Ok((s, _)) => s,
+                Err(_) => return,
+            },
+            Err(_) => return,
+        };
+        let ws = match accept_async(stream).await {
+            Ok(ws) => ws,
+            Err(_) => return,
+        };
+        let (mut ws_sink, mut ws_stream) = ws.split();
 
-        // PTY → WS relay
-        let ws_out = ws_local.clone();
-        std::thread::spawn(move || {
-            let mut buf = [0u8; 16384];
-            loop {
-                match reader.read(&mut buf) {
-                    Ok(0) => break,
-                    Ok(n) => {
-                        let mut lock = match ws_out.lock() { Ok(l) => l, Err(_) => break };
-                        if lock.send(WsMessage::Binary(buf[..n].to_vec())).is_err() { break; }
+        // Channel: PTY reader → WS (unidirectional, no Mutex)
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<u8>>(256);
+
+        // Task 1: PTY read (blocking) → channel
+        let tx1 = tx.clone();
+        rt.spawn(async move {
+            let _ = tokio::task::spawn_blocking(move || {
+                let mut buf = [0u8; 16384];
+                loop {
+                    match reader.read(&mut buf) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            if tx1.blocking_send(buf[..n].to_vec()).is_err() { break; }
+                        }
+                        Err(_) => break,
                     }
-                    Err(_) => break,
                 }
+            }).await;
+        });
+
+        // Task 2: channel → WS sink (fully async)
+        rt.spawn(async move {
+            while let Some(data) = rx.recv().await {
+                if ws_sink.send(WsMessage::Binary(data)).await.is_err() { break; }
             }
         });
 
-        // WS → PTY relay
-        let mut pty_writer = writer;
-        std::thread::spawn(move || {
-            loop {
-                let msg = match ws_local.lock() {
-                    Ok(mut lock) => match lock.read() { Ok(m) => m, Err(_) => break },
-                    Err(_) => break,
-                };
-                match msg {
-                    WsMessage::Binary(data) => {
-                        if pty_writer.write_all(&data).is_err() { break; }
-                        if pty_writer.flush().is_err() { break; }
-                    }
+        // Task 3: WS stream → PTY write
+        // writer is Arc<Mutex<>> so it can be shared across spawn_blocking calls
+        let pty_w = Arc::new(Mutex::new(writer));
+        rt.spawn(async move {
+            while let Some(Ok(msg)) = ws_stream.next().await {
+                let data = match msg {
+                    WsMessage::Binary(d) => d,
+                    WsMessage::Text(t) => t.into_bytes(),
                     WsMessage::Close(_) => break,
                     _ => continue,
-                }
+                };
+                let w = pty_w.clone();
+                let result = tokio::task::spawn_blocking(move || {
+                    let mut guard = match w.lock() { Ok(g) => g, Err(_) => return };
+                    if guard.write_all(&data).is_err() { return; }
+                    let _ = guard.flush();
+                }).await;
+                if result.is_err() { break; }
             }
         });
     });
 
-    // Store session (master for resize, writer unused — WS handles I/O)
+    // Store session (master for resize)
     let sessions = app_handle.state::<AppState>();
     sessions.sessions.lock().unwrap().insert(
         id,
