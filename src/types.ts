@@ -3,11 +3,6 @@ import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { SshHost } from "./profiles";
 
-export interface PtyOutputPayload {
-  id: string;
-  data: string; // base64-encoded PTY bytes
-}
-
 export type TabType = "local" | "ssh";
 
 export interface Tab {

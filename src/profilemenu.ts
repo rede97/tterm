@@ -98,6 +98,7 @@ function populateMenu() {
     }
     profileMenu.appendChild(sshCol);
   }
+
 }
 
 export function initProfileMenu() {

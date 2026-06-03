@@ -1,5 +1,4 @@
-﻿import { listen } from "@tauri-apps/api/event";
-import { invoke } from "@tauri-apps/api/core";
+﻿import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { createElement, Cog } from "lucide";
 import "@xterm/xterm/css/xterm.css";
@@ -12,7 +11,6 @@ import "@fontsource/roboto-mono";
 import "@fontsource/ubuntu-mono";
 import "./assets/fonts/nerd-fonts.css";
 import { parseFontFamily, updateFontStack, setSystemFonts } from "./fontconfig";
-import { PtyOutputPayload } from "./types";
 import { tabManager, initTabManager } from "./tabmanager";
 import { initSearchBar } from "./search";
 import { initProfileMenu } from "./profilemenu";
@@ -60,25 +58,6 @@ welcomeEl.appendChild(welcomeVersion);
 // -- init TabManager ---
 
 initTabManager(tabsContainer, terminalContainer, welcomeEl);
-
-// -- PTY output routing ---
-// data arrives as base64-encoded bytes.  Batching is handled on the Rust
-// side (11ms coalescing window), so here we just decode and write directly.
-
-function _b64decode(b64: string): Uint8Array {
-  const raw = atob(b64);
-  const out = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
-  return out;
-}
-
-listen<PtyOutputPayload>("pty-output", (event) => {
-  const { id, data } = event.payload;
-  const tab = tabManager.get(id);
-  if (tab) {
-    tab.terminal.write(_b64decode(data));
-  }
-});
 
 // -- settings --
 

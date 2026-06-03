@@ -2,19 +2,18 @@ use portable_pty::{native_pty_system, CommandBuilder, PtySize, MasterPty};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
+use std::net::TcpListener;
 use std::path::PathBuf;
-use std::sync::Mutex;
-use std::sync::mpsc::{sync_channel, RecvTimeoutError};
-use std::time::Instant;
-use tauri::{Emitter, Manager};
+use std::sync::{Arc, Mutex};
+use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
-use base64::Engine as _;
-
+use tungstenite::accept;
+use tungstenite::Message as WsMessage;
 
 #[derive(Clone, Serialize)]
-pub(crate) struct PtyOutput {
+pub(crate) struct WsConnectResult {
     pub(crate) id: String,
-    pub(crate) data: String, // base64-encoded bytes — 3x smaller than JSON number array
+    pub(crate) port: u16,
 }
 
 pub(crate) struct PtySession {
@@ -39,7 +38,7 @@ fn get_shell() -> String {
     }
 }
 
-fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder) -> Result<(), String> {
+fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder) -> Result<u16, String> {
     let pty_sys = native_pty_system();
     let pty_pair = pty_sys
         .openpty(PtySize {
@@ -61,77 +60,61 @@ fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder) -> R
     let mut reader = master.try_clone_reader().map_err(|e| e.to_string())?;
     let writer = master.take_writer().map_err(|e| e.to_string())?;
 
-    // background threads: read PTY → channel → batcher (5ms window) → emit
-    // Two-thread pipeline matches VS Code's approach: reader pushes into a
-    // channel, batcher drains available chunks with a short coalescing window
-    // before emitting a single merged base64 event.  This avoids per-chunk
-    // IPC overhead that causes flicker during rapid terminal output.
-    let emit_id = id.clone();
-    let emit_handle = app_handle.clone();
-    let (tx, rx) = sync_channel::<Vec<u8>>(128);
+    // Start local WS server on random port
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .map_err(|e| format!("Failed to bind local WS: {}", e))?;
+    let port = listener.local_addr()
+        .map_err(|e| format!("Failed to get port: {}", e))?.port();
 
-    // Reader thread: blocking reads from PTY, push raw chunks into channel
+    // Accept + relay threads
     std::thread::spawn(move || {
-        let mut buf = [0u8; 16384];
-        loop {
-            match reader.read(&mut buf) {
-                Ok(0) => break,
-                Ok(n) => {
-                    if tx.send(buf[..n].to_vec()).is_err() {
-                        break;
-                    }
-                }
-                Err(_) => break,
-            }
-        }
-    });
+        let (stream, _) = match listener.accept() { Ok(c) => c, Err(_) => return };
+        let ws_local = match accept(stream) { Ok(ws) => Arc::new(Mutex::new(ws)), Err(_) => return };
 
-    // Batcher thread: 5ms coalescing window (matches VS Code's strategy).
-    // All chunks within the window merge into a single emit, reducing IPC
-    // event count and xterm.js partial-render passes.
-    std::thread::spawn(move || {
-        let mut pending: Vec<u8> = Vec::with_capacity(65536);
-        loop {
-            let first = match rx.recv() {
-                Ok(data) => data,
-                Err(_) => break,
-            };
-            let deadline = Instant::now() + std::time::Duration::from_millis(11);
-            pending.extend_from_slice(&first);
-
-            // Drain all chunks arriving within the 5ms coalescing window
+        // PTY → WS relay
+        let ws_out = ws_local.clone();
+        std::thread::spawn(move || {
+            let mut buf = [0u8; 16384];
             loop {
-                let remaining = deadline.saturating_duration_since(Instant::now());
-                if remaining.is_zero() {
-                    break;
-                }
-                match rx.recv_timeout(remaining) {
-                    Ok(more) => pending.extend_from_slice(&more),
-                    Err(RecvTimeoutError::Timeout) => break,
-                    Err(RecvTimeoutError::Disconnected) => break,
+                match reader.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        let mut lock = match ws_out.lock() { Ok(l) => l, Err(_) => break };
+                        if lock.send(WsMessage::Binary(buf[..n].to_vec())).is_err() { break; }
+                    }
+                    Err(_) => break,
                 }
             }
+        });
 
-            if !pending.is_empty() {
-                let _ = emit_handle.emit(
-                    "pty-output",
-                    PtyOutput {
-                        id: emit_id.clone(),
-                        data: base64::engine::general_purpose::STANDARD.encode(&pending),
-                    },
-                );
-                pending.clear();
+        // WS → PTY relay
+        let mut pty_writer = writer;
+        std::thread::spawn(move || {
+            loop {
+                let msg = match ws_local.lock() {
+                    Ok(mut lock) => match lock.read() { Ok(m) => m, Err(_) => break },
+                    Err(_) => break,
+                };
+                match msg {
+                    WsMessage::Binary(data) => {
+                        if pty_writer.write_all(&data).is_err() { break; }
+                        if pty_writer.flush().is_err() { break; }
+                    }
+                    WsMessage::Close(_) => break,
+                    _ => continue,
+                }
             }
-        }
+        });
     });
 
+    // Store session (master for resize, writer unused — WS handles I/O)
     let sessions = app_handle.state::<AppState>();
     sessions.sessions.lock().unwrap().insert(
         id,
-        PtySession { master: Some(master), writer },
+        PtySession { master: Some(master), writer: Box::new(std::io::sink()) },
     );
 
-    Ok(())
+    Ok(port)
 }
 
 fn apply_initial_cwd(cmd: &mut CommandBuilder, cwd: Option<&PathBuf>) {
@@ -143,34 +126,39 @@ fn apply_initial_cwd(cmd: &mut CommandBuilder, cwd: Option<&PathBuf>) {
 }
 
 #[tauri::command]
-fn pty_spawn(state: tauri::State<AppState>, app: tauri::AppHandle, command: Option<String>) -> Result<String, String> {
+fn pty_spawn(state: tauri::State<AppState>, app: tauri::AppHandle, command: Option<String>) -> Result<WsConnectResult, String> {
     let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
     let id = format!("tab-{}", *next);
     *next += 1;
     drop(next);
 
-    if let Some(cmd) = command {
+    let port = if let Some(cmd) = command {
         if !cmd.is_empty() {
             let (exe, args) = parse_command(&cmd);
             if args.is_empty() {
                 let mut builder = CommandBuilder::new(&exe);
                 apply_initial_cwd(&mut builder, state.initial_cwd.as_ref());
-                spawn_pty(app, id.clone(), builder)?;
+                spawn_pty(app.clone(), id.clone(), builder)?
             } else {
                 let mut builder = CommandBuilder::new(&exe);
                 for a in &args { builder.arg(a); }
                 apply_initial_cwd(&mut builder, state.initial_cwd.as_ref());
-                spawn_pty(app, id.clone(), builder)?;
+                spawn_pty(app.clone(), id.clone(), builder)?
             }
-            return Ok(id);
+        } else {
+            let shell = get_shell();
+            let mut builder = CommandBuilder::new(&shell);
+            apply_initial_cwd(&mut builder, state.initial_cwd.as_ref());
+            spawn_pty(app.clone(), id.clone(), builder)?
         }
-    }
+    } else {
+        let shell = get_shell();
+        let mut builder = CommandBuilder::new(&shell);
+        apply_initial_cwd(&mut builder, state.initial_cwd.as_ref());
+        spawn_pty(app.clone(), id.clone(), builder)?
+    };
 
-    let shell = get_shell();
-    let mut builder = CommandBuilder::new(&shell);
-    apply_initial_cwd(&mut builder, state.initial_cwd.as_ref());
-    spawn_pty(app, id.clone(), builder)?;
-    Ok(id)
+    Ok(WsConnectResult { id, port })
 }
 
 fn launch_working_directory() -> Option<PathBuf> {
@@ -400,7 +388,7 @@ fn delete_config(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn pty_spawn_ssh(state: tauri::State<AppState>, app: tauri::AppHandle, hostname: String, port: u16, user: String) -> Result<String, String> {
+fn pty_spawn_ssh(state: tauri::State<AppState>, app: tauri::AppHandle, hostname: String, port: u16, user: String) -> Result<WsConnectResult, String> {
     let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
     let id = format!("tab-{}", *next);
     *next += 1;
@@ -413,8 +401,8 @@ fn pty_spawn_ssh(state: tauri::State<AppState>, app: tauri::AppHandle, hostname:
     cmd.arg("-p");
     cmd.arg(&port_str);
 
-    spawn_pty(app, id.clone(), cmd)?;
-    Ok(id)
+    let ws_port = spawn_pty(app, id.clone(), cmd)?;
+    Ok(WsConnectResult { id, port: ws_port })
 }
 
 #[tauri::command]
@@ -451,7 +439,6 @@ fn pty_resize(state: tauri::State<AppState>, id: &str, cols: u16, rows: u16) -> 
                 })
                 .map_err(|e| e.to_string())?;
         } else {
-            // pipe session: send resize message (type 0x01 + 4 byte sizes)
             let msg = [0x01u8, cols as u8, (cols >> 8) as u8, rows as u8, (rows >> 8) as u8];
             session.writer.write_all(&msg).map_err(|e| e.to_string())?;
         }

@@ -66,27 +66,29 @@ export class TabManager {
     return el;
   }
 
-  private _register(tab: TerminalTab): void {
+  private _register(tab: TerminalTab, port: number): void {
     const tabEl = this._createTabElement(tab);
     this.tabsContainer.appendChild(tabEl);
 
-    tab.terminal.onData((data) => {
-      invoke("pty_write", { id: tab.id, data });
+    import("@xterm/addon-attach").then(({ AttachAddon }) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}`);
+      const attachAddon = new AttachAddon(socket);
+      tab.terminal.loadAddon(attachAddon);
     });
 
     this.tabs.set(tab.id, tab);
   }
 
   async createLocalTab(command?: string, label?: string): Promise<TerminalTab> {
-    const id: string = await invoke("pty_spawn", command ? { command } : {});
-    const tab = new TerminalTab(id, "local", label || "Terminal", this.terminalContainer);
+    const result: { id: string; port: number } = await invoke("pty_spawn", command ? { command } : {});
+    const tab = new TerminalTab(result.id, "local", label || "Terminal", this.terminalContainer);
     if (command) { tab.command = command; }
-    this._register(tab);
+    this._register(tab, result.port);
 
     await this._ensureFontsReady(tab);
 
     this._hideWelcome();
-    this.switchTo(id);
+    this.switchTo(result.id);
     tab.fitDeferred();
     this.refreshBadges();
 
@@ -94,19 +96,19 @@ export class TabManager {
   }
 
   async createSshTab(host: SshHost): Promise<TerminalTab> {
-    const id: string = await invoke("pty_spawn_ssh", {
+    const result: { id: string; port: number } = await invoke("pty_spawn_ssh", {
       hostname: hostProp(host, "hostname") || host.name,
       port: parseInt(hostProp(host, "port") || "22", 10),
       user: hostProp(host, "user") || "root",
     });
-    const tab = new TerminalTab(id, "ssh", host.name, this.terminalContainer);
+    const tab = new TerminalTab(result.id, "ssh", host.name, this.terminalContainer);
     tab.sshHost = host;
-    this._register(tab);
+    this._register(tab, result.port);
 
     await this._ensureFontsReady(tab);
 
     this._hideWelcome();
-    this.switchTo(id);
+    this.switchTo(result.id);
     tab.fitDeferred();
     this.refreshBadges();
 
