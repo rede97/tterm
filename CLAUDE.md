@@ -18,7 +18,7 @@ No tests or linters are configured.
 
 ## Project
 
-A multi-tab desktop terminal emulator (TTerm) built with Tauri v2. The frontend is vanilla TypeScript + Vite using xterm.js to render terminals. The Rust backend spawns native shells via PTY (pseudo-terminal) and pipes I/O between each shell and its corresponding tab.
+A multi-tab desktop terminal emulator (TTerm) built with Tauri v2. The frontend is vanilla TypeScript + Vite using xterm.js to render terminals. The Rust backend spawns native shells via PTY (pseudo-terminal) and bridges I/O over a local WebSocket loopback connection.
 
 ## Architecture
 
@@ -50,7 +50,7 @@ A multi-tab desktop terminal emulator (TTerm) built with Tauri v2. The frontend 
 
 | File | Role |
 |---|---|
-| `src/main.ts` | Init `TabManager`, PTY listener, settings button, welcome screen, calls all `init*()` |
+| `src/main.ts` | Init `TabManager`, WebSocket PTY bridge, settings button, welcome screen, calls all `init*()` |
 | `src/profiles.ts` | SSH/WT profiles, config persistence, font defaults |
 | `src/settings.ts` | Settings page (sidebar layout), `createSettingsContent()`, feedback/reset/apply |
 | `src/window.ts` | Window controls (min/max/close), drag handling, maximize/restore icon toggle |
@@ -64,7 +64,7 @@ A multi-tab desktop terminal emulator (TTerm) built with Tauri v2. The frontend 
 
 ### Backend (`src-tauri/`)
 
-- `src-tauri/src/lib.rs` — Tauri builder, PTY management, SSH config parsing, WT profile/fragment loading, config I/O, plugin registration
+- `src-tauri/src/lib.rs` — Tauri builder, PTY management + WebSocket bridge (tokio-tungstenite), SSH config parsing, WT profile/fragment loading, config I/O, plugin registration
 - `src-tauri/src/main.rs` — entry point, calls `tterm_lib::run()`
 - `src-tauri/capabilities/default.json` — permissions (core, window, opener, window-state)
 - Plugins: `tauri-plugin-window-state` (auto save/restore window size, position, maximize), `tauri-plugin-dialog`, `tauri-plugin-opener`
@@ -73,7 +73,7 @@ A multi-tab desktop terminal emulator (TTerm) built with Tauri v2. The frontend 
 
 - `AppState` holds `HashMap<String, PtySession>` + `next_id` counter + `initial_cwd: Option<PathBuf>` (set via `--working-directory` CLI arg)
 - `PtySession` stores the PTY `master` (for resize) and `writer` (for write)
-- Each tab spawns a dedicated shell process and background read thread
+- Each tab spawns a dedicated shell process and background read task (tokio `spawn_blocking` → mpsc channel → WebSocket)
 
 ### Communication model
 
@@ -81,8 +81,8 @@ Frontend → Backend: Tauri `invoke()` commands:
 
 | command | args | purpose |
 |---|---|---|
-| `pty_spawn` | `command?` | create tab, return `"tab-N"` id. No command = default shell |
-| `pty_spawn_ssh` | `hostname`, `port`, `user` | create SSH tab |
+| `pty_spawn` | `command?` | create tab, return `{ id, port }` (WebSocket port). No command = default shell |
+| `pty_spawn_ssh` | `hostname`, `port`, `user` | create SSH tab, return `{ id, port }` |
 | `pty_write` | `id`, `data` | write keystrokes to tab's PTY |
 | `pty_resize` | `id`, `cols`, `rows` | notify PTY of terminal resize |
 | `pty_kill` | `id` | kill tab's shell, remove session |
@@ -106,7 +106,7 @@ Frontend → Backend: Tauri `invoke()` commands:
 | `list_system_fonts` | — | enumerate installed fonts from Windows registry |
 | `serial_list_ports` | — | enumerate serial ports |
 
-Backend → Frontend: `pty-output` event `{ id: string, data: number[] }`.
+Backend → Frontend: **WebSocket** `ws://127.0.0.1:{port}` — binary frames carry raw PTY bytes directly to xterm.js via `@xterm/addon-attach` (no serialization, no Tauri events). The legacy `pty-output` Tauri event was removed in the WebSocket refactor.
 
 ## Profile loading flow
 
@@ -230,8 +230,8 @@ Per-tab: `TerminalTab.searchQuery` saved on close and input events, restored on 
 
 ## Key dependencies
 
-- Frontend: `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-search`, `@xterm/addon-webgl`, `@tauri-apps/api`
-- Backend: `tauri` v2, `portable-pty` (cross-platform PTY), `serde`, `serde_json`
+- Frontend: `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-search`, `@xterm/addon-webgl`, `@xterm/addon-attach`, `@tauri-apps/api`
+- Backend: `tauri` v2, `portable-pty` (cross-platform PTY), `tokio-tungstenite` (WebSocket bridge), `serde`, `serde_json`
 - Icons: `lucide` (MIT-licensed SVG icon library, stroke-based, consistent 2px weight)
 - Icon generation: `sharp` (devDependency, rasterize `src/assets/tterm.svg` into platform icon formats)
 
