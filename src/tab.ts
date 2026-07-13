@@ -125,6 +125,73 @@ export class TerminalTab {
         }).catch(() => { });
       }
     }, true);
+
+    // Freeze IME textarea position during composition to prevent candidate window drift.
+    this._patchImeFreeze();
+  }
+
+  private _patchImeFreeze(): void {
+    // Intercept the hidden textarea's style setter to freeze left/top during IME composition.
+    // Strategy: locate xterm.js's internal textarea via _core.textarea, then replace
+    // the style object's `left` and `top` setters. When composition is active, all
+    // writes are redirected to frozen pixel coordinates captured at compositionstart.
+    let left: number | null = null;
+    let top: number | null = null;
+
+    const core = (this.terminal as any)._core;
+
+    // Need to wait for xterm.open() to complete before _core.textarea exists.
+    // open() runs synchronously in the constructor above, so it's safe here.
+    const ta: HTMLTextAreaElement | undefined = core.textarea;
+    if (!ta) return;
+
+    // Replace `ta.style` with a Proxy whose setters for left/top/width are
+    // clamped during IME composition.
+    const origStyle = ta.style;
+    const proxyHandler: ProxyHandler<CSSStyleDeclaration> = {
+      set(target, prop, value, receiver) {
+        if (left !== null && top !== null) {
+          if (prop === "left") {
+            return Reflect.set(target, prop, left + "px", receiver);
+          }
+          if (prop === "top") {
+            return Reflect.set(target, prop, top + "px", receiver);
+          }
+          // Prevent xterm.js from setting width to a huge value (screen width).
+          // Clamp to one cell width so IME candidate window stays at correct position.
+          if (prop === "width") {
+            const dims = core._renderService?.dimensions?.css;
+            const cellW = dims?.cell?.width ?? 8;
+            return Reflect.set(target, prop, Math.max(cellW, 1) + "px", receiver);
+          }
+        }
+        return Reflect.set(target, prop, value, receiver);
+      }
+    };
+
+    // Override the textarea's style property descriptor so that every
+    // `this._textarea.style.left = ...` call in xterm.js goes through our proxy.
+    Object.defineProperty(ta, "style", {
+      get() { return new Proxy(origStyle, proxyHandler); },
+      set(_v: CSSStyleDeclaration) { /* ignore */ },
+      configurable: true,
+    });
+
+    // compositionstart/end: capture the frozen anchor position.
+    // These fire on the hidden textarea and bubble through document.
+    document.addEventListener("compositionstart", () => {
+      const buf = this.terminal.buffer.active;
+      const dims = core._renderService?.dimensions?.css;
+      const cellW = dims?.cell?.width ?? 8;
+      const cellH = dims?.cell?.height ?? 16;
+      left = (buf.cursorX - 1) * cellW;
+      top = buf.cursorY * cellH;
+    }, true);
+
+    document.addEventListener("compositionend", () => {
+      left = null;
+      top = null;
+    }, true);
   }
 
   show(): void {
