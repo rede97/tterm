@@ -3,6 +3,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
@@ -20,8 +21,13 @@ pub(crate) struct PtySession {
     pub(crate) master: Box<dyn MasterPty + Send>,
 }
 
+pub(crate) struct SerialSession {
+    pub(crate) cancel: Arc<AtomicBool>,
+}
+
 pub(crate) struct AppState {
     pub(crate) sessions: Mutex<HashMap<String, PtySession>>,
+    pub(crate) serial_sessions: Mutex<HashMap<String, SerialSession>>,
     pub(crate) next_id: Mutex<u32>,
     pub(crate) initial_cwd: Option<PathBuf>,
 }
@@ -56,9 +62,29 @@ fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder) -> R
     drop(pty_pair.slave);
 
     let master = pty_pair.master;
-    let mut reader = master.try_clone_reader().map_err(|e| e.to_string())?;
+    let reader = master.try_clone_reader().map_err(|e| e.to_string())?;
     let writer: Box<dyn Write + Send> = master.take_writer().map_err(|e| e.to_string())?;
 
+    let port = start_ws_relay(reader, writer, None)?;
+
+    // Store session (master for resize)
+    let sessions = app_handle.state::<AppState>();
+    sessions.sessions.lock().map_err(|e| e.to_string())?.insert(
+        id,
+        PtySession { master },
+    );
+
+    Ok(port)
+}
+
+// Start a WebSocket loopback relay between a byte stream (reader/writer) and
+// a single WS client. Returns the bound port. `cancel` lets serial sessions
+// stop the blocking read loop (serial reads time out every 100ms to poll it).
+fn start_ws_relay<R, W>(mut reader: R, writer: W, cancel: Option<Arc<AtomicBool>>) -> Result<u16, String>
+where
+    R: Read + Send + 'static,
+    W: Write + Send + 'static,
+{
     // Bind WebSocket server on random port
     let listener = std::net::TcpListener::bind("127.0.0.1:0")
         .map_err(|e| format!("Failed to bind local WS: {}", e))?;
@@ -86,18 +112,25 @@ fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder) -> R
         // Channel: PTY reader → WS (unidirectional, no Mutex)
         let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<u8>>(256);
 
-        // Task 1: PTY read (blocking) → channel
+        // Task 1: stream read (blocking) → channel
         let tx1 = tx.clone();
         rt.spawn(async move {
             let _ = tokio::task::spawn_blocking(move || {
                 let mut buf = [0u8; 16384];
                 loop {
+                    if let Some(c) = &cancel {
+                        if c.load(Ordering::Relaxed) { break; }
+                    }
                     match reader.read(&mut buf) {
                         Ok(0) => break,
                         Ok(n) => {
                             if tx1.blocking_send(buf[..n].to_vec()).is_err() { break; }
                         }
-                        Err(_) => break,
+                        Err(e) => {
+                            // Serial reads use a timeout to poll `cancel`
+                            if e.kind() == std::io::ErrorKind::TimedOut { continue; }
+                            break;
+                        }
                     }
                 }
             }).await;
@@ -110,7 +143,7 @@ fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder) -> R
             }
         });
 
-        // Task 3: WS stream → PTY write
+        // Task 3: WS stream → stream write
         // writer is Arc<Mutex<>> so it can be shared across spawn_blocking calls
         let pty_w = Arc::new(Mutex::new(writer));
         rt.spawn(async move {
@@ -131,13 +164,6 @@ fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder) -> R
             }
         });
     });
-
-    // Store session (master for resize)
-    let sessions = app_handle.state::<AppState>();
-    sessions.sessions.lock().map_err(|e| e.to_string())?.insert(
-        id,
-        PtySession { master },
-    );
 
     Ok(port)
 }
@@ -454,6 +480,12 @@ fn pty_resize(state: tauri::State<AppState>, id: &str, cols: u16, rows: u16) -> 
 fn pty_kill(state: tauri::State<AppState>, id: &str) -> Result<(), String> {
     let mut sessions = state.sessions.lock().map_err(|e| e.to_string())?;
     sessions.remove(id);
+    drop(sessions);
+    // Also cancel a serial session with the same id (no-op for PTY tabs)
+    let mut serial = state.serial_sessions.lock().map_err(|e| e.to_string())?;
+    if let Some(session) = serial.remove(id) {
+        session.cancel.store(true, Ordering::Relaxed);
+    }
     Ok(())
 }
 
@@ -607,6 +639,90 @@ fn serial_list_ports() -> Vec<SerialPortInfo> {
         .collect()
 }
 
+// -- Serial port sessions ---
+// Serial I/O relays over the same WebSocket loopback as PTY (start_ws_relay).
+// No PTY/frames involved: xterm input goes WS -> serial write directly.
+
+fn map_data_bits(bits: u8) -> Result<serialport::DataBits, String> {
+    match bits {
+        5 => Ok(serialport::DataBits::Five),
+        6 => Ok(serialport::DataBits::Six),
+        7 => Ok(serialport::DataBits::Seven),
+        8 => Ok(serialport::DataBits::Eight),
+        _ => Err(format!("Invalid data bits: {} (expected 5-8)", bits)),
+    }
+}
+
+fn map_parity(parity: &str) -> Result<serialport::Parity, String> {
+    match parity.to_ascii_lowercase().as_str() {
+        "none" => Ok(serialport::Parity::None),
+        "odd" => Ok(serialport::Parity::Odd),
+        "even" => Ok(serialport::Parity::Even),
+        _ => Err(format!("Invalid parity: {} (expected none|odd|even)", parity)),
+    }
+}
+
+fn map_stop_bits(bits: u8) -> Result<serialport::StopBits, String> {
+    match bits {
+        1 => Ok(serialport::StopBits::One),
+        2 => Ok(serialport::StopBits::Two),
+        _ => Err(format!("Invalid stop bits: {} (expected 1|2)", bits)),
+    }
+}
+
+fn map_flow_control(flow: &str) -> Result<serialport::FlowControl, String> {
+    match flow.to_ascii_lowercase().as_str() {
+        "none" => Ok(serialport::FlowControl::None),
+        "software" | "xonxoff" => Ok(serialport::FlowControl::Software),
+        "hardware" | "rtscts" => Ok(serialport::FlowControl::Hardware),
+        _ => Err(format!("Invalid flow control: {} (expected none|software|hardware)", flow)),
+    }
+}
+
+fn open_serial(
+    port_name: &str, baud_rate: u32, data_bits: u8, parity: &str, stop_bits: u8, flow_control: &str,
+) -> Result<Box<dyn serialport::SerialPort>, String> {
+    serialport::new(port_name, baud_rate)
+        .data_bits(map_data_bits(data_bits)?)
+        .parity(map_parity(parity)?)
+        .stop_bits(map_stop_bits(stop_bits)?)
+        .flow_control(map_flow_control(flow_control)?)
+        // Short timeout lets the blocking read loop poll the cancel flag
+        .timeout(std::time::Duration::from_millis(100))
+        .open()
+        .map_err(|e| format!("Failed to open {}: {}", port_name, e))
+}
+
+#[tauri::command]
+fn serial_spawn(
+    state: tauri::State<AppState>,
+    port_name: String,
+    baud_rate: u32,
+    data_bits: u8,
+    parity: String,
+    stop_bits: u8,
+    flow_control: String,
+) -> Result<WsConnectResult, String> {
+    let port = open_serial(&port_name, baud_rate, data_bits, &parity, stop_bits, &flow_control)?;
+    let reader = port.try_clone().map_err(|e| e.to_string())?;
+
+    let cancel = Arc::new(AtomicBool::new(false));
+    let ws_port = start_ws_relay(reader, port, Some(cancel.clone()))?;
+
+    let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
+    let id = format!("tab-{}", *next);
+    *next += 1;
+    drop(next);
+
+    state
+        .serial_sessions
+        .lock()
+        .map_err(|e| e.to_string())?
+        .insert(id.clone(), SerialSession { cancel });
+
+    Ok(WsConnectResult { id, port: ws_port })
+}
+
 // -- System font enumeration ---
 
 // Strip the registry font-name suffix, returning the family name.
@@ -649,6 +765,7 @@ pub fn run() {
 
             app.manage(AppState {
                 sessions: Mutex::new(HashMap::new()),
+                serial_sessions: Mutex::new(HashMap::new()),
                 next_id: Mutex::new(1),
                 initial_cwd: launch_working_directory(),
             });
@@ -656,7 +773,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, save_text_file, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, open_new_window, ssh_read_config_raw, open_config_dir, open_ssh_config, ssh_clear_known_hosts, ssh_save_config, read_wt_settings, read_wt_fragments, find_vs_instances, read_config, write_config, delete_config, serial_list_ports, list_system_fonts])
+        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, save_text_file, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, open_new_window, ssh_read_config_raw, open_config_dir, open_ssh_config, ssh_clear_known_hosts, ssh_save_config, read_wt_settings, read_wt_fragments, find_vs_instances, read_config, write_config, delete_config, serial_list_ports, serial_spawn, list_system_fonts])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -807,5 +924,58 @@ mod tests {
     #[test]
     fn get_shell_is_cmd_on_windows() {
         assert_eq!(get_shell(), "cmd.exe");
+    }
+
+    // -- serial parameter mapping --
+
+    #[test]
+    fn serial_data_bits_valid_range() {
+        assert!(matches!(map_data_bits(5).unwrap(), serialport::DataBits::Five));
+        assert!(matches!(map_data_bits(8).unwrap(), serialport::DataBits::Eight));
+    }
+
+    #[test]
+    fn serial_data_bits_rejects_invalid() {
+        assert!(map_data_bits(4).is_err());
+        assert!(map_data_bits(9).is_err());
+    }
+
+    #[test]
+    fn serial_parity_case_insensitive() {
+        assert!(matches!(map_parity("none").unwrap(), serialport::Parity::None));
+        assert!(matches!(map_parity("Odd").unwrap(), serialport::Parity::Odd));
+        assert!(matches!(map_parity("EVEN").unwrap(), serialport::Parity::Even));
+        assert!(map_parity("mark").is_err());
+    }
+
+    #[test]
+    fn serial_stop_bits() {
+        assert!(matches!(map_stop_bits(1).unwrap(), serialport::StopBits::One));
+        assert!(matches!(map_stop_bits(2).unwrap(), serialport::StopBits::Two));
+        assert!(map_stop_bits(3).is_err());
+    }
+
+    #[test]
+    fn serial_flow_control_aliases() {
+        assert!(matches!(map_flow_control("none").unwrap(), serialport::FlowControl::None));
+        assert!(matches!(map_flow_control("xonxoff").unwrap(), serialport::FlowControl::Software));
+        assert!(matches!(map_flow_control("rtscts").unwrap(), serialport::FlowControl::Hardware));
+        assert!(map_flow_control("magic").is_err());
+    }
+
+    #[test]
+    fn open_serial_invalid_port_returns_err_not_panic() {
+        // Smoke test: nonexistent port must fail gracefully.
+        // COM254 is essentially never present on real systems.
+        let result = open_serial("\\\\.\\COM254", 115200, 8, "none", 1, "none");
+        assert!(result.is_err());
+        let msg = result.err().unwrap();
+        assert!(msg.contains("COM254"), "error should name the port: {}", msg);
+    }
+
+    #[test]
+    fn open_serial_invalid_params_rejected_before_open() {
+        let result = open_serial("\\\\.\\COM254", 115200, 9, "none", 1, "none");
+        assert!(result.err().unwrap().contains("data bits"));
     }
 }

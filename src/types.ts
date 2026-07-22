@@ -3,7 +3,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { SshHost } from "./profiles";
 
-export type TabType = "local" | "ssh";
+export type TabType = "local" | "ssh" | "serial";
 
 export interface Tab {
   id: string;

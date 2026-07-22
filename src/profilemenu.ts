@@ -111,10 +111,7 @@ function populateMenu() {
     for (const port of serialPorts) {
       const device = port.product || port.manufacturer || port.driver;
       const ids = port.vid && port.pid ? ` ${port.vid}:${port.pid}` : "";
-      const item = createMenuItem(Cable, port.name, device + ids, () => {});
-      item.classList.add("disabled");
-      item.title = "Serial sessions are not supported yet";
-      serialCol.appendChild(item);
+      serialCol.appendChild(createMenuItem(Cable, port.name, device + ids, () => tabManager.createSerialTab(port)));
     }
     profileMenu.appendChild(serialCol);
   }

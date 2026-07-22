@@ -1,4 +1,4 @@
-﻿import { localProfiles, configFontFamily, configFontSize, hiddenProfiles, configPasteWarning, configPasteTrim, configTerminalBell, configRenderer, configScrollback, configTabWidthMode, configThemeName, saveConfig, loadConfig, sshHosts, loadSshHosts, hiddenSshHosts, SshHost, hostProp } from "./profiles";
+﻿import { localProfiles, configFontFamily, configFontSize, hiddenProfiles, configPasteWarning, configPasteTrim, configTerminalBell, configRenderer, configScrollback, configTabWidthMode, configThemeName, configSerialBaud, saveConfig, loadConfig, sshHosts, loadSshHosts, hiddenSshHosts, SshHost, hostProp } from "./profiles";
 import { allThemes, findTheme } from "./themes";
 import { buildFontFamily, updateFontStack, parseFontFamily } from "./fontconfig";
 import { invoke } from "@tauri-apps/api/core";
@@ -121,6 +121,21 @@ export function createSettingsContent(): HTMLElement {
             <label class="settings-toggle-row" style="padding:0;gap:0;">
               <input type="checkbox" id="set-paste-trim" ${configPasteTrim ? "checked" : ""} />
             </label>
+          </div>
+        </div>
+      </div>
+      <div class="settings-subsection">
+        <div class="settings-subsection-title">Serial</div>
+        <div class="settings-item settings-item-row">
+          <div class="settings-item-info">
+            <div class="settings-item-title">Default baud rate</div>
+            <div class="settings-item-desc">Baud rate for new serial sessions (8N1, no flow control).</div>
+          </div>
+          <div class="settings-item-control">
+            <select id="set-serial-baud" class="settings-select">
+              ${[9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600].map(b =>
+                `<option value="${b}" ${configSerialBaud === b ? "selected" : ""}>${b}</option>`).join("")}
+            </select>
           </div>
         </div>
       </div>
@@ -375,6 +390,8 @@ function refreshForm(root: HTMLElement) {
     themeEl.value = configThemeName;
     themeEl.dispatchEvent(new Event("change"));
   }
+  const baudEl = root.querySelector("#set-serial-baud") as HTMLSelectElement;
+  if (baudEl) baudEl.value = String(configSerialBaud);
   checks.forEach(c => {
     c.checked = !hiddenProfiles.includes(c.value);
   });
@@ -634,6 +651,8 @@ async function applySettings(root: HTMLElement) {
   if (tabWidthEl) partial.tabWidthMode = tabWidthEl.value;
   const themeEl = root.querySelector("#set-theme") as HTMLSelectElement;
   if (themeEl) partial.themeName = themeEl.value;
+  const baudEl = root.querySelector("#set-serial-baud") as HTMLSelectElement;
+  if (baudEl) partial.serialBaud = parseInt(baudEl.value, 10) || 115200;
 
   const hidden: string[] = [];
   checks.forEach(c => { if (!c.checked) hidden.push(c.value); });

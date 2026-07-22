@@ -30,7 +30,7 @@ TTerm strips away the excess. Three priorities: **fast controls**, **clean termi
 - **Settings panel** — General, Appearance, and Profile tabs with renderer selection, scrollback buffer, paste options, tab width mode
 - **Custom window decorations** — no native title bar; VS Code-style tab bar with integrated window controls
 - **Open in new window** — launch additional app windows from context menu
-- **Serial port enumeration** — auto-detects connected serial devices (USB VID/PID, manufacturer) in the new-tab menu
+- **Serial terminal** — auto-detects serial devices (USB VID/PID, manufacturer) and opens sessions in one click (115200 8N1 default, configurable baud)
 - **Color schemes** — 12 built-in themes (Solarized, Dracula, Nord, Gruvbox, Monokai, etc.), auto-imports custom Windows Terminal schemes, live preview in settings
 - **Persistent config** — all settings preserved across sessions
 
@@ -67,7 +67,7 @@ bun run tauri build
 
 ## Roadmap
 
-- [~] Serial port support (port enumeration done; session support in progress)
+- [x] Serial port support
 - [ ] Split panes
 - [~] Custom color scheme configuration UI (built-in themes + WT scheme import done; custom editor pending)
 - [ ] Session recording and replay

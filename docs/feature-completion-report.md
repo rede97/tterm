@@ -12,7 +12,7 @@
 | 分类 | 数量 | 已达成 | 部分达成 | 未达成 |
 |---|---|---|---|---|
 | README 声明功能 | 14 | 14 | 0 | 0 |
-| 路线图功能 | 5 | 0 | 2（串口、配色） | 3 |
+| 路线图功能 | 5 | 1（串口） | 1（配色） | 3 |
 
 README 中声明的全部功能均已实现并经代码验证；路线图 5 项中仅串口（Serial）有进展（端口枚举已实现）。Telnet 已从需求中移除（太小众且不安全）。
 
@@ -33,7 +33,7 @@ README 中声明的全部功能均已实现并经代码验证；路线图 5 项�
 | 11 | 配置持久化 | ✅ 达成 | `{app_config_dir}/config.json`，`read_config`/`write_config`/`delete_config` |
 | 12 | 字体管理系统 | ✅ 达成（v0.1.4 新增，超出 README 清单） | `fontconfig.ts`/`fontpicker.ts`：内置 + 系统字体、实时预览、优先级排序、CJK 回退 |
 
-| 13 | 串口设备枚举 | ✅ 达成 | 后端 `serial_list_ports`（`serial_enumerator`）+ 前端 `loadSerialPorts()`；新建标签菜单新增 Serial 列，每次打开菜单重新枚举（支持热插拔），显示端口名、设备名与 USB VID:PID；菜单项禁用态（会话功能未开放） |
+| 13 | 串口设备枚举 | ✅ 达成 | 后端 `serial_list_ports` + 前端 `loadSerialPorts()`；新建标签菜单 Serial 列，每次打开菜单重新枚举（支持热插拔），显示端口名、设备名与 USB VID:PID，点击即打开串口会话 |
 
 | 14 | 配色方案 | ✅ 达成 | 12 款内置主题 + WT schemes 自动导入 + 设置面板实时预览 + 热切换；`themeName` 持久化 |
 
@@ -55,7 +55,7 @@ README 中声明的全部功能均已实现并经代码验证；路线图 5 项�
 
 | 路线图项 | 状态 | 说明 |
 |---|---|---|
-| 串口（Serial）连接 | 🟡 部分达成（约 40%） | 端口枚举全链路达成：后端 `serial_list_ports` + 前端枚举加载 + 新建菜单 Serial 列展示。尚未实现：串口会话模型（打开/读写/关闭）、参数配置（波特率/数据位/校验位）、标签接入 |
+| 串口（Serial）连接 | ✅ 达成（真机验证待硬件） | 全链路实现：`serial_spawn` 命令（波特率/数据位/校验/停止位/流控参数映射）、`start_ws_relay` 通用中继（PTY/串口共用）、前端 `createSerialTab`、设置面板默认波特率、计划文档 `docs/serial-port-plan.md`（含真机验证清单）。冒烟测试 7 例（参数映射、无效端口优雅报错） |
 | 分屏显示 | ❌ 未启动 | 现有架构以标签为单位，每标签一个 xterm 实例，分屏需重构布局模型 |
 | 自定义配色方案配置界面 | 🟡 部分达成（约 60%） | `themes.ts`：12 款内置主题（Solarized/Dracula/Nord/Gruvbox/One Half/Monokai/Tango/Tokyo Night/Campbell 等）+ WT settings.json schemes 自动导入（`purple`→`magenta` 字段映射、内置重名跳过）；设置 > 外观面板下拉选择 + 实时色板/终端预览；`themeName` 配置持久化，Apply 后全标签热切换。待做：用户自定义配色编辑器 |
 | 终端会话录制与回放 | ❌ 未启动 | WebSocket 中继层是天然的录制切入点 |

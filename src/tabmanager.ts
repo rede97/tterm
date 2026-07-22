@@ -1,5 +1,5 @@
 ﻿import { invoke } from "@tauri-apps/api/core";
-import { SshHost, localProfiles, defaultLocalProfile, hostProp } from "./profiles";
+import { SshHost, localProfiles, defaultLocalProfile, hostProp, configSerialBaud, SerialPort } from "./profiles";
 import { TerminalTab } from "./tab";
 
 export class TabManager {
@@ -103,6 +103,28 @@ export class TabManager {
     });
     const tab = new TerminalTab(result.id, "ssh", host.name, this.terminalContainer);
     tab.sshHost = host;
+    this._register(tab, result.port);
+
+    await this._ensureFontsReady(tab);
+
+    this._hideWelcome();
+    this.switchTo(result.id);
+    tab.fitDeferred();
+    this.refreshBadges();
+
+    return tab;
+  }
+
+  async createSerialTab(port: SerialPort): Promise<TerminalTab> {
+    const result: { id: string; port: number } = await invoke("serial_spawn", {
+      portName: port.name,
+      baudRate: configSerialBaud,
+      dataBits: 8,
+      parity: "none",
+      stopBits: 1,
+      flowControl: "none",
+    });
+    const tab = new TerminalTab(result.id, "serial", port.name, this.terminalContainer);
     this._register(tab, result.port);
 
     await this._ensureFontsReady(tab);

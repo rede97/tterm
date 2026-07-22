@@ -50,6 +50,7 @@ export let configRenderer = "webgl";
 export let configScrollback = 20000;
 export let configTabWidthMode = "equal";
 export let configThemeName: string = DEFAULT_THEME_NAME;
+export let configSerialBaud = 115200;
 export let hiddenSshHosts: string[] = [];
 export let serialPorts: SerialPort[] = [];
 export let configLoaded = false;
@@ -230,6 +231,7 @@ function readConfigValues(cfg: any) {
   if (typeof cfg.scrollback === "number" && cfg.scrollback >= 100 && cfg.scrollback <= 100000) configScrollback = cfg.scrollback;
   if (typeof cfg.tabWidthMode === "string") configTabWidthMode = cfg.tabWidthMode;
   if (typeof cfg.themeName === "string") configThemeName = cfg.themeName;
+  if (typeof cfg.serialBaud === "number" && cfg.serialBaud >= 300 && cfg.serialBaud <= 921600) configSerialBaud = cfg.serialBaud;
   if (Array.isArray(cfg.hiddenSshHosts)) hiddenSshHosts = cfg.hiddenSshHosts;
 }
 
@@ -244,6 +246,7 @@ export function getDefaultConfig(): Record<string, unknown> {
     scrollback: 20000,
     tabWidthMode: "equal",
     themeName: DEFAULT_THEME_NAME,
+    serialBaud: 115200,
     hiddenProfiles: [],
     hiddenSshHosts: [],
   };

@@ -1,5 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// Spyable tabManager — avoids instantiating real xterm terminals in happy-dom.
+const { tabManagerMock } = vi.hoisted(() => ({
+  tabManagerMock: {
+    createLocalTab: vi.fn(),
+    createSshTab: vi.fn(),
+    createSerialTab: vi.fn(),
+  },
+}));
+vi.mock("../src/tabmanager", () => ({ tabManager: tabManagerMock }));
+
 // Mock the Tauri IPC layer before importing any app module.
 const defaultInvoke = (cmd: string) => {
   if (cmd === "serial_list_ports") {
@@ -22,7 +32,7 @@ describe("profile menu (serial enumeration)", () => {
     `;
     document.querySelector(".profile-menu")?.remove();
     vi.resetModules();
-    invokeMock.mockReset();
+    vi.clearAllMocks();
     invokeMock.mockImplementation(defaultInvoke);
   });
 
@@ -37,29 +47,44 @@ describe("profile menu (serial enumeration)", () => {
     });
   }
 
+  function serialItem(label: string): Element {
+    const items = [...document.querySelectorAll(".profile-menu .profile-item")];
+    const hit = items.find(i => i.querySelector(".item-label")?.textContent === label);
+    expect(hit, `menu item ${label}`).toBeTruthy();
+    return hit!;
+  }
+
   it("shows a Serial column with enumerated ports", async () => {
     await openMenu();
-    const items = [...document.querySelectorAll(".profile-menu .profile-item")];
-    const com3 = items.find(i => i.querySelector(".item-label")?.textContent === "COM3");
-    expect(com3).toBeTruthy();
-    expect(com3!.querySelector(".item-detail")!.textContent).toContain("USB-SERIAL CH340");
-    expect(com3!.querySelector(".item-detail")!.textContent).toContain("1A86:7523");
+    const com3 = serialItem("COM3");
+    expect(com3.querySelector(".item-detail")!.textContent).toContain("USB-SERIAL CH340");
+    expect(com3.querySelector(".item-detail")!.textContent).toContain("1A86:7523");
   });
 
   it("falls back to manufacturer when product is empty", async () => {
     await openMenu();
-    const items = [...document.querySelectorAll(".profile-menu .profile-item")];
-    const com5 = items.find(i => i.querySelector(".item-label")?.textContent === "COM5");
-    expect(com5!.querySelector(".item-detail")!.textContent).toContain("FTDI");
-    expect(com5!.querySelector(".item-detail")!.textContent).toContain("0403:6001");
+    const com5 = serialItem("COM5");
+    expect(com5.querySelector(".item-detail")!.textContent).toContain("FTDI");
+    expect(com5.querySelector(".item-detail")!.textContent).toContain("0403:6001");
   });
 
-  it("marks serial items as disabled (sessions not yet supported)", async () => {
+  it("serial items are enabled and open a serial tab on click", async () => {
     await openMenu();
-    const items = [...document.querySelectorAll(".profile-menu .profile-item")];
-    const com3 = items.find(i => i.querySelector(".item-label")?.textContent === "COM3");
-    expect(com3!.classList.contains("disabled")).toBe(true);
-    expect(com3!.title).toContain("not supported");
+    const com3 = serialItem("COM3");
+    expect(com3.classList.contains("disabled")).toBe(false);
+    (com3 as HTMLElement).click();
+    expect(tabManagerMock.createSerialTab).toHaveBeenCalledTimes(1);
+    expect(tabManagerMock.createSerialTab.mock.calls[0][0]).toMatchObject({
+      name: "COM3",
+      vid: "1A86",
+      pid: "7523",
+    });
+  });
+
+  it("closes the menu after clicking a serial item", async () => {
+    await openMenu();
+    (serialItem("COM5") as HTMLElement).click();
+    expect(document.querySelector(".profile-menu")!.classList.contains("open")).toBe(false);
   });
 
   it("omits the Serial column when no ports are present", async () => {

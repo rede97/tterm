@@ -71,8 +71,10 @@ A multi-tab desktop terminal emulator (TTerm) built with Tauri v2. The frontend 
 
 ### PTY session model
 
-- `AppState` holds `HashMap<String, PtySession>` + `next_id` counter + `initial_cwd: Option<PathBuf>` (set via `--working-directory` CLI arg)
-- `PtySession` stores the PTY `master` (for resize) and `writer` (for write)
+- `AppState` holds `HashMap<String, PtySession>` + `HashMap<String, SerialSession>` + `next_id` counter + `initial_cwd: Option<PathBuf>` (set via `--working-directory` CLI arg)
+- `PtySession` stores the PTY `master` (for resize)
+- `SerialSession` stores an `Arc<AtomicBool>` cancel flag; serial reads use a 100ms timeout to poll it
+- PTY and serial sessions share the same WebSocket relay (`start_ws_relay`); `pty_kill` terminates either kind
 - Each tab spawns a dedicated shell process and background read task (tokio `spawn_blocking` → mpsc channel → WebSocket)
 
 ### Communication model
@@ -104,6 +106,7 @@ Frontend → Backend: Tauri `invoke()` commands:
 | `save_text_file` | `content` | save text to file via native save dialog |
 | `list_system_fonts` | — | enumerate installed fonts from Windows registry |
 | `serial_list_ports` | — | enumerate serial ports |
+| `serial_spawn` | `port_name`, `baud_rate`, `data_bits`, `parity`, `stop_bits`, `flow_control` | open serial session + WS relay, return `{ id, port }` |
 
 Backend → Frontend: **WebSocket** `ws://127.0.0.1:{port}` — binary frames carry raw PTY bytes directly to xterm.js via `@xterm/addon-attach` (no serialization, no Tauri events). The legacy `pty-output` Tauri event was removed in the WebSocket refactor.
 
