@@ -1,3 +1,41 @@
+## v0.2.0
+
+New Features
+
+- Serial port terminal: device enumeration (USB VID/PID, two-line menu items), full-duplex
+  sessions over the shared WebSocket relay, live baud switching from the context menu,
+  per-port parameter memory, DTR/RTS assertion for CDC-ACM devices (debug probes),
+  busy/unplugged error toasts
+- Color schemes: 12 built-in themes (Solarized, Dracula, Nord, Gruvbox, One Half, Monokai,
+  Tokyo Night...), automatic Windows Terminal scheme import, live preview in Settings
+- Session reconnect for local/SSH/serial: disconnect overlay + strikethrough tab label,
+  press Enter to respawn the session in place
+- Tab drag reorder via SortableJS with 150ms animation
+- OSC 9;4 progress bar on tabs (normal/error/warning/indeterminate)
+- Toast notification system; all user-facing errors unified through it
+- Terminal size hint overlay (centered, terminal font stack)
+- Demo TTY (debug builds): animated TUI + OSC 9;4 demo for testing
+
+Fixes
+
+- Serial loopback latency: single-owner I/O pump thread replaces concurrent handle I/O
+  (Windows serializes ReadFile/WriteFile on synchronous handles, stalling writes ~100ms)
+- Dragged tab disappearing when the mouse was released outside the window
+- Tab click dead zones: window-drag swallowing clicks after pointer jitter; horizontal
+  scrollbar strip overlaying the bottom pixels of tabs
+- SSH config Host * wildcard leaking as a regular host when not the last block
+- Hysteresis could return 0 columns on tiny containers (degenerate grid)
+- ConPTY never signals EOF on child exit: watchdog thread now detects session death,
+  enabling disconnect detection and reconnect
+
+Improvements
+
+- Rust backend split from one 1300-line file into 12 focused modules with colocated tests
+- Three-layer test framework: 37 Rust + 74 Vitest unit/DOM cases + 8 tauri-driver E2E
+  cases driving the real app window (docs/testing.md)
+- Dead code removal (pty_write command, orphaned modules, unused dependencies)
+- E2E pitfalls documented as a reusable pi skill (.pi/skills/tauri-e2e-testing)
+
 ## v0.1.5
 
 Fixes

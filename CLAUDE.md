@@ -71,10 +71,11 @@ A multi-tab desktop terminal emulator (TTerm) built with Tauri v2. The frontend 
 
 ### PTY session model
 
-- `AppState` holds `HashMap<String, PtySession>` + `HashMap<String, SerialSession>` + `next_id` counter + `initial_cwd: Option<PathBuf>` (set via `--working-directory` CLI arg)
-- `PtySession` stores the PTY `master` (for resize)
-- `SerialSession` stores an `Arc<AtomicBool>` cancel flag; serial reads use a 100ms timeout to poll it
-- PTY and serial sessions share the same WebSocket relay (`start_ws_relay`); `pty_kill` terminates either kind
+- `AppState` holds `sessions: Arc<Mutex<HashMap<String, PtySession>>>` + `serial_sessions: Mutex<HashMap<String, SerialSession>>` + `next_id` counter + `initial_cwd: Option<PathBuf>` (set via `--working-directory` CLI arg)
+- `PtySession` stores the PTY `master` (`Option`, None after child exit), a `SpawnSpec` (reconnect params), and a `nonce` (per-spawn token guarding the watchdog against reconnect races)
+- A per-spawn **watchdog thread** waits on `child.wait()`; on exit it sets `master = None`, closing ConPTY so the relay read loop unblocks (ConPTY never signals EOF on child death). The spec stays for reconnection
+- `SerialSession` stores an `Arc<AtomicBool>` cancel flag, a `SerialCtl` control channel (live baud switch), and an optional `SpawnSpec`
+- PTY and serial sessions share the same WebSocket relay (`start_ws_relay`); when the byte stream ends, the relay sends a WS Close frame — the frontend `close` event is the disconnect signal. `pty_kill` terminates either kind; `session_reconnect` respawns with the same id from the stored spec
 - Each tab spawns a dedicated shell process and background read task (tokio `spawn_blocking` → mpsc channel → WebSocket)
 
 ### Communication model
@@ -87,6 +88,7 @@ Frontend → Backend: Tauri `invoke()` commands:
 | `pty_spawn_ssh` | `hostname`, `port`, `user` | create SSH tab, return `{ id, port }` |
 | `pty_resize` | `id`, `cols`, `rows` | notify PTY of terminal resize |
 | `pty_kill` | `id` | kill tab's shell, remove session |
+| `session_reconnect` | `id` | respawn a session from its stored SpawnSpec, same id, return `{ id, port }` |
 | `window_minimize` | — | minimize the window |
 | `window_toggle_maximize` | — | toggle maximize/restore |
 | `window_close` | — | close the window |
@@ -107,6 +109,7 @@ Frontend → Backend: Tauri `invoke()` commands:
 | `list_system_fonts` | — | enumerate installed fonts from Windows registry |
 | `serial_list_ports` | — | enumerate serial ports |
 | `serial_spawn` | `port_name`, `baud_rate`, `data_bits`, `parity`, `stop_bits`, `flow_control` | open serial session + WS relay, return `{ id, port }` |
+| `serial_set_baud` | `id`, `baud_rate` | live baud switch via the pump's SerialCtl channel (no reconnect) |
 
 Backend → Frontend: **WebSocket** `ws://127.0.0.1:{port}` — binary frames carry raw PTY bytes directly to xterm.js via `@xterm/addon-attach` (no serialization, no Tauri events). The legacy `pty-output` Tauri event was removed in the WebSocket refactor.
 
@@ -181,6 +184,20 @@ Noto Sans fonts are per-script variants (SC = Simplified Chinese, JP = Japanese,
 - `TerminalTab.hide()` always sets `needsResize = true`. `show()` does NOT fit.
 - `TabManager.switchTo()` handles `wasSettingsOpen`: if same tab was hidden by settings, re-shows it.
 - Window resize: all tabs marked dirty; only active tab fitted immediately (debounced 10ms).
+
+## Tab drag reorder
+
+**SortableJS** on `#tabs` (`TabManager.initSortable()`, called from `initTabManager` — never in the constructor: the module singleton is built with null containers). Config: `forceFallback: true` (native HTML5 DnD unreliable in WebView2), 150ms animation, 5px click/drag tolerance, `.tab-close` filtered, settings tab excluded via the draggable selector. `onEnd` rebuilds the tabs Map from DOM order and refreshes badges. `window.ts` drag handler skips `.tab` (Sortable owns tab pointer events).
+
+## Disconnect & reconnect
+
+- Relay sends a WS Close frame when the byte stream ends → `TerminalTab.attachSocket`'s close listener → `setDisconnected(true)`: centered overlay + strikethrough red tab label.
+- Enter (capture-phase keydown on tab element) → `reconnectTab` → `session_reconnect` (same id, stored SpawnSpec) → `attachSocket` with the new port.
+- Serial live baud: context menu (shift+right-click) → Baud Rate flyout → `serial_set_baud`; per-port memory in `config.serialPortParams`.
+
+## Error notifications
+
+All user-facing errors go through `showToast(message, "error")` (`src/toast.ts`) — tab creation, serial open (busy/unplugged), reconnect failure, new window. Settings panel keeps its inline feedback element for in-context results.
 
 ## Fit & hysteresis
 
