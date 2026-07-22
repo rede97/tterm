@@ -687,10 +687,93 @@ fn open_serial(
         .parity(map_parity(parity)?)
         .stop_bits(map_stop_bits(stop_bits)?)
         .flow_control(map_flow_control(flow_control)?)
-        // Short timeout lets the blocking read loop poll the cancel flag
-        .timeout(std::time::Duration::from_millis(100))
+        // Short read timeout: the I/O pump polls writes and cancel each cycle.
+        // 20ms keeps keystroke echo latency imperceptible.
+        .timeout(std::time::Duration::from_millis(20))
         .open()
         .map_err(|e| format!("Failed to open {}: {}", port_name, e))
+}
+
+// Read adapter: device output channel -> relay read loop.
+struct SerialIoReader {
+    rx: std::sync::mpsc::Receiver<Vec<u8>>,
+    cur: std::collections::VecDeque<u8>,
+}
+
+impl Read for SerialIoReader {
+    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+        while self.cur.is_empty() {
+            match self.rx.recv() {
+                Ok(data) => self.cur.extend(data),
+                Err(_) => return Ok(0), // I/O pump exited -> EOF
+            }
+        }
+        let n = self.cur.len().min(out.len());
+        for slot in out.iter_mut().take(n) {
+            *slot = self.cur.pop_front().unwrap();
+        }
+        Ok(n)
+    }
+}
+
+// Write adapter: relay write path -> device input channel.
+struct SerialIoWriter {
+    tx: std::sync::mpsc::Sender<Vec<u8>>,
+}
+
+impl Write for SerialIoWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.tx
+            .send(buf.to_vec())
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::BrokenPipe, "serial I/O pump gone"))?;
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+// Single thread exclusively owns the serial port. Windows synchronous handles
+// serialize ReadFile/WriteFile on the same file object, so the previous
+// try_clone design blocked keystroke writes behind the pending read (up to
+// 100ms). This pump avoids concurrent handle I/O entirely:
+// drain pending writes first, then read with a short timeout.
+fn serial_io_loop(
+    mut port: Box<dyn serialport::SerialPort>,
+    out: std::sync::mpsc::Sender<Vec<u8>>,
+    input: std::sync::mpsc::Receiver<Vec<u8>>,
+    cancel: Arc<AtomicBool>,
+) {
+    let mut buf = [0u8; 16384];
+    'outer: loop {
+        if cancel.load(Ordering::Relaxed) {
+            break;
+        }
+        // 1. Drain all pending writes immediately (keystrokes -> device)
+        loop {
+            match input.try_recv() {
+                Ok(data) => {
+                    if port.write_all(&data).is_err() {
+                        break 'outer;
+                    }
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => break 'outer,
+            }
+        }
+        let _ = port.flush();
+        // 2. Read whatever the device sent (<=20ms block)
+        match port.read(&mut buf) {
+            Ok(0) => {}
+            Ok(n) => {
+                if out.send(buf[..n].to_vec()).is_err() {
+                    break;
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::TimedOut => {}
+            Err(_) => break,
+        }
+    }
 }
 
 #[tauri::command]
@@ -704,10 +787,18 @@ fn serial_spawn(
     flow_control: String,
 ) -> Result<WsConnectResult, String> {
     let port = open_serial(&port_name, baud_rate, data_bits, &parity, stop_bits, &flow_control)?;
-    let reader = port.try_clone().map_err(|e| e.to_string())?;
 
     let cancel = Arc::new(AtomicBool::new(false));
-    let ws_port = start_ws_relay(reader, port, Some(cancel.clone()))?;
+    let (out_tx, out_rx) = std::sync::mpsc::channel::<Vec<u8>>();
+    let (in_tx, in_rx) = std::sync::mpsc::channel::<Vec<u8>>();
+    std::thread::spawn({
+        let cancel = cancel.clone();
+        move || serial_io_loop(port, out_tx, in_rx, cancel)
+    });
+
+    let reader = SerialIoReader { rx: out_rx, cur: std::collections::VecDeque::new() };
+    let writer = SerialIoWriter { tx: in_tx };
+    let ws_port = start_ws_relay(reader, writer, Some(cancel.clone()))?;
 
     let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
     let id = format!("tab-{}", *next);
@@ -1189,6 +1280,37 @@ mod tests {
         let mut buf = [0u8; 64];
         let n = reader.read(&mut buf).unwrap();
         assert_eq!(&buf[..n], b"hello");
+        assert_eq!(reader.read(&mut buf).unwrap(), 0);
+    }
+
+    // -- serial I/O pump adapters --
+
+    #[test]
+    fn serial_io_writer_forwards_to_channel() {
+        let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+        let mut writer = SerialIoWriter { tx };
+        writer.write_all(b"AT+CMD\r\n").unwrap();
+        writer.flush().unwrap();
+        assert_eq!(rx.try_recv().unwrap(), b"AT+CMD\r\n".to_vec());
+    }
+
+    #[test]
+    fn serial_io_writer_errors_when_pump_gone() {
+        let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+        drop(rx);
+        let mut writer = SerialIoWriter { tx };
+        assert_eq!(writer.write(b"x").unwrap_err().kind(), std::io::ErrorKind::BrokenPipe);
+    }
+
+    #[test]
+    fn serial_io_reader_eof_when_pump_gone() {
+        let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+        let mut reader = SerialIoReader { rx, cur: std::collections::VecDeque::new() };
+        tx.send(b"device-data".to_vec()).unwrap();
+        drop(tx);
+        let mut buf = [0u8; 64];
+        let n = reader.read(&mut buf).unwrap();
+        assert_eq!(&buf[..n], b"device-data");
         assert_eq!(reader.read(&mut buf).unwrap(), 0);
     }
 }

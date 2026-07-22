@@ -300,6 +300,27 @@ body {
   background: #333333;
 }
 
+/* terminal size hint overlay (cols × rows on resize) */
+.size-hint {
+  position: absolute;
+  top: 8px;
+  right: 14px;
+  padding: 2px 10px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #ffffff;
+  font-size: 12px;
+  font-family: monospace;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.size-hint.visible {
+  opacity: 1;
+}
+
 /* OSC 9;4 progress bar on tabs */
 .tab-progress {
   position: absolute;
@@ -412,6 +433,7 @@ body {
 .terminal-instance {
   width: 100%;
   height: 100%;
+  position: relative;
   background: #1e1e1e;
   /* isolate paint: prevent layout recalc from cascading into xterm canvas */
   contain: layout style paint;

@@ -6,6 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { TabType } from "./types";
 import { hysteresis } from "./hysteresis";
 import { parseOsc9Progress, applyProgressToTabElement } from "./osc";
+import { SizeHint } from "./sizehint";
 import { SshHost, configFontFamily, configFontSize, configRenderer, configScrollback, configThemeName, trimPasteContent } from "./profiles";
 import { findTheme } from "./themes";
 
@@ -27,6 +28,7 @@ export class TerminalTab {
   searchQuery = "";
   progressState = 0;
   progress = 0;
+  sizeHint!: SizeHint;
 
   constructor(id: string, type: TabType, label: string, container: HTMLElement) {
     this.id = id;
@@ -37,6 +39,7 @@ export class TerminalTab {
     this.element.className = "terminal-instance";
     this.element.style.display = "none";
     container.appendChild(this.element);
+    this.sizeHint = new SizeHint(this.element);
 
     this.terminal = new Terminal({
       allowProposedApi: true,
@@ -215,8 +218,10 @@ export class TerminalTab {
     const cols = hysteresis(floatCols, this.terminal.cols, 0.8, 0.9);
     const rows = hysteresis(floatRows, this.terminal.rows, 0.98, 1.0);
 
-    if (this.terminal.cols !== cols || this.terminal.rows !== rows)
+    if (this.terminal.cols !== cols || this.terminal.rows !== rows) {
       this.terminal.resize(cols, rows);
+      this.sizeHint.show(cols, rows);
+    }
 
     return { cols, rows };
   }
@@ -254,6 +259,7 @@ export class TerminalTab {
   }
 
   destroy(): void {
+    this.sizeHint.destroy();
     this.element.remove();
     this.tabElement.remove();
     this.terminal.dispose();
