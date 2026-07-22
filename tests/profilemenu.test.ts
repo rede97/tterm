@@ -6,6 +6,7 @@ const { tabManagerMock } = vi.hoisted(() => ({
     createLocalTab: vi.fn(),
     createSshTab: vi.fn(),
     createSerialTab: vi.fn(),
+    createDemoTab: vi.fn(),
   },
 }));
 vi.mock("../src/tabmanager", () => ({ tabManager: tabManagerMock }));
@@ -102,5 +103,15 @@ describe("profile menu (serial enumeration)", () => {
     await openMenu();
     const titles = [...document.querySelectorAll(".profile-section-title")].map(e => e.textContent);
     expect(titles[0]).toBe("Local");
+  });
+
+  it("shows the Demo TTY entry in dev mode and opens a demo tab on click", async () => {
+    await openMenu();
+    // vitest runs with import.meta.env.DEV = true
+    const items = [...document.querySelectorAll(".profile-menu .profile-item")];
+    const demo = items.find(i => i.querySelector(".item-label")?.textContent === "Demo TTY");
+    expect(demo).toBeTruthy();
+    (demo as HTMLElement).click();
+    expect(tabManagerMock.createDemoTab).toHaveBeenCalledTimes(1);
   });
 });

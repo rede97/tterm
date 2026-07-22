@@ -58,7 +58,8 @@ README 中声明的全部功能均已实现并经代码验证；路线图 5 项�
 | 串口（Serial）连接 | ✅ 达成（真机验证待硬件） | 全链路实现：`serial_spawn` 命令（波特率/数据位/校验/停止位/流控参数映射）、`start_ws_relay` 通用中继（PTY/串口共用）、前端 `createSerialTab`、设置面板默认波特率、计划文档 `docs/serial-port-plan.md`（含真机验证清单）。冒烟测试 7 例（参数映射、无效端口优雅报错） |
 | 分屏显示 | ❌ 未启动 | 现有架构以标签为单位，每标签一个 xterm 实例，分屏需重构布局模型 |
 | 自定义配色方案配置界面 | 🟡 部分达成（约 60%） | `themes.ts`：12 款内置主题（Solarized/Dracula/Nord/Gruvbox/One Half/Monokai/Tango/Tokyo Night/Campbell 等）+ WT settings.json schemes 自动导入（`purple`→`magenta` 字段映射、内置重名跳过）；设置 > 外观面板下拉选择 + 实时色板/终端预览；`themeName` 配置持久化，Apply 后全标签热切换。待做：用户自定义配色编辑器 |
-| 终端会话录制与回放 | ❌ 未启动 | WebSocket 中继层（`start_ws_relay`）是天然的录制切入点 |
+| 终端会话录制与回放 | ⛔ 已从需求移除 | 用户决策：非现阶段核心需求（2025-07-22） |
+| Demo TTY（调试工具） | ✅ 达成 | debug 限定：Rust 线程生成 TUI 动画帧 + OSC 9;4 进度序列（不定态→0-100%→警告→错误→隐藏，20s 循环），纯内存 channel 复用 `start_ws_relay`（无子进程）；按键交互（空格暂停/r 重置/q 退出）；release 下 `demo_spawn` 返回 Err。为进度条功能提供端到端演示 |
 | OSC 9;4 进度条 | ✅ 达成 | `osc.ts`：OSC 9 payload 解析（状态 0-4、进度钳制 0-100）+ 标签底部进度条（正常绿/错误红/警告黄/不定态滑动动画）；`tab.ts` 注册 OSC handler，非进度类 OSC 9 子类型透传 |
 | 标签拖拽排序 | ✅ 达成（路线图外新增） | `tabdrag.ts`：鼠标拖拽实现（WebView2 中 HTML5 DnD 不可靠）；6px 阈值防误触、中点判定插入位置、拖拽中实时重排、放置后同步 tabs Map 顺序并抑制误触点击；标签不再作为窗口拖拽区域 |
 

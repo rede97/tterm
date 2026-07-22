@@ -1,4 +1,4 @@
-import { createElement, Terminal as TerminalIcon, Globe, Cable } from "lucide";
+import { createElement, Terminal as TerminalIcon, Globe, Cable, FlaskConical } from "lucide";
 import { sshHosts, localProfiles, hiddenProfiles, hiddenSshHosts, hostProp, serialPorts, loadSerialPorts } from "./profiles";
 import { tabManager } from "./tabmanager";
 
@@ -79,6 +79,11 @@ function populateMenu() {
     }
   } else {
     localCol.appendChild(createMenuItem(TerminalIcon, "Default shell", "", () => tabManager.createLocalTab()));
+  }
+
+  // Debug builds only: mock TTY demo (OSC 9;4 progress + TUI animation)
+  if (import.meta.env.DEV) {
+    localCol.appendChild(createMenuItem(FlaskConical, "Demo TTY", "debug", () => tabManager.createDemoTab()));
   }
   profileMenu.appendChild(localCol);
 

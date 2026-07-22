@@ -70,7 +70,6 @@ bun run tauri build
 - [x] Serial port support
 - [ ] Split panes
 - [~] Custom color scheme configuration UI (built-in themes + WT scheme import done; custom editor pending)
-- [ ] Session recording and replay
 - [x] OSC 9;4 terminal progress bar in tab title
 
 ## License

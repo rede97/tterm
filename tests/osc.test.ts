@@ -32,6 +32,16 @@ describe("parseOsc9Progress", () => {
     expect(parseOsc9Progress("4;x;50")).toBeNull();   // non-numeric state
     expect(parseOsc9Progress("4;1;abc")).toBeNull();  // non-numeric progress
   });
+
+  it("contract: parses every sequence the Rust demo TTY can emit", () => {
+    // demo_loop phases: (3,0), (1,0..100), (4,100), (2,100), (0,100)
+    const emitted = ["4;3;0", "4;1;0", "4;1;42", "4;1;100", "4;4;100", "4;2;100", "4;0;100"];
+    for (const data of emitted) {
+      const p = parseOsc9Progress(data);
+      expect(p, data).not.toBeNull();
+      expect(p!.state).toBe(Number(data.split(";")[1]));
+    }
+  });
 });
 
 describe("applyProgressToTabElement", () => {

@@ -43,6 +43,27 @@ describe("TTerm application", () => {
     }, { timeout: 5000 });
   });
 
+  it("demo TTY tab renders TUI frames and OSC 9;4 progress bar", async () => {
+    // Open the new-tab menu and click "Demo TTY"
+    await $("#new-tab-menu-btn").click();
+    const demoItem = await browser.waitUntil(async () => {
+      const items = await $$(".profile-menu .profile-item");
+      for (const it of items) {
+        const label = await it.$(".item-label").getText();
+        if (label === "Demo TTY") return it;
+      }
+      return false;
+    }, { timeout: 5000 });
+    await demoItem.click();
+
+    // A new tab opens and, within a few frames, gets a .tab-progress bar
+    const before = (await $$("#tabs .tab")).length;
+    await browser.waitUntil(async () => {
+      const bars = await $$("#tabs .tab .tab-progress");
+      return bars.length > 0 && (await $$("#tabs .tab")).length >= before;
+    }, { timeout: 10000, timeoutMsg: "no .tab-progress appeared on demo tab" });
+  });
+
   it("shows the terminal viewport inside the active tab", async () => {
     // The `active` class lives on the tab-bar element (.tab.active), not on
     // .terminal-instance — the visible instance is the one without display:none.

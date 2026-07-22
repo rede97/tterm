@@ -173,6 +173,21 @@ export class TabManager {
     return tab;
   }
 
+  async createDemoTab(): Promise<TerminalTab> {
+    const result: { id: string; port: number } = await invoke("demo_spawn");
+    const tab = new TerminalTab(result.id, "local", "Demo TTY", this.terminalContainer);
+    this._register(tab, result.port);
+
+    await this._ensureFontsReady(tab);
+
+    this._hideWelcome();
+    this.switchTo(result.id);
+    tab.fitDeferred();
+    this.refreshBadges();
+
+    return tab;
+  }
+
   // Wait for web fonts to load, then force xterm to re-measure character cells.
   // Without this, the first tab opened measures with a fallback font and caches
   // wrong glyph metrics, causing wide character spacing until next resize.
