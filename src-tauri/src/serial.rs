@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crate::relay::start_ws_relay;
-use crate::state::{AppState, SerialSession, WsConnectResult};
+use crate::state::{AppState, SerialCtl, SerialSession, WsConnectResult};
 
 #[derive(Clone, Serialize)]
 pub struct SerialPortInfo {
@@ -69,10 +69,23 @@ pub(crate) fn map_flow_control(flow: &str) -> Result<serialport::FlowControl, St
     }
 }
 
-pub(crate) fn open_serial(
+// Map low-level open errors to actionable messages.
+pub(crate) fn serial_open_error(port_name: &str, err: &serialport::Error) -> String {
+    let msg = err.to_string();
+    let lower = msg.to_lowercase();
+    if lower.contains("access") || lower.contains("denied") || lower.contains("busy") || lower.contains("being used") {
+        format!("{} is busy — opened by another application", port_name)
+    } else if lower.contains("not found") || lower.contains("cannot find") || lower.contains("does not exist") {
+        format!("{} not found — device may have been unplugged", port_name)
+    } else {
+        format!("Failed to open {}: {}", port_name, msg)
+    }
+}
+
+fn open_serial(
     port_name: &str, baud_rate: u32, data_bits: u8, parity: &str, stop_bits: u8, flow_control: &str,
 ) -> Result<Box<dyn serialport::SerialPort>, String> {
-    serialport::new(port_name, baud_rate)
+    let mut port = serialport::new(port_name, baud_rate)
         .data_bits(map_data_bits(data_bits)?)
         .parity(map_parity(parity)?)
         .stop_bits(map_stop_bits(stop_bits)?)
@@ -81,7 +94,13 @@ pub(crate) fn open_serial(
         // 20ms keeps keystroke echo latency imperceptible.
         .timeout(std::time::Duration::from_millis(20))
         .open()
-        .map_err(|e| format!("Failed to open {}: {}", port_name, e))
+        .map_err(|e| serial_open_error(port_name, &e))?;
+    // Assert DTR and RTS like PuTTY/node-serialport do. Many CDC-ACM devices
+    // (debug probes, Arduino-class boards) gate TX on these lines; FT232-style
+    // adapters don't care either way.
+    let _ = port.write_data_terminal_ready(true);
+    let _ = port.write_request_to_send(true);
+    Ok(port)
 }
 
 // Read adapter: device output channel -> relay read loop.
@@ -132,12 +151,21 @@ pub(crate) fn serial_io_loop(
     mut port: Box<dyn serialport::SerialPort>,
     out: std::sync::mpsc::Sender<Vec<u8>>,
     input: std::sync::mpsc::Receiver<Vec<u8>>,
+    ctl: std::sync::mpsc::Receiver<SerialCtl>,
     cancel: Arc<AtomicBool>,
 ) {
     let mut buf = [0u8; 16384];
     'outer: loop {
         if cancel.load(Ordering::Relaxed) {
             break;
+        }
+        // 0. Apply pending control messages (e.g. live baud switch)
+        while let Ok(msg) = ctl.try_recv() {
+            match msg {
+                SerialCtl::SetBaud(baud) => {
+                    let _ = port.set_baud_rate(baud);
+                }
+            }
         }
         // 1. Drain all pending writes immediately (keystrokes -> device)
         loop {
@@ -181,9 +209,10 @@ pub fn serial_spawn(
     let cancel = Arc::new(AtomicBool::new(false));
     let (out_tx, out_rx) = std::sync::mpsc::channel::<Vec<u8>>();
     let (in_tx, in_rx) = std::sync::mpsc::channel::<Vec<u8>>();
+    let (ctl_tx, ctl_rx) = std::sync::mpsc::channel::<SerialCtl>();
     std::thread::spawn({
         let cancel = cancel.clone();
-        move || serial_io_loop(port, out_tx, in_rx, cancel)
+        move || serial_io_loop(port, out_tx, in_rx, ctl_rx, cancel)
     });
 
     let reader = SerialIoReader { rx: out_rx, cur: std::collections::VecDeque::new() };
@@ -199,9 +228,21 @@ pub fn serial_spawn(
         .serial_sessions
         .lock()
         .map_err(|e| e.to_string())?
-        .insert(id.clone(), SerialSession { cancel });
+        .insert(id.clone(), SerialSession { cancel, ctl: ctl_tx });
 
     Ok(WsConnectResult { id, port: ws_port })
+}
+
+#[tauri::command]
+pub fn serial_set_baud(state: tauri::State<AppState>, id: &str, baud_rate: u32) -> Result<(), String> {
+    let sessions = state.serial_sessions.lock().map_err(|e| e.to_string())?;
+    let session = sessions
+        .get(id)
+        .ok_or_else(|| format!("No serial session: {}", id))?;
+    session
+        .ctl
+        .send(SerialCtl::SetBaud(baud_rate))
+        .map_err(|e| format!("Serial session closed: {}", e))
 }
 
 #[cfg(test)]
@@ -259,6 +300,38 @@ mod tests {
     fn open_serial_invalid_params_rejected_before_open() {
         let result = open_serial("\\\\.\\COM254", 115200, 9, "none", 1, "none");
         assert!(result.err().unwrap().contains("data bits"));
+    }
+
+    // -- serial open error mapping --
+
+    #[test]
+    fn busy_error_mentions_occupation() {
+        let e = serialport::Error::new(
+            serialport::ErrorKind::Io(std::io::ErrorKind::PermissionDenied),
+            "Access is denied. (os error 5)",
+        );
+        let msg = serial_open_error("COM3", &e);
+        assert!(msg.contains("COM3"));
+        assert!(msg.contains("busy"));
+    }
+
+    #[test]
+    fn missing_device_error_mentions_unplugged() {
+        let e = serialport::Error::new(
+            serialport::ErrorKind::NoDevice,
+            "The system cannot find the file specified.",
+        );
+        let msg = serial_open_error("COM7", &e);
+        assert!(msg.contains("COM7"));
+        assert!(msg.contains("not found"));
+    }
+
+    #[test]
+    fn unknown_error_falls_through_with_detail() {
+        let e = serialport::Error::new(serialport::ErrorKind::Unknown, "something weird");
+        let msg = serial_open_error("COM3", &e);
+        assert!(msg.contains("Failed to open COM3"));
+        assert!(msg.contains("something weird"));
     }
 
     // -- serial I/O pump adapters --

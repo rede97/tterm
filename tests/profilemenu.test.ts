@@ -55,23 +55,17 @@ describe("profile menu (serial enumeration)", () => {
     return hit!;
   }
 
-  it("shows a Serial column with enumerated ports", async () => {
+  it("line 1: COM name · friendly name; line 2: vendor VID:PID", async () => {
     await openMenu();
-    const com3 = serialItem("COM3");
-    expect(com3.querySelector(".item-detail")!.textContent).toContain("USB-SERIAL CH340");
-    expect(com3.querySelector(".item-detail")!.textContent).toContain("1A86:7523");
-  });
-
-  it("falls back to manufacturer when product is empty", async () => {
-    await openMenu();
-    const com5 = serialItem("COM5");
-    expect(com5.querySelector(".item-detail")!.textContent).toContain("FTDI");
-    expect(com5.querySelector(".item-detail")!.textContent).toContain("0403:6001");
+    const com3 = serialItem("COM3 · USB-SERIAL CH340");
+    expect(com3.querySelector(".item-subline")!.textContent).toBe("wch.cn 1A86:7523");
+    const com5 = serialItem("COM5 · FTDIBUS");
+    expect(com5.querySelector(".item-subline")!.textContent).toBe("FTDI 0403:6001");
   });
 
   it("serial items are enabled and open a serial tab on click", async () => {
     await openMenu();
-    const com3 = serialItem("COM3");
+    const com3 = serialItem("COM3 · USB-SERIAL CH340");
     expect(com3.classList.contains("disabled")).toBe(false);
     (com3 as HTMLElement).click();
     expect(tabManagerMock.createSerialTab).toHaveBeenCalledTimes(1);
@@ -84,7 +78,7 @@ describe("profile menu (serial enumeration)", () => {
 
   it("closes the menu after clicking a serial item", async () => {
     await openMenu();
-    (serialItem("COM5") as HTMLElement).click();
+    (serialItem("COM5 · FTDIBUS") as HTMLElement).click();
     expect(document.querySelector(".profile-menu")!.classList.contains("open")).toBe(false);
   });
 

@@ -107,6 +107,33 @@ const termMenuGroup = document.createElement("div");
 termMenuGroup.dataset.group = "term";
 termMenuGroup.style.display = "none";
 
+const SERIAL_BAUDS = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
+
+// Baud Rate submenu (serial tabs only, mirrors the color submenu pattern)
+const baudItem = document.createElement("div");
+baudItem.className = "menu-item has-submenu";
+baudItem.style.display = "none";
+const baudLabel = document.createElement("span");
+baudLabel.textContent = "Baud Rate";
+baudItem.appendChild(baudLabel);
+const baudArrow = document.createElement("span");
+baudArrow.className = "menu-arrow";
+baudArrow.textContent = "›";
+baudItem.appendChild(baudArrow);
+
+const baudSub = document.createElement("div");
+baudSub.className = "baud-submenu";
+for (const b of SERIAL_BAUDS) {
+  const el = document.createElement("div");
+  el.className = "menu-item baud-option";
+  el.dataset.baud = String(b);
+  baudSub.appendChild(el);
+}
+baudItem.appendChild(baudSub);
+baudItem.addEventListener("mouseenter", () => baudSub.classList.add("open"));
+baudItem.addEventListener("mouseleave", () => baudSub.classList.remove("open"));
+termMenuGroup.appendChild(baudItem);
+
 termMenuGroup.appendChild(mkItem("Copy", "copy"));
 termMenuGroup.appendChild(mkItem("Copy as HTML", "copy-html"));
 termMenuGroup.appendChild(mkItem("Paste", "paste"));
@@ -129,6 +156,14 @@ contextMenu.addEventListener("click", (e) => {
     e.stopPropagation();
     const t = tabManager.get(currentTabId);
     if (t) t.setColor(target.dataset.color);
+    closeContextMenu();
+    return;
+  }
+
+  // Baud option
+  if (target.classList.contains("baud-option") && target.dataset.baud) {
+    e.stopPropagation();
+    tabManager.setSerialBaud(currentTabId, parseInt(target.dataset.baud, 10));
     closeContextMenu();
     return;
   }
@@ -232,6 +267,16 @@ export function showTabContextMenu(tabId: string, x: number, y: number) {
 
 export function showTerminalContextMenu(tabId: string, x: number, y: number) {
   currentTabId = tabId;
+  // Baud Rate submenu is serial-only; refresh checkmarks from the tab state
+  const tab = tabManager.get(tabId);
+  const isSerial = tab?.type === "serial";
+  baudItem.style.display = isSerial ? "" : "none";
+  if (isSerial) {
+    baudSub.querySelectorAll<HTMLElement>(".baud-option").forEach(el => {
+      const b = parseInt(el.dataset.baud!, 10);
+      el.textContent = b === tab!.serialBaud ? `${b} ✓` : String(b);
+    });
+  }
   tabMenuGroup.style.display = "none";
   termMenuGroup.style.display = "";
   showAt(x, y);

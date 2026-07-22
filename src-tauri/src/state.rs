@@ -17,6 +17,13 @@ pub struct PtySession {
 
 pub struct SerialSession {
     pub(crate) cancel: Arc<AtomicBool>,
+    pub(crate) ctl: std::sync::mpsc::Sender<SerialCtl>,
+}
+
+// Control messages for the serial I/O pump thread.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SerialCtl {
+    SetBaud(u32),
 }
 
 pub struct AppState {

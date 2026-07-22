@@ -21,6 +21,8 @@ export class TerminalTab {
   type: TabType;
   command?: string;
   sshHost?: SshHost;
+  serialPortName?: string;
+  serialBaud?: number;
   label: string;
   color?: string;
   needsResize = false;

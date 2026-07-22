@@ -32,7 +32,7 @@ function flipMenu() {
   profileMenu.style.top = top + "px";
 }
 
-function createMenuItem(iconFn: any, label: string, detail: string, onClick: () => void): HTMLElement {
+function createMenuItem(iconFn: any, label: string, detail: string, onClick: () => void, subline = ""): HTMLElement {
   const item = document.createElement("div");
   item.className = "profile-item";
 
@@ -41,10 +41,25 @@ function createMenuItem(iconFn: any, label: string, detail: string, onClick: () 
   iconWrap.appendChild(createElement(iconFn, { stroke: "currentColor", width: 14, height: 14 }));
   item.appendChild(iconWrap);
 
-  const labelEl = document.createElement("span");
-  labelEl.className = "item-label";
-  labelEl.textContent = label;
-  item.appendChild(labelEl);
+  if (subline) {
+    // two-line layout: label on top, subline (light small) below
+    const textWrap = document.createElement("div");
+    textWrap.className = "item-text";
+    const labelEl = document.createElement("span");
+    labelEl.className = "item-label";
+    labelEl.textContent = label;
+    textWrap.appendChild(labelEl);
+    const subEl = document.createElement("span");
+    subEl.className = "item-subline";
+    subEl.textContent = subline;
+    textWrap.appendChild(subEl);
+    item.appendChild(textWrap);
+  } else {
+    const labelEl = document.createElement("span");
+    labelEl.className = "item-label";
+    labelEl.textContent = label;
+    item.appendChild(labelEl);
+  }
 
   if (detail) {
     const detailEl = document.createElement("span");
@@ -114,9 +129,12 @@ function populateMenu() {
     serialCol.appendChild(serialTitle);
 
     for (const port of serialPorts) {
-      const device = port.product || port.manufacturer || port.driver;
-      const ids = port.vid && port.pid ? ` ${port.vid}:${port.pid}` : "";
-      serialCol.appendChild(createMenuItem(Cable, port.name, device + ids, () => tabManager.createSerialTab(port)));
+      // Line 1: COM name · friendly name. Line 2 (light small): vendor VID:PID.
+      const ids = port.vid && port.pid ? `${port.vid}:${port.pid}` : "";
+      const subline = [port.manufacturer, ids].filter(Boolean).join(" ");
+      const friendly = port.product || port.driver;
+      const label = friendly ? `${port.name} · ${friendly}` : port.name;
+      serialCol.appendChild(createMenuItem(Cable, label, "", () => tabManager.createSerialTab(port), subline));
     }
     profileMenu.appendChild(serialCol);
   }

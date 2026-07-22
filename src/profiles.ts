@@ -36,6 +36,23 @@ export interface SerialPort {
   pid: string;
 }
 
+export interface SerialParams {
+  baud: number;
+}
+
+// Per-port remembered parameters, keyed by port name (e.g. "COM3").
+export let serialPortParams: Record<string, SerialParams> = {};
+
+// Baud for opening a port: remembered value wins, global default otherwise.
+export function serialBaudFor(portName: string): number {
+  return serialPortParams[portName]?.baud ?? configSerialBaud;
+}
+
+export async function rememberSerialBaud(portName: string, baud: number) {
+  serialPortParams = { ...serialPortParams, [portName]: { baud } };
+  await saveConfig({ serialPortParams });
+}
+
 export let sshHosts: SshHost[] = [];
 export let localProfiles: LocalProfile[] = [];
 export let vsInstalls: VsInstallation[] = [];
@@ -232,6 +249,7 @@ function readConfigValues(cfg: any) {
   if (typeof cfg.tabWidthMode === "string") configTabWidthMode = cfg.tabWidthMode;
   if (typeof cfg.themeName === "string") configThemeName = cfg.themeName;
   if (typeof cfg.serialBaud === "number" && cfg.serialBaud >= 300 && cfg.serialBaud <= 921600) configSerialBaud = cfg.serialBaud;
+  if (cfg.serialPortParams && typeof cfg.serialPortParams === "object") serialPortParams = cfg.serialPortParams;
   if (Array.isArray(cfg.hiddenSshHosts)) hiddenSshHosts = cfg.hiddenSshHosts;
 }
 
@@ -247,6 +265,7 @@ export function getDefaultConfig(): Record<string, unknown> {
     tabWidthMode: "equal",
     themeName: DEFAULT_THEME_NAME,
     serialBaud: 115200,
+    serialPortParams: {},
     hiddenProfiles: [],
     hiddenSshHosts: [],
   };

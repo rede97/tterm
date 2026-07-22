@@ -46,7 +46,7 @@ pub fn run() {
                 ssh::ssh_save_config,
                 config::read_config, config::write_config, config::delete_config, config::open_config_dir,
                 wt::read_wt_settings, wt::read_wt_fragments, wt::find_vs_instances,
-                serial::serial_list_ports, serial::serial_spawn,
+                serial::serial_list_ports, serial::serial_spawn, serial::serial_set_baud,
                 demo::demo_spawn,
                 fonts::list_system_fonts,
             ] }
@@ -59,7 +59,7 @@ pub fn run() {
                 ssh::ssh_save_config,
                 config::read_config, config::write_config, config::delete_config, config::open_config_dir,
                 wt::read_wt_settings, wt::read_wt_fragments, wt::find_vs_instances,
-                serial::serial_list_ports, serial::serial_spawn,
+                serial::serial_list_ports, serial::serial_spawn, serial::serial_set_baud,
                 fonts::list_system_fonts,
             ] }
         })

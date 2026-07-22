@@ -69,6 +69,7 @@ bun run tauri build
 
 - [x] Serial port support
 - [ ] Split panes
+- [ ] Auto-reconnect for SSH / serial sessions (low priority)
 - [~] Custom color scheme configuration UI (built-in themes + WT scheme import done; custom editor pending)
 - [x] OSC 9;4 terminal progress bar in tab title
 
