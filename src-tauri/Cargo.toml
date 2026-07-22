@@ -27,7 +27,6 @@ tauri-plugin-dialog = "2.7.1"
 tauri-plugin-window-state = "2.4.1"
 winreg = "0.52"
 serial_enumerator = "0.2"
-base64 = "0.22"
 tokio = { version = "1", features = ["sync", "net", "rt"] }
 tokio-tungstenite = { version = "0.24", default-features = false, features = ["__rustls-tls", "connect", "handshake"] }
 futures-util = "0.3"

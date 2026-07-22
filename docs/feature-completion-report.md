@@ -49,7 +49,7 @@ README 中声明的全部功能均已实现并经代码验证；路线图 5 项�
 | 窗口标题跟随终端 | ✅ | `onTitleChange` 已接线（v0.1.4） |
 | 构建 | ✅ | `bun run build` 通过，tsc 零错误，vite 零警告 |
 | 测试 | ✅ 已建立（三层） | Rust 单元测试 24 例（lib.rs 内嵌）；Vitest 前端单元 + happy-dom DOM 测试 34 例；tauri-driver + WebdriverIO E2E 4 例。详见 `docs/testing.md` |
-| 遗留代码 | ⚠️ | `src/terminal.ts` 为孤儿模块（无引用，仅留作参考），建议删除 |
+| 遗留代码 | ✅ 已清理 | 已删除 `pty_write` 死命令（前端零调用）、`terminal.ts`/`state.ts` 孤儿模块、未使用的 `base64` 依赖、PTY 管道帧编码分支 |
 
 ## 四、路线图功能达成情况
 

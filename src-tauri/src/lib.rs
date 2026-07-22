@@ -17,8 +17,7 @@ pub(crate) struct WsConnectResult {
 }
 
 pub(crate) struct PtySession {
-    pub(crate) master: Option<Box<dyn MasterPty + Send>>,
-    pub(crate) writer: Box<dyn Write + Send>,
+    pub(crate) master: Box<dyn MasterPty + Send>,
 }
 
 pub(crate) struct AppState {
@@ -137,7 +136,7 @@ fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder) -> R
     let sessions = app_handle.state::<AppState>();
     sessions.sessions.lock().map_err(|e| e.to_string())?.insert(
         id,
-        PtySession { master: Some(master), writer: Box::new(std::io::sink()) },
+        PtySession { master },
     );
 
     Ok(port)
@@ -434,60 +433,19 @@ fn pty_spawn_ssh(state: tauri::State<AppState>, app: tauri::AppHandle, hostname:
     Ok(WsConnectResult { id, port: ws_port })
 }
 
-// Encode a framed message for pipe-based sessions (e.g. serial).
-// Layout: [msg_type, len_lo, len, len, len_hi, ...data]
-fn encode_pipe_frame(data: &[u8]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(5 + data.len());
-    out.push(0x00u8);
-    out.extend_from_slice(&(data.len() as u32).to_le_bytes());
-    out.extend_from_slice(data);
-    out
-}
-
-// Encode a resize message for pipe-based sessions.
-// Layout: [0x01, cols_lo, cols_hi, rows_lo, rows_hi]
-fn encode_resize_frame(cols: u16, rows: u16) -> [u8; 5] {
-    [0x01u8, cols as u8, (cols >> 8) as u8, rows as u8, (rows >> 8) as u8]
-}
-
-#[tauri::command]
-fn pty_write(state: tauri::State<AppState>, id: &str, data: &str) -> Result<(), String> {
-    let mut sessions = state.sessions.lock().map_err(|e| e.to_string())?;
-    if let Some(session) = sessions.get_mut(id) {
-        if session.master.is_none() {
-            // pipe session: prepend framing (type 0x00 + 4-byte LE length)
-            let frame = encode_pipe_frame(data.as_bytes());
-            session.writer.write_all(&frame).map_err(|e| e.to_string())?;
-        } else {
-            session
-                .writer
-                .write_all(data.as_bytes())
-                .map_err(|e| e.to_string())?;
-        }
-        session.writer.flush().map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
 #[tauri::command]
 fn pty_resize(state: tauri::State<AppState>, id: &str, cols: u16, rows: u16) -> Result<(), String> {
     let mut sessions = state.sessions.lock().map_err(|e| e.to_string())?;
     if let Some(session) = sessions.get_mut(id) {
-        if let Some(master) = &session.master {
-            master
-                .resize(PtySize {
-                    rows,
-                    cols,
-                    pixel_width: 0,
-                    pixel_height: 0,
-                })
-                .map_err(|e| e.to_string())?;
-        } else {
-            session
-                .writer
-                .write_all(&encode_resize_frame(cols, rows))
-                .map_err(|e| e.to_string())?;
-        }
+        session
+            .master
+            .resize(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -698,7 +656,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, save_text_file, pty_write, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, open_new_window, ssh_read_config_raw, open_config_dir, open_ssh_config, ssh_clear_known_hosts, ssh_save_config, read_wt_settings, read_wt_fragments, find_vs_instances, read_config, write_config, delete_config, serial_list_ports, list_system_fonts])
+        .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, save_text_file, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, open_new_window, ssh_read_config_raw, open_config_dir, open_ssh_config, ssh_clear_known_hosts, ssh_save_config, read_wt_settings, read_wt_fragments, find_vs_instances, read_config, write_config, delete_config, serial_list_ports, list_system_fonts])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -784,34 +742,6 @@ mod tests {
     #[test]
     fn expand_env_no_percent_passthrough() {
         assert_eq!(expand_env_str("plain text"), "plain text");
-    }
-
-    // -- encode_pipe_frame / encode_resize_frame --
-
-    #[test]
-    fn pipe_frame_layout() {
-        let frame = encode_pipe_frame(b"hello");
-        assert_eq!(frame[0], 0x00);
-        assert_eq!(&frame[1..5], &5u32.to_le_bytes());
-        assert_eq!(&frame[5..], b"hello");
-        assert_eq!(frame.len(), 10);
-    }
-
-    #[test]
-    fn pipe_frame_empty_payload() {
-        let frame = encode_pipe_frame(b"");
-        assert_eq!(frame, vec![0x00, 0, 0, 0, 0]);
-    }
-
-    #[test]
-    fn resize_frame_layout() {
-        // cols=300 (0x012C), rows=20 (0x0014)
-        assert_eq!(encode_resize_frame(300, 20), [0x01, 0x2C, 0x01, 0x14, 0x00]);
-    }
-
-    #[test]
-    fn resize_frame_small_values() {
-        assert_eq!(encode_resize_frame(80, 24), [0x01, 80, 0, 24, 0]);
     }
 
     // -- strip_font_suffix --

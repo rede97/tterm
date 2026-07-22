@@ -37,8 +37,8 @@ A multi-tab desktop terminal emulator (TTerm) built with Tauri v2. The frontend 
   - `refreshBadges()` — queries `.tab[data-tab-id^="tab-"]` (skips `#settings`); sets `tab.index` per tab
   - `closeTab(id)` — kills PTY, destroys terminal, switches to neighbor (skipping settings tab), refreshes badges
 
-- **`src/state.ts`** — `appState` as alias for `tabManager`. Do NOT add new state here.
-- **`src/terminal.ts`** — ORPHANED (no imports). Old `createTerminal`/`applyFit`/`showSizeHint`; kept for reference.
+- **`src/state.ts`** — DELETED (was an unused `appState` alias). Do not reintroduce; use `tabManager` directly.
+- **`src/terminal.ts`** — DELETED (orphaned old helpers).
 - **`src/tabs.ts`** — DELETED. Migrated to `tab.ts` + `tabmanager.ts`.
 
 ### Circular dependencies: DO NOT introduce
@@ -83,7 +83,6 @@ Frontend → Backend: Tauri `invoke()` commands:
 |---|---|---|
 | `pty_spawn` | `command?` | create tab, return `{ id, port }` (WebSocket port). No command = default shell |
 | `pty_spawn_ssh` | `hostname`, `port`, `user` | create SSH tab, return `{ id, port }` |
-| `pty_write` | `id`, `data` | write keystrokes to tab's PTY |
 | `pty_resize` | `id`, `cols`, `rows` | notify PTY of terminal resize |
 | `pty_kill` | `id` | kill tab's shell, remove session |
 | `window_minimize` | — | minimize the window |
