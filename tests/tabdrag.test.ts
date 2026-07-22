@@ -55,9 +55,9 @@ describe("attachTabDrag", () => {
   }
 
   function drag(el: HTMLElement, fromX: number, toX: number) {
-    el.dispatchEvent(new MouseEvent("mousedown", { button: 0, clientX: fromX, bubbles: true }));
-    document.dispatchEvent(new MouseEvent("mousemove", { clientX: toX, bubbles: true }));
-    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    el.dispatchEvent(new PointerEvent("pointerdown", { button: 0, clientX: fromX, bubbles: true }));
+    el.dispatchEvent(new PointerEvent("pointermove", { clientX: toX, bubbles: true }));
+    el.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
   }
 
   it("does nothing below the drag threshold (click passes through)", () => {
@@ -97,18 +97,40 @@ describe("attachTabDrag", () => {
     attachTabDrag(tabs[0], () => siblings(tabs[0]), () => null, { onReorder: vi.fn(), onDrop });
 
     // right button
-    tabs[0].dispatchEvent(new MouseEvent("mousedown", { button: 2, clientX: 0, bubbles: true }));
-    document.dispatchEvent(new MouseEvent("mousemove", { clientX: 200, bubbles: true }));
-    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    tabs[0].dispatchEvent(new PointerEvent("pointerdown", { button: 2, clientX: 0, bubbles: true }));
+    tabs[0].dispatchEvent(new PointerEvent("pointermove", { clientX: 200, bubbles: true }));
+    tabs[0].dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
 
     // close button as target
     const close = document.createElement("button");
     close.className = "tab-close";
     tabs[0].appendChild(close);
-    close.dispatchEvent(new MouseEvent("mousedown", { button: 0, clientX: 0, bubbles: true }));
-    document.dispatchEvent(new MouseEvent("mousemove", { clientX: 200, bubbles: true }));
-    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    close.dispatchEvent(new PointerEvent("pointerdown", { button: 0, clientX: 0, bubbles: true }));
+    tabs[0].dispatchEvent(new PointerEvent("pointermove", { clientX: 200, bubbles: true }));
+    tabs[0].dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
 
     expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it("pointercancel settles the drag without leaving a stale transform", () => {
+    const onDrop = vi.fn();
+    mockRect(tabs[0], 0); mockRect(tabs[1], 100); mockRect(tabs[2], 200);
+    attachTabDrag(
+      tabs[0],
+      () => siblings(tabs[0]),
+      () => null,
+      { onReorder: (before) => container.insertBefore(tabs[0], before), onDrop },
+    );
+
+    tabs[0].dispatchEvent(new PointerEvent("pointerdown", { button: 0, clientX: 50, bubbles: true }));
+    mockRect(tabs[0], 160);
+    tabs[0].dispatchEvent(new PointerEvent("pointermove", { clientX: 260, bubbles: true }));
+    expect(tabs[0].classList.contains("dragging")).toBe(true);
+
+    // capture lost mid-drag (e.g. mouse released outside the window)
+    tabs[0].dispatchEvent(new PointerEvent("pointercancel", { bubbles: true }));
+    expect(onDrop).toHaveBeenCalledTimes(1);
+    expect(tabs[0].style.transform).toBe("");
+    expect(tabs[0].classList.contains("dragging")).toBe(false);
   });
 });

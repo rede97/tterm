@@ -7,6 +7,7 @@ import { TabType } from "./types";
 import { hysteresis } from "./hysteresis";
 import { parseOsc9Progress, applyProgressToTabElement } from "./osc";
 import { SizeHint } from "./sizehint";
+import { DisconnectOverlay } from "./disconnect";
 import { SshHost, configFontFamily, configFontSize, configRenderer, configScrollback, configThemeName, trimPasteContent } from "./profiles";
 import { findTheme } from "./themes";
 
@@ -31,6 +32,12 @@ export class TerminalTab {
   progressState = 0;
   progress = 0;
   sizeHint!: SizeHint;
+  disconnected = false;
+  // set by TabManager: called when the session socket closes / Enter requests reconnect
+  onSocketClosed?: () => void;
+  onReconnectRequested?: () => void;
+  private disconnectOverlay!: DisconnectOverlay;
+  private attachAddon?: import("@xterm/addon-attach").AttachAddon;
 
   constructor(id: string, type: TabType, label: string, container: HTMLElement) {
     this.id = id;
@@ -41,7 +48,17 @@ export class TerminalTab {
     this.element.className = "terminal-instance";
     this.element.style.display = "none";
     container.appendChild(this.element);
-    this.sizeHint = new SizeHint(this.element);
+    this.sizeHint = new SizeHint(this.element, 1200, configFontFamily);
+    this.disconnectOverlay = new DisconnectOverlay(this.element);
+
+    // Enter on a disconnected session triggers reconnect (capture, before xterm)
+    this.element.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (this.disconnected && e.key === "Enter") {
+        e.preventDefault();
+        e.stopPropagation();
+        this.onReconnectRequested?.();
+      }
+    }, true);
 
     this.terminal = new Terminal({
       allowProposedApi: true,
@@ -107,6 +124,25 @@ export class TerminalTab {
 
     // Freeze IME textarea position during composition to prevent candidate window drift.
     this._patchImeFreeze();
+  }
+
+  // Attach (or re-attach) the session WebSocket. Disposes any previous addon.
+  attachSocket(port: number): void {
+    this.attachAddon?.dispose();
+    this.attachAddon = undefined;
+    import("@xterm/addon-attach").then(({ AttachAddon }) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}`);
+      socket.addEventListener("close", () => this.onSocketClosed?.());
+      this.attachAddon = new AttachAddon(socket);
+      this.terminal.loadAddon(this.attachAddon);
+    });
+  }
+
+  setDisconnected(v: boolean): void {
+    this.disconnected = v;
+    if (v) this.disconnectOverlay.show();
+    else this.disconnectOverlay.hide();
+    this.tabElement?.classList.toggle("disconnected", v);
   }
 
   // OSC 9;4 progress: update stored state and the tab progress bar.
@@ -262,6 +298,7 @@ export class TerminalTab {
 
   destroy(): void {
     this.sizeHint.destroy();
+    this.disconnectOverlay.destroy();
     this.element.remove();
     this.tabElement.remove();
     this.terminal.dispose();

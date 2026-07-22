@@ -1,6 +1,7 @@
 import { tabManager } from "./tabmanager";
 import { openFind } from "./search";
 import { trimPasteContent } from "./profiles";
+import { showToast } from "./toast";
 import { invoke } from "@tauri-apps/api/core";
 
 const TAB_COLORS = [
@@ -184,7 +185,7 @@ function dispatch(action: string) {
       tabManager.createLocalTab();
       break;
     case "new-window":
-      invoke("open_new_window").catch(console.error);
+      invoke("open_new_window").catch((e) => showToast(`Failed to open new window: ${e}`, "error"));
       break;
     case "reset-color": {
       const t = tabManager.get(tabId);

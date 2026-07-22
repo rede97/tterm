@@ -12,7 +12,7 @@ mod window;
 mod wt;
 
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
 use state::AppState;
@@ -27,7 +27,7 @@ pub fn run() {
             let _pty_sys = portable_pty::native_pty_system();
 
             app.manage(AppState {
-                sessions: Mutex::new(HashMap::new()),
+                sessions: Arc::new(Mutex::new(HashMap::new())),
                 serial_sessions: Mutex::new(HashMap::new()),
                 next_id: Mutex::new(1),
                 initial_cwd: pty::launch_working_directory(),
@@ -39,7 +39,7 @@ pub fn run() {
         .invoke_handler({
             #[cfg(debug_assertions)]
             { tauri::generate_handler![
-                pty::pty_spawn, pty::pty_spawn_ssh, pty::pty_resize, pty::pty_kill,
+                pty::pty_spawn, pty::pty_spawn_ssh, pty::pty_resize, pty::pty_kill, pty::session_reconnect,
                 window::window_minimize, window::window_toggle_maximize, window::window_close,
                 window::window_start_drag, window::open_new_window, window::save_text_file,
                 ssh::ssh_read_config_raw, ssh::open_ssh_config, ssh::ssh_clear_known_hosts,
@@ -52,7 +52,7 @@ pub fn run() {
             ] }
             #[cfg(not(debug_assertions))]
             { tauri::generate_handler![
-                pty::pty_spawn, pty::pty_spawn_ssh, pty::pty_resize, pty::pty_kill,
+                pty::pty_spawn, pty::pty_spawn_ssh, pty::pty_resize, pty::pty_kill, pty::session_reconnect,
                 window::window_minimize, window::window_toggle_maximize, window::window_close,
                 window::window_start_drag, window::open_new_window, window::save_text_file,
                 ssh::ssh_read_config_raw, ssh::open_ssh_config, ssh::ssh_clear_known_hosts,

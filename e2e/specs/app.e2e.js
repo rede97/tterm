@@ -64,6 +64,35 @@ describe("TTerm application", () => {
     }, { timeout: 10000, timeoutMsg: "no .tab-progress appeared on demo tab" });
   });
 
+  it("shows disconnect overlay on session exit and reconnects with Enter", async () => {
+    // Use the first (local shell) tab: type exit to kill the shell
+    const firstTab = await $("#tabs .tab");
+    await firstTab.click();
+    await browser.pause(500);
+    // click the terminal viewport to guarantee xterm's textarea has focus
+    const viewport = await $(".terminal-instance .xterm");
+    await viewport.click();
+    await browser.pause(300);
+    await browser.keys(["e", "x", "i", "t", "Enter"]);
+
+    // shell exits -> PTY EOF -> WS close -> overlay appears
+    await browser.waitUntil(async () => {
+      return await browser.execute(() => {
+        const ov = document.querySelector(".disconnect-overlay");
+        return ov && ov.style.display !== "none";
+      });
+    }, { timeout: 10000, timeoutMsg: "disconnect overlay did not appear" });
+
+    // Enter triggers session_reconnect -> overlay disappears
+    await browser.keys("Enter");
+    await browser.waitUntil(async () => {
+      return await browser.execute(() => {
+        const ovs = [...document.querySelectorAll(".disconnect-overlay")];
+        return ovs.every(o => o.style.display === "none");
+      });
+    }, { timeout: 10000, timeoutMsg: "overlay did not disappear after Enter" });
+  });
+
   it("shows the terminal viewport inside the active tab", async () => {
     // The `active` class lives on the tab-bar element (.tab.active), not on
     // .terminal-instance — the visible instance is the one without display:none.

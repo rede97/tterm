@@ -315,17 +315,55 @@ body {
   background: #333333;
 }
 
-/* terminal size hint overlay (cols × rows on resize) */
+/* disconnect overlay */
+.disconnect-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 15;
+}
+
+.disconnect-box {
+  text-align: center;
+  padding: 16px 28px;
+  background: #252526;
+  border: 1px solid #be1100;
+  border-radius: 8px;
+}
+
+.disconnect-title {
+  color: #f14c4c;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.disconnect-hint {
+  color: #aaaaaa;
+  font-size: 12px;
+}
+
+/* dimmed tab label while disconnected */
+.tab.disconnected .tab-label {
+  color: #f14c4c;
+  text-decoration: line-through;
+}
+
+/* terminal size hint overlay (cols × rows on resize), centered */
 .size-hint {
   position: absolute;
-  top: 8px;
-  right: 14px;
-  padding: 2px 10px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 4px 14px;
   background: rgba(0, 0, 0, 0.65);
   color: #ffffff;
-  font-size: 12px;
+  font-size: 14px;
   font-family: monospace;
-  border-radius: 3px;
+  border-radius: 4px;
   opacity: 0;
   transition: opacity 0.15s ease;
   pointer-events: none;

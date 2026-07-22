@@ -6,7 +6,7 @@ use tauri::Manager;
 
 use crate::cmdparse::parse_command;
 use crate::relay::start_ws_relay;
-use crate::state::{AppState, PtySession, WsConnectResult};
+use crate::state::{AppState, PtySession, SpawnSpec, WsConnectResult};
 
 pub(crate) fn get_shell() -> String {
     #[cfg(target_os = "windows")]
@@ -18,7 +18,11 @@ pub(crate) fn get_shell() -> String {
         std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".into())
     }
 }
-pub(crate) fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder) -> Result<u16, String> {
+// Monotonic per-spawn token: lets the child-exit watcher avoid removing a
+// NEWER session that reused the same tab id (reconnect race).
+static SESSION_NONCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+pub(crate) fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder, spec: SpawnSpec) -> Result<u16, String> {
     let pty_sys = native_pty_system();
     let pty_pair = pty_sys
         .openpty(PtySize {
@@ -29,7 +33,7 @@ pub(crate) fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBu
         })
         .map_err(|e| e.to_string())?;
 
-    let _child = pty_pair
+    let mut child = pty_pair
         .slave
         .spawn_command(cmd)
         .map_err(|e| e.to_string())?;
@@ -43,11 +47,32 @@ pub(crate) fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBu
     let port = start_ws_relay(reader, writer, None)?;
 
     // Store session (master for resize)
+    let nonce = SESSION_NONCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let sessions = app_handle.state::<AppState>();
     sessions.sessions.lock().map_err(|e| e.to_string())?.insert(
-        id,
-        PtySession { master },
+        id.clone(),
+        PtySession { master: Some(master), spec, nonce },
     );
+
+    // Watchdog: when the child exits, drop the master from the session table.
+    // ConPTY does NOT signal EOF on the output pipe when the child dies, so
+    // the relay's read loop would block forever otherwise. Dropping the master
+    // closes the PseudoConsole, the read fails, and the relay closes the WS —
+    // which is how the frontend learns the session died.
+    let sessions_arc = sessions.sessions.clone();
+    std::thread::spawn(move || {
+        let _ = child.wait();
+        if let Ok(mut m) = sessions_arc.lock() {
+            // Only touch OUR spawn (not a reconnect replacement).
+            // Drop the master (closes ConPTY, unblocks the relay read loop)
+            // but keep the spec for reconnection.
+            if m.get(&id).map_or(false, |s| s.nonce == nonce) {
+                if let Some(s) = m.get_mut(&id) {
+                    s.master = None;
+                }
+            }
+        }
+    });
 
     Ok(port)
 }
@@ -62,6 +87,24 @@ pub(crate) fn apply_initial_cwd(cmd: &mut CommandBuilder, cwd: Option<&PathBuf>)
     }
 }
 
+// Build a CommandBuilder for a local session: explicit command (with args),
+// or the default shell when command is None/empty.
+pub(crate) fn command_builder(command: Option<&str>, initial_cwd: Option<&PathBuf>) -> CommandBuilder {
+    let mut builder = match command {
+        Some(cmd) if !cmd.is_empty() => {
+            let (exe, args) = parse_command(cmd);
+            let mut b = CommandBuilder::new(&exe);
+            for a in &args {
+                b.arg(a);
+            }
+            b
+        }
+        _ => CommandBuilder::new(get_shell()),
+    };
+    apply_initial_cwd(&mut builder, initial_cwd);
+    builder
+}
+
 #[tauri::command]
 pub fn pty_spawn(state: tauri::State<AppState>, app: tauri::AppHandle, command: Option<String>) -> Result<WsConnectResult, String> {
     let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
@@ -69,31 +112,9 @@ pub fn pty_spawn(state: tauri::State<AppState>, app: tauri::AppHandle, command: 
     *next += 1;
     drop(next);
 
-    let port = if let Some(cmd) = command {
-        if !cmd.is_empty() {
-            let (exe, args) = parse_command(&cmd);
-            if args.is_empty() {
-                let mut builder = CommandBuilder::new(&exe);
-                apply_initial_cwd(&mut builder, state.initial_cwd.as_ref());
-                spawn_pty(app.clone(), id.clone(), builder)?
-            } else {
-                let mut builder = CommandBuilder::new(&exe);
-                for a in &args { builder.arg(a); }
-                apply_initial_cwd(&mut builder, state.initial_cwd.as_ref());
-                spawn_pty(app.clone(), id.clone(), builder)?
-            }
-        } else {
-            let shell = get_shell();
-            let mut builder = CommandBuilder::new(&shell);
-            apply_initial_cwd(&mut builder, state.initial_cwd.as_ref());
-            spawn_pty(app.clone(), id.clone(), builder)?
-        }
-    } else {
-        let shell = get_shell();
-        let mut builder = CommandBuilder::new(&shell);
-        apply_initial_cwd(&mut builder, state.initial_cwd.as_ref());
-        spawn_pty(app.clone(), id.clone(), builder)?
-    };
+    let spec = SpawnSpec::Pty { command: command.clone() };
+    let builder = command_builder(command.as_deref(), state.initial_cwd.as_ref());
+    let port = spawn_pty(app.clone(), id.clone(), builder, spec)?;
 
     Ok(WsConnectResult { id, port })
 }
@@ -124,7 +145,8 @@ pub fn pty_spawn_ssh(state: tauri::State<AppState>, app: tauri::AppHandle, hostn
     cmd.arg("-p");
     cmd.arg(&port_str);
 
-    let ws_port = spawn_pty(app, id.clone(), cmd)?;
+    let spec = SpawnSpec::Ssh { hostname, port, user };
+    let ws_port = spawn_pty(app, id.clone(), cmd, spec)?;
     Ok(WsConnectResult { id, port: ws_port })
 }
 
@@ -132,17 +154,74 @@ pub fn pty_spawn_ssh(state: tauri::State<AppState>, app: tauri::AppHandle, hostn
 pub fn pty_resize(state: tauri::State<AppState>, id: &str, cols: u16, rows: u16) -> Result<(), String> {
     let mut sessions = state.sessions.lock().map_err(|e| e.to_string())?;
     if let Some(session) = sessions.get_mut(id) {
-        session
-            .master
-            .resize(PtySize {
-                rows,
-                cols,
-                pixel_width: 0,
-                pixel_height: 0,
-            })
-            .map_err(|e| e.to_string())?;
+        if let Some(master) = &session.master {
+            master
+                .resize(PtySize {
+                    rows,
+                    cols,
+                    pixel_width: 0,
+                    pixel_height: 0,
+                })
+                .map_err(|e| e.to_string())?;
+        }
+        // master None (child exited): resize is a no-op until reconnect
     }
     Ok(())
+}
+
+// Kill a session's resources (PTY master or serial pump) without touching specs.
+fn kill_session_resources(state: &AppState, id: &str) -> Result<(), String> {
+    {
+        let mut sessions = state.sessions.lock().map_err(|e| e.to_string())?;
+        sessions.remove(id);
+    }
+    let mut serial = state.serial_sessions.lock().map_err(|e| e.to_string())?;
+    if let Some(session) = serial.remove(id) {
+        session.cancel.store(true, Ordering::Relaxed);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn session_reconnect(state: tauri::State<AppState>, app: tauri::AppHandle, id: &str) -> Result<WsConnectResult, String> {
+    // 1. Look up the spawn spec in either session table
+    let spec = {
+        let sessions = state.sessions.lock().map_err(|e| e.to_string())?;
+        sessions.get(id).map(|s| s.spec.clone())
+    };
+    let spec = match spec {
+        Some(s) => Some(s),
+        None => {
+            let serial = state.serial_sessions.lock().map_err(|e| e.to_string())?;
+            serial.get(id).and_then(|s| s.spec.clone())
+        }
+    };
+    let spec = spec.ok_or_else(|| format!("Session is not reconnectable: {}", id))?;
+
+    // 2. Tear down the old session
+    kill_session_resources(&state, id)?;
+
+    // 3. Respawn with the same id
+    let port = match spec {
+        SpawnSpec::Pty { command } => {
+            let builder = command_builder(command.as_deref(), state.initial_cwd.as_ref());
+            spawn_pty(app, id.to_string(), builder, SpawnSpec::Pty { command })?
+        }
+        SpawnSpec::Ssh { hostname, port, user } => {
+            let mut cmd = CommandBuilder::new("ssh");
+            cmd.arg(format!("{}@{}", user, hostname));
+            cmd.arg("-p");
+            cmd.arg(port.to_string());
+            spawn_pty(app, id.to_string(), cmd, SpawnSpec::Ssh { hostname, port, user })?
+        }
+        SpawnSpec::Serial { port_name, baud_rate, data_bits, parity, stop_bits, flow_control } => {
+            crate::serial::spawn_serial_session(
+                &state, id.to_string(), &port_name, baud_rate, data_bits, &parity, stop_bits, &flow_control,
+            )?
+        }
+    };
+
+    Ok(WsConnectResult { id: id.to_string(), port })
 }
 
 #[tauri::command]

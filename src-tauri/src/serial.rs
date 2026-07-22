@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crate::relay::start_ws_relay;
-use crate::state::{AppState, SerialCtl, SerialSession, WsConnectResult};
+use crate::state::{AppState, SerialCtl, SerialSession, SpawnSpec, WsConnectResult};
 
 #[derive(Clone, Serialize)]
 pub struct SerialPortInfo {
@@ -194,17 +194,19 @@ pub(crate) fn serial_io_loop(
     }
 }
 
-#[tauri::command]
-pub fn serial_spawn(
-    state: tauri::State<AppState>,
-    port_name: String,
+// Open a serial port and start the I/O pump + WS relay for session `id`.
+// Shared by serial_spawn (new tab) and session_reconnect (same id).
+pub(crate) fn spawn_serial_session(
+    state: &AppState,
+    id: String,
+    port_name: &str,
     baud_rate: u32,
     data_bits: u8,
-    parity: String,
+    parity: &str,
     stop_bits: u8,
-    flow_control: String,
-) -> Result<WsConnectResult, String> {
-    let port = open_serial(&port_name, baud_rate, data_bits, &parity, stop_bits, &flow_control)?;
+    flow_control: &str,
+) -> Result<u16, String> {
+    let port = open_serial(port_name, baud_rate, data_bits, parity, stop_bits, flow_control)?;
 
     let cancel = Arc::new(AtomicBool::new(false));
     let (out_tx, out_rx) = std::sync::mpsc::channel::<Vec<u8>>();
@@ -219,18 +221,43 @@ pub fn serial_spawn(
     let writer = SerialIoWriter { tx: in_tx };
     let ws_port = start_ws_relay(reader, writer, Some(cancel.clone()))?;
 
+    let spec = SpawnSpec::Serial {
+        port_name: port_name.to_string(),
+        baud_rate,
+        data_bits,
+        parity: parity.to_string(),
+        stop_bits,
+        flow_control: flow_control.to_string(),
+    };
+    state
+        .serial_sessions
+        .lock()
+        .map_err(|e| e.to_string())?
+        .insert(id, SerialSession { cancel, ctl: ctl_tx, spec: Some(spec) });
+
+    Ok(ws_port)
+}
+
+#[tauri::command]
+pub fn serial_spawn(
+    state: tauri::State<AppState>,
+    port_name: String,
+    baud_rate: u32,
+    data_bits: u8,
+    parity: String,
+    stop_bits: u8,
+    flow_control: String,
+) -> Result<WsConnectResult, String> {
     let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
     let id = format!("tab-{}", *next);
     *next += 1;
     drop(next);
 
-    state
-        .serial_sessions
-        .lock()
-        .map_err(|e| e.to_string())?
-        .insert(id.clone(), SerialSession { cancel, ctl: ctl_tx });
+    let port = spawn_serial_session(
+        &state, id.clone(), &port_name, baud_rate, data_bits, &parity, stop_bits, &flow_control,
+    )?;
 
-    Ok(WsConnectResult { id, port: ws_port })
+    Ok(WsConnectResult { id, port })
 }
 
 #[tauri::command]

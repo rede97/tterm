@@ -1,6 +1,11 @@
 // Mouse-based tab drag reordering.
 // HTML5 drag-and-drop is unreliable in WebView2 (same reason the font picker
-// avoids it), so reordering is implemented with mousedown/mousemove/mouseup.
+// avoids it), so reordering is implemented with pointer events.
+//
+// Pointer capture is essential: without it, releasing the mouse outside the
+// window loses the mouseup event, leaving a stale translateX transform that
+// paints the tab outside its container clip — the tab "disappears" visually
+// while remaining fully functional in the DOM.
 
 export interface TabRect {
   left: number;
@@ -37,23 +42,48 @@ export function attachTabDrag(
   getEndRef: () => HTMLElement | null,
   cb: DragCallbacks,
 ): void {
-  el.addEventListener("mousedown", (e: MouseEvent) => {
+  el.addEventListener("pointerdown", (e: PointerEvent) => {
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest(".tab-close")) return;
     // Prevent the window-drag handler on #tab-bar from starting a window move
     e.stopPropagation();
 
     const startX = e.clientX;
+    const elWidth = el.getBoundingClientRect().width;
     let dragging = false;
 
-    const onMove = (ev: MouseEvent) => {
+    const finish = () => {
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerup", onUp);
+      el.removeEventListener("pointercancel", onCancel);
+      if (el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId);
+      if (!dragging) return;
+      el.classList.remove("dragging");
+      el.style.transform = "";
+      cb.onDrop();
+    };
+    const onUp = () => finish();
+    // pointercancel: capture lost (OS gesture, window switch) — settle at the
+    // current DOM position instead of leaving a stale transform
+    const onCancel = () => finish();
+
+    const onMove = (ev: PointerEvent) => {
       const dx = ev.clientX - startX;
       if (!dragging) {
         if (Math.abs(dx) < DRAG_THRESHOLD_PX) return;
         dragging = true;
         el.classList.add("dragging");
       }
-      el.style.transform = `translateX(${dx}px)`;
+      // Clamp so the tab always stays at least partially inside the container
+      const parentRect = el.parentElement?.getBoundingClientRect();
+      const elLeft = el.getBoundingClientRect().left;
+      let clamped = dx;
+      if (parentRect) {
+        const minDx = parentRect.left - elLeft - elWidth * 0.5;
+        const maxDx = parentRect.right - elLeft - elWidth * 0.5;
+        clamped = Math.max(minDx, Math.min(maxDx, dx));
+      }
+      el.style.transform = `translateX(${clamped}px)`;
 
       const center = el.getBoundingClientRect().left + el.getBoundingClientRect().width / 2;
       const siblings = getSiblings();
@@ -69,16 +99,11 @@ export function attachTabDrag(
       cb.onReorder(before);
     };
 
-    const onUp = () => {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-      if (!dragging) return;
-      el.classList.remove("dragging");
-      el.style.transform = "";
-      cb.onDrop();
-    };
-
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
+    // Capture the pointer: all subsequent events retarget to this element,
+    // even when the cursor leaves the window.
+    el.setPointerCapture?.(e.pointerId);
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", onUp);
+    el.addEventListener("pointercancel", onCancel);
   });
 }

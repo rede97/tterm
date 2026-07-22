@@ -151,7 +151,7 @@ pub fn demo_spawn(state: tauri::State<AppState>) -> Result<WsConnectResult, Stri
         .serial_sessions
         .lock()
         .map_err(|e| e.to_string())?
-        .insert(id.clone(), SerialSession { cancel, ctl: std::sync::mpsc::channel::<crate::state::SerialCtl>().0 });
+        .insert(id.clone(), SerialSession { cancel, ctl: std::sync::mpsc::channel::<crate::state::SerialCtl>().0, spec: None });
 
     Ok(WsConnectResult { id, port: ws_port })
 }

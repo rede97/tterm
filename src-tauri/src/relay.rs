@@ -39,6 +39,11 @@ where
 
         // Task 1: stream read (blocking) → channel
         let tx1 = tx.clone();
+        // Drop the original sender: Task 1 must be the sole sender, so that
+        // when the stream hits EOF (shell exit, serial unplug) the channel
+        // closes, Task 2 ends, and the WebSocket closes — this is how the
+        // frontend detects a disconnected session.
+        drop(tx);
         rt.spawn(async move {
             let _ = tokio::task::spawn_blocking(move || {
                 let mut buf = [0u8; 16384];
@@ -66,6 +71,10 @@ where
             while let Some(data) = rx.recv().await {
                 if ws_sink.send(WsMessage::Binary(data)).await.is_err() { break; }
             }
+            // Stream ended (shell exit / serial unplug): send a proper Close
+            // frame so the frontend socket fires 'close' — merely dropping
+            // the sink half would leave the TCP connection open silently.
+            let _ = ws_sink.close().await;
         });
 
         // Task 3: WS stream → stream write

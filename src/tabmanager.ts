@@ -107,17 +107,47 @@ export class TabManager {
     const tabEl = this._createTabElement(tab);
     this.tabsContainer.appendChild(tabEl);
 
-    import("@xterm/addon-attach").then(({ AttachAddon }) => {
-      const socket = new WebSocket(`ws://127.0.0.1:${port}`);
-      const attachAddon = new AttachAddon(socket);
-      tab.terminal.loadAddon(attachAddon);
-    });
+    tab.onSocketClosed = () => this._onSessionClosed(tab.id);
+    tab.onReconnectRequested = () => this.reconnectTab(tab.id);
+    tab.attachSocket(port);
 
     this.tabs.set(tab.id, tab);
   }
 
-  async createLocalTab(command?: string, label?: string): Promise<TerminalTab> {
-    const result: { id: string; port: number } = await invoke("pty_spawn", command ? { command } : {});
+  // Session socket closed => PTY exited / serial pump died: show the overlay.
+  private _onSessionClosed(tabId: string): void {
+    const tab = this.tabs.get(tabId);
+    if (!tab || tab.disconnected || this._reconnecting.has(tabId)) return;
+    tab.setDisconnected(true);
+  }
+
+  private _reconnecting = new Set<string>();
+
+  // Respawn the session backend-side (same id) and re-attach the socket.
+  async reconnectTab(tabId: string): Promise<void> {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return;
+    this._reconnecting.add(tabId);
+    try {
+      const result: { id: string; port: number } = await invoke("session_reconnect", { id: tabId });
+      tab.setDisconnected(false);
+      tab.attachSocket(result.port);
+      tab.terminal.focus();
+    } catch (e) {
+      showToast(`Reconnect failed: ${e}`, "error");
+    } finally {
+      this._reconnecting.delete(tabId);
+    }
+  }
+
+  async createLocalTab(command?: string, label?: string): Promise<TerminalTab | null> {
+    let result: { id: string; port: number };
+    try {
+      result = await invoke("pty_spawn", command ? { command } : {});
+    } catch (e) {
+      showToast(`Failed to start shell: ${e}`, "error");
+      return null;
+    }
     const tab = new TerminalTab(result.id, "local", label || "Terminal", this.terminalContainer);
     if (command) { tab.command = command; }
     this._register(tab, result.port);
@@ -132,12 +162,18 @@ export class TabManager {
     return tab;
   }
 
-  async createSshTab(host: SshHost): Promise<TerminalTab> {
-    const result: { id: string; port: number } = await invoke("pty_spawn_ssh", {
-      hostname: hostProp(host, "hostname") || host.name,
-      port: parseInt(hostProp(host, "port") || "22", 10),
-      user: hostProp(host, "user") || "root",
-    });
+  async createSshTab(host: SshHost): Promise<TerminalTab | null> {
+    let result: { id: string; port: number };
+    try {
+      result = await invoke("pty_spawn_ssh", {
+        hostname: hostProp(host, "hostname") || host.name,
+        port: parseInt(hostProp(host, "port") || "22", 10),
+        user: hostProp(host, "user") || "root",
+      });
+    } catch (e) {
+      showToast(`Failed to start SSH session: ${e}`, "error");
+      return null;
+    }
     const tab = new TerminalTab(result.id, "ssh", host.name, this.terminalContainer);
     tab.sshHost = host;
     this._register(tab, result.port);
@@ -193,8 +229,14 @@ export class TabManager {
     tab.rename(`${tab.serialPortName} · ${baud}`);
   }
 
-  async createDemoTab(): Promise<TerminalTab> {
-    const result: { id: string; port: number } = await invoke("demo_spawn");
+  async createDemoTab(): Promise<TerminalTab | null> {
+    let result: { id: string; port: number };
+    try {
+      result = await invoke("demo_spawn");
+    } catch (e) {
+      showToast(String(e), "error");
+      return null;
+    }
     const tab = new TerminalTab(result.id, "local", "Demo TTY", this.terminalContainer);
     this._register(tab, result.port);
 

@@ -97,6 +97,11 @@ function applyTabWidthMode(): void {
 
 // -- init feature modules --
 
+// Debug/E2E introspection hook (dev builds only)
+if (import.meta.env.DEV) {
+  (window as any).__tterm = { tabs: tabManager.tabs };
+}
+
 tabManager.initNewTabButton();
 initSearchBar();
 initProfileMenu();
