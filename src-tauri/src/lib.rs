@@ -135,7 +135,7 @@ fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder) -> R
 
     // Store session (master for resize)
     let sessions = app_handle.state::<AppState>();
-    sessions.sessions.lock().unwrap().insert(
+    sessions.sessions.lock().map_err(|e| e.to_string())?.insert(
         id,
         PtySession { master: Some(master), writer: Box::new(std::io::sink()) },
     );
@@ -188,7 +188,10 @@ fn pty_spawn(state: tauri::State<AppState>, app: tauri::AppHandle, command: Opti
 }
 
 fn launch_working_directory() -> Option<PathBuf> {
-    let mut args = std::env::args_os().skip(1);
+    parse_working_dir(std::env::args_os().skip(1))
+}
+
+fn parse_working_dir<I: Iterator<Item = std::ffi::OsString>>(mut args: I) -> Option<PathBuf> {
     while let Some(arg) = args.next() {
         if arg == "--working-directory" {
             return args.next().map(PathBuf::from).filter(|path| path.is_dir());
@@ -431,21 +434,36 @@ fn pty_spawn_ssh(state: tauri::State<AppState>, app: tauri::AppHandle, hostname:
     Ok(WsConnectResult { id, port: ws_port })
 }
 
+// Encode a framed message for pipe-based sessions (e.g. serial).
+// Layout: [msg_type, len_lo, len, len, len_hi, ...data]
+fn encode_pipe_frame(data: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(5 + data.len());
+    out.push(0x00u8);
+    out.extend_from_slice(&(data.len() as u32).to_le_bytes());
+    out.extend_from_slice(data);
+    out
+}
+
+// Encode a resize message for pipe-based sessions.
+// Layout: [0x01, cols_lo, cols_hi, rows_lo, rows_hi]
+fn encode_resize_frame(cols: u16, rows: u16) -> [u8; 5] {
+    [0x01u8, cols as u8, (cols >> 8) as u8, rows as u8, (rows >> 8) as u8]
+}
+
 #[tauri::command]
 fn pty_write(state: tauri::State<AppState>, id: &str, data: &str) -> Result<(), String> {
     let mut sessions = state.sessions.lock().map_err(|e| e.to_string())?;
     if let Some(session) = sessions.get_mut(id) {
         if session.master.is_none() {
             // pipe session: prepend framing (type 0x00 + 4-byte LE length)
-            let msg_type = [0x00u8];
-            let len = (data.len() as u32).to_le_bytes();
-            session.writer.write_all(&msg_type).map_err(|e| e.to_string())?;
-            session.writer.write_all(&len).map_err(|e| e.to_string())?;
+            let frame = encode_pipe_frame(data.as_bytes());
+            session.writer.write_all(&frame).map_err(|e| e.to_string())?;
+        } else {
+            session
+                .writer
+                .write_all(data.as_bytes())
+                .map_err(|e| e.to_string())?;
         }
-        session
-            .writer
-            .write_all(data.as_bytes())
-            .map_err(|e| e.to_string())?;
         session.writer.flush().map_err(|e| e.to_string())?;
     }
     Ok(())
@@ -465,8 +483,10 @@ fn pty_resize(state: tauri::State<AppState>, id: &str, cols: u16, rows: u16) -> 
                 })
                 .map_err(|e| e.to_string())?;
         } else {
-            let msg = [0x01u8, cols as u8, (cols >> 8) as u8, rows as u8, (rows >> 8) as u8];
-            session.writer.write_all(&msg).map_err(|e| e.to_string())?;
+            session
+                .writer
+                .write_all(&encode_resize_frame(cols, rows))
+                .map_err(|e| e.to_string())?;
         }
     }
     Ok(())
@@ -631,6 +651,17 @@ fn serial_list_ports() -> Vec<SerialPortInfo> {
 
 // -- System font enumeration ---
 
+// Strip the registry font-name suffix, returning the family name.
+// Returns None if the name has no known suffix.
+fn strip_font_suffix(name: &str) -> Option<String> {
+    for suffix in [" (TrueType)", " (OpenType)"] {
+        if let Some(stripped) = name.strip_suffix(suffix) {
+            return Some(stripped.to_string());
+        }
+    }
+    None
+}
+
 #[tauri::command]
 fn list_system_fonts() -> Vec<String> {
     use winreg::enums::*;
@@ -639,11 +670,8 @@ fn list_system_fonts() -> Vec<String> {
     let mut names: Vec<String> = Vec::new();
     if let Ok(key) = hklm.open_subkey(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts") {
         for v in key.enum_values().filter_map(|r| r.ok()) {
-            let family = v.0;
-            if family.ends_with(" (TrueType)") {
-                names.push(family.replace(" (TrueType)", ""));
-            } else if family.ends_with(" (OpenType)") {
-                names.push(family.replace(" (OpenType)", ""));
+            if let Some(family) = strip_font_suffix(&v.0) {
+                names.push(family);
             }
         }
     }
@@ -673,4 +701,181 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![pty_spawn, pty_spawn_ssh, save_text_file, pty_write, pty_resize, pty_kill, window_minimize, window_toggle_maximize, window_close, window_start_drag, open_new_window, ssh_read_config_raw, open_config_dir, open_ssh_config, ssh_clear_known_hosts, ssh_save_config, read_wt_settings, read_wt_fragments, find_vs_instances, read_config, write_config, delete_config, serial_list_ports, list_system_fonts])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+// ── Unit tests ──────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -- parse_command --
+
+    #[test]
+    fn parse_command_simple() {
+        let (exe, args) = parse_command("cmd.exe /c echo");
+        assert_eq!(exe, "cmd.exe");
+        assert_eq!(args, vec!["/c", "echo"]);
+    }
+
+    #[test]
+    fn parse_command_quoted_path_with_spaces() {
+        let (exe, args) = parse_command("\"C:\\Program Files\\app\\tool.exe\" -k \"arg with spaces\"");
+        assert_eq!(exe, "C:\\Program Files\\app\\tool.exe");
+        assert_eq!(args, vec!["-k", "arg with spaces"]);
+    }
+
+    #[test]
+    fn parse_command_collapses_repeated_spaces() {
+        let (exe, args) = parse_command("powershell.exe   -NoExit   -Command");
+        assert_eq!(exe, "powershell.exe");
+        assert_eq!(args, vec!["-NoExit", "-Command"]);
+    }
+
+    #[test]
+    fn parse_command_no_args() {
+        let (exe, args) = parse_command("wsl.exe");
+        assert_eq!(exe, "wsl.exe");
+        assert!(args.is_empty());
+    }
+
+    #[test]
+    fn parse_command_empty_string_returns_input() {
+        let (exe, args) = parse_command("");
+        assert_eq!(exe, "");
+        assert!(args.is_empty());
+    }
+
+    #[test]
+    fn parse_command_unclosed_quote_consumes_rest() {
+        let (exe, args) = parse_command("app.exe \"dangling quote");
+        assert_eq!(exe, "app.exe");
+        assert_eq!(args, vec!["dangling quote"]);
+    }
+
+    #[test]
+    fn parse_command_expands_env_vars() {
+        std::env::set_var("TTERM_TEST_TOOL", "mytool");
+        let (exe, args) = parse_command("%TTERM_TEST_TOOL% --flag");
+        assert_eq!(exe, "mytool");
+        assert_eq!(args, vec!["--flag"]);
+    }
+
+    // -- expand_env_str --
+
+    #[test]
+    fn expand_env_existing_var() {
+        std::env::set_var("TTERM_TEST_EXPAND", "expanded");
+        assert_eq!(expand_env_str("%TTERM_TEST_EXPAND%"), "expanded");
+    }
+
+    #[test]
+    fn expand_env_missing_var_kept_verbatim() {
+        assert_eq!(expand_env_str("%TTERM_DEFINITELY_MISSING_VAR%"), "%TTERM_DEFINITELY_MISSING_VAR%");
+    }
+
+    #[test]
+    fn expand_env_multiple_vars_and_literal_text() {
+        std::env::set_var("TTERM_TEST_A", "foo");
+        std::env::set_var("TTERM_TEST_B", "bar");
+        assert_eq!(expand_env_str("pre-%TTERM_TEST_A%-mid-%TTERM_TEST_B%-post"), "pre-foo-mid-bar-post");
+    }
+
+    #[test]
+    fn expand_env_no_percent_passthrough() {
+        assert_eq!(expand_env_str("plain text"), "plain text");
+    }
+
+    // -- encode_pipe_frame / encode_resize_frame --
+
+    #[test]
+    fn pipe_frame_layout() {
+        let frame = encode_pipe_frame(b"hello");
+        assert_eq!(frame[0], 0x00);
+        assert_eq!(&frame[1..5], &5u32.to_le_bytes());
+        assert_eq!(&frame[5..], b"hello");
+        assert_eq!(frame.len(), 10);
+    }
+
+    #[test]
+    fn pipe_frame_empty_payload() {
+        let frame = encode_pipe_frame(b"");
+        assert_eq!(frame, vec![0x00, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn resize_frame_layout() {
+        // cols=300 (0x012C), rows=20 (0x0014)
+        assert_eq!(encode_resize_frame(300, 20), [0x01, 0x2C, 0x01, 0x14, 0x00]);
+    }
+
+    #[test]
+    fn resize_frame_small_values() {
+        assert_eq!(encode_resize_frame(80, 24), [0x01, 80, 0, 24, 0]);
+    }
+
+    // -- strip_font_suffix --
+
+    #[test]
+    fn strip_truetype_suffix() {
+        assert_eq!(strip_font_suffix("Consolas (TrueType)"), Some("Consolas".to_string()));
+    }
+
+    #[test]
+    fn strip_opentype_suffix() {
+        assert_eq!(strip_font_suffix("Segoe UI (OpenType)"), Some("Segoe UI".to_string()));
+    }
+
+    #[test]
+    fn strip_unknown_suffix_returns_none() {
+        assert_eq!(strip_font_suffix("Some Font (Raster)"), None);
+        assert_eq!(strip_font_suffix("Some Font"), None);
+    }
+
+    #[test]
+    fn strip_suffix_only_at_end() {
+        // " (TrueType)" in the middle must not be stripped
+        assert_eq!(strip_font_suffix("Weird (TrueType) Font"), None);
+    }
+
+    // -- parse_working_dir --
+
+    #[test]
+    fn working_dir_flag_with_existing_dir() {
+        let tmp = std::env::temp_dir();
+        let args = vec![
+            std::ffi::OsString::from("--working-directory"),
+            tmp.clone().into_os_string(),
+        ];
+        assert_eq!(parse_working_dir(args.into_iter()), Some(tmp));
+    }
+
+    #[test]
+    fn working_dir_flag_absent() {
+        let args = vec![std::ffi::OsString::from("--other-flag")];
+        assert_eq!(parse_working_dir(args.into_iter()), None);
+    }
+
+    #[test]
+    fn working_dir_nonexistent_dir_rejected() {
+        let args = vec![
+            std::ffi::OsString::from("--working-directory"),
+            std::ffi::OsString::from("C:\\definitely\\not\\a\\real\\tterm\\dir"),
+        ];
+        assert_eq!(parse_working_dir(args.into_iter()), None);
+    }
+
+    #[test]
+    fn working_dir_flag_without_value() {
+        let args = vec![std::ffi::OsString::from("--working-directory")];
+        assert_eq!(parse_working_dir(args.into_iter()), None);
+    }
+
+    // -- get_shell (platform smoke) --
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn get_shell_is_cmd_on_windows() {
+        assert_eq!(get_shell(), "cmd.exe");
+    }
 }

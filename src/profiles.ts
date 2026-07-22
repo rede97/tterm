@@ -26,6 +26,15 @@ export interface VsInstallation {
   instance_id?: string | null;
 }
 
+export interface SerialPort {
+  name: string;
+  driver: string;
+  manufacturer: string;
+  product: string;
+  vid: string;
+  pid: string;
+}
+
 export let sshHosts: SshHost[] = [];
 export let localProfiles: LocalProfile[] = [];
 export let vsInstalls: VsInstallation[] = [];
@@ -40,46 +49,19 @@ export let configRenderer = "webgl";
 export let configScrollback = 20000;
 export let configTabWidthMode = "equal";
 export let hiddenSshHosts: string[] = [];
+export let serialPorts: SerialPort[] = [];
 export let configLoaded = false;
 
 // -- SSH hosts (frontend-owned parsing) --
 
-function parseSshConfig(raw: string): SshHost[] {
+export function parseSshConfig(raw: string): SshHost[] {
   const hosts: SshHost[] = [];
   let current: SshHost | null = null;
   const preProps: Record<string, string> = {};
   let wildcardProps: Record<string, string> = {};
 
-  for (const line of raw.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const spaceIdx = trimmed.search(/\s/);
-    if (spaceIdx === -1) continue;
-    const rawKey = trimmed.slice(0, spaceIdx);
-    const key = rawKey.toLowerCase();
-    const value = trimmed.slice(spaceIdx + 1).trim();
-
-    if (key === "host") {
-      if (current) {
-        const names = (current as any).__names || [current.name];
-        for (const n of names) {
-          const h: SshHost = { name: n, ...wildcardProps, ...preProps };
-          for (const [k, v] of Object.entries(current)) {
-            if (k !== "name" && !(k as any).startsWith("__")) h[k] = v;
-          }
-          hosts.push(h);
-        }
-      }
-      const names = value.split(/\s+/);
-      current = { name: names[0], __names: names } as any;
-    } else if (current) {
-      (current as any)[rawKey] = value;
-    } else {
-      preProps[rawKey] = value;
-    }
-  }
-  // flush last host
-  if (current) {
+  const flush = () => {
+    if (!current) return;
     const names = (current as any).__names || [current.name];
     for (const n of names) {
       const h: SshHost = { name: n, ...wildcardProps, ...preProps };
@@ -94,7 +76,29 @@ function parseSshConfig(raw: string): SshHost[] {
         hosts.push(h);
       }
     }
+  };
+
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const spaceIdx = trimmed.search(/\s/);
+    if (spaceIdx === -1) continue;
+    const rawKey = trimmed.slice(0, spaceIdx);
+    const key = rawKey.toLowerCase();
+    const value = trimmed.slice(spaceIdx + 1).trim();
+
+    if (key === "host") {
+      flush();
+      const names = value.split(/\s+/);
+      current = { name: names[0], __names: names } as any;
+    } else if (current) {
+      (current as any)[rawKey] = value;
+    } else {
+      preProps[rawKey] = value;
+    }
   }
+  // flush last host
+  flush();
   for (const h of hosts) { delete (h as any).__names; }
   return hosts;
 }
@@ -193,6 +197,17 @@ export async function loadLocalProfiles() {
     if (fragments && fragments.length > 0) parseWtFragments(fragments);
   } catch (e) {
     console.error("Failed to load WT profiles:", e);
+  }
+}
+
+// -- Serial ports (enumeration via Windows registry/SetupAPI) --
+
+export async function loadSerialPorts() {
+  try {
+    serialPorts = await invoke<SerialPort[]>("serial_list_ports");
+  } catch (e) {
+    console.error("Failed to list serial ports:", e);
+    serialPorts = [];
   }
 }
 

@@ -12,7 +12,7 @@ bun run tauri dev    # full Tauri app in dev mode
 bun run tauri build  # production binary
 ```
 
-No tests or linters are configured.
+Tests: `bun run test` (Vitest unit + happy-dom DOM tests in `tests/`), `bun run test:rust` (Rust unit tests in `lib.rs`), `bun run test:e2e` (tauri-driver + WebdriverIO, see `docs/testing.md`). No linters configured.
 
 **Always run `bun run build` before committing.** Before creating a release tag, ensure the build output has zero warnings (including vite `[plugin vite:reporter]` warnings).
 
@@ -251,7 +251,7 @@ const targets = [[32,'32x32.png'],[128,'128x128.png'],[256,'128x128@2x.png'],[51
 
 ## Platform notes
 
-On Windows, the default shell is `cmd.exe`. On Unix, it's the user's `$SHELL` (fallback `/bin/sh`). Vite dev server binds `127.0.0.1` explicitly (not `::1`) because IPv6 loopback has connectivity issues on Windows. `AppState.initial_cwd` is populated from the `--working-directory` CLI argument (passed by Windows Terminal integration). VS instances are discovered via `vswhere.exe` with a fallback to scanning common `Program Files` paths.
+On Windows, the default shell is `cmd.exe`. On Unix, it's the user's `$SHELL` (fallback `/bin/sh`). Vite dev server binds `127.0.0.1` explicitly (not `::1`) because IPv6 loopback has connectivity issues on Windows; `devUrl` in tauri.conf.json likewise uses `127.0.0.1` (never `localhost`). `AppState.initial_cwd` is populated from the `--working-directory` CLI argument (passed by Windows Terminal integration). VS instances are discovered via `vswhere.exe` with a fallback to scanning common `Program Files` paths.
 
 ## Shell tools: Bash vs PowerShell
 

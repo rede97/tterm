@@ -12,8 +12,16 @@ dist
 dist-ssr
 *.local
 
+# E2E WebDriver binaries (download per docs/testing.md)
+e2e/drivers/
+
 .claude/
 .reasonix/
+
+# pi local state (skills stay committed)
+.pi/settings.local.json
+.pi/sessions/
+.pi/todos/
 
 # Editor directories and files
 .vscode/*

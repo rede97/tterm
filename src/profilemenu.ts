@@ -1,5 +1,5 @@
-import { createElement, Terminal as TerminalIcon, Globe } from "lucide";
-import { sshHosts, localProfiles, hiddenProfiles, hiddenSshHosts, hostProp } from "./profiles";
+import { createElement, Terminal as TerminalIcon, Globe, Cable } from "lucide";
+import { sshHosts, localProfiles, hiddenProfiles, hiddenSshHosts, hostProp, serialPorts, loadSerialPorts } from "./profiles";
 import { tabManager } from "./tabmanager";
 
 const menuBtn = document.getElementById("new-tab-menu-btn")!;
@@ -99,6 +99,26 @@ function populateMenu() {
     profileMenu.appendChild(sshCol);
   }
 
+  if (serialPorts.length > 0) {
+    const serialCol = document.createElement("div");
+    serialCol.className = "profile-col";
+
+    const serialTitle = document.createElement("div");
+    serialTitle.className = "profile-section-title";
+    serialTitle.textContent = "Serial";
+    serialCol.appendChild(serialTitle);
+
+    for (const port of serialPorts) {
+      const device = port.product || port.manufacturer || port.driver;
+      const ids = port.vid && port.pid ? ` ${port.vid}:${port.pid}` : "";
+      const item = createMenuItem(Cable, port.name, device + ids, () => {});
+      item.classList.add("disabled");
+      item.title = "Serial sessions are not supported yet";
+      serialCol.appendChild(item);
+    }
+    profileMenu.appendChild(serialCol);
+  }
+
 }
 
 export function initProfileMenu() {
@@ -111,6 +131,13 @@ export function initProfileMenu() {
       positionMenu();
       profileMenu.classList.add("open");
       requestAnimationFrame(() => flipMenu());
+      // Re-enumerate in the background so hot-plugged devices appear
+      loadSerialPorts().then(() => {
+        if (profileMenu.classList.contains("open")) {
+          populateMenu();
+          flipMenu();
+        }
+      });
     }
   });
 

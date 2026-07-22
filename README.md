@@ -30,6 +30,7 @@ TTerm strips away the excess. Three priorities: **fast controls**, **clean termi
 - **Settings panel** — General, Appearance, and Profile tabs with renderer selection, scrollback buffer, paste options, tab width mode
 - **Custom window decorations** — no native title bar; VS Code-style tab bar with integrated window controls
 - **Open in new window** — launch additional app windows from context menu
+- **Serial port enumeration** — auto-detects connected serial devices (USB VID/PID, manufacturer) in the new-tab menu
 - **Persistent config** — all settings preserved across sessions
 
 ## Performance
@@ -44,7 +45,7 @@ TTerm strips away the excess. Three priorities: **fast controls**, **clean termi
 
 - **Frontend**: TypeScript + Vite + xterm.js v6 + Lucide Icons
 - **Backend**: Rust + Tauri v2 + portable-pty
-- **IPC**: Tauri invoke/event bridge; PTY I/O streamed via events
+- **IPC**: Tauri invoke commands + local WebSocket loopback (binary PTY I/O streamed directly to xterm.js)
 - **Packaging**: NSIS installer (~5 MB)
 
 ## Development
@@ -65,8 +66,7 @@ bun run tauri build
 
 ## Roadmap
 
-- [ ] Serial port support
-- [ ] Telnet protocol support
+- [~] Serial port support (port enumeration done; session support in progress)
 - [ ] Split panes
 - [ ] Custom color scheme configuration UI
 - [ ] Session recording and replay
