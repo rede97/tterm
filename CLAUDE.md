@@ -12,7 +12,7 @@ bun run tauri dev    # full Tauri app in dev mode
 bun run tauri build  # production binary
 ```
 
-Tests: `bun run test` (Vitest unit + happy-dom DOM tests in `tests/`), `bun run test:rust` (Rust unit tests in `lib.rs`), `bun run test:e2e` (tauri-driver + WebdriverIO, see `docs/testing.md`). No linters configured.
+Tests: `bun run test` (Vitest unit + happy-dom DOM tests in `tests/`), `bun run test:rust` (Rust unit tests, colocated in each `src-tauri/src/*.rs` module), `bun run test:e2e` (tauri-driver + WebdriverIO, see `docs/testing.md`). No linters configured.
 
 **Always run `bun run build` before committing.** Before creating a release tag, ensure the build output has zero warnings (including vite `[plugin vite:reporter]` warnings).
 
@@ -64,7 +64,7 @@ A multi-tab desktop terminal emulator (TTerm) built with Tauri v2. The frontend 
 
 ### Backend (`src-tauri/`)
 
-- `src-tauri/src/lib.rs` — Tauri builder, PTY management + WebSocket bridge (tokio-tungstenite), SSH config parsing, WT profile/fragment loading, config I/O, plugin registration
+- `src-tauri/src/lib.rs` — crate root (mod wiring + `run()` only). Modules: `state.rs` (AppState/session tables), `relay.rs` (WS loopback relay shared by PTY/serial/demo), `pty.rs`, `serial.rs`, `demo.rs` (debug-only), `wt.rs`, `config.rs`, `ssh.rs`, `window.rs`, `fonts.rs`, `cmdparse.rs`
 - `src-tauri/src/main.rs` — entry point, calls `tterm_lib::run()`
 - `src-tauri/capabilities/default.json` — permissions (core, window, opener, window-state)
 - Plugins: `tauri-plugin-window-state` (auto save/restore window size, position, maximize), `tauri-plugin-dialog`, `tauri-plugin-opener`
