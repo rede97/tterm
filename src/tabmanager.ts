@@ -2,7 +2,7 @@
 import { SshHost, localProfiles, defaultLocalProfile, hostProp, SerialPort, serialBaudFor, rememberSerialBaud } from "./profiles";
 import { showToast } from "./toast";
 import { TerminalTab } from "./tab";
-import { attachTabDrag } from "./tabdrag";
+import Sortable from "sortablejs";
 
 export class TabManager {
   tabs = new Map<string, TerminalTab>();
@@ -18,7 +18,6 @@ export class TabManager {
   private readonly _welcomeEl: HTMLElement;
 
   private _resizeTimer: ReturnType<typeof setTimeout> | null = null;
-  private _suppressTabClick = false;
 
   constructor(
     tabsContainer: HTMLElement,
@@ -30,6 +29,26 @@ export class TabManager {
     this._welcomeEl = welcomeEl;
 
     window.addEventListener("resize", () => this._onResize());
+  }
+
+  // Tab drag reorder via SortableJS (mature pointer math; forceFallback
+  // avoids the unreliable native HTML5 drag-and-drop in WebView2).
+  // Must be called after the real containers are injected (the module-level
+  // singleton is constructed with nulls).
+  initSortable(): void {
+    new Sortable(this.tabsContainer, {
+      animation: 150,
+      direction: "horizontal",
+      draggable: ".tab[data-tab-id^=\"tab-\"]",
+      filter: ".tab-close",
+      preventOnFilter: false,
+      forceFallback: true,
+      fallbackTolerance: 5,
+      onEnd: () => {
+        this._syncTabOrderFromDom();
+        this.refreshBadges();
+      },
+    });
   }
 
   // -- tab creation --
@@ -59,13 +78,7 @@ export class TabManager {
     });
     el.appendChild(closeBtn);
 
-    el.addEventListener("click", () => {
-      if (this._suppressTabClick) {
-        this._suppressTabClick = false;
-        return;
-      }
-      this.switchTo(tab.id);
-    });
+    el.addEventListener("click", () => this.switchTo(tab.id));
     el.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -73,23 +86,6 @@ export class TabManager {
     });
 
     tab.tabElement = el;
-
-    // Mouse-based drag reorder (HTML5 DnD is unreliable in WebView2)
-    attachTabDrag(
-      el,
-      () => [...this.tabsContainer.querySelectorAll<HTMLElement>(".tab[data-tab-id^=\"tab-\"]")]
-        .filter(s => s !== el),
-      () => this.tabsContainer.querySelector<HTMLElement>(".tab[data-tab-id=\"#settings\"]"),
-      {
-        onReorder: (before) => this.tabsContainer.insertBefore(el, before),
-        onDrop: () => {
-          this._suppressTabClick = true;
-          this._syncTabOrderFromDom();
-          this.refreshBadges();
-        },
-      },
-    );
-
     return el;
   }
 
@@ -546,6 +542,7 @@ export function initTabManager(
   welcomeEl: HTMLElement,
 ): TabManager {
   Object.assign(tabManager, { tabsContainer, terminalContainer, _welcomeEl: welcomeEl });
+  tabManager.initSortable();
   return tabManager;
 }
 

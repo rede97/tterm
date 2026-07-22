@@ -93,6 +93,37 @@ describe("TTerm application", () => {
     }, { timeout: 10000, timeoutMsg: "overlay did not disappear after Enter" });
   });
 
+  it("reorders tabs via drag (SortableJS)", async () => {
+    const btn = await $("#new-tab");
+    if ((await $$("#tabs .tab")).length < 2) await btn.click();
+    await browser.waitUntil(async () => (await $$("#tabs .tab")).length >= 2, { timeout: 15000 });
+
+    const rects = await browser.execute(() =>
+      [...document.querySelectorAll("#tabs .tab")].map(t => {
+        const r = t.getBoundingClientRect();
+        return { id: t.dataset.tabId, x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      }));
+    const [t1, t2] = rects;
+
+    // drag the 2nd tab left past the 1st tab's midpoint (multi-step: Sortable
+    // needs a realistic pointermove sequence)
+    const startX = Math.round(t2.x), endX = Math.round(t1.x - 60), y = Math.round(t1.y);
+    const action = browser.action("pointer")
+      .move({ x: startX, y })
+      .down()
+      .pause(120);
+    const steps = 8;
+    for (let i = 1; i <= steps; i++) {
+      action.move({ x: Math.round(startX + (endX - startX) * i / steps), y, duration: 60 }).pause(40);
+    }
+    await action.pause(200).up().perform();
+    await browser.pause(400);
+
+    const order = await browser.execute(() =>
+      [...document.querySelectorAll("#tabs .tab")].map(t => t.dataset.tabId));
+    expect(order[0]).toBe(t2.id);
+  });
+
   it("shows the terminal viewport inside the active tab", async () => {
     // The `active` class lives on the tab-bar element (.tab.active), not on
     // .terminal-instance — the visible instance is the one without display:none.

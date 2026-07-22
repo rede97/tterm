@@ -25,6 +25,8 @@ function initDrag() {
   tabBar.addEventListener("mousedown", (e) => {
     const target = e.target as HTMLElement;
     if (target.tagName === "BUTTON" || target.closest("button")) return;
+    // Tabs are handled by SortableJS (drag reorder), not window drag
+    if (target.closest(".tab")) return;
 
     const startX = e.clientX;
     const startY = e.clientY;
