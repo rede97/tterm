@@ -956,6 +956,32 @@ body {
   max-width: 320px;
 }
 
+/* theme preview swatches */
+.theme-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 0 4px;
+}
+
+.theme-preview-term {
+  flex-basis: 100%;
+  font-family: monospace;
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.theme-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+}
+
 .settings-select:focus {
   border-color: #0078d4;
 }

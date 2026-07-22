@@ -1,5 +1,6 @@
 ﻿import { invoke } from "@tauri-apps/api/core";
 import { buildFontFamily, defaultFontStack } from "./fontconfig";
+import { setWtThemes, parseWtSchemes, DEFAULT_THEME_NAME } from "./themes";
 
 // SshHost is a simple KV map: { name, hostname, user, port, forwardagent, ... }
 // All values are strings. Frontend owns all parsing + generation.
@@ -48,6 +49,7 @@ export let configTerminalBell = false;
 export let configRenderer = "webgl";
 export let configScrollback = 20000;
 export let configTabWidthMode = "equal";
+export let configThemeName: string = DEFAULT_THEME_NAME;
 export let hiddenSshHosts: string[] = [];
 export let serialPorts: SerialPort[] = [];
 export let configLoaded = false;
@@ -192,7 +194,10 @@ export async function loadLocalProfiles() {
   }
   try {
     const raw = await invoke<string | null>("read_wt_settings");
-    if (raw) parseWtProfiles(raw);
+    if (raw) {
+      parseWtProfiles(raw);
+      setWtThemes(parseWtSchemes(raw));
+    }
     const fragments = await invoke<string[]>("read_wt_fragments");
     if (fragments && fragments.length > 0) parseWtFragments(fragments);
   } catch (e) {
@@ -224,6 +229,7 @@ function readConfigValues(cfg: any) {
   if (typeof cfg.renderer === "string") configRenderer = cfg.renderer;
   if (typeof cfg.scrollback === "number" && cfg.scrollback >= 100 && cfg.scrollback <= 100000) configScrollback = cfg.scrollback;
   if (typeof cfg.tabWidthMode === "string") configTabWidthMode = cfg.tabWidthMode;
+  if (typeof cfg.themeName === "string") configThemeName = cfg.themeName;
   if (Array.isArray(cfg.hiddenSshHosts)) hiddenSshHosts = cfg.hiddenSshHosts;
 }
 
@@ -237,6 +243,7 @@ export function getDefaultConfig(): Record<string, unknown> {
     renderer: "webgl",
     scrollback: 20000,
     tabWidthMode: "equal",
+    themeName: DEFAULT_THEME_NAME,
     hiddenProfiles: [],
     hiddenSshHosts: [],
   };

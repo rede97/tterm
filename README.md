@@ -31,6 +31,7 @@ TTerm strips away the excess. Three priorities: **fast controls**, **clean termi
 - **Custom window decorations** — no native title bar; VS Code-style tab bar with integrated window controls
 - **Open in new window** — launch additional app windows from context menu
 - **Serial port enumeration** — auto-detects connected serial devices (USB VID/PID, manufacturer) in the new-tab menu
+- **Color schemes** — 12 built-in themes (Solarized, Dracula, Nord, Gruvbox, Monokai, etc.), auto-imports custom Windows Terminal schemes, live preview in settings
 - **Persistent config** — all settings preserved across sessions
 
 ## Performance
@@ -68,7 +69,7 @@ bun run tauri build
 
 - [~] Serial port support (port enumeration done; session support in progress)
 - [ ] Split panes
-- [ ] Custom color scheme configuration UI
+- [~] Custom color scheme configuration UI (built-in themes + WT scheme import done; custom editor pending)
 - [ ] Session recording and replay
 - [ ] OSC 9;4 terminal progress bar in tab title
 

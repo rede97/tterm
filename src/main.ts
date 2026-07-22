@@ -20,8 +20,9 @@ import {
   localProfiles, defaultLocalProfile,
   loadSshHosts, loadLocalProfiles, loadConfig,
   configFontFamily, configFontSize, configScrollback,
-  configTabWidthMode,
+  configTabWidthMode, configThemeName,
 } from "./profiles";
+import { findTheme } from "./themes";
 
 // -- DOM refs ---
 
@@ -78,6 +79,7 @@ setOnSettingsChanged(async () => {
     tab.terminal.options.fontFamily = configFontFamily;
     tab.terminal.options.fontSize = configFontSize;
     tab.terminal.options.scrollback = configScrollback;
+    tab.terminal.options.theme = findTheme(configThemeName).theme;
   }
   applyTabWidthMode();
   tabManager.triggerResize();

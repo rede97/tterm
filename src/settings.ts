@@ -1,4 +1,5 @@
-﻿import { localProfiles, configFontFamily, configFontSize, hiddenProfiles, configPasteWarning, configPasteTrim, configTerminalBell, configRenderer, configScrollback, configTabWidthMode, saveConfig, loadConfig, sshHosts, loadSshHosts, hiddenSshHosts, SshHost, hostProp } from "./profiles";
+﻿import { localProfiles, configFontFamily, configFontSize, hiddenProfiles, configPasteWarning, configPasteTrim, configTerminalBell, configRenderer, configScrollback, configTabWidthMode, configThemeName, saveConfig, loadConfig, sshHosts, loadSshHosts, hiddenSshHosts, SshHost, hostProp } from "./profiles";
+import { allThemes, findTheme } from "./themes";
 import { buildFontFamily, updateFontStack, parseFontFamily } from "./fontconfig";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
@@ -210,8 +211,43 @@ export function createSettingsContent(): HTMLElement {
         </div>
       </div>
     </div>
+    <div class="settings-section">
+      <div class="settings-section-title">Color Scheme</div>
+      <div class="settings-item settings-item-row">
+        <div class="settings-item-info">
+          <div class="settings-item-title">Theme</div>
+          <div class="settings-item-desc">Terminal color scheme. Windows Terminal schemes are imported automatically.</div>
+        </div>
+        <div class="settings-item-control">
+          <select id="set-theme" class="settings-select">
+            ${themeOptionsHtml()}
+          </select>
+        </div>
+      </div>
+      <div class="settings-item">
+        <div id="set-theme-preview" class="theme-preview"></div>
+      </div>
+    </div>
   `;
   body.appendChild(panelAppearance);
+
+  // Theme selector — live preview swatches
+  const themeSelect = panelAppearance.querySelector("#set-theme") as HTMLSelectElement;
+  const themePreview = panelAppearance.querySelector("#set-theme-preview") as HTMLElement;
+  const renderThemePreview = (name: string) => {
+    const t = findTheme(name).theme;
+    const swatches = [t.black, t.red, t.green, t.yellow, t.blue, t.magenta, t.cyan, t.white,
+      t.brightBlack, t.brightRed, t.brightGreen, t.brightYellow, t.brightBlue, t.brightMagenta, t.brightCyan, t.brightWhite];
+    themePreview.innerHTML =
+      `<div class="theme-preview-term" style="background:${t.background};color:${t.foreground}">user@host:~$ ls -la <span class="theme-preview-dir">src/</span> <span class="theme-preview-exe">run.sh</span> README.md</div>` +
+      swatches.map(c => `<span class="theme-swatch" style="background:${c ?? "transparent"}"></span>`).join("");
+    const dir = themePreview.querySelector(".theme-preview-dir") as HTMLElement;
+    if (dir) dir.style.color = t.blue ?? "";
+    const exe = themePreview.querySelector(".theme-preview-exe") as HTMLElement;
+    if (exe) exe.style.color = t.green ?? "";
+  };
+  renderThemePreview(themeSelect.value);
+  themeSelect.addEventListener("change", () => renderThemePreview(themeSelect.value));
 
   // Font config button — opens font picker
   panelAppearance.querySelector("#set-font-config")!.addEventListener("click", () => {
@@ -334,6 +370,11 @@ function refreshForm(root: HTMLElement) {
   if (scrollbackEl) scrollbackEl.value = String(configScrollback);
   const tabWidthEl = root.querySelector("#set-tab-width") as HTMLSelectElement;
   if (tabWidthEl) tabWidthEl.value = configTabWidthMode;
+  const themeEl = root.querySelector("#set-theme") as HTMLSelectElement;
+  if (themeEl) {
+    themeEl.value = configThemeName;
+    themeEl.dispatchEvent(new Event("change"));
+  }
   checks.forEach(c => {
     c.checked = !hiddenProfiles.includes(c.value);
   });
@@ -591,6 +632,8 @@ async function applySettings(root: HTMLElement) {
   if (scrollbackEl) partial.scrollback = Math.max(100, Math.min(100000, parseInt(scrollbackEl.value, 10) || 1000));
   const tabWidthEl = root.querySelector("#set-tab-width") as HTMLSelectElement;
   if (tabWidthEl) partial.tabWidthMode = tabWidthEl.value;
+  const themeEl = root.querySelector("#set-theme") as HTMLSelectElement;
+  if (themeEl) partial.themeName = themeEl.value;
 
   const hidden: string[] = [];
   checks.forEach(c => { if (!c.checked) hidden.push(c.value); });
@@ -599,6 +642,18 @@ async function applySettings(root: HTMLElement) {
   await saveConfig(partial);
   const cb = settingsChangedFn();
   if (cb) cb();
+}
+
+function themeOptionsHtml(): string {
+  const builtin = allThemes().filter(t => t.source === "builtin");
+  const wt = allThemes().filter(t => t.source === "wt");
+  const opt = (name: string) =>
+    `<option value="${esc(name)}" ${configThemeName === name ? "selected" : ""}>${esc(name)}</option>`;
+  let html = `<optgroup label="Built-in">${builtin.map(t => opt(t.name)).join("")}</optgroup>`;
+  if (wt.length > 0) {
+    html += `<optgroup label="Windows Terminal">${wt.map(t => opt(t.name)).join("")}</optgroup>`;
+  }
+  return html;
 }
 
 function esc(s: string): string {
