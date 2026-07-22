@@ -1,6 +1,7 @@
 ﻿import { invoke } from "@tauri-apps/api/core";
 import { SshHost, localProfiles, defaultLocalProfile, hostProp, configSerialBaud, SerialPort } from "./profiles";
 import { TerminalTab } from "./tab";
+import { attachTabDrag } from "./tabdrag";
 
 export class TabManager {
   tabs = new Map<string, TerminalTab>();
@@ -16,6 +17,7 @@ export class TabManager {
   private readonly _welcomeEl: HTMLElement;
 
   private _resizeTimer: ReturnType<typeof setTimeout> | null = null;
+  private _suppressTabClick = false;
 
   constructor(
     tabsContainer: HTMLElement,
@@ -35,7 +37,8 @@ export class TabManager {
     const el = document.createElement("div");
     el.className = "tab";
     el.dataset.tabId = tab.id;
-    el.setAttribute("data-tauri-drag-region", "");
+    // NOTE: no data-tauri-drag-region here — tabs support mouse-based
+    // drag reordering, which would conflict with native window dragging.
 
     const badge = document.createElement("span");
     badge.className = "tab-badge";
@@ -55,7 +58,13 @@ export class TabManager {
     });
     el.appendChild(closeBtn);
 
-    el.addEventListener("click", () => this.switchTo(tab.id));
+    el.addEventListener("click", () => {
+      if (this._suppressTabClick) {
+        this._suppressTabClick = false;
+        return;
+      }
+      this.switchTo(tab.id);
+    });
     el.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -63,7 +72,34 @@ export class TabManager {
     });
 
     tab.tabElement = el;
+
+    // Mouse-based drag reorder (HTML5 DnD is unreliable in WebView2)
+    attachTabDrag(
+      el,
+      () => [...this.tabsContainer.querySelectorAll<HTMLElement>(".tab[data-tab-id^=\"tab-\"]")]
+        .filter(s => s !== el),
+      () => this.tabsContainer.querySelector<HTMLElement>(".tab[data-tab-id=\"#settings\"]"),
+      {
+        onReorder: (before) => this.tabsContainer.insertBefore(el, before),
+        onDrop: () => {
+          this._suppressTabClick = true;
+          this._syncTabOrderFromDom();
+          this.refreshBadges();
+        },
+      },
+    );
+
     return el;
+  }
+
+  // Rebuild the tabs Map in DOM order after a drag reorder.
+  private _syncTabOrderFromDom(): void {
+    const ordered = new Map<string, TerminalTab>();
+    for (const el of this.tabsContainer.querySelectorAll<HTMLElement>(".tab[data-tab-id^=\"tab-\"]")) {
+      const tab = this.tabs.get(el.dataset.tabId!);
+      if (tab) ordered.set(tab.id, tab);
+    }
+    this.tabs = ordered;
   }
 
   private _register(tab: TerminalTab, port: number): void {

@@ -5,6 +5,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { invoke } from "@tauri-apps/api/core";
 import { TabType } from "./types";
 import { hysteresis } from "./hysteresis";
+import { parseOsc9Progress, applyProgressToTabElement } from "./osc";
 import { SshHost, configFontFamily, configFontSize, configRenderer, configScrollback, configThemeName, trimPasteContent } from "./profiles";
 import { findTheme } from "./themes";
 
@@ -24,6 +25,8 @@ export class TerminalTab {
   needsResize = false;
   index = 0;
   searchQuery = "";
+  progressState = 0;
+  progress = 0;
 
   constructor(id: string, type: TabType, label: string, container: HTMLElement) {
     this.id = id;
@@ -48,6 +51,14 @@ export class TerminalTab {
     this.terminal.loadAddon(this.fitAddon);
     this.searchAddon = new SearchAddon();
     this.terminal.loadAddon(this.searchAddon);
+
+    // OSC 9;4 progress reporting (build tasks etc.)
+    this.terminal.parser.registerOscHandler(9, (data: string) => {
+      const p = parseOsc9Progress(data);
+      if (!p) return false;
+      this.setProgress(p.state, p.progress);
+      return true;
+    });
     if (configRenderer === "webgl") this.terminal.loadAddon(new WebglAddon());
     this.terminal.open(this.element);
 
@@ -91,6 +102,13 @@ export class TerminalTab {
 
     // Freeze IME textarea position during composition to prevent candidate window drift.
     this._patchImeFreeze();
+  }
+
+  // OSC 9;4 progress: update stored state and the tab progress bar.
+  setProgress(state: number, progress: number): void {
+    this.progressState = state;
+    this.progress = progress;
+    if (this.tabElement) applyProgressToTabElement(this.tabElement, state, progress);
   }
 
   private _patchImeFreeze(): void {

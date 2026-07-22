@@ -244,7 +244,10 @@ body {
 }
 
 #tabs::-webkit-scrollbar {
-  height: 3px;
+  /* Zero height: a rendered scrollbar overlaps the bottom pixels of tabs and
+     swallows clicks (elementFromPoint hits #tabs, which has no click handler).
+     Horizontal scrolling is handled by the wheel handler instead. */
+  height: 0;
 }
 
 #tabs::-webkit-scrollbar-track {
@@ -263,6 +266,7 @@ body {
 .tab {
   display: flex;
   align-items: center;
+  position: relative;
   min-width: 120px;
   max-width: 200px;
   height: 100%;
@@ -294,6 +298,43 @@ body {
 
 .tab:hover:not(.active) {
   background: #333333;
+}
+
+/* OSC 9;4 progress bar on tabs */
+.tab-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  background: #0dbc79;
+  transition: width 0.25s ease;
+  pointer-events: none;
+}
+
+.tab-progress.state-error {
+  background: #f14c4c;
+}
+
+.tab-progress.state-warning {
+  background: #f5f543;
+}
+
+.tab-progress.state-indeterminate {
+  width: 30%;
+  animation: tab-progress-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes tab-progress-slide {
+  0%   { left: 0; }
+  50%  { left: 70%; }
+  100% { left: 0; }
+}
+
+/* Tab being drag-reordered */
+.tab.dragging {
+  z-index: 10;
+  opacity: 0.85;
+  transition: none;
 }
 
 .tab-badge {

@@ -20,7 +20,7 @@ TTerm 去掉多余设计，只关注三件事：**高效操控**、**清晰的�
 
 ## 功能
 
-- **多标签终端** — 无限标签，支持本地 Shell（cmd.exe / PowerShell）和 SSH 远程连接
+- **多标签终端** — 无限标签，支持本地 Shell（cmd.exe / PowerShell）和 SSH 远程连接，拖拽重排序
 - **SSH 配置集成** — 自动解析 `~/.ssh/config`，一键连接远端主机
 - **Windows Terminal 配置导入** — 读取 WT 的 `settings.json` 和扩展片段，复用已有配置（VS、WSL、Azure、Git Bash、MSYS2）
 - **配置可见性控制** — 在设置中自由开关导入的配置，隐藏后不会丢失
@@ -71,7 +71,7 @@ bun run tauri build
 - [ ] 分屏显示
 - [~] 自定义配色方案配置界面（内置主题 + WT 方案导入已实现，自定义编辑器待做）
 - [ ] 终端会话录制与回放
-- [ ] OSC 9;4 终端标签页进度条
+- [x] OSC 9;4 终端标签页进度条
 
 ## 许可
 

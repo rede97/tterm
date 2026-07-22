@@ -20,7 +20,7 @@ TTerm strips away the excess. Three priorities: **fast controls**, **clean termi
 
 ## Features
 
-- **Multi-tab terminal** — unlimited tabs supporting local shells (cmd.exe / PowerShell) and SSH connections
+- **Multi-tab terminal** — unlimited tabs supporting local shells (cmd.exe / PowerShell) and SSH connections, with drag-to-reorder
 - **SSH config integration** — auto-parses `~/.ssh/config` for one-click remote host connections
 - **Windows Terminal import** — reads WT `settings.json` and fragments to reuse existing profiles (VS, WSL, Azure, Git Bash, MSYS2)
 - **Profile visibility control** — toggle imported profiles on/off in settings without losing them
@@ -71,7 +71,7 @@ bun run tauri build
 - [ ] Split panes
 - [~] Custom color scheme configuration UI (built-in themes + WT scheme import done; custom editor pending)
 - [ ] Session recording and replay
-- [ ] OSC 9;4 terminal progress bar in tab title
+- [x] OSC 9;4 terminal progress bar in tab title
 
 ## License
 
