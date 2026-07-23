@@ -27,11 +27,16 @@ pub fn run() {
             // verify PTY system is available
             let _pty_sys = portable_pty::native_pty_system();
 
+            // Unified WebSocket relay hub: single loopback port, path routing,
+            // per-process auth token. Must start before any session spawns.
+            let hub = relay::WsHub::start()?;
+
             app.manage(AppState {
                 sessions: Arc::new(Mutex::new(HashMap::new())),
                 serial_sessions: Mutex::new(HashMap::new()),
                 next_id: Mutex::new(1),
                 initial_cwd: pty::launch_working_directory(),
+                hub,
             });
 
             Ok(())

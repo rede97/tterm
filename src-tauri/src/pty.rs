@@ -5,7 +5,7 @@ use std::sync::atomic::Ordering;
 use tauri::Manager;
 
 use crate::cmdparse::parse_command;
-use crate::relay::start_ws_relay;
+use crate::relay::{register_session, unregister_session};
 use crate::state::{AppState, PtySession, SpawnSpec, WsConnectResult};
 
 pub(crate) fn get_shell() -> String {
@@ -22,7 +22,7 @@ pub(crate) fn get_shell() -> String {
 // NEWER session that reused the same tab id (reconnect race).
 static SESSION_NONCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
-pub(crate) fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder, spec: SpawnSpec) -> Result<u16, String> {
+pub(crate) fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder, spec: SpawnSpec) -> Result<(), String> {
     let pty_sys = native_pty_system();
     let pty_pair = pty_sys
         .openpty(PtySize {
@@ -44,11 +44,11 @@ pub(crate) fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBu
     let reader = master.try_clone_reader().map_err(|e| e.to_string())?;
     let writer: Box<dyn Write + Send> = master.take_writer().map_err(|e| e.to_string())?;
 
-    let port = start_ws_relay(reader, writer, None)?;
+    let sessions = app_handle.state::<AppState>();
+    register_session(&sessions.hub, &id, reader, writer, None)?;
 
     // Store session (master for resize)
     let nonce = SESSION_NONCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let sessions = app_handle.state::<AppState>();
     sessions.sessions.lock().map_err(|e| e.to_string())?.insert(
         id.clone(),
         PtySession { master: Some(master), spec, nonce },
@@ -74,11 +74,10 @@ pub(crate) fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBu
         }
     });
 
-    Ok(port)
+    Ok(())
 }
 
-// Start a WebSocket loopback relay between a byte stream (reader/writer) and
-// a single WS client. Returns the bound port. `cancel` lets serial sessions
+// Apply the launch-time working directory (if any) to a command builder.
 pub(crate) fn apply_initial_cwd(cmd: &mut CommandBuilder, cwd: Option<&PathBuf>) {
     if let Some(cwd) = cwd {
         if cwd.is_dir() {
@@ -114,9 +113,9 @@ pub fn pty_spawn(state: tauri::State<AppState>, app: tauri::AppHandle, command: 
 
     let spec = SpawnSpec::Pty { command: command.clone() };
     let builder = command_builder(command.as_deref(), state.initial_cwd.as_ref());
-    let port = spawn_pty(app.clone(), id.clone(), builder, spec)?;
+    spawn_pty(app.clone(), id.clone(), builder, spec)?;
 
-    Ok(WsConnectResult { id, port })
+    Ok(state.ws_result(id))
 }
 
 pub(crate) fn launch_working_directory() -> Option<PathBuf> {
@@ -146,8 +145,8 @@ pub fn pty_spawn_ssh(state: tauri::State<AppState>, app: tauri::AppHandle, hostn
     cmd.arg(&port_str);
 
     let spec = SpawnSpec::Ssh { hostname, port, user };
-    let ws_port = spawn_pty(app, id.clone(), cmd, spec)?;
-    Ok(WsConnectResult { id, port: ws_port })
+    spawn_pty(app, id.clone(), cmd, spec)?;
+    Ok(state.ws_result(id))
 }
 
 #[tauri::command]
@@ -171,6 +170,7 @@ pub fn pty_resize(state: tauri::State<AppState>, id: &str, cols: u16, rows: u16)
 
 // Kill a session's resources (PTY master or serial pump) without touching specs.
 fn kill_session_resources(state: &AppState, id: &str) -> Result<(), String> {
+    unregister_session(&state.hub, id);
     {
         let mut sessions = state.sessions.lock().map_err(|e| e.to_string())?;
         sessions.remove(id);
@@ -202,7 +202,7 @@ pub fn session_reconnect(state: tauri::State<AppState>, app: tauri::AppHandle, i
     kill_session_resources(&state, id)?;
 
     // 3. Respawn with the same id
-    let port = match spec {
+    match spec {
         SpawnSpec::Pty { command } => {
             let builder = command_builder(command.as_deref(), state.initial_cwd.as_ref());
             spawn_pty(app, id.to_string(), builder, SpawnSpec::Pty { command })?
@@ -221,20 +221,12 @@ pub fn session_reconnect(state: tauri::State<AppState>, app: tauri::AppHandle, i
         }
     };
 
-    Ok(WsConnectResult { id: id.to_string(), port })
+    Ok(state.ws_result(id.to_string()))
 }
 
 #[tauri::command]
 pub fn pty_kill(state: tauri::State<AppState>, id: &str) -> Result<(), String> {
-    let mut sessions = state.sessions.lock().map_err(|e| e.to_string())?;
-    sessions.remove(id);
-    drop(sessions);
-    // Also cancel a serial session with the same id (no-op for PTY tabs)
-    let mut serial = state.serial_sessions.lock().map_err(|e| e.to_string())?;
-    if let Some(session) = serial.remove(id) {
-        session.cancel.store(true, Ordering::Relaxed);
-    }
-    Ok(())
+    kill_session_resources(&state, id)
 }
 
 #[cfg(test)]

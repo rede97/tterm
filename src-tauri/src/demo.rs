@@ -1,13 +1,13 @@
 //! Demo TTY (debug builds only — entire file gated in lib.rs).
 //! A mock terminal session with no child process: a thread generates animated
 //! TUI frames + OSC 9;4 progress sequences; keystrokes control playback.
-//! Reuses start_ws_relay via in-memory Read/Write adapters.
+//! Reuses the WS relay hub via in-memory Read/Write adapters.
 
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use crate::relay::start_ws_relay;
+use crate::relay::register_session;
 use crate::state::{AppState, SerialSession, WsConnectResult};
 
 
@@ -138,14 +138,14 @@ pub fn demo_spawn(state: tauri::State<AppState>) -> Result<WsConnectResult, Stri
         move || demo_loop(frame_tx, key_rx, cancel)
     });
 
-    let reader = DemoReader::new(frame_rx);
-    let writer = DemoWriter { tx: key_tx };
-    let ws_port = start_ws_relay(reader, writer, Some(cancel.clone()))?;
-
     let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
     let id = format!("tab-{}", *next);
     *next += 1;
     drop(next);
+
+    let reader = DemoReader::new(frame_rx);
+    let writer = DemoWriter { tx: key_tx };
+    register_session(&state.hub, &id, reader, writer, Some(cancel.clone()))?;
 
     state
         .serial_sessions
@@ -153,7 +153,7 @@ pub fn demo_spawn(state: tauri::State<AppState>) -> Result<WsConnectResult, Stri
         .map_err(|e| e.to_string())?
         .insert(id.clone(), SerialSession { cancel, ctl: std::sync::mpsc::channel::<crate::state::SerialCtl>().0, spec: None });
 
-    Ok(WsConnectResult { id, port: ws_port })
+    Ok(state.ws_result(id))
 }
 
 // ── Mock serial ports (debug builds) ────────────────────────────────

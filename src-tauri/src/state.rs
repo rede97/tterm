@@ -5,10 +5,15 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
+use crate::relay::WsHub;
+
 #[derive(Clone, Serialize)]
 pub struct WsConnectResult {
     pub(crate) id: String,
+    // Hub endpoint (same for every session) + per-process auth token.
+    // The frontend connects to ws://127.0.0.1:<port>/pty/<id>?token=<token>.
     pub(crate) port: u16,
+    pub(crate) token: String,
 }
 
 pub struct PtySession {
@@ -56,4 +61,12 @@ pub struct AppState {
     pub(crate) serial_sessions: Mutex<HashMap<String, SerialSession>>,
     pub(crate) next_id: Mutex<u32>,
     pub(crate) initial_cwd: Option<PathBuf>,
+    pub(crate) hub: Arc<WsHub>,
+}
+
+impl AppState {
+    // Connect info handed back to the frontend after (re)spawning a session.
+    pub(crate) fn ws_result(&self, id: String) -> WsConnectResult {
+        WsConnectResult { id, port: self.hub.port, token: self.hub.token.clone() }
+    }
 }

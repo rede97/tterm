@@ -4459,7 +4459,9 @@ name = "tterm"
 version = "0.3.0"
 dependencies = [
  "futures-util",
+ "http",
  "portable-pty",
+ "rand",
  "serde",
  "serde_json",
  "serial_enumerator",

@@ -64,7 +64,7 @@ A multi-tab desktop terminal emulator (TTerm) built with Tauri v2. The frontend 
 
 ### Backend (`src-tauri/`)
 
-- `src-tauri/src/lib.rs` — crate root (mod wiring + `run()` only). Modules: `state.rs` (AppState/session tables), `relay.rs` (WS loopback relay shared by PTY/serial/demo), `pty.rs`, `serial.rs`, `demo.rs` (debug-only), `wt.rs`, `config.rs`, `ssh.rs`, `window.rs`, `fonts.rs`, `cmdparse.rs`
+- `src-tauri/src/lib.rs` — crate root (mod wiring + `run()` only). Modules: `state.rs` (AppState/session tables), `relay.rs` (unified WS relay hub shared by PTY/serial/demo), `pty.rs`, `serial.rs`, `demo.rs` (debug-only), `wt.rs`, `config.rs`, `ssh.rs`, `window.rs`, `fonts.rs`, `cmdparse.rs`
 - `src-tauri/src/main.rs` — entry point, calls `tterm_lib::run()`
 - `src-tauri/capabilities/default.json` — permissions (core, window, opener, window-state)
 - Plugins: `tauri-plugin-window-state` (auto save/restore window size, position, maximize), `tauri-plugin-dialog`, `tauri-plugin-opener`
@@ -75,7 +75,7 @@ A multi-tab desktop terminal emulator (TTerm) built with Tauri v2. The frontend 
 - `PtySession` stores the PTY `master` (`Option`, None after child exit), a `SpawnSpec` (reconnect params), and a `nonce` (per-spawn token guarding the watchdog against reconnect races)
 - A per-spawn **watchdog thread** waits on `child.wait()`; on exit it sets `master = None`, closing ConPTY so the relay read loop unblocks (ConPTY never signals EOF on child death). The spec stays for reconnection
 - `SerialSession` stores an `Arc<AtomicBool>` cancel flag, a `SerialCtl` control channel (live baud switch), and an optional `SpawnSpec`
-- PTY and serial sessions share the same WebSocket relay (`start_ws_relay`); when the byte stream ends, the relay sends a WS Close frame — the frontend `close` event is the disconnect signal. `pty_kill` terminates either kind; `session_reconnect` respawns with the same id from the stored spec
+- PTY and serial sessions share the unified WebSocket relay hub (`relay.rs`: one loopback listener bound once at startup, all sessions multiplexed on it). Routing is by URL path — `ws://127.0.0.1:{port}/pty/{id}?token={token}` — where `token` is a per-process random 64-hex-char secret generated at startup and returned by every spawn command; handshakes without a valid token are rejected (403), unknown routes/ids 404. When the byte stream ends, the hub sends a WS Close frame — the frontend `close` event is the disconnect signal. `pty_kill` terminates either kind; `session_reconnect` respawns with the same id from the stored spec
 - Each tab spawns a dedicated shell process and background read task (tokio `spawn_blocking` → mpsc channel → WebSocket)
 
 ### Communication model
@@ -84,11 +84,11 @@ Frontend → Backend: Tauri `invoke()` commands:
 
 | command | args | purpose |
 |---|---|---|
-| `pty_spawn` | `command?` | create tab, return `{ id, port }` (WebSocket port). No command = default shell |
-| `pty_spawn_ssh` | `hostname`, `port`, `user` | create SSH tab, return `{ id, port }` |
+| `pty_spawn` | `command?` | create tab, return `{ id, port, token }` (hub endpoint + auth token). No command = default shell |
+| `pty_spawn_ssh` | `hostname`, `port`, `user` | create SSH tab, return `{ id, port, token }` |
 | `pty_resize` | `id`, `cols`, `rows` | notify PTY of terminal resize |
 | `pty_kill` | `id` | kill tab's shell, remove session |
-| `session_reconnect` | `id` | respawn a session from its stored SpawnSpec, same id, return `{ id, port }` |
+| `session_reconnect` | `id` | respawn a session from its stored SpawnSpec, same id, return `{ id, port, token }` |
 | `window_minimize` | — | minimize the window |
 | `window_toggle_maximize` | — | toggle maximize/restore |
 | `window_close` | — | close the window |
@@ -108,10 +108,10 @@ Frontend → Backend: Tauri `invoke()` commands:
 | `save_text_file` | `content` | save text to file via native save dialog |
 | `list_system_fonts` | — | enumerate installed fonts from Windows registry |
 | `serial_list_ports` | — | enumerate serial ports |
-| `serial_spawn` | `port_name`, `baud_rate`, `data_bits`, `parity`, `stop_bits`, `flow_control` | open serial session + WS relay, return `{ id, port }` |
+| `serial_spawn` | `port_name`, `baud_rate`, `data_bits`, `parity`, `stop_bits`, `flow_control` | open serial session + WS relay, return `{ id, port, token }` |
 | `serial_set_baud` | `id`, `baud_rate` | live baud switch via the pump's SerialCtl channel (no reconnect) |
 
-Backend → Frontend: **WebSocket** `ws://127.0.0.1:{port}` — binary frames carry raw PTY bytes directly to xterm.js via `@xterm/addon-attach` (no serialization, no Tauri events). The legacy `pty-output` Tauri event was removed in the WebSocket refactor.
+Backend → Frontend: **WebSocket** `ws://127.0.0.1:{port}/pty/{id}?token={token}` — a single hub port multiplexes all sessions (path routing + per-process token auth). Binary frames carry raw PTY bytes directly to xterm.js via `@xterm/addon-attach` (no serialization, no Tauri events). The legacy `pty-output` Tauri event was removed in the WebSocket refactor.
 
 ## Profile loading flow
 

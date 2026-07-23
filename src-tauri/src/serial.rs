@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crate::newline::{NewlineFilter, NewlineMode};
-use crate::relay::start_ws_relay;
+use crate::relay::register_session;
 use crate::state::{AppState, SerialCtl, SerialSession, SpawnSpec, WsConnectResult};
 
 #[derive(Clone, Serialize)]
@@ -240,7 +240,7 @@ pub(crate) fn spawn_serial_session(
     stop_bits: u8,
     flow_control: &str,
     output_newline: &str,
-) -> Result<u16, String> {
+) -> Result<(), String> {
     let port = open_serial(port_name, baud_rate, data_bits, parity, stop_bits, flow_control)?;
     let spec = SpawnSpec::Serial {
         port_name: port_name.to_string(),
@@ -260,7 +260,7 @@ pub(crate) fn start_serial_session(
     id: String,
     port: Box<dyn serialport::SerialPort>,
     spec: Option<SpawnSpec>,
-) -> Result<u16, String> {
+) -> Result<(), String> {
     let nl_mode = spec
         .as_ref()
         .and_then(|s| match s {
@@ -279,7 +279,7 @@ pub(crate) fn start_serial_session(
 
     let reader = SerialIoReader { rx: out_rx, cur: std::collections::VecDeque::new() };
     let writer = SerialIoWriter { tx: in_tx };
-    let ws_port = start_ws_relay(reader, writer, Some(cancel.clone()))?;
+    register_session(&state.hub, &id, reader, writer, Some(cancel.clone()))?;
 
     state
         .serial_sessions
@@ -287,7 +287,7 @@ pub(crate) fn start_serial_session(
         .map_err(|e| e.to_string())?
         .insert(id, SerialSession { cancel, ctl: ctl_tx, spec });
 
-    Ok(ws_port)
+    Ok(())
 }
 
 #[tauri::command]
@@ -321,15 +321,15 @@ pub fn serial_spawn(
             flow_control: flow_control.clone(),
             output_newline: nl.to_string(),
         };
-        let port = start_serial_session(&state, id.clone(), mock, Some(spec))?;
-        return Ok(WsConnectResult { id, port });
+        start_serial_session(&state, id.clone(), mock, Some(spec))?;
+        return Ok(state.ws_result(id));
     }
 
-    let port = spawn_serial_session(
+    spawn_serial_session(
         &state, id.clone(), &port_name, baud_rate, data_bits, &parity, stop_bits, &flow_control, nl,
     )?;
 
-    Ok(WsConnectResult { id, port })
+    Ok(state.ws_result(id))
 }
 
 #[tauri::command]

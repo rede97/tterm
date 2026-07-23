@@ -99,13 +99,13 @@ export class TabManager {
     this.tabs = ordered;
   }
 
-  private _register(tab: TerminalTab, port: number): void {
+  private _register(tab: TerminalTab, port: number, token: string): void {
     const tabEl = this._createTabElement(tab);
     this.tabsContainer.appendChild(tabEl);
 
     tab.onSocketClosed = () => this._onSessionClosed(tab.id);
     tab.onReconnectRequested = () => this.reconnectTab(tab.id);
-    tab.attachSocket(port);
+    tab.attachSocket(port, token);
 
     this.tabs.set(tab.id, tab);
   }
@@ -125,9 +125,9 @@ export class TabManager {
     if (!tab) return;
     this._reconnecting.add(tabId);
     try {
-      const result: { id: string; port: number } = await invoke("session_reconnect", { id: tabId });
+      const result: { id: string; port: number; token: string } = await invoke("session_reconnect", { id: tabId });
       tab.setDisconnected(false);
-      tab.attachSocket(result.port);
+      tab.attachSocket(result.port, result.token);
       tab.terminal.focus();
     } catch (e) {
       showToast(`Reconnect failed: ${e}`, "error");
@@ -137,7 +137,7 @@ export class TabManager {
   }
 
   async createLocalTab(command?: string, label?: string): Promise<TerminalTab | null> {
-    let result: { id: string; port: number };
+    let result: { id: string; port: number; token: string };
     try {
       result = await invoke("pty_spawn", command ? { command } : {});
     } catch (e) {
@@ -146,7 +146,7 @@ export class TabManager {
     }
     const tab = new TerminalTab(result.id, "local", label || "Terminal", this.terminalContainer);
     if (command) { tab.command = command; }
-    this._register(tab, result.port);
+    this._register(tab, result.port, result.token);
 
     await this._ensureFontsReady(tab);
 
@@ -159,7 +159,7 @@ export class TabManager {
   }
 
   async createSshTab(host: SshHost): Promise<TerminalTab | null> {
-    let result: { id: string; port: number };
+    let result: { id: string; port: number; token: string };
     try {
       result = await invoke("pty_spawn_ssh", {
         hostname: hostProp(host, "hostname") || host.name,
@@ -172,7 +172,7 @@ export class TabManager {
     }
     const tab = new TerminalTab(result.id, "ssh", host.name, this.terminalContainer);
     tab.sshHost = host;
-    this._register(tab, result.port);
+    this._register(tab, result.port, result.token);
 
     await this._ensureFontsReady(tab);
 
@@ -186,7 +186,7 @@ export class TabManager {
 
   async createSerialTab(port: SerialPort): Promise<TerminalTab | null> {
     const params = serialParamsFor(port);
-    let result: { id: string; port: number };
+    let result: { id: string; port: number; token: string };
     try {
       result = await invoke("serial_spawn", {
         portName: port.name,
@@ -207,7 +207,7 @@ export class TabManager {
     tab.outputNewline = params.outputNewline;
     tab.enterNewline = params.enterNewline;
     tab.inputMode = params.inputMode;
-    this._register(tab, result.port);
+    this._register(tab, result.port, result.token);
 
     await this._ensureFontsReady(tab);
 
@@ -247,7 +247,7 @@ export class TabManager {
   }
 
   async createDemoTab(): Promise<TerminalTab | null> {
-    let result: { id: string; port: number };
+    let result: { id: string; port: number; token: string };
     try {
       result = await invoke("demo_spawn");
     } catch (e) {
@@ -255,7 +255,7 @@ export class TabManager {
       return null;
     }
     const tab = new TerminalTab(result.id, "local", "Demo TTY", this.terminalContainer);
-    this._register(tab, result.port);
+    this._register(tab, result.port, result.token);
 
     await this._ensureFontsReady(tab);
 

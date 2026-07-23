@@ -158,11 +158,13 @@ export class TerminalTab {
   }
 
   // Attach (or re-attach) the session WebSocket. Disposes any previous addon.
-  attachSocket(port: number): void {
+  // The hub multiplexes all sessions on one port; routing is by path and the
+  // per-process token authenticates the handshake.
+  attachSocket(port: number, token: string): void {
     this.attachAddon?.dispose();
     this.attachAddon = undefined;
     import("@xterm/addon-attach").then(({ AttachAddon }) => {
-      const socket = new WebSocket(`ws://127.0.0.1:${port}`);
+      const socket = new WebSocket(`ws://127.0.0.1:${port}/pty/${encodeURIComponent(this.id)}?token=${token}`);
       socket.addEventListener("close", () => this.onSocketClosed?.());
       if (this.type === "serial") {
         // Serial tabs forward input themselves (input modes: normal/echo/line)
