@@ -302,6 +302,16 @@ git commit -m "type: short description
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 ```
 
+## Documentation principles
+
+Changelog, release notes, and user-facing docs are written for **users, not contributors**:
+
+- **Product features, not code details.** Describe what the user can do ("serial baud rate switchable without reconnecting"), never how it's implemented (no file names, function names, struct fields, or internal architecture).
+- **One line per user-visible change.** Group tiny related tweaks into a single meaningful entry.
+- **Internal work goes in one summary line at most.** Refactors, test infrastructure, dependency bumps, and dead-code removal are mentioned only if they affect users or contributors setting up the project (e.g. the test framework).
+- **Fixes describe the symptom that was fixed**, not the root cause analysis ("fixed serial echo delay" not "synchronous handle serialization in ReadFile").
+- **Terminology matches the UI.** Use the same names the user sees in menus and settings.
+
 ## Release process
 
 Before creating a release tag, ensure the build output has zero warnings (including vite `[plugin vite:reporter]` warnings).

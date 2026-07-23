@@ -1,3 +1,29 @@
+## v0.3.0
+
+New Features
+
+- Serial settings panel: a dedicated home for serial — default baud rate and input mode,
+  per-device settings for connected ports, and a history of remembered devices with Forget
+- Serial input modes: Normal (send keys directly), Echo (local echo), and Line by Line
+  (edit locally with backspace, send the whole line on Enter)
+- Output newlines: seven modes (Keep, Implicit CR in every LF, Implicit LF in every CR,
+  Force CR/LF/CRLF, Strip) for devices with unusual line endings — switchable live from
+  the context menu without reconnecting
+- Device memory now matches USB adapters by VID:PID, so per-device settings follow the
+  device even when its COM number changes
+- Theme gallery: every color scheme is shown as a live preview card, so you can pick
+  at a glance instead of cycling a dropdown
+
+Fixes
+
+- Theme previews now render in the same font as the terminal (previously a generic
+  monospace font, which did not match the real look)
+
+Notes
+
+- Debug builds enumerate two mock serial ports (loopback echo and newline patterns)
+  for hardware-free testing
+
 ## v0.2.0
 
 New Features
