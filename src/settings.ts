@@ -1,5 +1,5 @@
 ﻿import { localProfiles, configFontFamily, configFontSize, hiddenProfiles, configPasteWarning, configPasteTrim, configTerminalBell, configRenderer, configScrollback, configTabWidthMode, configThemeName, configSerialBaud, configSerialInputMode, configSerialOutputNewline, saveConfig, loadConfig, sshHosts, loadSshHosts, hiddenSshHosts, SshHost, hostProp, serialPorts, loadSerialPorts, serialPortParams, rememberSerialParams, forgetSerialParams, serialKeyFor, SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SerialInputMode, SerialOutputNewline } from "./profiles";
-import { allThemes, findTheme } from "./themes";
+import { allThemes } from "./themes";
 import { buildFontFamily, updateFontStack, parseFontFamily } from "./fontconfig";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
@@ -220,41 +220,11 @@ export function createSettingsContent(): HTMLElement {
     </div>
     <div class="settings-section">
       <div class="settings-section-title">Color Scheme</div>
-      <div class="settings-item settings-item-row">
-        <div class="settings-item-info">
-          <div class="settings-item-title">Theme</div>
-          <div class="settings-item-desc">Terminal color scheme. Windows Terminal schemes are imported automatically.</div>
-        </div>
-        <div class="settings-item-control">
-          <select id="set-theme" class="settings-select">
-            ${themeOptionsHtml()}
-          </select>
-        </div>
-      </div>
-      <div class="settings-item">
-        <div id="set-theme-preview" class="theme-preview"></div>
-      </div>
+      <div class="settings-item-desc" style="margin-bottom:6px">Click a card to choose. Windows Terminal schemes are imported automatically.</div>
+      <div id="set-theme-gallery" class="theme-gallery"></div>
     </div>
   `;
   body.appendChild(panelAppearance);
-
-  // Theme selector — live preview swatches
-  const themeSelect = panelAppearance.querySelector("#set-theme") as HTMLSelectElement;
-  const themePreview = panelAppearance.querySelector("#set-theme-preview") as HTMLElement;
-  const renderThemePreview = (name: string) => {
-    const t = findTheme(name).theme;
-    const swatches = [t.black, t.red, t.green, t.yellow, t.blue, t.magenta, t.cyan, t.white,
-      t.brightBlack, t.brightRed, t.brightGreen, t.brightYellow, t.brightBlue, t.brightMagenta, t.brightCyan, t.brightWhite];
-    themePreview.innerHTML =
-      `<div class="theme-preview-term" style="background:${t.background};color:${t.foreground}">user@host:~$ ls -la <span class="theme-preview-dir">src/</span> <span class="theme-preview-exe">run.sh</span> README.md</div>` +
-      swatches.map(c => `<span class="theme-swatch" style="background:${c ?? "transparent"}"></span>`).join("");
-    const dir = themePreview.querySelector(".theme-preview-dir") as HTMLElement;
-    if (dir) dir.style.color = t.blue ?? "";
-    const exe = themePreview.querySelector(".theme-preview-exe") as HTMLElement;
-    if (exe) exe.style.color = t.green ?? "";
-  };
-  renderThemePreview(themeSelect.value);
-  themeSelect.addEventListener("change", () => renderThemePreview(themeSelect.value));
 
   // Font config button — opens font picker
   panelAppearance.querySelector("#set-font-config")!.addEventListener("click", () => {
@@ -359,6 +329,8 @@ export function createSettingsContent(): HTMLElement {
     });
   });
 
+  renderThemeGallery(root, applyBtn);
+
   return root;
 }
 
@@ -385,11 +357,8 @@ function refreshForm(root: HTMLElement) {
   if (scrollbackEl) scrollbackEl.value = String(configScrollback);
   const tabWidthEl = root.querySelector("#set-tab-width") as HTMLSelectElement;
   if (tabWidthEl) tabWidthEl.value = configTabWidthMode;
-  const themeEl = root.querySelector("#set-theme") as HTMLSelectElement;
-  if (themeEl) {
-    themeEl.value = configThemeName;
-    themeEl.dispatchEvent(new Event("change"));
-  }
+  root.dataset.themeName = configThemeName;
+  renderThemeGallerySelection(root);
   const baudEl = root.querySelector("#set-serial-baud") as HTMLSelectElement;
   if (baudEl) baudEl.value = String(configSerialBaud);
   const modeEl = root.querySelector("#set-serial-input-mode") as HTMLSelectElement;
@@ -803,8 +772,7 @@ async function applySettings(root: HTMLElement) {
   if (scrollbackEl) partial.scrollback = Math.max(100, Math.min(100000, parseInt(scrollbackEl.value, 10) || 1000));
   const tabWidthEl = root.querySelector("#set-tab-width") as HTMLSelectElement;
   if (tabWidthEl) partial.tabWidthMode = tabWidthEl.value;
-  const themeEl = root.querySelector("#set-theme") as HTMLSelectElement;
-  if (themeEl) partial.themeName = themeEl.value;
+  partial.themeName = root.dataset.themeName || configThemeName;
   const baudEl = root.querySelector("#set-serial-baud") as HTMLSelectElement;
   if (baudEl) partial.serialBaud = parseInt(baudEl.value, 10) || 115200;
   const modeEl = root.querySelector("#set-serial-input-mode") as HTMLSelectElement;
@@ -821,16 +789,63 @@ async function applySettings(root: HTMLElement) {
   if (cb) cb();
 }
 
-function themeOptionsHtml(): string {
-  const builtin = allThemes().filter(t => t.source === "builtin");
-  const wt = allThemes().filter(t => t.source === "wt");
-  const opt = (name: string) =>
-    `<option value="${esc(name)}" ${configThemeName === name ? "selected" : ""}>${esc(name)}</option>`;
-  let html = `<optgroup label="Built-in">${builtin.map(t => opt(t.name)).join("")}</optgroup>`;
-  if (wt.length > 0) {
-    html += `<optgroup label="Windows Terminal">${wt.map(t => opt(t.name)).join("")}</optgroup>`;
+// Rebuild theme cards and wire click-to-choose. Called once after the footer
+// (Apply button) exists.
+function renderThemeGallery(root: HTMLElement, applyBtn: HTMLElement) {
+  const gallery = root.querySelector("#set-theme-gallery") as HTMLElement;
+  if (!gallery) return;
+  root.dataset.themeName = root.dataset.themeName || configThemeName;
+  gallery.innerHTML = "";
+
+  for (const t of allThemes()) {
+    const th = t.theme;
+    const card = document.createElement("div");
+    card.className = "theme-card";
+    card.dataset.theme = t.name;
+
+    const preview = document.createElement("div");
+    preview.className = "theme-card-preview";
+    preview.style.background = th.background ?? "";
+    preview.style.color = th.foreground ?? "";
+    // match the real terminal font, not generic monospace
+    preview.style.fontFamily = configFontFamily;
+
+    const line = document.createElement("div");
+    line.innerHTML = `$ ls <span style="color:${th.blue}">src/</span> <span style="color:${th.green}">run.sh</span> <span style="color:${th.red}">err.txt</span>`;
+    preview.appendChild(line);
+
+    const swatches = document.createElement("div");
+    swatches.className = "theme-card-swatches";
+    for (const c of [th.black, th.red, th.green, th.yellow, th.blue, th.magenta, th.cyan, th.white,
+      th.brightBlack, th.brightRed, th.brightGreen, th.brightYellow, th.brightBlue, th.brightMagenta, th.brightCyan, th.brightWhite]) {
+      const s = document.createElement("span");
+      s.className = "theme-card-swatch";
+      s.style.background = c ?? "transparent";
+      swatches.appendChild(s);
+    }
+    preview.appendChild(swatches);
+    card.appendChild(preview);
+
+    const name = document.createElement("div");
+    name.className = "theme-card-name";
+    name.textContent = t.source === "wt" ? `${t.name} (WT)` : t.name;
+    card.appendChild(name);
+
+    card.addEventListener("click", () => {
+      root.dataset.themeName = t.name;
+      renderThemeGallerySelection(root);
+      applyBtn.classList.remove("applied");
+    });
+    gallery.appendChild(card);
   }
-  return html;
+  renderThemeGallerySelection(root);
+}
+
+function renderThemeGallerySelection(root: HTMLElement) {
+  const current = root.dataset.themeName || configThemeName;
+  root.querySelectorAll<HTMLElement>("#set-theme-gallery .theme-card").forEach(card => {
+    card.classList.toggle("selected", card.dataset.theme === current);
+  });
 }
 
 function esc(s: string): string {

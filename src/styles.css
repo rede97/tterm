@@ -1134,6 +1134,66 @@ body {
   max-width: 320px;
 }
 
+/* theme gallery cards (Appearance > Color Scheme) */
+.theme-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.theme-card {
+  border: 1px solid #3e3e42;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #252526;
+}
+
+.theme-card:hover {
+  border-color: #6a6a6a;
+}
+
+.theme-card.selected {
+  border-color: #0e639c;
+  box-shadow: 0 0 0 1px #0e639c;
+}
+
+.theme-card-preview {
+  font-size: 11px;
+  padding: 8px 10px;
+  line-height: 1.6;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.theme-card-swatches {
+  display: flex;
+  gap: 2px;
+  margin-top: 5px;
+}
+
+.theme-card-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.theme-card-name {
+  padding: 5px 10px;
+  font-size: 12px;
+  color: #cccccc;
+  background: #2d2d2d;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.theme-card.selected .theme-card-name {
+  color: #ffffff;
+}
+
 /* theme preview swatches */
 .theme-preview {
   display: flex;
