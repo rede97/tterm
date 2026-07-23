@@ -124,6 +124,45 @@ describe("TTerm application", () => {
     expect(order[0]).toBe(t2.id);
   });
 
+  it("mock serial loopback echoes typed input (debug enumeration)", async () => {
+    // debug builds enumerate MOCK-LOOP via serial_list_ports like real hardware.
+    // NOTE: the menu re-populates when async enumeration resolves, so query and
+    // click the live element in one execute (wdio element handles go stale).
+    await $("#new-tab-menu-btn").click();
+    await browser.waitUntil(async () => {
+      return await browser.execute(() => {
+        const items = [...document.querySelectorAll(".profile-menu .profile-item")];
+        return items.some(i => i.querySelector(".item-label")?.textContent?.includes("MOCK-LOOP"));
+      });
+    }, { timeout: 8000 });
+    await browser.execute(() => {
+      const items = [...document.querySelectorAll(".profile-menu .profile-item")];
+      const hit = items.find(i => i.querySelector(".item-label")?.textContent?.includes("MOCK-LOOP"));
+      if (hit) hit.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await browser.pause(800);
+    // focus the mock tab's terminal explicitly (earlier tests may leave focus elsewhere)
+    await browser.execute(() => {
+      for (const [, tab] of (window).__tterm.tabs.entries()) {
+        if (tab.label && tab.label.includes("MOCK")) tab.terminal.focus();
+      }
+    });
+    await browser.keys(["H", "I", "M", "O", "C", "K"]);
+    await browser.pause(600);
+    const text = await browser.execute(() => {
+      for (const [, tab] of (window).__tterm.tabs.entries()) {
+        if (tab.label && tab.label.includes("MOCK")) {
+          const buf = tab.terminal.buffer.active;
+          let out = "";
+          for (let i = 0; i < buf.length; i++) out += buf.getLine(i)?.translateToString(true) ?? "";
+          return out;
+        }
+      }
+      return "";
+    });
+    expect(text).toContain("HIMOCK");
+  });
+
   it("shows the terminal viewport inside the active tab", async () => {
     // The `active` class lives on the tab-bar element (.tab.active), not on
     // .terminal-instance — the visible instance is the one without display:none.

@@ -97,9 +97,11 @@ function applyTabWidthMode(): void {
 
 // -- init feature modules --
 
-// Debug/E2E introspection hook (dev builds only)
+// Debug/E2E introspection hook (dev builds only).
+// NOTE: tabs must be a getter — _syncTabOrderFromDom reassigns the Map on
+// drag reorder, a captured reference would go stale.
 if (import.meta.env.DEV) {
-  (window as any).__tterm = { tabs: tabManager.tabs };
+  (window as any).__tterm = { get tabs() { return tabManager.tabs; }, mgr: tabManager };
 }
 
 tabManager.initNewTabButton();

@@ -1,6 +1,6 @@
 import { tabManager } from "./tabmanager";
 import { openFind } from "./search";
-import { trimPasteContent } from "./profiles";
+import { trimPasteContent, SERIAL_BAUD_RATES } from "./profiles";
 import { showToast } from "./toast";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -108,7 +108,7 @@ const termMenuGroup = document.createElement("div");
 termMenuGroup.dataset.group = "term";
 termMenuGroup.style.display = "none";
 
-const SERIAL_BAUDS = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
+const SERIAL_BAUDS = SERIAL_BAUD_RATES;
 
 // Baud Rate submenu (serial tabs only, mirrors the color submenu pattern)
 const baudItem = document.createElement("div");

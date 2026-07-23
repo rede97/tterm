@@ -8,7 +8,8 @@ import { hysteresis } from "./hysteresis";
 import { parseOsc9Progress, applyProgressToTabElement } from "./osc";
 import { SizeHint } from "./sizehint";
 import { DisconnectOverlay } from "./disconnect";
-import { SshHost, configFontFamily, configFontSize, configRenderer, configScrollback, configThemeName, trimPasteContent } from "./profiles";
+import { SshHost, configFontFamily, configFontSize, configRenderer, configScrollback, configThemeName, trimPasteContent, SerialInputMode } from "./profiles";
+import { createSerialInputHandler } from "./serialinput";
 import { findTheme } from "./themes";
 
 export class TerminalTab {
@@ -23,7 +24,9 @@ export class TerminalTab {
   command?: string;
   sshHost?: SshHost;
   serialPortName?: string;
+  serialKey?: string;
   serialBaud?: number;
+  inputMode: SerialInputMode = "normal";
   label: string;
   color?: string;
   needsResize = false;
@@ -133,9 +136,37 @@ export class TerminalTab {
     import("@xterm/addon-attach").then(({ AttachAddon }) => {
       const socket = new WebSocket(`ws://127.0.0.1:${port}`);
       socket.addEventListener("close", () => this.onSocketClosed?.());
-      this.attachAddon = new AttachAddon(socket);
+      if (this.type === "serial") {
+        // Serial tabs forward input themselves (input modes: normal/echo/line)
+        this.attachAddon = new AttachAddon(socket, { bidirectional: false });
+        this.serialSocket = socket;
+        this._hookSerialInput();
+      } else {
+        this.attachAddon = new AttachAddon(socket);
+      }
       this.terminal.loadAddon(this.attachAddon);
     });
+  }
+
+  private serialSocket?: WebSocket;
+  private serialInputDisposable?: { dispose(): void };
+
+  private _hookSerialInput(): void {
+    this.serialInputDisposable?.dispose();
+    const handler = createSerialInputHandler(
+      this.inputMode,
+      (d) => {
+        const s = this.serialSocket;
+        if (s && s.readyState === WebSocket.OPEN) s.send(d);
+      },
+      (d) => this.terminal.write(d),
+    );
+    this.serialInputDisposable = this.terminal.onData((d) => handler(d));
+  }
+
+  setSerialInputMode(mode: SerialInputMode): void {
+    this.inputMode = mode;
+    if (this.type === "serial") this._hookSerialInput();
   }
 
   setDisconnected(v: boolean): void {

@@ -36,21 +36,49 @@ export interface SerialPort {
   pid: string;
 }
 
+export type SerialInputMode = "normal" | "echo" | "line";
+
 export interface SerialParams {
   baud: number;
+  inputMode?: SerialInputMode;
 }
 
-// Per-port remembered parameters, keyed by port name (e.g. "COM3").
+// Per-port remembered parameters. USB devices are keyed by VID:PID (stable
+// across COM number changes), others by port name.
 export let serialPortParams: Record<string, SerialParams> = {};
+
+export function serialKeyFor(port: { name: string; vid: string; pid: string }): string {
+  return port.vid && port.pid ? `usb:${port.vid}:${port.pid}` : `com:${port.name}`;
+}
+
+// Effective params for a port: remembered values win, global defaults otherwise.
+export function serialParamsFor(port: { name: string; vid: string; pid: string }): Required<SerialParams> {
+  const mem = serialPortParams[serialKeyFor(port)];
+  return {
+    baud: mem?.baud ?? configSerialBaud,
+    inputMode: mem?.inputMode ?? configSerialInputMode,
+  };
+}
+
+export async function rememberSerialParams(key: string, params: Partial<SerialParams>) {
+  serialPortParams = { ...serialPortParams, [key]: { ...serialPortParams[key], ...params } };
+  await saveConfig({ serialPortParams });
+}
+
+export async function forgetSerialParams(key: string) {
+  const next = { ...serialPortParams };
+  delete next[key];
+  serialPortParams = next;
+  await saveConfig({ serialPortParams });
+}
 
 // Baud for opening a port: remembered value wins, global default otherwise.
 export function serialBaudFor(portName: string): number {
-  return serialPortParams[portName]?.baud ?? configSerialBaud;
+  return serialPortParams[`com:${portName}`]?.baud ?? configSerialBaud;
 }
 
 export async function rememberSerialBaud(portName: string, baud: number) {
-  serialPortParams = { ...serialPortParams, [portName]: { baud } };
-  await saveConfig({ serialPortParams });
+  await rememberSerialParams(`com:${portName}`, { baud });
 }
 
 export let sshHosts: SshHost[] = [];
@@ -68,6 +96,10 @@ export let configScrollback = 20000;
 export let configTabWidthMode = "equal";
 export let configThemeName: string = DEFAULT_THEME_NAME;
 export let configSerialBaud = 115200;
+export let configSerialInputMode: SerialInputMode = "normal";
+
+// Common baud rates offered in menus and settings.
+export const SERIAL_BAUD_RATES = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
 export let hiddenSshHosts: string[] = [];
 export let serialPorts: SerialPort[] = [];
 export let configLoaded = false;
@@ -249,6 +281,7 @@ function readConfigValues(cfg: any) {
   if (typeof cfg.tabWidthMode === "string") configTabWidthMode = cfg.tabWidthMode;
   if (typeof cfg.themeName === "string") configThemeName = cfg.themeName;
   if (typeof cfg.serialBaud === "number" && cfg.serialBaud >= 300 && cfg.serialBaud <= 921600) configSerialBaud = cfg.serialBaud;
+  if (cfg.serialInputMode === "normal" || cfg.serialInputMode === "echo" || cfg.serialInputMode === "line") configSerialInputMode = cfg.serialInputMode;
   if (cfg.serialPortParams && typeof cfg.serialPortParams === "object") serialPortParams = cfg.serialPortParams;
   if (Array.isArray(cfg.hiddenSshHosts)) hiddenSshHosts = cfg.hiddenSshHosts;
 }
@@ -265,6 +298,7 @@ export function getDefaultConfig(): Record<string, unknown> {
     tabWidthMode: "equal",
     themeName: DEFAULT_THEME_NAME,
     serialBaud: 115200,
+    serialInputMode: "normal",
     serialPortParams: {},
     hiddenProfiles: [],
     hiddenSshHosts: [],

@@ -96,7 +96,8 @@ function populateMenu() {
     localCol.appendChild(createMenuItem(TerminalIcon, "Default shell", "", () => tabManager.createLocalTab()));
   }
 
-  // Debug builds only: mock TTY demo (OSC 9;4 progress + TUI animation)
+  // Debug builds only: mock TTY demo (OSC 9;4 progress + TUI animation).
+  // Mock serial ports come through serial_list_ports enumeration instead.
   if (import.meta.env.DEV) {
     localCol.appendChild(createMenuItem(FlaskConical, "Demo TTY", "debug", () => tabManager.createDemoTab()));
   }

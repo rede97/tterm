@@ -1,4 +1,4 @@
-﻿import { localProfiles, configFontFamily, configFontSize, hiddenProfiles, configPasteWarning, configPasteTrim, configTerminalBell, configRenderer, configScrollback, configTabWidthMode, configThemeName, configSerialBaud, saveConfig, loadConfig, sshHosts, loadSshHosts, hiddenSshHosts, SshHost, hostProp } from "./profiles";
+﻿import { localProfiles, configFontFamily, configFontSize, hiddenProfiles, configPasteWarning, configPasteTrim, configTerminalBell, configRenderer, configScrollback, configTabWidthMode, configThemeName, configSerialBaud, configSerialInputMode, saveConfig, loadConfig, sshHosts, loadSshHosts, hiddenSshHosts, SshHost, hostProp, serialPorts, loadSerialPorts, serialPortParams, rememberSerialParams, forgetSerialParams, serialKeyFor, SERIAL_BAUD_RATES, SerialInputMode } from "./profiles";
 import { allThemes, findTheme } from "./themes";
 import { buildFontFamily, updateFontStack, parseFontFamily } from "./fontconfig";
 import { invoke } from "@tauri-apps/api/core";
@@ -6,6 +6,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
 import { settingsChangedFn } from "./settings-events";
+import { showToast } from "./toast";
 
 export function createSettingsContent(): HTMLElement {
   const root = document.createElement("div");
@@ -35,10 +36,16 @@ export function createSettingsContent(): HTMLElement {
   navSsh.textContent = "SSH";
   navSsh.dataset.panel = "ssh";
 
+  const navSerial = document.createElement("button");
+  navSerial.className = "settings-nav-item";
+  navSerial.textContent = "Serial";
+  navSerial.dataset.panel = "serial";
+
   sidebar.appendChild(navGeneral);
   sidebar.appendChild(navAppearance);
   sidebar.appendChild(navProfile);
   sidebar.appendChild(navSsh);
+  sidebar.appendChild(navSerial);
   root.appendChild(sidebar);
 
   // -- Body --
@@ -121,21 +128,6 @@ export function createSettingsContent(): HTMLElement {
             <label class="settings-toggle-row" style="padding:0;gap:0;">
               <input type="checkbox" id="set-paste-trim" ${configPasteTrim ? "checked" : ""} />
             </label>
-          </div>
-        </div>
-      </div>
-      <div class="settings-subsection">
-        <div class="settings-subsection-title">Serial</div>
-        <div class="settings-item settings-item-row">
-          <div class="settings-item-info">
-            <div class="settings-item-title">Default baud rate</div>
-            <div class="settings-item-desc">Baud rate for new serial sessions (8N1, no flow control).</div>
-          </div>
-          <div class="settings-item-control">
-            <select id="set-serial-baud" class="settings-select">
-              ${[9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600].map(b =>
-                `<option value="${b}" ${configSerialBaud === b ? "selected" : ""}>${b}</option>`).join("")}
-            </select>
           </div>
         </div>
       </div>
@@ -298,6 +290,14 @@ export function createSettingsContent(): HTMLElement {
   renderSshPanel(panelSsh);
   body.appendChild(panelSsh);
 
+  // Serial panel
+  const panelSerial = document.createElement("div");
+  panelSerial.className = "settings-panel-content";
+  panelSerial.dataset.panel = "serial";
+  panelSerial.style.display = "none";
+  renderSerialPanel(panelSerial);
+  body.appendChild(panelSerial);
+
   // Footer
   const footer = document.createElement("div");
   footer.className = "settings-footer";
@@ -392,6 +392,8 @@ function refreshForm(root: HTMLElement) {
   }
   const baudEl = root.querySelector("#set-serial-baud") as HTMLSelectElement;
   if (baudEl) baudEl.value = String(configSerialBaud);
+  const modeEl = root.querySelector("#set-serial-input-mode") as HTMLSelectElement;
+  if (modeEl) modeEl.value = configSerialInputMode;
   checks.forEach(c => {
     c.checked = !hiddenProfiles.includes(c.value);
   });
@@ -455,6 +457,131 @@ export function generateSshConfig(hosts: SshHost[]): string {
     lines.push("");
   }
   return lines.join("\n") + "\n";
+}
+
+function baudOptionsHtml(current: number): string {
+  return SERIAL_BAUD_RATES.map(b =>
+    `<option value="${b}" ${current === b ? "selected" : ""}>${b}</option>`).join("");
+}
+
+function inputModeOptionsHtml(current: SerialInputMode): string {
+  const modes: [SerialInputMode, string][] = [["normal", "Normal"], ["echo", "Echo"], ["line", "Line by Line"]];
+  return modes.map(([v, label]) =>
+    `<option value="${v}" ${current === v ? "selected" : ""}>${label}</option>`).join("");
+}
+
+function renderSerialPanel(container: HTMLElement) {
+  container.innerHTML = `
+    <div class="settings-section">
+      <div class="settings-section-title">Defaults</div>
+      <div class="settings-item settings-item-row">
+        <div class="settings-item-info">
+          <div class="settings-item-title">Default baud rate</div>
+          <div class="settings-item-desc">Baud rate for ports without remembered settings (8N1, no flow control).</div>
+        </div>
+        <div class="settings-item-control">
+          <select id="set-serial-baud" class="settings-select">${baudOptionsHtml(configSerialBaud)}</select>
+        </div>
+      </div>
+      <div class="settings-item settings-item-row">
+        <div class="settings-item-info">
+          <div class="settings-item-title">Default input mode</div>
+          <div class="settings-item-desc">Normal: send keys directly. ECHO: also echo locally. Line by Line: edit locally, send whole line on Enter.</div>
+        </div>
+        <div class="settings-item-control">
+          <select id="set-serial-input-mode" class="settings-select">${inputModeOptionsHtml(configSerialInputMode)}</select>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">Connected Ports</div>
+      <div id="serial-port-list">
+        <div class="settings-item-desc">Enumerating…</div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">History</div>
+      <div id="serial-history-list"></div>
+    </div>
+  `;
+
+  const listEl = container.querySelector("#serial-port-list")!;
+  const historyEl = container.querySelector("#serial-history-list")!;
+
+  const renderHistory = () => {
+    const keys = Object.keys(serialPortParams);
+    if (keys.length === 0) {
+      historyEl.innerHTML = `<div class="settings-item-desc">No remembered port settings.</div>`;
+      return;
+    }
+    historyEl.innerHTML = keys.map(key => {
+      const p = serialPortParams[key];
+      const label = key.startsWith("usb:") ? `USB ${key.slice(4)}` : key.slice(4);
+      return `
+        <div class="settings-item settings-item-row serial-history-row" data-key="${esc(key)}">
+          <div class="settings-item-info">
+            <div class="settings-item-title">${esc(label)}</div>
+            <div class="settings-item-desc">${p.baud} baud · ${esc(p.inputMode ?? "normal")}</div>
+          </div>
+          <div class="settings-item-control">
+            <button class="settings-link-btn serial-history-forget" data-key="${esc(key)}">Forget</button>
+          </div>
+        </div>`;
+    }).join("");
+    historyEl.querySelectorAll<HTMLButtonElement>(".serial-history-forget").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        await forgetSerialParams(btn.dataset.key!);
+        renderHistory();
+        showToast(`Forgot ${btn.dataset.key}`, "info", 1500);
+      });
+    });
+  };
+  renderHistory();
+
+  loadSerialPorts().then(() => {
+    if (serialPorts.length === 0) {
+      listEl.innerHTML = `<div class="settings-item-desc">No serial devices detected.</div>`;
+      return;
+    }
+    listEl.innerHTML = serialPorts.map(p => {
+      const ids = p.vid && p.pid ? `${p.vid}:${p.pid}` : "";
+      const sub = [p.product || p.driver, p.manufacturer, ids].filter(Boolean).join(" · ");
+      const key = serialKeyFor(p);
+      const mem = serialPortParams[key];
+      const baud = mem?.baud ?? configSerialBaud;
+      const mode = mem?.inputMode ?? configSerialInputMode;
+      return `
+        <div class="settings-item settings-item-row serial-port-row">
+          <div class="settings-item-info">
+            <div class="settings-item-title">${esc(p.name)}</div>
+            <div class="settings-item-desc">${esc(sub)}</div>
+          </div>
+          <div class="settings-item-control" style="display:flex;gap:6px;">
+            <select class="settings-select serial-port-baud" data-key="${esc(key)}">
+              ${baudOptionsHtml(baud)}
+            </select>
+            <select class="settings-select serial-port-mode" data-key="${esc(key)}">
+              ${inputModeOptionsHtml(mode)}
+            </select>
+          </div>
+        </div>`;
+    }).join("");
+
+    listEl.querySelectorAll<HTMLSelectElement>(".serial-port-baud").forEach(sel => {
+      sel.addEventListener("change", async () => {
+        await rememberSerialParams(sel.dataset.key!, { baud: parseInt(sel.value, 10) });
+        showToast(`Baud saved: ${sel.value}`, "info", 1500);
+        renderHistory();
+      });
+    });
+    listEl.querySelectorAll<HTMLSelectElement>(".serial-port-mode").forEach(sel => {
+      sel.addEventListener("change", async () => {
+        await rememberSerialParams(sel.dataset.key!, { inputMode: sel.value as SerialInputMode });
+        showToast(`Input mode saved: ${sel.value}`, "info", 1500);
+        renderHistory();
+      });
+    });
+  });
 }
 
 function renderSshPanel(container: HTMLElement) {
@@ -653,6 +780,8 @@ async function applySettings(root: HTMLElement) {
   if (themeEl) partial.themeName = themeEl.value;
   const baudEl = root.querySelector("#set-serial-baud") as HTMLSelectElement;
   if (baudEl) partial.serialBaud = parseInt(baudEl.value, 10) || 115200;
+  const modeEl = root.querySelector("#set-serial-input-mode") as HTMLSelectElement;
+  if (modeEl) partial.serialInputMode = modeEl.value;
 
   const hidden: string[] = [];
   checks.forEach(c => { if (!c.checked) hidden.push(c.value); });

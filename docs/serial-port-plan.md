@@ -80,4 +80,18 @@ PTY 与串口共用；串口读循环对超时错误继续轮询并检查 cancel
 
 - 每端口参数记忆与会话内参数修改
 - DTR/RTS 控制信号、break 发送
-- HEX 显示模式、时间戳、日志录制（与"会话录制"路线图项合并设计）
+- HEX 显示模式、时间戳、日志录制（与“会话录制”路线图项合并设计）
+
+## 模拟串口（debug 构建，已实现）
+
+`serial_list_ports` 在 debug 构建下追加两个虚拟端口，**走完全正常的生产路径**
+（菜单 → `serial_spawn` → 泵线程 → WS → xterm），无硬件即可测试全部串口 UX：
+
+| 端口 | 行为 |
+|---|---|
+| `MOCK-LOOP` | 回环：写入即回读（`set_baud_rate` 会回显确认），测试输入模式/延迟/波特率切换 |
+| `MOCK-NL` | 周期发射 4 组换行模式块（CRLF / 仅 LF / 仅 CR / 混合），测试输出换行处理 |
+
+实现：`MockSerialPort`（`demo.rs`）实现 `serialport::SerialPort` trait，`serial_spawn`
+识别模拟端口名并注入 `start_serial_session`；release 构建零代码（cfg 门控）。
+E2E 覆盖：菜单打开 MOCK-LOOP → 打字 → 回显断言。

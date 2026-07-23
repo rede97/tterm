@@ -156,6 +156,147 @@ pub fn demo_spawn(state: tauri::State<AppState>) -> Result<WsConnectResult, Stri
     Ok(WsConnectResult { id, port: ws_port })
 }
 
+// ── Mock serial ports (debug builds) ────────────────────────────────
+// Virtual SerialPort implementations injected into the REAL serial pump
+// (serial::start_serial_session), so loopback/newline tests exercise the
+// production I/O path — including future backend newline processing.
+
+use std::time::Duration;
+
+pub(crate) enum MockKind {
+    Loopback,
+    Newlines,
+}
+
+struct MockShared {
+    rx: std::sync::Mutex<std::sync::mpsc::Receiver<Vec<u8>>>,
+    tx: std::sync::mpsc::Sender<Vec<u8>>,
+}
+
+// Line-ending test blocks emitted by the newlines mock.
+pub(crate) const NEWLINE_BLOCKS: [&str; 4] = [
+    "\x1b[36m[1] CRLF lines:\x1b[0m\r\nalpha\r\nbeta\r\n",
+    "\x1b[36m[2] LF only (staircase when raw):\x1b[0m\nalpha\nbeta\n",
+    "\x1b[36m[3] CR only (overwrite when raw):\x1b[0m\ralpha\rbeta\r",
+    "\x1b[36m[4] mixed:\x1b[0m\nalpha\r\nbeta\rgamma\r\n",
+];
+
+pub(crate) struct MockSerialPort {
+    kind: MockKind,
+    shared: Arc<MockShared>,
+    baud: u32,
+}
+
+// Mock port names injected into serial_list_ports / serial_spawn in debug builds.
+pub(crate) const MOCK_LOOPBACK_NAME: &str = "MOCK-LOOP";
+pub(crate) const MOCK_NEWLINES_NAME: &str = "MOCK-NL";
+
+// Map a mock port name to a fresh virtual port (None for real hardware names).
+pub(crate) fn mock_port_by_name(name: &str) -> Option<Box<dyn serialport::SerialPort>> {
+    match name {
+        MOCK_LOOPBACK_NAME => Some(Box::new(MockSerialPort::loopback())),
+        MOCK_NEWLINES_NAME => Some(Box::new(MockSerialPort::newline_emitter())),
+        _ => None,
+    }
+}
+
+impl MockSerialPort {
+    pub(crate) fn loopback() -> Self {
+        let (tx, rx) = std::sync::mpsc::channel();
+        Self { kind: MockKind::Loopback, shared: Arc::new(MockShared { rx: std::sync::Mutex::new(rx), tx }), baud: 115200 }
+    }
+
+    pub(crate) fn newline_emitter() -> Self {
+        let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+        // Background thread cycles through line-ending test blocks
+        let tx2 = tx.clone();
+        std::thread::spawn(move || {
+            let mut i = 0;
+            loop {
+                if tx2.send(NEWLINE_BLOCKS[i % NEWLINE_BLOCKS.len()].as_bytes().to_vec()).is_err() {
+                    break;
+                }
+                i += 1;
+                std::thread::sleep(Duration::from_millis(2500));
+            }
+        });
+        Self { kind: MockKind::Newlines, shared: Arc::new(MockShared { rx: std::sync::Mutex::new(rx), tx }), baud: 115200 }
+    }
+}
+
+impl Read for MockSerialPort {
+    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+        let rx = self.shared.rx.lock().unwrap();
+        match rx.recv_timeout(Duration::from_millis(20)) {
+            Ok(data) => {
+                let n = data.len().min(out.len());
+                out[..n].copy_from_slice(&data[..n]);
+                Ok(n)
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "mock timeout"))
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => Ok(0),
+        }
+    }
+}
+
+impl Write for MockSerialPort {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self.kind {
+            // Loopback: written bytes come straight back as reads
+            MockKind::Loopback => {
+                let _ = self.shared.tx.send(buf.to_vec());
+            }
+            // Newline emitter: input is discarded (device is talk-only)
+            MockKind::Newlines => {}
+        }
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl serialport::SerialPort for MockSerialPort {
+    fn name(&self) -> Option<String> {
+        Some(match self.kind { MockKind::Loopback => "MOCK-LOOP".into(), MockKind::Newlines => "MOCK-NL".into() })
+    }
+    fn baud_rate(&self) -> serialport::Result<u32> { Ok(self.baud) }
+    fn data_bits(&self) -> serialport::Result<serialport::DataBits> { Ok(serialport::DataBits::Eight) }
+    fn flow_control(&self) -> serialport::Result<serialport::FlowControl> { Ok(serialport::FlowControl::None) }
+    fn parity(&self) -> serialport::Result<serialport::Parity> { Ok(serialport::Parity::None) }
+    fn stop_bits(&self) -> serialport::Result<serialport::StopBits> { Ok(serialport::StopBits::One) }
+    fn timeout(&self) -> Duration { Duration::from_millis(20) }
+    fn set_baud_rate(&mut self, baud_rate: u32) -> serialport::Result<()> {
+        self.baud = baud_rate;
+        // Loopback reports the baud change so the user sees it took effect
+        if let MockKind::Loopback = self.kind {
+            let _ = self.shared.tx.send(format!("\r\n[mock] baud => {}\r\n", baud_rate).into_bytes());
+        }
+        Ok(())
+    }
+    fn set_data_bits(&mut self, _: serialport::DataBits) -> serialport::Result<()> { Ok(()) }
+    fn set_flow_control(&mut self, _: serialport::FlowControl) -> serialport::Result<()> { Ok(()) }
+    fn set_parity(&mut self, _: serialport::Parity) -> serialport::Result<()> { Ok(()) }
+    fn set_stop_bits(&mut self, _: serialport::StopBits) -> serialport::Result<()> { Ok(()) }
+    fn set_timeout(&mut self, _: Duration) -> serialport::Result<()> { Ok(()) }
+    fn write_request_to_send(&mut self, _: bool) -> serialport::Result<()> { Ok(()) }
+    fn write_data_terminal_ready(&mut self, _: bool) -> serialport::Result<()> { Ok(()) }
+    fn read_clear_to_send(&mut self) -> serialport::Result<bool> { Ok(true) }
+    fn read_data_set_ready(&mut self) -> serialport::Result<bool> { Ok(true) }
+    fn read_ring_indicator(&mut self) -> serialport::Result<bool> { Ok(false) }
+    fn read_carrier_detect(&mut self) -> serialport::Result<bool> { Ok(true) }
+    fn bytes_to_read(&self) -> serialport::Result<u32> { Ok(0) }
+    fn bytes_to_write(&self) -> serialport::Result<u32> { Ok(0) }
+    fn clear(&self, _: serialport::ClearBuffer) -> serialport::Result<()> { Ok(()) }
+    fn try_clone(&self) -> serialport::Result<Box<dyn serialport::SerialPort>> {
+        Ok(Box::new(MockSerialPort { kind: match self.kind { MockKind::Loopback => MockKind::Loopback, MockKind::Newlines => MockKind::Newlines }, shared: self.shared.clone(), baud: self.baud }))
+    }
+    fn set_break(&self) -> serialport::Result<()> { Ok(()) }
+    fn clear_break(&self) -> serialport::Result<()> { Ok(()) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,6 +349,48 @@ mod tests {
         let n = reader.read(&mut buf).unwrap();
         assert_eq!(&buf[..n], b"hello");
         assert_eq!(reader.read(&mut buf).unwrap(), 0);
+    }
+
+    #[test]
+    fn mock_loopback_roundtrip() {
+        let mut port = MockSerialPort::loopback();
+        port.write_all(b"AT+TEST\r").unwrap();
+        let mut buf = [0u8; 64];
+        let n = port.read(&mut buf).unwrap();
+        assert_eq!(&buf[..n], b"AT+TEST\r");
+    }
+
+    #[test]
+    fn mock_loopback_baud_change_is_reported() {
+        use serialport::SerialPort;
+        let mut port = MockSerialPort::loopback();
+        port.set_baud_rate(9600).unwrap();
+        assert_eq!(port.baud_rate().unwrap(), 9600);
+        let mut buf = [0u8; 64];
+        let n = port.read(&mut buf).unwrap();
+        let msg = String::from_utf8_lossy(&buf[..n]);
+        assert!(msg.contains("9600"), "{}", msg);
+    }
+
+    #[test]
+    fn mock_newlines_blocks_cover_all_ending_styles() {
+        assert!(NEWLINE_BLOCKS[0].contains("\r\n"));
+        let b1 = NEWLINE_BLOCKS[1];
+        assert!(b1.contains("\n") && !b1.contains("\r"));  // LF only
+        let b2 = NEWLINE_BLOCKS[2];
+        assert!(b2.contains("\r") && !b2.contains("\n"));  // CR only
+        let b3 = NEWLINE_BLOCKS[3];
+        assert!(b3.contains("\r\n") && b3.contains("\rgamma") && b3.ends_with("\n")); // mixed
+    }
+
+    #[test]
+    fn mock_newlines_emits_first_block_immediately() {
+        let mut port = MockSerialPort::newline_emitter();
+        let mut buf = [0u8; 256];
+        let n = port.read(&mut buf).unwrap();
+        let text = String::from_utf8_lossy(&buf[..n]);
+        assert!(text.contains("[1]"));
+        assert!(text.contains("\r\n"));
     }
 
 }

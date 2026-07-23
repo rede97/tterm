@@ -1,5 +1,5 @@
 ﻿import { invoke } from "@tauri-apps/api/core";
-import { SshHost, localProfiles, defaultLocalProfile, hostProp, SerialPort, serialBaudFor, rememberSerialBaud } from "./profiles";
+import { SshHost, localProfiles, defaultLocalProfile, hostProp, SerialPort, serialParamsFor, serialKeyFor, rememberSerialParams } from "./profiles";
 import { showToast } from "./toast";
 import { TerminalTab } from "./tab";
 import Sortable from "sortablejs";
@@ -185,12 +185,12 @@ export class TabManager {
   }
 
   async createSerialTab(port: SerialPort): Promise<TerminalTab | null> {
-    const baud = serialBaudFor(port.name);
+    const params = serialParamsFor(port);
     let result: { id: string; port: number };
     try {
       result = await invoke("serial_spawn", {
         portName: port.name,
-        baudRate: baud,
+        baudRate: params.baud,
         dataBits: 8,
         parity: "none",
         stopBits: 1,
@@ -200,9 +200,11 @@ export class TabManager {
       showToast(String(e), "error");
       return null;
     }
-    const tab = new TerminalTab(result.id, "serial", `${port.name} · ${baud}`, this.terminalContainer);
+    const tab = new TerminalTab(result.id, "serial", `${port.name} · ${params.baud}`, this.terminalContainer);
     tab.serialPortName = port.name;
-    tab.serialBaud = baud;
+    tab.serialKey = serialKeyFor(port);
+    tab.serialBaud = params.baud;
+    tab.inputMode = params.inputMode;
     this._register(tab, result.port);
 
     await this._ensureFontsReady(tab);
@@ -218,10 +220,10 @@ export class TabManager {
   // Live baud switch for an open serial session; persists per-port memory.
   async setSerialBaud(tabId: string, baud: number): Promise<void> {
     const tab = this.tabs.get(tabId);
-    if (!tab || tab.type !== "serial" || !tab.serialPortName) return;
+    if (!tab || tab.type !== "serial" || !tab.serialPortName || !tab.serialKey) return;
     await invoke("serial_set_baud", { id: tabId, baudRate: baud });
     tab.serialBaud = baud;
-    await rememberSerialBaud(tab.serialPortName, baud);
+    await rememberSerialParams(tab.serialKey, { baud });
     tab.rename(`${tab.serialPortName} · ${baud}`);
   }
 

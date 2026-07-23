@@ -18,7 +18,7 @@ pub struct SerialPortInfo {
 
 #[tauri::command]
 pub fn serial_list_ports() -> Vec<SerialPortInfo> {
-    serial_enumerator::get_serial_list()
+    let mut result: Vec<SerialPortInfo> = serial_enumerator::get_serial_list()
         .into_iter()
         .map(|p| {
             let (vid, pid) = p.usb_info.map_or((String::new(), String::new()), |u| (u.vid, u.pid));
@@ -31,7 +31,30 @@ pub fn serial_list_ports() -> Vec<SerialPortInfo> {
                 pid,
             }
         })
-        .collect()
+        .collect();
+
+    // Debug builds: inject virtual mock ports so the entire serial UX
+    // (menu, session, params memory, settings) is testable without hardware.
+    #[cfg(debug_assertions)]
+    {
+        result.push(SerialPortInfo {
+            name: crate::demo::MOCK_LOOPBACK_NAME.into(),
+            driver: "tterm-mock".into(),
+            manufacturer: "TTerm".into(),
+            product: "Mock Loopback (echo)".into(),
+            vid: String::new(),
+            pid: String::new(),
+        });
+        result.push(SerialPortInfo {
+            name: crate::demo::MOCK_NEWLINES_NAME.into(),
+            driver: "tterm-mock".into(),
+            manufacturer: "TTerm".into(),
+            product: "Mock Newline Patterns".into(),
+            vid: String::new(),
+            pid: String::new(),
+        });
+    }
+    result
 }
 pub(crate) fn map_data_bits(bits: u8) -> Result<serialport::DataBits, String> {
     match bits {
@@ -207,7 +230,24 @@ pub(crate) fn spawn_serial_session(
     flow_control: &str,
 ) -> Result<u16, String> {
     let port = open_serial(port_name, baud_rate, data_bits, parity, stop_bits, flow_control)?;
+    let spec = SpawnSpec::Serial {
+        port_name: port_name.to_string(),
+        baud_rate,
+        data_bits,
+        parity: parity.to_string(),
+        stop_bits,
+        flow_control: flow_control.to_string(),
+    };
+    start_serial_session(state, id, port, Some(spec))
+}
 
+// Start pump + relay for an already-open serial port (real or mock).
+pub(crate) fn start_serial_session(
+    state: &AppState,
+    id: String,
+    port: Box<dyn serialport::SerialPort>,
+    spec: Option<SpawnSpec>,
+) -> Result<u16, String> {
     let cancel = Arc::new(AtomicBool::new(false));
     let (out_tx, out_rx) = std::sync::mpsc::channel::<Vec<u8>>();
     let (in_tx, in_rx) = std::sync::mpsc::channel::<Vec<u8>>();
@@ -221,19 +261,11 @@ pub(crate) fn spawn_serial_session(
     let writer = SerialIoWriter { tx: in_tx };
     let ws_port = start_ws_relay(reader, writer, Some(cancel.clone()))?;
 
-    let spec = SpawnSpec::Serial {
-        port_name: port_name.to_string(),
-        baud_rate,
-        data_bits,
-        parity: parity.to_string(),
-        stop_bits,
-        flow_control: flow_control.to_string(),
-    };
     state
         .serial_sessions
         .lock()
         .map_err(|e| e.to_string())?
-        .insert(id, SerialSession { cancel, ctl: ctl_tx, spec: Some(spec) });
+        .insert(id, SerialSession { cancel, ctl: ctl_tx, spec });
 
     Ok(ws_port)
 }
@@ -252,6 +284,13 @@ pub fn serial_spawn(
     let id = format!("tab-{}", *next);
     *next += 1;
     drop(next);
+
+    // Debug builds: mock port names get a virtual port instead of a real open
+    #[cfg(debug_assertions)]
+    if let Some(mock) = crate::demo::mock_port_by_name(&port_name) {
+        let port = start_serial_session(&state, id.clone(), mock, None)?;
+        return Ok(WsConnectResult { id, port });
+    }
 
     let port = spawn_serial_session(
         &state, id.clone(), &port_name, baud_rate, data_bits, &parity, stop_bits, &flow_control,

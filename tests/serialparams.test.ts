@@ -9,34 +9,56 @@ const { invokeMock } = vi.hoisted(() => ({
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 
 import {
-  serialBaudFor, rememberSerialBaud, serialPortParams, configSerialBaud,
+  serialKeyFor, serialParamsFor, rememberSerialParams, forgetSerialParams,
+  serialPortParams, configSerialBaud, configSerialInputMode,
 } from "../src/profiles";
 
-describe("serial per-port baud memory", () => {
+const USB_PORT = { name: "COM3", vid: "1A86", pid: "7523" };
+const COM_PORT = { name: "COM7", vid: "", pid: "" };
+
+describe("serial per-port memory (keyed by VID:PID for USB)", () => {
   beforeEach(() => {
     invokeMock.mockClear();
+    for (const k of Object.keys(serialPortParams)) delete serialPortParams[k];
   });
 
-  it("falls back to the global default when no memory exists", () => {
-    expect(serialBaudFor("COM99")).toBe(configSerialBaud);
+  it("keys USB devices by vid:pid, others by port name", () => {
+    expect(serialKeyFor(USB_PORT)).toBe("usb:1A86:7523");
+    expect(serialKeyFor(COM_PORT)).toBe("com:COM7");
   });
 
-  it("rememberSerialBaud updates the lookup and persists to config", async () => {
-    await rememberSerialBaud("COM3", 9600);
-    expect(serialBaudFor("COM3")).toBe(9600);
-    // other ports still use the default
-    expect(serialBaudFor("COM5")).toBe(configSerialBaud);
-
-    const writeCall = invokeMock.mock.calls.find(c => c[0] === "write_config");
-    expect(writeCall).toBeTruthy();
-    const written = JSON.parse((writeCall![1] as any).content);
-    expect(written.serialPortParams.COM3.baud).toBe(9600);
+  it("falls back to global defaults when no memory exists", () => {
+    const p = serialParamsFor(USB_PORT);
+    expect(p.baud).toBe(configSerialBaud);
+    expect(p.inputMode).toBe(configSerialInputMode);
   });
 
-  it("rememberSerialBaud overwrites previous memory for the same port", async () => {
-    await rememberSerialBaud("COM3", 9600);
-    await rememberSerialBaud("COM3", 57600);
-    expect(serialBaudFor("COM3")).toBe(57600);
-    expect(Object.keys(serialPortParams)).toEqual(["COM3"]);
+  it("remembered params win and persist", async () => {
+    await rememberSerialParams(serialKeyFor(USB_PORT), { baud: 9600, inputMode: "line" });
+    const p = serialParamsFor(USB_PORT);
+    expect(p.baud).toBe(9600);
+    expect(p.inputMode).toBe("line");
+    // a different COM name with the same VID:PID still matches
+    const moved = serialParamsFor({ name: "COM11", vid: "1A86", pid: "7523" });
+    expect(moved.baud).toBe(9600);
+
+    const write = invokeMock.mock.calls.find(c => c[0] === "write_config");
+    const written = JSON.parse((write![1] as any).content);
+    expect(written.serialPortParams["usb:1A86:7523"].baud).toBe(9600);
+  });
+
+  it("partial updates merge with existing memory", async () => {
+    await rememberSerialParams(serialKeyFor(USB_PORT), { baud: 9600, inputMode: "echo" });
+    await rememberSerialParams(serialKeyFor(USB_PORT), { baud: 57600 });
+    const p = serialParamsFor(USB_PORT);
+    expect(p.baud).toBe(57600);
+    expect(p.inputMode).toBe("echo"); // preserved
+  });
+
+  it("forget removes the record", async () => {
+    await rememberSerialParams(serialKeyFor(USB_PORT), { baud: 9600 });
+    await forgetSerialParams(serialKeyFor(USB_PORT));
+    expect(serialPortParams[serialKeyFor(USB_PORT)]).toBeUndefined();
+    expect(serialParamsFor(USB_PORT).baud).toBe(configSerialBaud);
   });
 });
