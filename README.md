@@ -5,34 +5,38 @@
 <h1 align="center">TTerm</h1>
 
 <p align="center">
-  <a href="https://github.com/rede97/tterm/actions/workflows/ci.yml"><img src="https://github.com/rede97/tterm/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  A fast, tiny, focused terminal for Windows.<br/>
+  Local shells, SSH, and serial — all in a ~5 MB installer.
 </p>
 
-A Windows terminal emulator built with Tauri v2 + xterm.js. Optimized for small binary size, high performance, and low resource usage. Focuses on the terminal content, not flashy UI.
+<p align="center">
+  <a href="https://github.com/rede97/tterm/actions/workflows/ci.yml"><img src="https://github.com/rede97/tterm/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/rede97/tterm/releases/latest"><img src="https://img.shields.io/github/v/release/rede97/tterm" alt="Release" /></a>
+  <a href="https://github.com/rede97/tterm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/rede97/tterm" alt="License" /></a>
+</p>
+
+<p align="center">
+  <img src="docs/images/screenshot.png" width="820" alt="TTerm screenshot" />
+</p>
 
 > [中文](README_CN.md)
 
-## Philosophy
+## Why TTerm
 
-Hyper (Electron) is bloated — large install size, high memory usage, slow startup. It also suffers from excessive terminal padding, broken IME input, and color scheme overrides. Windows Terminal is decent but hard to extend; common tasks like SSH and serial connections require too many clicks.
+- **Fast** — cold start under 1 second. No Electron bloat.
+- **Tiny** — ~5 MB installer, under 30 MB idle memory.
+- **Serial, done right** — for hardware hackers: automatic device enumeration
+  (USB VID:PID), one-click sessions, live baud switching without reconnecting,
+  newline modes (fix staircase LF or overwriting CR output), input modes
+  (direct / local echo / line editing), and per-device memory keyed by VID:PID.
+- **SSH built in** — reads your `~/.ssh/config`, one click to any host.
+- **Reconnect in a keystroke** — when a session drops, press Enter and it comes back.
+- **Theme gallery** — 12 built-in schemes plus automatic Windows Terminal
+  import, all previewed in your actual terminal font.
 
-TTerm strips away the excess. Three priorities: **fast controls**, **clean terminal display**, **instant startup**.
+## Download
 
-## Features
-
-- **Multi-tab terminal** — unlimited tabs supporting local shells (cmd.exe / PowerShell) and SSH connections, with drag-to-reorder
-- **SSH config integration** — auto-parses `~/.ssh/config` for one-click remote host connections
-- **Windows Terminal import** — reads WT `settings.json` and fragments to reuse existing profiles (VS, WSL, Azure, Git Bash, MSYS2)
-- **Profile visibility control** — toggle imported profiles on/off in settings without losing them
-- **Tab context menu** — right-click to new tab, rename, recolor, duplicate, export text, close right/other tabs
-- **Terminal context menu** — shift+right-click for copy (plain/HTML), paste, clear, find, export, new tab
-- **In-terminal search** — Ctrl+Shift+F to open the find bar
-- **Settings panel** — General, Appearance, and Profile tabs with renderer selection, scrollback buffer, paste options, tab width mode
-- **Custom window decorations** — no native title bar; VS Code-style tab bar with integrated window controls
-- **Open in new window** — launch additional app windows from context menu
-- **Serial terminal** — auto-detects serial devices (USB VID/PID, manufacturer) and opens sessions in one click (115200 8N1 default, configurable baud)
-- **Color schemes** — 12 built-in themes (Solarized, Dracula, Nord, Gruvbox, Monokai, etc.), auto-imports custom Windows Terminal schemes, live preview in settings
-- **Persistent config** — all settings preserved across sessions
+Grab the installer (NSIS / MSI) from [Releases](https://github.com/rede97/tterm/releases/latest).
 
 ## Performance
 
@@ -42,36 +46,21 @@ TTerm strips away the excess. Three priorities: **fast controls**, **clean termi
 | Cold start | < 1s | ~3-5s |
 | Idle memory | < 30 MB | ~150 MB+ |
 
-## Tech Stack
-
-- **Frontend**: TypeScript + Vite + xterm.js v6 + Lucide Icons
-- **Backend**: Rust + Tauri v2 + portable-pty
-- **IPC**: Tauri invoke commands + local WebSocket loopback (binary PTY I/O streamed directly to xterm.js)
-- **Packaging**: NSIS installer (~5 MB)
-
-## Development
+## Build from source
 
 ```sh
-# Install dependencies
 bun install
-
-# Frontend dev server
-bun run dev
-
-# Full Tauri dev mode
-bun run tauri dev
-
-# Production build
 bun run tauri build
 ```
 
+Stack: Tauri v2 (Rust) + xterm.js, terminal I/O over a local WebSocket loopback.
+Dev and testing docs live in [docs/testing.md](docs/testing.md).
+
 ## Roadmap
 
-- [x] Serial port support
 - [ ] Split panes
-- [x] Reconnect for SSH / serial sessions (disconnect hint + Enter to reconnect)
-- [~] Custom color scheme configuration UI (built-in themes + WT scheme import done; custom editor pending)
-- [x] OSC 9;4 terminal progress bar in tab title
+- [ ] Custom color scheme editor
+- [x] ~~Serial terminal~~ · ~~Session reconnect~~ · ~~Theme system~~ · ~~OSC 9;4 progress~~
 
 ## License
 

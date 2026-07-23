@@ -5,34 +5,36 @@
 <h1 align="center">TTerm</h1>
 
 <p align="center">
-  <a href="https://github.com/rede97/tterm/actions/workflows/ci.yml"><img src="https://github.com/rede97/tterm/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  一个快、小、专注的 Windows 终端。<br/>
+  本地 Shell、SSH、串口，一个不少 —— 安装包却只有 ~5 MB。
 </p>
 
-基于 Tauri v2 + xterm.js 构建的 Windows 终端模拟器。追求小体积、高性能、低资源占用，专注于终端内容本身而非华而不实的界面。
+<p align="center">
+  <a href="https://github.com/rede97/tterm/actions/workflows/ci.yml"><img src="https://github.com/rede97/tterm/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/rede97/tterm/releases/latest"><img src="https://img.shields.io/github/v/release/rede97/tterm" alt="Release" /></a>
+  <a href="https://github.com/rede97/tterm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/rede97/tterm" alt="License" /></a>
+</p>
+
+<p align="center">
+  <img src="docs/images/screenshot.png" width="820" alt="TTerm 运行截图" />
+</p>
 
 > [English](README.md)
 
-## 理念
+## 为什么选 TTerm
 
-Hyper（Electron）终端体积臃肿、内存占用高、启动慢，且存在终端边距过大、IME 输入异常、配色方案被覆盖等问题。Windows Terminal 功能尚可但扩展性差，SSH/串口等常用操作定位繁琐。
+- **快** — 冷启动 < 1 秒，打开即用，没有 Electron 的臃肿
+- **小** — 安装包 ~5 MB，空闲内存 < 30 MB
+- **串口利器** — 硬件开发友好：设备自动枚举（USB VID:PID）、一键打开、
+  波特率即点即切不断连、换行模式（LF 阶梯、CR 覆盖都有解）、输入模式
+  （直发 / 本地回显 / 整行编辑），设备参数按 VID:PID 记忆
+- **SSH 原生集成** — 自动读取 `~/.ssh/config`，主机一键连接
+- **断线不怕** — 会话断开后按一下回车，原地重连
+- **主题画廊** — 12 款内置配色 + 自动导入 Windows Terminal 方案，所见即所得
 
-TTerm 去掉多余设计，只关注三件事：**高效操控**、**清晰的终端显示**、**快速启动**。
+## 下载
 
-## 功能
-
-- **多标签终端** — 无限标签，支持本地 Shell（cmd.exe / PowerShell）和 SSH 远程连接，拖拽重排序
-- **SSH 配置集成** — 自动解析 `~/.ssh/config`，一键连接远端主机
-- **Windows Terminal 配置导入** — 读取 WT 的 `settings.json` 和扩展片段，复用已有配置（VS、WSL、Azure、Git Bash、MSYS2）
-- **配置可见性控制** — 在设置中自由开关导入的配置，隐藏后不会丢失
-- **标签上下文菜单** — 右键标签可新建、改名、换颜色、复制、导出文本、关闭右侧/其他
-- **终端上下文菜单** — Shift+右键可复制（纯文本/HTML）、粘贴、清屏、搜索、导出、新建标签
-- **终端内搜索** — Ctrl+Shift+F 打开搜索栏
-- **设置面板** — 通用、外观、配置三栏布局，支持渲染器切换、回滚缓冲区、粘贴选项、标签宽度模式
-- **自定义窗口装饰** — 无原生标题栏，VS Code 风格标签栏集成窗口控制按钮
-- **新建窗口** — 从右键菜单启动新应用窗口
-- **串口终端** — 自动枚举串口设备（USB VID/PID、厂商信息），一键打开串口会话（默认 115200 8N1，波特率可配置）
-- **配色方案** — 12 款内置主题（Solarized、Dracula、Nord、Gruvbox、Monokai 等），自动导入 Windows Terminal 自定义方案，设置面板实时预览
-- **配置持久化** — 所有设置跨会话保留
+从 [Releases](https://github.com/rede97/tterm/releases/latest) 获取安装包（NSIS / MSI）。
 
 ## 性能
 
@@ -42,36 +44,21 @@ TTerm 去掉多余设计，只关注三件事：**高效操控**、**清晰的�
 | 冷启动 | < 1s | ~3-5s |
 | 空闲内存 | < 30 MB | ~150 MB+ |
 
-## 技术栈
-
-- **前端**: TypeScript + Vite + xterm.js v6 + Lucide Icons
-- **后端**: Rust + Tauri v2 + portable-pty
-- **通信**: Tauri invoke 命令 + 本地 WebSocket 回环（PTY I/O 二进制帧直连 xterm.js）
-- **打包**: NSIS 安装包 (~5 MB)
-
-## 开发
+## 从源码构建
 
 ```sh
-# 安装依赖
 bun install
-
-# 前端开发
-bun run dev
-
-# 完整 Tauri 应用开发
-bun run tauri dev
-
-# 构建
 bun run tauri build
 ```
 
+技术栈：Tauri v2 (Rust) + xterm.js，本地 WebSocket 回环传输终端数据。
+测试与开发文档见 [docs/testing.md](docs/testing.md)。
+
 ## 路线图
 
-- [x] 串口（Serial）连接支持
 - [ ] 分屏显示
-- [x] SSH / 串口断线重连（断联提示 + 回车重连）
-- [~] 自定义配色方案配置界面（内置主题 + WT 方案导入已实现，自定义编辑器待做）
-- [x] OSC 9;4 终端标签页进度条
+- [ ] 配色方案自定义编辑器
+- [x] ~~串口终端~~ · ~~断线重连~~ · ~~主题系统~~ · ~~OSC 9;4 进度条~~
 
 ## 许可
 
