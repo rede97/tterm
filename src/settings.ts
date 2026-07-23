@@ -1,4 +1,4 @@
-﻿import { localProfiles, configFontFamily, configFontSize, hiddenProfiles, configPasteWarning, configPasteTrim, configTerminalBell, configRenderer, configScrollback, configTabWidthMode, configThemeName, configSerialBaud, configSerialInputMode, saveConfig, loadConfig, sshHosts, loadSshHosts, hiddenSshHosts, SshHost, hostProp, serialPorts, loadSerialPorts, serialPortParams, rememberSerialParams, forgetSerialParams, serialKeyFor, SERIAL_BAUD_RATES, SerialInputMode } from "./profiles";
+﻿import { localProfiles, configFontFamily, configFontSize, hiddenProfiles, configPasteWarning, configPasteTrim, configTerminalBell, configRenderer, configScrollback, configTabWidthMode, configThemeName, configSerialBaud, configSerialInputMode, configSerialOutputNewline, saveConfig, loadConfig, sshHosts, loadSshHosts, hiddenSshHosts, SshHost, hostProp, serialPorts, loadSerialPorts, serialPortParams, rememberSerialParams, forgetSerialParams, serialKeyFor, SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SerialInputMode, SerialOutputNewline } from "./profiles";
 import { allThemes, findTheme } from "./themes";
 import { buildFontFamily, updateFontStack, parseFontFamily } from "./fontconfig";
 import { invoke } from "@tauri-apps/api/core";
@@ -394,6 +394,8 @@ function refreshForm(root: HTMLElement) {
   if (baudEl) baudEl.value = String(configSerialBaud);
   const modeEl = root.querySelector("#set-serial-input-mode") as HTMLSelectElement;
   if (modeEl) modeEl.value = configSerialInputMode;
+  const nlEl = root.querySelector("#set-serial-output-newline") as HTMLSelectElement;
+  if (nlEl) nlEl.value = configSerialOutputNewline;
   checks.forEach(c => {
     c.checked = !hiddenProfiles.includes(c.value);
   });
@@ -470,6 +472,11 @@ function inputModeOptionsHtml(current: SerialInputMode): string {
     `<option value="${v}" ${current === v ? "selected" : ""}>${label}</option>`).join("");
 }
 
+function outputNewlineOptionsHtml(current: string): string {
+  return SERIAL_OUTPUT_NEWLINES.map(([v, label]) =>
+    `<option value="${v}" ${current === v ? "selected" : ""}>${label}</option>`).join("");
+}
+
 function renderSerialPanel(container: HTMLElement) {
   container.innerHTML = `
     <div class="settings-section">
@@ -490,6 +497,15 @@ function renderSerialPanel(container: HTMLElement) {
         </div>
         <div class="settings-item-control">
           <select id="set-serial-input-mode" class="settings-select">${inputModeOptionsHtml(configSerialInputMode)}</select>
+        </div>
+      </div>
+      <div class="settings-item settings-item-row">
+        <div class="settings-item-info">
+          <div class="settings-item-title">Default output newlines</div>
+          <div class="settings-item-desc">How device output line endings are rewritten before display.</div>
+        </div>
+        <div class="settings-item-control">
+          <select id="set-serial-output-newline" class="settings-select">${outputNewlineOptionsHtml(configSerialOutputNewline)}</select>
         </div>
       </div>
     </div>
@@ -521,7 +537,7 @@ function renderSerialPanel(container: HTMLElement) {
         <div class="settings-item settings-item-row serial-history-row" data-key="${esc(key)}">
           <div class="settings-item-info">
             <div class="settings-item-title">${esc(label)}</div>
-            <div class="settings-item-desc">${p.baud} baud · ${esc(p.inputMode ?? "normal")}</div>
+            <div class="settings-item-desc">${p.baud} baud · ${esc(p.inputMode ?? "normal")} · ${esc(p.outputNewline ?? "keep")}</div>
           </div>
           <div class="settings-item-control">
             <button class="settings-link-btn serial-history-forget" data-key="${esc(key)}">Forget</button>
@@ -550,6 +566,7 @@ function renderSerialPanel(container: HTMLElement) {
       const mem = serialPortParams[key];
       const baud = mem?.baud ?? configSerialBaud;
       const mode = mem?.inputMode ?? configSerialInputMode;
+      const nl = mem?.outputNewline ?? configSerialOutputNewline;
       return `
         <div class="settings-item settings-item-row serial-port-row">
           <div class="settings-item-info">
@@ -562,6 +579,9 @@ function renderSerialPanel(container: HTMLElement) {
             </select>
             <select class="settings-select serial-port-mode" data-key="${esc(key)}">
               ${inputModeOptionsHtml(mode)}
+            </select>
+            <select class="settings-select serial-port-nl" data-key="${esc(key)}">
+              ${outputNewlineOptionsHtml(nl)}
             </select>
           </div>
         </div>`;
@@ -578,6 +598,13 @@ function renderSerialPanel(container: HTMLElement) {
       sel.addEventListener("change", async () => {
         await rememberSerialParams(sel.dataset.key!, { inputMode: sel.value as SerialInputMode });
         showToast(`Input mode saved: ${sel.value}`, "info", 1500);
+        renderHistory();
+      });
+    });
+    listEl.querySelectorAll<HTMLSelectElement>(".serial-port-nl").forEach(sel => {
+      sel.addEventListener("change", async () => {
+        await rememberSerialParams(sel.dataset.key!, { outputNewline: sel.value as SerialOutputNewline });
+        showToast(`Output newlines saved: ${sel.value}`, "info", 1500);
         renderHistory();
       });
     });
@@ -782,6 +809,8 @@ async function applySettings(root: HTMLElement) {
   if (baudEl) partial.serialBaud = parseInt(baudEl.value, 10) || 115200;
   const modeEl = root.querySelector("#set-serial-input-mode") as HTMLSelectElement;
   if (modeEl) partial.serialInputMode = modeEl.value;
+  const nlEl = root.querySelector("#set-serial-output-newline") as HTMLSelectElement;
+  if (nlEl) partial.serialOutputNewline = nlEl.value;
 
   const hidden: string[] = [];
   checks.forEach(c => { if (!c.checked) hidden.push(c.value); });

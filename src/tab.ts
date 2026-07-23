@@ -26,6 +26,7 @@ export class TerminalTab {
   serialPortName?: string;
   serialKey?: string;
   serialBaud?: number;
+  outputNewline?: string;
   inputMode: SerialInputMode = "normal";
   label: string;
   color?: string;

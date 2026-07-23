@@ -37,10 +37,22 @@ export interface SerialPort {
 }
 
 export type SerialInputMode = "normal" | "echo" | "line";
+export type SerialOutputNewline = "keep" | "cr-in-lf" | "lf-in-cr" | "force-crlf" | "force-lf" | "force-cr" | "strip";
+
+export const SERIAL_OUTPUT_NEWLINES: [SerialOutputNewline, string][] = [
+  ["keep", "Keep (raw)"],
+  ["cr-in-lf", "Implicit CR in every LF"],
+  ["lf-in-cr", "Implicit LF in every CR"],
+  ["force-crlf", "Force CRLF"],
+  ["force-lf", "Force LF"],
+  ["force-cr", "Force CR"],
+  ["strip", "Strip"],
+];
 
 export interface SerialParams {
   baud: number;
   inputMode?: SerialInputMode;
+  outputNewline?: SerialOutputNewline;
 }
 
 // Per-port remembered parameters. USB devices are keyed by VID:PID (stable
@@ -57,6 +69,7 @@ export function serialParamsFor(port: { name: string; vid: string; pid: string }
   return {
     baud: mem?.baud ?? configSerialBaud,
     inputMode: mem?.inputMode ?? configSerialInputMode,
+    outputNewline: mem?.outputNewline ?? configSerialOutputNewline,
   };
 }
 
@@ -97,6 +110,7 @@ export let configTabWidthMode = "equal";
 export let configThemeName: string = DEFAULT_THEME_NAME;
 export let configSerialBaud = 115200;
 export let configSerialInputMode: SerialInputMode = "normal";
+export let configSerialOutputNewline: SerialOutputNewline = "keep";
 
 // Common baud rates offered in menus and settings.
 export const SERIAL_BAUD_RATES = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
@@ -282,6 +296,7 @@ function readConfigValues(cfg: any) {
   if (typeof cfg.themeName === "string") configThemeName = cfg.themeName;
   if (typeof cfg.serialBaud === "number" && cfg.serialBaud >= 300 && cfg.serialBaud <= 921600) configSerialBaud = cfg.serialBaud;
   if (cfg.serialInputMode === "normal" || cfg.serialInputMode === "echo" || cfg.serialInputMode === "line") configSerialInputMode = cfg.serialInputMode;
+  if (typeof cfg.serialOutputNewline === "string" && SERIAL_OUTPUT_NEWLINES.some(([v]) => v === cfg.serialOutputNewline)) configSerialOutputNewline = cfg.serialOutputNewline;
   if (cfg.serialPortParams && typeof cfg.serialPortParams === "object") serialPortParams = cfg.serialPortParams;
   if (Array.isArray(cfg.hiddenSshHosts)) hiddenSshHosts = cfg.hiddenSshHosts;
 }
@@ -299,6 +314,7 @@ export function getDefaultConfig(): Record<string, unknown> {
     themeName: DEFAULT_THEME_NAME,
     serialBaud: 115200,
     serialInputMode: "normal",
+    serialOutputNewline: "keep",
     serialPortParams: {},
     hiddenProfiles: [],
     hiddenSshHosts: [],

@@ -1,6 +1,6 @@
 import { tabManager } from "./tabmanager";
 import { openFind } from "./search";
-import { trimPasteContent, SERIAL_BAUD_RATES } from "./profiles";
+import { trimPasteContent, SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES } from "./profiles";
 import { showToast } from "./toast";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -135,6 +135,32 @@ baudItem.addEventListener("mouseenter", () => baudSub.classList.add("open"));
 baudItem.addEventListener("mouseleave", () => baudSub.classList.remove("open"));
 termMenuGroup.appendChild(baudItem);
 
+// Output newlines submenu (serial tabs only)
+const nlItem = document.createElement("div");
+nlItem.className = "menu-item has-submenu";
+nlItem.style.display = "none";
+const nlLabel = document.createElement("span");
+nlLabel.textContent = "Output Newlines";
+nlItem.appendChild(nlLabel);
+const nlArrow = document.createElement("span");
+nlArrow.className = "menu-arrow";
+nlArrow.textContent = "›";
+nlItem.appendChild(nlArrow);
+
+const nlSub = document.createElement("div");
+nlSub.className = "baud-submenu";
+for (const [v, label] of SERIAL_OUTPUT_NEWLINES) {
+  const el = document.createElement("div");
+  el.className = "menu-item nl-option";
+  el.dataset.nl = v;
+  el.dataset.nlLabel = label;
+  nlSub.appendChild(el);
+}
+nlItem.appendChild(nlSub);
+nlItem.addEventListener("mouseenter", () => nlSub.classList.add("open"));
+nlItem.addEventListener("mouseleave", () => nlSub.classList.remove("open"));
+termMenuGroup.appendChild(nlItem);
+
 termMenuGroup.appendChild(mkItem("Copy", "copy"));
 termMenuGroup.appendChild(mkItem("Copy as HTML", "copy-html"));
 termMenuGroup.appendChild(mkItem("Paste", "paste"));
@@ -165,6 +191,14 @@ contextMenu.addEventListener("click", (e) => {
   if (target.classList.contains("baud-option") && target.dataset.baud) {
     e.stopPropagation();
     tabManager.setSerialBaud(currentTabId, parseInt(target.dataset.baud, 10));
+    closeContextMenu();
+    return;
+  }
+
+  // Output newline option
+  if (target.classList.contains("nl-option") && target.dataset.nl) {
+    e.stopPropagation();
+    tabManager.setSerialOutputNewline(currentTabId, target.dataset.nl as import("./profiles").SerialOutputNewline);
     closeContextMenu();
     return;
   }
@@ -272,10 +306,16 @@ export function showTerminalContextMenu(tabId: string, x: number, y: number) {
   const tab = tabManager.get(tabId);
   const isSerial = tab?.type === "serial";
   baudItem.style.display = isSerial ? "" : "none";
+  nlItem.style.display = isSerial ? "" : "none";
   if (isSerial) {
     baudSub.querySelectorAll<HTMLElement>(".baud-option").forEach(el => {
       const b = parseInt(el.dataset.baud!, 10);
       el.textContent = b === tab!.serialBaud ? `${b} ✓` : String(b);
+    });
+    nlSub.querySelectorAll<HTMLElement>(".nl-option").forEach(el => {
+      const current = tab!.outputNewline ?? "keep";
+      const isCur = el.dataset.nl === current;
+      el.textContent = isCur ? `${el.dataset.nlLabel} ✓` : el.dataset.nlLabel!;
     });
   }
   tabMenuGroup.style.display = "none";

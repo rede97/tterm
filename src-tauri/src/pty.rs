@@ -214,9 +214,9 @@ pub fn session_reconnect(state: tauri::State<AppState>, app: tauri::AppHandle, i
             cmd.arg(port.to_string());
             spawn_pty(app, id.to_string(), cmd, SpawnSpec::Ssh { hostname, port, user })?
         }
-        SpawnSpec::Serial { port_name, baud_rate, data_bits, parity, stop_bits, flow_control } => {
+        SpawnSpec::Serial { port_name, baud_rate, data_bits, parity, stop_bits, flow_control, output_newline } => {
             crate::serial::spawn_serial_session(
-                &state, id.to_string(), &port_name, baud_rate, data_bits, &parity, stop_bits, &flow_control,
+                &state, id.to_string(), &port_name, baud_rate, data_bits, &parity, stop_bits, &flow_control, &output_newline,
             )?
         }
     };

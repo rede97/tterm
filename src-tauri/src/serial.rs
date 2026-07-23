@@ -3,6 +3,7 @@ use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use crate::newline::{NewlineFilter, NewlineMode};
 use crate::relay::start_ws_relay;
 use crate::state::{AppState, SerialCtl, SerialSession, SpawnSpec, WsConnectResult};
 
@@ -176,17 +177,21 @@ pub(crate) fn serial_io_loop(
     input: std::sync::mpsc::Receiver<Vec<u8>>,
     ctl: std::sync::mpsc::Receiver<SerialCtl>,
     cancel: Arc<AtomicBool>,
+    mut newline_filter: NewlineFilter,
 ) {
     let mut buf = [0u8; 16384];
     'outer: loop {
         if cancel.load(Ordering::Relaxed) {
             break;
         }
-        // 0. Apply pending control messages (e.g. live baud switch)
+        // 0. Apply pending control messages (e.g. live baud / newline switch)
         while let Ok(msg) = ctl.try_recv() {
             match msg {
                 SerialCtl::SetBaud(baud) => {
                     let _ = port.set_baud_rate(baud);
+                }
+                SerialCtl::SetOutputNewline(mode) => {
+                    newline_filter.set_mode(mode);
                 }
             }
         }
@@ -203,11 +208,17 @@ pub(crate) fn serial_io_loop(
             }
         }
         let _ = port.flush();
-        // 2. Read whatever the device sent (<=20ms block)
+        // 2. Read whatever the device sent (<=20ms block), then apply the
+        // output newline filter before forwarding.
         match port.read(&mut buf) {
             Ok(0) => {}
             Ok(n) => {
-                if out.send(buf[..n].to_vec()).is_err() {
+                let mut processed = Vec::with_capacity(n + 16);
+                newline_filter.process(&buf[..n], &mut processed);
+                if processed.is_empty() {
+                    continue;
+                }
+                if out.send(processed).is_err() {
                     break;
                 }
             }
@@ -228,6 +239,7 @@ pub(crate) fn spawn_serial_session(
     parity: &str,
     stop_bits: u8,
     flow_control: &str,
+    output_newline: &str,
 ) -> Result<u16, String> {
     let port = open_serial(port_name, baud_rate, data_bits, parity, stop_bits, flow_control)?;
     let spec = SpawnSpec::Serial {
@@ -237,6 +249,7 @@ pub(crate) fn spawn_serial_session(
         parity: parity.to_string(),
         stop_bits,
         flow_control: flow_control.to_string(),
+        output_newline: output_newline.to_string(),
     };
     start_serial_session(state, id, port, Some(spec))
 }
@@ -248,13 +261,20 @@ pub(crate) fn start_serial_session(
     port: Box<dyn serialport::SerialPort>,
     spec: Option<SpawnSpec>,
 ) -> Result<u16, String> {
+    let nl_mode = spec
+        .as_ref()
+        .and_then(|s| match s {
+            SpawnSpec::Serial { output_newline, .. } => NewlineMode::from_str(output_newline).ok(),
+            _ => None,
+        })
+        .unwrap_or(NewlineMode::Keep);
     let cancel = Arc::new(AtomicBool::new(false));
     let (out_tx, out_rx) = std::sync::mpsc::channel::<Vec<u8>>();
     let (in_tx, in_rx) = std::sync::mpsc::channel::<Vec<u8>>();
     let (ctl_tx, ctl_rx) = std::sync::mpsc::channel::<SerialCtl>();
     std::thread::spawn({
         let cancel = cancel.clone();
-        move || serial_io_loop(port, out_tx, in_rx, ctl_rx, cancel)
+        move || serial_io_loop(port, out_tx, in_rx, ctl_rx, cancel, NewlineFilter::new(nl_mode))
     });
 
     let reader = SerialIoReader { rx: out_rx, cur: std::collections::VecDeque::new() };
@@ -279,21 +299,34 @@ pub fn serial_spawn(
     parity: String,
     stop_bits: u8,
     flow_control: String,
+    output_newline: Option<String>,
 ) -> Result<WsConnectResult, String> {
     let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
     let id = format!("tab-{}", *next);
     *next += 1;
     drop(next);
 
+    let nl = output_newline.as_deref().unwrap_or("keep");
+    NewlineMode::from_str(nl)?; // validate early
+
     // Debug builds: mock port names get a virtual port instead of a real open
     #[cfg(debug_assertions)]
     if let Some(mock) = crate::demo::mock_port_by_name(&port_name) {
-        let port = start_serial_session(&state, id.clone(), mock, None)?;
+        let spec = SpawnSpec::Serial {
+            port_name: port_name.clone(),
+            baud_rate,
+            data_bits,
+            parity: parity.clone(),
+            stop_bits,
+            flow_control: flow_control.clone(),
+            output_newline: nl.to_string(),
+        };
+        let port = start_serial_session(&state, id.clone(), mock, Some(spec))?;
         return Ok(WsConnectResult { id, port });
     }
 
     let port = spawn_serial_session(
-        &state, id.clone(), &port_name, baud_rate, data_bits, &parity, stop_bits, &flow_control,
+        &state, id.clone(), &port_name, baud_rate, data_bits, &parity, stop_bits, &flow_control, nl,
     )?;
 
     Ok(WsConnectResult { id, port })
@@ -308,6 +341,23 @@ pub fn serial_set_baud(state: tauri::State<AppState>, id: &str, baud_rate: u32) 
     session
         .ctl
         .send(SerialCtl::SetBaud(baud_rate))
+        .map_err(|e| format!("Serial session closed: {}", e))
+}
+
+#[tauri::command]
+pub fn serial_set_output_newline(state: tauri::State<AppState>, id: &str, mode: &str) -> Result<(), String> {
+    let mode = NewlineMode::from_str(mode)?;
+    let mut sessions = state.serial_sessions.lock().map_err(|e| e.to_string())?;
+    let session = sessions
+        .get_mut(id)
+        .ok_or_else(|| format!("No serial session: {}", id))?;
+    // Keep the spec in sync so reconnect preserves the current mode
+    if let Some(SpawnSpec::Serial { output_newline, .. }) = &mut session.spec {
+        *output_newline = mode.as_str().to_string();
+    }
+    session
+        .ctl
+        .send(SerialCtl::SetOutputNewline(mode))
         .map_err(|e| format!("Serial session closed: {}", e))
 }
 

@@ -3,6 +3,7 @@ mod config;
 #[cfg(debug_assertions)]
 mod demo;
 mod fonts;
+mod newline;
 mod pty;
 mod relay;
 mod serial;
@@ -47,6 +48,7 @@ pub fn run() {
                 config::read_config, config::write_config, config::delete_config, config::open_config_dir,
                 wt::read_wt_settings, wt::read_wt_fragments, wt::find_vs_instances,
                 serial::serial_list_ports, serial::serial_spawn, serial::serial_set_baud,
+                serial::serial_set_output_newline,
                 demo::demo_spawn,
                 fonts::list_system_fonts,
             ] }
@@ -60,6 +62,7 @@ pub fn run() {
                 config::read_config, config::write_config, config::delete_config, config::open_config_dir,
                 wt::read_wt_settings, wt::read_wt_fragments, wt::find_vs_instances,
                 serial::serial_list_ports, serial::serial_spawn, serial::serial_set_baud,
+                serial::serial_set_output_newline,
                 fonts::list_system_fonts,
             ] }
         })

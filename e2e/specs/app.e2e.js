@@ -163,6 +163,58 @@ describe("TTerm application", () => {
     expect(text).toContain("HIMOCK");
   });
 
+  it("output newline cr-in-lf fixes LF-only staircase (MOCK-NL end-to-end)", async () => {
+    await $("#new-tab-menu-btn").click();
+    await browser.waitUntil(async () => {
+      return await browser.execute(() => {
+        const items = [...document.querySelectorAll(".profile-menu .profile-item")];
+        return items.some(i => i.querySelector(".item-label")?.textContent?.includes("MOCK-NL"));
+      });
+    }, { timeout: 8000 });
+    await browser.execute(() => {
+      const items = [...document.querySelectorAll(".profile-menu .profile-item")];
+      const hit = items.find(i => i.querySelector(".item-label")?.textContent?.includes("MOCK-NL"));
+      if (hit) hit.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    const dumpLines = () => browser.execute(() => {
+      for (const [, tab] of (window).__tterm.tabs.entries()) {
+        if (tab.label && tab.label.includes("MOCK-NL")) {
+          const buf = tab.terminal.buffer.active;
+          const lines = [];
+          for (let i = 0; i < buf.length; i++) lines.push(buf.getLine(i)?.translateToString(false) ?? "");
+          return lines;
+        }
+      }
+      return [];
+    });
+
+    // wait for the LF-only block [2] in raw mode: beta should be staircased
+    await browser.waitUntil(async () => {
+      const lines = await dumpLines();
+      return lines.some(l => l.includes("[2]")) && lines.some(l => /^ +beta/.test(l));
+    }, { timeout: 15000, timeoutMsg: "raw staircase block [2] not seen" });
+
+    // switch output newlines to cr-in-lf, clear, wait for the block to cycle back
+    await browser.execute(() => {
+      for (const [id, tab] of (window).__tterm.tabs.entries()) {
+        if (tab.label && tab.label.includes("MOCK-NL")) {
+          (window).__tterm.mgr.setSerialOutputNewline(id, "cr-in-lf");
+          tab.terminal.clear();
+        }
+      }
+    });
+
+    await browser.waitUntil(async () => {
+      const lines = await dumpLines();
+      return lines.some(l => l.includes("[2]")) && lines.some(l => /^beta\s*$/.test(l));
+    }, { timeout: 20000, timeoutMsg: "cr-in-lf did not de-staircase block [2]" });
+
+    // and no staircased beta remains
+    const lines = await dumpLines();
+    expect(lines.some(l => /^ +beta/.test(l))).toBe(false);
+  });
+
   it("shows the terminal viewport inside the active tab", async () => {
     // The `active` class lives on the tab-bar element (.tab.active), not on
     // .terminal-instance — the visible instance is the one without display:none.

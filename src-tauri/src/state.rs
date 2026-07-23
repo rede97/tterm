@@ -38,13 +38,17 @@ pub enum SpawnSpec {
         parity: String,
         stop_bits: u8,
         flow_control: String,
+        output_newline: String,
     },
 }
+
+use crate::newline::NewlineMode;
 
 // Control messages for the serial I/O pump thread.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SerialCtl {
     SetBaud(u32),
+    SetOutputNewline(NewlineMode),
 }
 
 pub struct AppState {
