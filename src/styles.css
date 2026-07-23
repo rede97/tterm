@@ -315,6 +315,26 @@ body {
   background: #333333;
 }
 
+/* floating IME composition box */
+.ime-box {
+  position: absolute;
+  padding: 4px 12px;
+  background: #252526;
+  border: 1px solid #0e639c;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.4;
+  min-width: 48px;
+  max-width: 60%;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-all;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 25;
+}
+
 /* disconnect overlay */
 .disconnect-overlay {
   position: absolute;

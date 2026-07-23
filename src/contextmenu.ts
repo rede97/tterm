@@ -1,6 +1,6 @@
 import { tabManager } from "./tabmanager";
 import { openFind } from "./search";
-import { trimPasteContent, SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES } from "./profiles";
+import { trimPasteContent, SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES } from "./profiles";
 import { showToast } from "./toast";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -161,6 +161,32 @@ nlItem.addEventListener("mouseenter", () => nlSub.classList.add("open"));
 nlItem.addEventListener("mouseleave", () => nlSub.classList.remove("open"));
 termMenuGroup.appendChild(nlItem);
 
+// Enter-sends submenu (serial tabs only)
+const enterItem = document.createElement("div");
+enterItem.className = "menu-item has-submenu";
+enterItem.style.display = "none";
+const enterLabel = document.createElement("span");
+enterLabel.textContent = "Enter Sends";
+enterItem.appendChild(enterLabel);
+const enterArrow = document.createElement("span");
+enterArrow.className = "menu-arrow";
+enterArrow.textContent = "›";
+enterItem.appendChild(enterArrow);
+
+const enterSub = document.createElement("div");
+enterSub.className = "baud-submenu";
+for (const [v, label] of SERIAL_ENTER_NEWLINES) {
+  const el = document.createElement("div");
+  el.className = "menu-item enter-option";
+  el.dataset.enter = v;
+  el.dataset.enterLabel = label;
+  enterSub.appendChild(el);
+}
+enterItem.appendChild(enterSub);
+enterItem.addEventListener("mouseenter", () => enterSub.classList.add("open"));
+enterItem.addEventListener("mouseleave", () => enterSub.classList.remove("open"));
+termMenuGroup.appendChild(enterItem);
+
 termMenuGroup.appendChild(mkItem("Copy", "copy"));
 termMenuGroup.appendChild(mkItem("Copy as HTML", "copy-html"));
 termMenuGroup.appendChild(mkItem("Paste", "paste"));
@@ -191,6 +217,14 @@ contextMenu.addEventListener("click", (e) => {
   if (target.classList.contains("baud-option") && target.dataset.baud) {
     e.stopPropagation();
     tabManager.setSerialBaud(currentTabId, parseInt(target.dataset.baud, 10));
+    closeContextMenu();
+    return;
+  }
+
+  // Enter-sends option
+  if (target.classList.contains("enter-option") && target.dataset.enter) {
+    e.stopPropagation();
+    tabManager.setSerialEnterNewline(currentTabId, target.dataset.enter as import("./profiles").SerialEnterNewline);
     closeContextMenu();
     return;
   }
@@ -307,6 +341,7 @@ export function showTerminalContextMenu(tabId: string, x: number, y: number) {
   const isSerial = tab?.type === "serial";
   baudItem.style.display = isSerial ? "" : "none";
   nlItem.style.display = isSerial ? "" : "none";
+  enterItem.style.display = isSerial ? "" : "none";
   if (isSerial) {
     baudSub.querySelectorAll<HTMLElement>(".baud-option").forEach(el => {
       const b = parseInt(el.dataset.baud!, 10);
@@ -316,6 +351,11 @@ export function showTerminalContextMenu(tabId: string, x: number, y: number) {
       const current = tab!.outputNewline ?? "keep";
       const isCur = el.dataset.nl === current;
       el.textContent = isCur ? `${el.dataset.nlLabel} ✓` : el.dataset.nlLabel!;
+    });
+    enterSub.querySelectorAll<HTMLElement>(".enter-option").forEach(el => {
+      const current = tab!.enterNewline ?? "cr";
+      const isCur = el.dataset.enter === current;
+      el.textContent = isCur ? `${el.dataset.enterLabel} ✓` : el.dataset.enterLabel!;
     });
   }
   tabMenuGroup.style.display = "none";

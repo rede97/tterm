@@ -1,5 +1,5 @@
 ﻿import { invoke } from "@tauri-apps/api/core";
-import { SshHost, localProfiles, defaultLocalProfile, hostProp, SerialPort, serialParamsFor, serialKeyFor, rememberSerialParams, SerialOutputNewline } from "./profiles";
+import { SshHost, localProfiles, defaultLocalProfile, hostProp, SerialPort, serialParamsFor, serialKeyFor, rememberSerialParams, SerialOutputNewline, SerialEnterNewline } from "./profiles";
 import { showToast } from "./toast";
 import { TerminalTab } from "./tab";
 import Sortable from "sortablejs";
@@ -205,6 +205,7 @@ export class TabManager {
     tab.serialKey = serialKeyFor(port);
     tab.serialBaud = params.baud;
     tab.outputNewline = params.outputNewline;
+    tab.enterNewline = params.enterNewline;
     tab.inputMode = params.inputMode;
     this._register(tab, result.port);
 
@@ -216,6 +217,14 @@ export class TabManager {
     this.refreshBadges();
 
     return tab;
+  }
+
+  // Live Enter-key newline switch (frontend-side); persists memory.
+  async setSerialEnterNewline(tabId: string, mode: SerialEnterNewline): Promise<void> {
+    const tab = this.tabs.get(tabId);
+    if (!tab || tab.type !== "serial" || !tab.serialKey) return;
+    tab.setSerialEnterNewline(mode);
+    await rememberSerialParams(tab.serialKey, { enterNewline: mode });
   }
 
   // Live output-newline switch for an open serial session; persists memory.

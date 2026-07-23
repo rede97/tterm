@@ -8,7 +8,8 @@ import { hysteresis } from "./hysteresis";
 import { parseOsc9Progress, applyProgressToTabElement } from "./osc";
 import { SizeHint } from "./sizehint";
 import { DisconnectOverlay } from "./disconnect";
-import { SshHost, configFontFamily, configFontSize, configRenderer, configScrollback, configThemeName, trimPasteContent, SerialInputMode } from "./profiles";
+import { ImeBox } from "./imebox";
+import { SshHost, configFontFamily, configFontSize, configRenderer, configScrollback, configThemeName, trimPasteContent, SerialInputMode, SerialEnterNewline } from "./profiles";
 import { createSerialInputHandler } from "./serialinput";
 import { findTheme } from "./themes";
 
@@ -28,6 +29,7 @@ export class TerminalTab {
   serialBaud?: number;
   outputNewline?: string;
   inputMode: SerialInputMode = "normal";
+  enterNewline: SerialEnterNewline = "cr";
   label: string;
   color?: string;
   needsResize = false;
@@ -41,6 +43,7 @@ export class TerminalTab {
   onSocketClosed?: () => void;
   onReconnectRequested?: () => void;
   private disconnectOverlay!: DisconnectOverlay;
+  private imeBox!: ImeBox;
   private attachAddon?: import("@xterm/addon-attach").AttachAddon;
 
   constructor(id: string, type: TabType, label: string, container: HTMLElement) {
@@ -54,6 +57,7 @@ export class TerminalTab {
     container.appendChild(this.element);
     this.sizeHint = new SizeHint(this.element, 1200, configFontFamily);
     this.disconnectOverlay = new DisconnectOverlay(this.element);
+    this.imeBox = new ImeBox(this.element, configFontFamily);
 
     // Enter on a disconnected session triggers reconnect (capture, before xterm)
     this.element.addEventListener("keydown", (e: KeyboardEvent) => {
@@ -128,6 +132,29 @@ export class TerminalTab {
 
     // Freeze IME textarea position during composition to prevent candidate window drift.
     this._patchImeFreeze();
+
+    // Floating IME composition box: mirrors the composition string at a
+    // position captured once per composition (never drifts mid-composition).
+    const textarea = this.element.querySelector(".xterm-helper-textarea") as HTMLElement | null;
+    if (textarea) {
+      this.imeBox.attach(textarea, () => this._cursorPixelPos());
+    }
+  }
+
+  // Cursor position in pixels, relative to the terminal element.
+  private _cursorPixelPos(): { x: number; y: number; cellH: number } {
+    try {
+      const core = (this.terminal as any)._core;
+      const dims = core._renderService.dimensions.css.cell;
+      const buf = this.terminal.buffer.active;
+      return {
+        x: buf.cursorX * dims.width,
+        y: buf.viewportY * dims.height,
+        cellH: dims.height,
+      };
+    } catch {
+      return { x: 8, y: 8, cellH: 16 };
+    }
   }
 
   // Attach (or re-attach) the session WebSocket. Disposes any previous addon.
@@ -156,6 +183,7 @@ export class TerminalTab {
     this.serialInputDisposable?.dispose();
     const handler = createSerialInputHandler(
       this.inputMode,
+      this.enterNewline,
       (d) => {
         const s = this.serialSocket;
         if (s && s.readyState === WebSocket.OPEN) s.send(d);
@@ -167,6 +195,11 @@ export class TerminalTab {
 
   setSerialInputMode(mode: SerialInputMode): void {
     this.inputMode = mode;
+    if (this.type === "serial") this._hookSerialInput();
+  }
+
+  setSerialEnterNewline(mode: SerialEnterNewline): void {
+    this.enterNewline = mode;
     if (this.type === "serial") this._hookSerialInput();
   }
 
@@ -331,6 +364,7 @@ export class TerminalTab {
   destroy(): void {
     this.sizeHint.destroy();
     this.disconnectOverlay.destroy();
+    this.imeBox.destroy();
     this.element.remove();
     this.tabElement.remove();
     this.terminal.dispose();
