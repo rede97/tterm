@@ -56,6 +56,7 @@ bun run tauri build
 
 ## 路线图
 
+- [ ] **AI 会话共享** —— 把任意活跃会话（本地 shell / SSH / 串口）通过一条可吊销的 WebSocket 链接交给本地 AI agent：你实时看着它每一步操作，一键即可切断。不截图、不 OCR,agent 直接拿原始字节流。（[设计稿 + agent 接入指南](docs/ai-session-sharing.md)）
 - [ ] 分屏显示
 - [ ] 配色方案自定义编辑器
 - [x] ~~串口终端~~ · ~~断线重连~~ · ~~主题系统~~ · ~~OSC 9;4 进度条~~

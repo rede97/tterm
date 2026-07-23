@@ -58,6 +58,7 @@ Dev and testing docs live in [docs/testing.md](docs/testing.md).
 
 ## Roadmap
 
+- [ ] **AI session sharing** — hand any live session (shell / SSH / serial) to a local AI agent over a scoped, revocable WebSocket link; you watch every keystroke in real time and cut it off with one click. No screenshots, no OCR — the agent gets the raw byte stream. ([design + agent integration guide](docs/ai-session-sharing.md))
 - [ ] Split panes
 - [ ] Custom color scheme editor
 - [x] ~~Serial terminal~~ · ~~Session reconnect~~ · ~~Theme system~~ · ~~OSC 9;4 progress~~
