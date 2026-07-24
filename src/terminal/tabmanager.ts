@@ -1,6 +1,6 @@
 ﻿import { invoke } from "@tauri-apps/api/core";
 import type { SshHost, SerialPort, SerialOutputNewline, SerialEnterNewline } from "../core/types";
-import { hostProp } from "../core/types";
+import { hostProp } from "../core/common";
 import { configStore } from "../core/store";
 import { serialParamsFor, serialKeyFor, rememberSerialParams } from "../config/serial-memory";
 import { showToast } from "../ui/toast";

@@ -3,7 +3,7 @@
 // the circular dependency: contextmenu ↔ tabmanager ↔ tab.
 
 import { openFind } from "./search";
-import { trimPasteContent, SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES } from "../core/types";
+import { trimPasteContent, SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES } from "../core/common";
 import type { SerialEnterNewline, SerialOutputNewline } from "../core/types";
 import { readText as clipboardReadText, writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
 import { configStore } from "../core/store";

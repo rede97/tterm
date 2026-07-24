@@ -3,7 +3,7 @@
 
 import { configStore, type ConfigState } from "../core/store";
 import type { SerialInputMode, SerialOutputNewline, SerialEnterNewline } from "../core/types";
-import { SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES } from "../core/types";
+import { SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES } from "../core/common";
 import { loadSerialPorts } from "../config/wt-profiles";
 import { serialKeyFor, rememberSerialParams, forgetSerialParams } from "../config/serial-memory";
 import { showToast } from "../ui/toast";

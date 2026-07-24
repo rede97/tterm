@@ -1,6 +1,6 @@
 import { createElement, Terminal as TerminalIcon, Globe, Cable, FlaskConical } from "lucide";
 import { configStore } from "../core/store";
-import { hostProp } from "../core/types";
+import { hostProp } from "../core/common";
 import { loadSerialPorts } from "../config/wt-profiles";
 import { tabManager } from "./tabmanager";
 

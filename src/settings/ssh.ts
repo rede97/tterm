@@ -3,7 +3,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { configStore, type ConfigState } from "../core/store";
-import { hostProp } from "../core/types";
+import { hostProp } from "../core/common";
 import { loadSshHosts, generateSshConfig } from "../config/ssh-config";
 import { logError } from "../core/errorlog";
 

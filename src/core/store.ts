@@ -2,7 +2,7 @@
 // Replaces 20+ mutable `export let` variables from profiles.ts and the
 // settingsChangedFn callback bridge from settings-events.ts.
 //
-// Design: pub/sub pattern, ~130 lines, zero third-party dependencies.
+// Design: pub/sub pattern, declarative schema, zero third-party dependencies.
 
 import { invoke } from "@tauri-apps/api/core";
 import { buildFontFamily, defaultFontStack } from "../util/fontconfig";
@@ -12,7 +12,7 @@ import type {
   SshHost, LocalProfile, VsInstallation, SerialPort,
   SerialParams, SerialInputMode, SerialOutputNewline, SerialEnterNewline,
 } from "./types";
-import { SERIAL_OUTPUT_NEWLINES } from "./types";
+import { SERIAL_OUTPUT_NEWLINES } from "./common";
 
 // ---- All config state in one interface ----
 
@@ -44,34 +44,61 @@ export interface ConfigState {
   loaded: boolean;
 }
 
+// ---- Declarative schema: single source of truth for defaults + validation ----
+
+interface SchemaEntry<T> {
+  default: T;
+  validate: (v: unknown) => v is T;
+}
+
+const isString = (v: unknown): v is string => typeof v === "string";
+const isBoolean = (v: unknown): v is boolean => typeof v === "boolean";
+const isNumber = (min: number, max: number) => (v: unknown): v is number => typeof v === "number" && v >= min && v <= max;
+const isArray = <T = unknown>(v: unknown): v is T[] => Array.isArray(v);
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+const isOneOf = <T extends string>(values: readonly T[]) => (v: unknown): v is T => typeof v === "string" && (values as readonly string[]).includes(v);
+const isOrNull = <T>(guard: (v: unknown) => v is T) => (v: unknown): v is T | null => v === null || guard(v);
+
+const SERIAL_INPUT_MODES = ["normal", "echo", "line"] as const;
+const SERIAL_ENTER_MODES = ["cr", "lf", "crlf"] as const;
+const OUTPUT_NEWLINE_VALUES = SERIAL_OUTPUT_NEWLINES.map(([v]) => v) as readonly SerialOutputNewline[];
+
+const SCHEMA = {
+  sshHosts:           { default: [] as SshHost[],          validate: isArray<SshHost> },
+  localProfiles:      { default: [] as LocalProfile[],     validate: isArray<LocalProfile> },
+  vsInstalls:         { default: [] as VsInstallation[],   validate: isArray<VsInstallation> },
+  serialPorts:        { default: [] as SerialPort[],       validate: isArray<SerialPort> },
+  serialPortParams:   { default: {} as Record<string, SerialParams>, validate: isObject },
+  hiddenProfiles:     { default: [] as string[],           validate: isArray<string> },
+  hiddenSshHosts:     { default: [] as string[],           validate: isArray<string> },
+  fontFamily:         { default: buildFontFamily(defaultFontStack()), validate: isString },
+  fontSize:           { default: 14,                       validate: isNumber(10, 32) },
+  scrollback:         { default: 20000,                    validate: isNumber(100, 100000) },
+  tabWidthMode:       { default: "equal",                  validate: isString },
+  themeName:          { default: DEFAULT_THEME_NAME,       validate: isString },
+  renderer:           { default: "webgl",                  validate: isString },
+  terminalBell:       { default: false,                    validate: isBoolean },
+  pasteWarning:       { default: true,                     validate: isBoolean },
+  pasteTrim:          { default: true,                     validate: isBoolean },
+  serialBaud:         { default: 115200,                   validate: isNumber(300, 921600) },
+  serialInputMode:    { default: "normal" as SerialInputMode, validate: isOneOf(SERIAL_INPUT_MODES) },
+  serialOutputNewline:{ default: "keep" as SerialOutputNewline, validate: isOneOf(OUTPUT_NEWLINE_VALUES) },
+  serialEnterNewline: { default: "cr" as SerialEnterNewline,  validate: isOneOf(SERIAL_ENTER_MODES) },
+  defaultLocalProfile: { default: null as string | null,    validate: isOrNull(isString) },
+  loaded:             { default: false,                    validate: isBoolean },
+} satisfies Record<string, SchemaEntry<unknown>>;
+
+type SchemaKey = keyof typeof SCHEMA;
+
 // Keys that are NOT persisted to the config file (runtime-only data)
-const RUNTIME_KEYS = new Set(["loaded", "serialPorts", "vsInstalls", "sshHosts", "localProfiles"]);
+const RUNTIME_KEYS = new Set<SchemaKey>(["loaded", "serialPorts", "vsInstalls", "sshHosts", "localProfiles"]);
 
 function defaultState(): ConfigState {
-  return {
-    sshHosts: [],
-    localProfiles: [],
-    vsInstalls: [],
-    serialPorts: [],
-    serialPortParams: {},
-    hiddenProfiles: [],
-    hiddenSshHosts: [],
-    fontFamily: buildFontFamily(defaultFontStack()),
-    fontSize: 14,
-    scrollback: 20000,
-    tabWidthMode: "equal",
-    themeName: DEFAULT_THEME_NAME,
-    renderer: "webgl",
-    terminalBell: false,
-    pasteWarning: true,
-    pasteTrim: true,
-    serialBaud: 115200,
-    serialInputMode: "normal",
-    serialOutputNewline: "keep",
-    serialEnterNewline: "cr",
-    defaultLocalProfile: null,
-    loaded: false,
-  };
+  const state = {} as ConfigState;
+  for (const [key, entry] of Object.entries(SCHEMA) as [SchemaKey, SchemaEntry<unknown>][]) {
+    (state as any)[key] = entry.default;
+  }
+  return state;
 }
 
 // ---- Pub/sub store ----
@@ -89,27 +116,29 @@ class ConfigStore {
     return this._state[key];
   }
 
-  /** Read-only snapshot of the entire state (live reference). */
-  snapshot(): Readonly<ConfigState> {
-    return this._state;
+  /** Shallow copy snapshot of the entire state. Mutations do not affect internal state. */
+  snapshot(): ConfigState {
+    return { ...this._state };
   }
 
   /** Batch-write config values. Memory updates immediately; disk write is debounced 300ms. */
   set(partial: Partial<ConfigState>): void {
     const changed: string[] = [];
-    for (const [k, v] of Object.entries(partial)) {
-      (this._state as any)[k] = v;
-      changed.push(k);
-    }
-    // Only schedule disk save for persisted keys
     const persisted: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(partial)) {
-      if (!RUNTIME_KEYS.has(k)) persisted[k] = v;
+      const key = k as SchemaKey;
+      if (key in SCHEMA && SCHEMA[key].validate(v)) {
+        (this._state as any)[key] = v;
+        changed.push(k);
+        if (!RUNTIME_KEYS.has(key)) persisted[k] = v;
+      }
     }
     if (Object.keys(persisted).length > 0) {
       this._scheduleSave(persisted);
     }
-    this._notify(changed);
+    if (changed.length > 0) {
+      this._notify(changed);
+    }
   }
 
   /** Subscribe to config changes. Returns an unsubscribe function. */
@@ -152,26 +181,14 @@ class ConfigStore {
 
   // ---- Internal helpers ----
 
-  /** Validate and apply a config object to internal state. */
-  private _applyConfig(cfg: any): void {
-    const s = this._state;
-    if (cfg.defaultLocalProfile !== undefined) s.defaultLocalProfile = cfg.defaultLocalProfile;
-    if (typeof cfg.fontFamily === "string") s.fontFamily = cfg.fontFamily;
-    if (typeof cfg.fontSize === "number" && cfg.fontSize >= 10 && cfg.fontSize <= 32) s.fontSize = cfg.fontSize;
-    if (Array.isArray(cfg.hiddenProfiles)) s.hiddenProfiles = cfg.hiddenProfiles;
-    if (typeof cfg.pasteWarning === "boolean") s.pasteWarning = cfg.pasteWarning;
-    if (typeof cfg.pasteTrim === "boolean") s.pasteTrim = cfg.pasteTrim;
-    if (typeof cfg.terminalBell === "boolean") s.terminalBell = cfg.terminalBell;
-    if (typeof cfg.renderer === "string") s.renderer = cfg.renderer;
-    if (typeof cfg.scrollback === "number" && cfg.scrollback >= 100 && cfg.scrollback <= 100000) s.scrollback = cfg.scrollback;
-    if (typeof cfg.tabWidthMode === "string") s.tabWidthMode = cfg.tabWidthMode;
-    if (typeof cfg.themeName === "string") s.themeName = cfg.themeName;
-    if (typeof cfg.serialBaud === "number" && cfg.serialBaud >= 300 && cfg.serialBaud <= 921600) s.serialBaud = cfg.serialBaud;
-    if (cfg.serialInputMode === "normal" || cfg.serialInputMode === "echo" || cfg.serialInputMode === "line") s.serialInputMode = cfg.serialInputMode;
-    if (typeof cfg.serialOutputNewline === "string" && SERIAL_OUTPUT_NEWLINES.some(([v]) => v === cfg.serialOutputNewline)) s.serialOutputNewline = cfg.serialOutputNewline;
-    if (cfg.serialEnterNewline === "cr" || cfg.serialEnterNewline === "lf" || cfg.serialEnterNewline === "crlf") s.serialEnterNewline = cfg.serialEnterNewline;
-    if (cfg.serialPortParams && typeof cfg.serialPortParams === "object") s.serialPortParams = cfg.serialPortParams;
-    if (Array.isArray(cfg.hiddenSshHosts)) s.hiddenSshHosts = cfg.hiddenSshHosts;
+  /** Validate and apply a config object to internal state using SCHEMA. */
+  private _applyConfig(cfg: Record<string, unknown>): void {
+    for (const [k, v] of Object.entries(cfg)) {
+      const key = k as SchemaKey;
+      if (key in SCHEMA && SCHEMA[key].validate(v)) {
+        (this._state as any)[key] = v;
+      }
+    }
   }
 
   private _scheduleSave(persisted: Record<string, unknown>): void {
@@ -204,7 +221,7 @@ class ConfigStore {
   private _persistableSnapshot(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(this._state)) {
-      if (!RUNTIME_KEYS.has(k)) result[k] = v;
+      if (!RUNTIME_KEYS.has(k as SchemaKey)) result[k] = v;
     }
     return result;
   }
