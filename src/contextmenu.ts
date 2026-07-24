@@ -3,6 +3,7 @@ import { openFind } from "./search";
 import { trimPasteContent, SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES } from "./profiles";
 import { showToast } from "./toast";
 import { invoke } from "@tauri-apps/api/core";
+import { readText as clipboardReadText } from "@tauri-apps/plugin-clipboard-manager";
 
 const TAB_COLORS = [
   "#e06c75", "#d19a66", "#e5c07b", "#98c379",
@@ -308,7 +309,7 @@ function dispatch(action: string) {
     case "paste": {
       const t = tabManager.get(tabId);
       if (!t) break;
-      navigator.clipboard.readText().then(text => {
+      clipboardReadText().then(text => {
         if (text) t.terminal.paste(trimPasteContent(text));
       }).catch(() => {});
       break;
