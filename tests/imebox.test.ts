@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { ImeBox } from "../src/imebox";
+import { ImeBox } from "../src/util/imebox";
 
 function setup(width = 400, height = 300) {
   document.body.innerHTML = "";

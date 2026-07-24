@@ -1,6 +1,9 @@
 ﻿import { invoke } from "@tauri-apps/api/core";
-import { SshHost, localProfiles, defaultLocalProfile, hostProp, SerialPort, serialParamsFor, serialKeyFor, rememberSerialParams, SerialOutputNewline, SerialEnterNewline } from "./profiles";
-import { showToast } from "./toast";
+import type { SshHost, SerialPort, SerialOutputNewline, SerialEnterNewline } from "../core/types";
+import { hostProp } from "../core/types";
+import { configStore } from "../core/store";
+import { serialParamsFor, serialKeyFor, rememberSerialParams } from "../config/serial-memory";
+import { showToast } from "../ui/toast";
 import { TerminalTab } from "./tab";
 import Sortable from "sortablejs";
 
@@ -540,8 +543,8 @@ export class TabManager {
   initNewTabButton(): void {
     const btn = document.getElementById("new-tab")!;
     btn.addEventListener("click", () => {
-      const defName = defaultLocalProfile ?? localProfiles[0]?.name ?? null;
-      const p = defName ? localProfiles.find(x => x.name === defName) : null;
+      const defName = configStore.get("defaultLocalProfile") ?? configStore.get("localProfiles")[0]?.name ?? null;
+      const p = defName ? configStore.get("localProfiles").find(x => x.name === defName) : null;
       if (p) this.createLocalTab(p.command, p.name);
       else this.createLocalTab();
     });

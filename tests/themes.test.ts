@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   BUILTIN_THEMES, DEFAULT_THEME_NAME, findTheme, allThemes,
   parseWtSchemes, setWtThemes,
-} from "../src/themes";
+} from "../src/util/themes";
 
 const ANSI_KEYS = [
   "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",

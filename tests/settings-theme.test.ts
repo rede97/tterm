@@ -11,9 +11,9 @@ const { invokeMock } = vi.hoisted(() => ({
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 vi.mock("@tauri-apps/api/app", () => ({ getVersion: () => Promise.resolve("0.2.0") }));
 
-import { createSettingsContent } from "../src/settings";
-import { BUILTIN_THEMES } from "../src/themes";
-import { configFontFamily, configThemeName } from "../src/profiles";
+import { createSettingsContent } from "../src/settings/index";
+import { BUILTIN_THEMES } from "../src/util/themes";
+import { configStore } from "../src/core/store";
 
 describe("settings — theme gallery", () => {
   beforeEach(() => {
@@ -30,8 +30,9 @@ describe("settings — theme gallery", () => {
     const preview = first.querySelector(".theme-card-preview") as HTMLElement;
     // preview uses the real terminal font stack, not generic monospace
     // (happy-dom normalizes quote styles, so compare quote-insensitively)
+    const fontFamily = configStore.get("fontFamily");
     expect(preview.style.fontFamily.replace(/["']/g, ""))
-      .toBe(configFontFamily.replace(/["']/g, ""));
+      .toBe(fontFamily.replace(/["']/g, ""));
     expect(first.querySelectorAll(".theme-card-swatch")).toHaveLength(16);
   });
 
@@ -39,7 +40,7 @@ describe("settings — theme gallery", () => {
     const root = createSettingsContent();
     const selected = root.querySelectorAll(".theme-card.selected");
     expect(selected).toHaveLength(1);
-    expect((selected[0] as HTMLElement).dataset.theme).toBe(configThemeName);
+    expect((selected[0] as HTMLElement).dataset.theme).toBe(configStore.get("themeName"));
   });
 
   it("clicking a card updates selection and pending themeName", () => {

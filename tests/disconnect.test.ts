@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { DisconnectOverlay } from "../src/disconnect";
+import { DisconnectOverlay } from "../src/util/disconnect";
 
 describe("DisconnectOverlay", () => {
   let parent: HTMLElement;

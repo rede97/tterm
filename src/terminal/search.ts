@@ -1,4 +1,5 @@
 ﻿import { tabManager } from "./tabmanager";
+import { createElement, ChevronUp, ChevronDown, X } from "lucide";
 
 // -- DOM --
 
@@ -12,11 +13,11 @@ searchInput.placeholder = "Find...";
 searchBar.appendChild(searchInput);
 
 const searchPrev = document.createElement("button");
-searchPrev.textContent = "^";
+searchPrev.appendChild(createElement(ChevronUp, { stroke: "currentColor", width: 14, height: 14 }));
 searchBar.appendChild(searchPrev);
 
 const searchNext = document.createElement("button");
-searchNext.textContent = "^";
+searchNext.appendChild(createElement(ChevronDown, { stroke: "currentColor", width: 14, height: 14 }));
 searchBar.appendChild(searchNext);
 
 const searchResults = document.createElement("span");
@@ -24,7 +25,7 @@ searchResults.id = "search-results";
 searchBar.appendChild(searchResults);
 
 const searchClose = document.createElement("button");
-searchClose.textContent = "x";
+searchClose.appendChild(createElement(X, { stroke: "currentColor", width: 14, height: 14 }));
 searchClose.className = "search-close";
 searchBar.appendChild(searchClose);
 

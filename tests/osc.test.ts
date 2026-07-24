@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseOsc9Progress, applyProgressToTabElement } from "../src/osc";
+import { parseOsc9Progress, applyProgressToTabElement } from "../src/util/osc";
 
 describe("parseOsc9Progress", () => {
   it("parses normal progress", () => {

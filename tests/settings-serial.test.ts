@@ -15,7 +15,7 @@ const { invokeMock } = vi.hoisted(() => ({
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 vi.mock("@tauri-apps/api/app", () => ({ getVersion: () => Promise.resolve("0.2.0") }));
 
-import { createSettingsContent } from "../src/settings";
+import { createSettingsContent } from "../src/settings/index";
 
 describe("settings — Serial panel", () => {
   beforeEach(() => {

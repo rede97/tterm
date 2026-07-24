@@ -1,4 +1,4 @@
-import type { SerialInputMode, SerialEnterNewline } from "./profiles";
+import type { SerialInputMode, SerialEnterNewline } from "../core/types";
 
 // Serial input modes:
 //   normal — keystrokes go straight to the device

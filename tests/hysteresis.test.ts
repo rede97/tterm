@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hysteresis } from "../src/hysteresis";
+import { hysteresis } from "../src/util/hysteresis";
 
 // Column thresholds used by TerminalTab.fit(): th_low=0.8, th_high=0.9
 const COL_LO = 0.8, COL_HI = 0.9;

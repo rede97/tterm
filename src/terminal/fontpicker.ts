@@ -1,7 +1,7 @@
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { BUILTIN_FONTS, NERDFONT_BUILTIN, FontDef, fontStack, buildFontFamily, systemFontDefs } from "./fontconfig";
-import { configFontSize } from "./profiles";
+import { BUILTIN_FONTS, NERDFONT_BUILTIN, FontDef, buildFontFamily, parseFontFamily, systemFontDefs } from "../util/fontconfig";
+import { configStore } from "../core/store";
 
 const NERDFONT_URL = "https://www.nerdfonts.com/";
 
@@ -71,7 +71,8 @@ export function showFontPickerDialog(
   document.body.appendChild(overlay);
 
   // --- state ---
-  let selected: string[] = [...fontStack];
+  // Initialize from the current font stack parsed from configStore
+  let selected: string[] = parseFontFamily(configStore.get("fontFamily"));
   let previewFont: string | null = null; // font selected for individual preview
   let previewTerminal: Terminal | null = null;
   let previewFitAddon: FitAddon | null = null;
@@ -232,7 +233,7 @@ export function showFontPickerDialog(
   function initPreview() {
     const term = new Terminal({
       cursorBlink: false,
-      fontSize: configFontSize,
+      fontSize: configStore.get("fontSize"),
       fontFamily: buildFontFamily(selected),
       scrollback: 5000,
       disableStdin: true,

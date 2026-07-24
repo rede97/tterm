@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { SizeHint } from "../src/sizehint";
+import { SizeHint } from "../src/util/sizehint";
 
 describe("SizeHint", () => {
   let parent: HTMLElement;

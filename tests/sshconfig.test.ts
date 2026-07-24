@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { parseSshConfig, SshHost } from "../src/profiles";
-import { generateSshConfig } from "../src/settings";
+import { parseSshConfig, generateSshConfig } from "../src/config/ssh-config";
+import type { SshHost } from "../src/core/types";
 
 describe("parseSshConfig", () => {
   it("parses a simple host block", () => {

@@ -1,9 +1,48 @@
-import { tabManager } from "./tabmanager";
+// Context menu — no longer statically imports tabManager.
+// Action handlers are injected via setContextMenuHandlers() to break
+// the circular dependency: contextmenu ↔ tabmanager ↔ tab.
+
 import { openFind } from "./search";
-import { trimPasteContent, SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES } from "./profiles";
-import { showToast } from "./toast";
-import { invoke } from "@tauri-apps/api/core";
-import { readText as clipboardReadText } from "@tauri-apps/plugin-clipboard-manager";
+import { trimPasteContent, SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES } from "../core/types";
+import type { SerialEnterNewline, SerialOutputNewline } from "../core/types";
+import { readText as clipboardReadText, writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
+import { configStore } from "../core/store";
+import { logCatch } from "../core/errorlog";
+
+// ---- Injected handlers ----
+
+export interface ContextMenuHandlers {
+  createLocalTab: () => void;
+  getTabLabel: (tabId: string) => string;
+  setTabColor: (tabId: string, color: string | undefined) => void;
+  renameTab: (tabId: string) => void;
+  duplicateTab: (tabId: string) => void;
+  closeTab: (tabId: string) => void;
+  closeTabsRight: (tabId: string) => void;
+  closeOtherTabs: (tabId: string) => void;
+  getSelection: (tabId: string) => string;
+  pasteToTab: (tabId: string, text: string) => void;
+  clearTab: (tabId: string) => void;
+  switchTo: (tabId: string) => void;
+  exportTab: (tabId: string) => void;
+  setSerialBaud: (tabId: string, baud: number) => void;
+  setSerialEnterNewline: (tabId: string, mode: SerialEnterNewline) => void;
+  setSerialOutputNewline: (tabId: string, mode: SerialOutputNewline) => void;
+  isSerialTab: (tabId: string) => boolean;
+  getSerialBaud: (tabId: string) => number | undefined;
+  getSerialOutputNewline: (tabId: string) => string | undefined;
+  getSerialEnterNewline: (tabId: string) => string | undefined;
+  getActiveTabId: () => string | null;
+  newWindow: () => void;
+}
+
+let _handlers: ContextMenuHandlers | null = null;
+
+export function setContextMenuHandlers(h: ContextMenuHandlers): void {
+  _handlers = h;
+}
+
+// ---- DOM ----
 
 const TAB_COLORS = [
   "#e06c75", "#d19a66", "#e5c07b", "#98c379",
@@ -69,7 +108,7 @@ colorLabel.textContent = "Change Tab Color";
 colorItem.appendChild(colorLabel);
 const arrow = document.createElement("span");
 arrow.className = "menu-arrow";
-arrow.textContent = "›";
+arrow.textContent = "\u203a";
 colorItem.appendChild(arrow);
 tabMenuGroup.appendChild(colorItem);
 
@@ -111,7 +150,7 @@ termMenuGroup.style.display = "none";
 
 const SERIAL_BAUDS = SERIAL_BAUD_RATES;
 
-// Baud Rate submenu (serial tabs only, mirrors the color submenu pattern)
+// Baud Rate submenu (serial tabs only)
 const baudItem = document.createElement("div");
 baudItem.className = "menu-item has-submenu";
 baudItem.style.display = "none";
@@ -120,7 +159,7 @@ baudLabel.textContent = "Baud Rate";
 baudItem.appendChild(baudLabel);
 const baudArrow = document.createElement("span");
 baudArrow.className = "menu-arrow";
-baudArrow.textContent = "›";
+baudArrow.textContent = "\u203a";
 baudItem.appendChild(baudArrow);
 
 const baudSub = document.createElement("div");
@@ -145,7 +184,7 @@ nlLabel.textContent = "Output Newlines";
 nlItem.appendChild(nlLabel);
 const nlArrow = document.createElement("span");
 nlArrow.className = "menu-arrow";
-nlArrow.textContent = "›";
+nlArrow.textContent = "\u203a";
 nlItem.appendChild(nlArrow);
 
 const nlSub = document.createElement("div");
@@ -171,7 +210,7 @@ enterLabel.textContent = "Enter Sends";
 enterItem.appendChild(enterLabel);
 const enterArrow = document.createElement("span");
 enterArrow.className = "menu-arrow";
-enterArrow.textContent = "›";
+enterArrow.textContent = "\u203a";
 enterItem.appendChild(enterArrow);
 
 const enterSub = document.createElement("div");
@@ -205,40 +244,34 @@ contextMenu.appendChild(termMenuGroup);
 contextMenu.addEventListener("click", (e) => {
   const target = e.target as HTMLElement;
 
-  // Color swatch
   if (target.classList.contains("color-swatch") && target.dataset.color) {
     e.stopPropagation();
-    const t = tabManager.get(currentTabId);
-    if (t) t.setColor(target.dataset.color);
+    _handlers?.setTabColor(currentTabId, target.dataset.color);
     closeContextMenu();
     return;
   }
 
-  // Baud option
   if (target.classList.contains("baud-option") && target.dataset.baud) {
     e.stopPropagation();
-    tabManager.setSerialBaud(currentTabId, parseInt(target.dataset.baud, 10));
+    _handlers?.setSerialBaud(currentTabId, parseInt(target.dataset.baud, 10));
     closeContextMenu();
     return;
   }
 
-  // Enter-sends option
   if (target.classList.contains("enter-option") && target.dataset.enter) {
     e.stopPropagation();
-    tabManager.setSerialEnterNewline(currentTabId, target.dataset.enter as import("./profiles").SerialEnterNewline);
+    _handlers?.setSerialEnterNewline(currentTabId, target.dataset.enter as SerialEnterNewline);
     closeContextMenu();
     return;
   }
 
-  // Output newline option
   if (target.classList.contains("nl-option") && target.dataset.nl) {
     e.stopPropagation();
-    tabManager.setSerialOutputNewline(currentTabId, target.dataset.nl as import("./profiles").SerialOutputNewline);
+    _handlers?.setSerialOutputNewline(currentTabId, target.dataset.nl as SerialOutputNewline);
     closeContextMenu();
     return;
   }
 
-  // Menu item with data-action
   const item = target.closest("[data-action]") as HTMLElement | null;
   if (!item) return;
   e.stopPropagation();
@@ -248,81 +281,65 @@ contextMenu.addEventListener("click", (e) => {
 });
 
 function dispatch(action: string) {
+  const h = _handlers;
+  if (!h) return;
   const tabId = currentTabId;
   switch (action) {
     case "new-tab":
-      tabManager.createLocalTab();
+      h.createLocalTab();
       break;
     case "new-window":
-      invoke("open_new_window").catch((e) => showToast(`Failed to open new window: ${e}`, "error"));
+      h.newWindow();
       break;
-    case "reset-color": {
-      const t = tabManager.get(tabId);
-      if (t) t.setColor(undefined);
+    case "reset-color":
+      h.setTabColor(tabId, undefined);
       break;
-    }
     case "rename":
-      tabManager.renameTab(tabId);
+      h.renameTab(tabId);
       break;
     case "duplicate":
-      tabManager.duplicateTab(tabId);
+      h.duplicateTab(tabId);
       break;
     case "close":
-      tabManager.closeTab(tabId);
+      h.closeTab(tabId);
       break;
     case "close-right":
-      tabManager.closeTabsRight(tabId);
+      h.closeTabsRight(tabId);
       break;
     case "close-others":
-      tabManager.closeOtherTabs(tabId);
+      h.closeOtherTabs(tabId);
       break;
     case "copy": {
-      const t = tabManager.get(tabId);
-      if (!t) break;
-      const sel = t.terminal.getSelection();
-      if (sel) {
-        const ta = document.createElement("textarea");
-        ta.value = sel;
-        ta.style.position = "fixed";
-        ta.style.left = "-9999px";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-      }
+      const sel = h.getSelection(tabId);
+      if (sel) clipboardWriteText(sel).catch(logCatch("clipboard.write"));
       break;
     }
     case "copy-html": {
-      const t = tabManager.get(tabId);
-      if (!t) break;
-      const sel = t.terminal.getSelection();
+      const sel = h.getSelection(tabId);
       if (sel) {
         const html = `<pre style="font-family:'JetBrains Mono',Consolas,monospace;font-size:13px;color:#d4d4d4;background:#1e1e1e;padding:8px;margin:0;overflow:auto;white-space:pre-wrap;word-wrap:break-word;">${sel.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`;
         const blob = new Blob([html], { type: "text/html" });
         const plain = new Blob([sel], { type: "text/plain" });
         navigator.clipboard.write([
           new ClipboardItem({ "text/plain": plain, "text/html": blob }),
-        ]).catch(() => {});
+        ]).catch(logCatch("clipboard.writeHtml"));
       }
       break;
     }
-    case "paste": {
-      const t = tabManager.get(tabId);
-      if (!t) break;
+    case "paste":
       clipboardReadText().then(text => {
-        if (text) t.terminal.paste(trimPasteContent(text));
-      }).catch(() => {});
+        if (text) h.pasteToTab(tabId, trimPasteContent(text, configStore.get("pasteTrim")));
+      }).catch(logCatch("clipboard.read"));
       break;
-    }
     case "clear":
-      tabManager.clearTab(tabId);
+      h.clearTab(tabId);
       break;
     case "find":
-      tabManager.switchTo(tabId);
+      h.switchTo(tabId);
       openFind(tabId);
       break;
     case "export":
-      tabManager.exportTab(tabId);
+      h.exportTab(tabId);
       break;
   }
 }
@@ -337,26 +354,26 @@ export function showTabContextMenu(tabId: string, x: number, y: number) {
 
 export function showTerminalContextMenu(tabId: string, x: number, y: number) {
   currentTabId = tabId;
-  // Baud Rate submenu is serial-only; refresh checkmarks from the tab state
-  const tab = tabManager.get(tabId);
-  const isSerial = tab?.type === "serial";
+  const h = _handlers;
+  const isSerial = h?.isSerialTab(tabId) ?? false;
   baudItem.style.display = isSerial ? "" : "none";
   nlItem.style.display = isSerial ? "" : "none";
   enterItem.style.display = isSerial ? "" : "none";
   if (isSerial) {
+    const baud = h?.getSerialBaud(tabId);
     baudSub.querySelectorAll<HTMLElement>(".baud-option").forEach(el => {
       const b = parseInt(el.dataset.baud!, 10);
-      el.textContent = b === tab!.serialBaud ? `${b} ✓` : String(b);
+      el.textContent = b === baud ? `${b} \u2713` : String(b);
     });
+    const curNl = h?.getSerialOutputNewline(tabId) ?? "keep";
     nlSub.querySelectorAll<HTMLElement>(".nl-option").forEach(el => {
-      const current = tab!.outputNewline ?? "keep";
-      const isCur = el.dataset.nl === current;
-      el.textContent = isCur ? `${el.dataset.nlLabel} ✓` : el.dataset.nlLabel!;
+      const isCur = el.dataset.nl === curNl;
+      el.textContent = isCur ? `${el.dataset.nlLabel!} \u2713` : el.dataset.nlLabel!;
     });
+    const curEnter = h?.getSerialEnterNewline(tabId) ?? "cr";
     enterSub.querySelectorAll<HTMLElement>(".enter-option").forEach(el => {
-      const current = tab!.enterNewline ?? "cr";
-      const isCur = el.dataset.enter === current;
-      el.textContent = isCur ? `${el.dataset.enterLabel} ✓` : el.dataset.enterLabel!;
+      const isCur = el.dataset.enter === curEnter;
+      el.textContent = isCur ? `${el.dataset.enterLabel!} \u2713` : el.dataset.enterLabel!;
     });
   }
   tabMenuGroup.style.display = "none";
@@ -375,9 +392,12 @@ export function initContextMenu() {
     if (e.key === "Escape" && contextMenu.classList.contains("open")) {
       closeContextMenu();
     }
-    if (e.key === "F" && e.ctrlKey && e.shiftKey && tabManager.activeTabId) {
-      e.preventDefault();
-      openFind(tabManager.activeTabId);
+    if (e.key === "F" && e.ctrlKey && e.shiftKey) {
+      const activeId = _handlers?.getActiveTabId();
+      if (activeId) {
+        e.preventDefault();
+        openFind(activeId);
+      }
     }
   });
 }

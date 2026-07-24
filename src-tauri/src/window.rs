@@ -25,11 +25,13 @@ pub fn window_start_drag(window: tauri::Window) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn open_new_window() -> Result<(), String> {
+pub fn open_new_window(state: tauri::State<crate::state::AppState>) -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    std::process::Command::new(exe)
-        .spawn()
-        .map_err(|e| e.to_string())?;
+    let mut cmd = std::process::Command::new(exe);
+    if let Some(cwd) = &state.initial_cwd {
+        cmd.arg("--working-directory").arg(cwd);
+    }
+    cmd.spawn().map_err(|e| e.to_string())?;
     Ok(())
 }
 

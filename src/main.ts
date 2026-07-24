@@ -10,19 +10,17 @@ import "@fontsource/ibm-plex-mono";
 import "@fontsource/roboto-mono";
 import "@fontsource/ubuntu-mono";
 import "./assets/fonts/nerd-fonts.css";
-import { parseFontFamily, updateFontStack, setSystemFonts } from "./fontconfig";
-import { tabManager, initTabManager } from "./tabmanager";
-import { initSearchBar } from "./search";
-import { initProfileMenu } from "./profilemenu";
-import { initWindowControls } from "./window";
-import { setOnSettingsChanged } from "./settings-events";
-import {
-  localProfiles, defaultLocalProfile,
-  loadSshHosts, loadLocalProfiles, loadConfig,
-  configFontFamily, configFontSize, configScrollback,
-  configTabWidthMode, configThemeName,
-} from "./profiles";
-import { findTheme } from "./themes";
+import { parseFontFamily, updateFontStack, setSystemFonts } from "./util/fontconfig";
+import { tabManager, initTabManager } from "./terminal/tabmanager";
+import { initSearchBar } from "./terminal/search";
+import { initProfileMenu } from "./terminal/profilemenu";
+import { initWindowControls } from "./ui/window";
+import { configStore } from "./core/store";
+import { loadSshHosts } from "./config/ssh-config";
+import { loadAllWtData } from "./config/wt-profiles";
+import { setWtThemes } from "./util/themes";
+import { findTheme } from "./util/themes";
+import { logCatch } from "./core/errorlog";
 
 // -- DOM refs ---
 
@@ -63,7 +61,7 @@ initTabManager(tabsContainer, terminalContainer, welcomeEl);
 // -- settings --
 
 tabManager.setSettingsFactory(async () => {
-  const m = await import("./settings");
+  const m = await import("./settings/index");
   return m.createSettingsContent();
 });
 
@@ -73,20 +71,22 @@ settingsBtn.addEventListener("click", () => {
   tabManager.toggleSettings();
 });
 
-setOnSettingsChanged(async () => {
-  await loadLocalProfiles();
-  for (const tab of tabManager.tabs.values()) {
-    tab.terminal.options.fontFamily = configFontFamily;
-    tab.terminal.options.fontSize = configFontSize;
-    tab.terminal.options.scrollback = configScrollback;
-    tab.terminal.options.theme = findTheme(configThemeName).theme;
+// Subscribe to config changes — update all open terminals when relevant keys change
+configStore.subscribe((keys) => {
+  if (keys.some(k => ["fontFamily", "fontSize", "scrollback", "themeName"].includes(k))) {
+    for (const tab of tabManager.tabs.values()) {
+      tab.terminal.options.fontFamily = configStore.get("fontFamily");
+      tab.terminal.options.fontSize = configStore.get("fontSize");
+      tab.terminal.options.scrollback = configStore.get("scrollback");
+      tab.terminal.options.theme = findTheme(configStore.get("themeName")).theme;
+    }
+    applyTabWidthMode();
+    tabManager.triggerResize();
   }
-  applyTabWidthMode();
-  tabManager.triggerResize();
 });
 
 function applyTabWidthMode(): void {
-  if (configTabWidthMode === "equal") {
+  if (configStore.get("tabWidthMode") === "equal") {
     tabsContainer.classList.add("tabs-equal");
     tabsContainer.classList.remove("tabs-adaptive");
   } else {
@@ -107,31 +107,69 @@ if (import.meta.env.DEV) {
 tabManager.initNewTabButton();
 initSearchBar();
 initProfileMenu();
-import("./contextmenu").then(m => m.initContextMenu());
+import("./terminal/contextmenu").then(m => {
+  m.setContextMenuHandlers({
+    createLocalTab: () => tabManager.createLocalTab(),
+    newWindow: () => invoke("open_new_window").catch(logCatch("window.openNew")),
+    getTabLabel: (id) => tabManager.get(id)?.label ?? "",
+    setTabColor: (id, color) => tabManager.get(id)?.setColor(color),
+    renameTab: (id) => tabManager.renameTab(id),
+    duplicateTab: (id) => tabManager.duplicateTab(id),
+    closeTab: (id) => tabManager.closeTab(id),
+    closeTabsRight: (id) => tabManager.closeTabsRight(id),
+    closeOtherTabs: (id) => tabManager.closeOtherTabs(id),
+    getSelection: (id) => tabManager.get(id)?.terminal.getSelection() ?? "",
+    pasteToTab: (id, text) => tabManager.get(id)?.terminal.paste(text),
+    clearTab: (id) => tabManager.clearTab(id),
+    switchTo: (id) => tabManager.switchTo(id),
+    exportTab: (id) => tabManager.exportTab(id),
+    setSerialBaud: (id, baud) => tabManager.setSerialBaud(id, baud),
+    setSerialEnterNewline: (id, mode) => tabManager.setSerialEnterNewline(id, mode),
+    setSerialOutputNewline: (id, mode) => tabManager.setSerialOutputNewline(id, mode),
+    isSerialTab: (id) => tabManager.get(id)?.type === "serial",
+    getSerialBaud: (id) => tabManager.get(id)?.serialBaud,
+    getSerialOutputNewline: (id) => tabManager.get(id)?.outputNewline,
+    getSerialEnterNewline: (id) => tabManager.get(id)?.enterNewline,
+    getActiveTabId: () => tabManager.activeTabId,
+  });
+  m.initContextMenu();
+});
 initWindowControls();
+
+// Flush pending debounced config writes before the window closes.
+window.addEventListener("beforeunload", () => configStore.flush());
 
 // -- initial tab --
 
-getVersion().then(v => { welcomeVersion.textContent = "v" + v; }).catch(() => {});
+getVersion().then(v => { welcomeVersion.textContent = "v" + v; }).catch(logCatch("app.version"));
 
-loadSshHosts();
+// Load SSH hosts and store in config
+loadSshHosts().then(hosts => {
+  configStore.set({ sshHosts: hosts });
+}).catch(logCatch("ssh.loadHosts"));
 
 // Load system fonts in background (non-blocking)
 invoke<string[]>("list_system_fonts").then(fonts => {
   setSystemFonts(fonts);
-}).catch(() => {});
+}).catch(logCatch("font.listSystem"));
 
-loadConfig().then(() => {
-  updateFontStack(parseFontFamily(configFontFamily));
-  return loadLocalProfiles();
-}).then(async () => {
+// Load config, then profiles, then open initial tab
+configStore.load().then(async () => {
+  updateFontStack(parseFontFamily(configStore.get("fontFamily")));
+
+  // Load WT profiles + VS installs + themes
+  const wt = await loadAllWtData();
+  setWtThemes(wt.themes);
+  configStore.set({
+    localProfiles: wt.profiles,
+    vsInstalls: wt.vsInstalls,
+  });
+
   applyTabWidthMode();
-  const defName = defaultLocalProfile ?? localProfiles[0]?.name ?? null;
-  const p = defName ? localProfiles.find(x => x.name === defName) : null;
+  const defName = configStore.get("defaultLocalProfile") ?? configStore.get("localProfiles")[0]?.name ?? null;
+  const p = defName ? configStore.get("localProfiles").find(x => x.name === defName) : null;
   if (p) await tabManager.createLocalTab(p.command, p.name);
   else await tabManager.createLocalTab();
 }).catch(() => {
   welcomeEl.style.display = "flex";
 });
-
-

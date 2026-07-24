@@ -9,7 +9,7 @@ const { tabManagerMock } = vi.hoisted(() => ({
     createDemoTab: vi.fn(),
   },
 }));
-vi.mock("../src/tabmanager", () => ({ tabManager: tabManagerMock }));
+vi.mock("../src/terminal/tabmanager", () => ({ tabManager: tabManagerMock }));
 
 // Mock the Tauri IPC layer before importing any app module.
 const defaultInvoke = (cmd: string) => {
@@ -38,7 +38,7 @@ describe("profile menu (serial enumeration)", () => {
   });
 
   async function openMenu() {
-    const m = await import("../src/profilemenu");
+    const m = await import("../src/terminal/profilemenu");
     m.initProfileMenu();
     (document.getElementById("new-tab-menu-btn")!).click();
     // allow the async re-enumeration + repopulate to complete
@@ -85,7 +85,7 @@ describe("profile menu (serial enumeration)", () => {
   it("omits the Serial column when no ports are present", async () => {
     invokeMock.mockImplementation((cmd: string) =>
       Promise.resolve(cmd === "serial_list_ports" ? [] : null));
-    const m = await import("../src/profilemenu");
+    const m = await import("../src/terminal/profilemenu");
     m.initProfileMenu();
     (document.getElementById("new-tab-menu-btn")!).click();
     await new Promise(r => setTimeout(r, 50));

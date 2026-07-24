@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { createSerialInputHandler } from "../src/serialinput";
+import { createSerialInputHandler } from "../src/util/serialinput";
 
 function make(mode: "normal" | "echo" | "line", enter: "cr" | "lf" | "crlf" = "cr") {
   const sent: string[] = [];

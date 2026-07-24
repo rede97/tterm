@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { CursorPositionFilter } from "../src/imefilter";
+import { CursorPositionFilter } from "../src/util/imefilter";
 
 // The filter timestamps everything with performance.now(); fake timers mock it.
 describe("CursorPositionFilter", () => {

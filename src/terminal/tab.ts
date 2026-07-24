@@ -3,17 +3,21 @@ import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { invoke } from "@tauri-apps/api/core";
-import { readText as clipboardReadText } from "@tauri-apps/plugin-clipboard-manager";
-import { TabType } from "./types";
-import { hysteresis } from "./hysteresis";
-import { parseOsc9Progress, applyProgressToTabElement } from "./osc";
-import { SizeHint } from "./sizehint";
-import { DisconnectOverlay } from "./disconnect";
-import { ImeBox } from "./imebox";
-import { CursorPositionFilter } from "./imefilter";
-import { SshHost, configFontFamily, configFontSize, configRenderer, configScrollback, configThemeName, trimPasteContent, SerialInputMode, SerialEnterNewline } from "./profiles";
-import { createSerialInputHandler } from "./serialinput";
-import { findTheme } from "./themes";
+import { readText as clipboardReadText, writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
+import { logCatch } from "../core/errorlog";
+import type { TabType } from "../core/types";
+export type { TabType };
+import { hysteresis } from "../util/hysteresis";
+import { parseOsc9Progress, applyProgressToTabElement } from "../util/osc";
+import { SizeHint } from "../util/sizehint";
+import { DisconnectOverlay } from "../util/disconnect";
+import { ImeBox } from "../util/imebox";
+import { CursorPositionFilter } from "../util/imefilter";
+import type { SshHost, SerialInputMode, SerialEnterNewline } from "../core/types";
+import { trimPasteContent } from "../core/types";
+import { configStore } from "../core/store";
+import { createSerialInputHandler } from "../util/serialinput";
+import { findTheme } from "../util/themes";
 
 export class TerminalTab {
   id: string;
@@ -63,9 +67,9 @@ export class TerminalTab {
     this.element.className = "terminal-instance";
     this.element.style.display = "none";
     container.appendChild(this.element);
-    this.sizeHint = new SizeHint(this.element, 1200, configFontFamily);
+    this.sizeHint = new SizeHint(this.element, 1200, configStore.get("fontFamily"));
     this.disconnectOverlay = new DisconnectOverlay(this.element);
-    this.imeBox = new ImeBox(this.element, configFontFamily);
+    this.imeBox = new ImeBox(this.element, configStore.get("fontFamily"));
 
     // Enter on a disconnected session triggers reconnect (capture, before xterm)
     this.element.addEventListener("keydown", (e: KeyboardEvent) => {
@@ -79,10 +83,10 @@ export class TerminalTab {
     this.terminal = new Terminal({
       allowProposedApi: true,
       cursorBlink: true,
-      fontSize: configFontSize,
-      fontFamily: configFontFamily,
-      scrollback: configScrollback,
-      theme: findTheme(configThemeName).theme,
+      fontSize: configStore.get("fontSize"),
+      fontFamily: configStore.get("fontFamily"),
+      scrollback: configStore.get("scrollback"),
+      theme: findTheme(configStore.get("themeName")).theme,
     });
 
     this.fitAddon = new FitAddon();
@@ -97,7 +101,7 @@ export class TerminalTab {
       this.setProgress(p.state, p.progress);
       return true;
     });
-    if (configRenderer === "webgl") this.terminal.loadAddon(new WebglAddon());
+    if (configStore.get("renderer") === "webgl") this.terminal.loadAddon(new WebglAddon());
     this.terminal.open(this.element);
 
     this.terminal.onTitleChange((title: string) => {
@@ -122,19 +126,12 @@ export class TerminalTab {
       e.preventDefault();
       const sel = this.terminal.getSelection();
       if (sel.length > 0) {
-        const ta = document.createElement("textarea");
-        ta.value = sel;
-        ta.style.position = "fixed";
-        ta.style.left = "-9999px";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
+        clipboardWriteText(sel).catch(logCatch("clipboard.write"));
         this.terminal.clearSelection();
       } else {
         clipboardReadText().then(t => {
-          if (t) this.terminal.paste(trimPasteContent(t));
-        }).catch(() => { });
+          if (t) this.terminal.paste(trimPasteContent(t, configStore.get("pasteTrim")));
+        }).catch(logCatch("clipboard.read"));
       }
     }, true);
 

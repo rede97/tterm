@@ -1,5 +1,7 @@
 import { createElement, Terminal as TerminalIcon, Globe, Cable, FlaskConical } from "lucide";
-import { sshHosts, localProfiles, hiddenProfiles, hiddenSshHosts, hostProp, serialPorts, loadSerialPorts } from "./profiles";
+import { configStore } from "../core/store";
+import { hostProp } from "../core/types";
+import { loadSerialPorts } from "../config/wt-profiles";
 import { tabManager } from "./tabmanager";
 
 const menuBtn = document.getElementById("new-tab-menu-btn")!;
@@ -42,7 +44,6 @@ function createMenuItem(iconFn: any, label: string, detail: string, onClick: () 
   item.appendChild(iconWrap);
 
   if (subline) {
-    // two-line layout: label on top, subline (light small) below
     const textWrap = document.createElement("div");
     textWrap.className = "item-text";
     const labelEl = document.createElement("span");
@@ -79,6 +80,12 @@ function createMenuItem(iconFn: any, label: string, detail: string, onClick: () 
 function populateMenu() {
   profileMenu.innerHTML = "";
 
+  const localProfiles = configStore.get("localProfiles");
+  const hiddenProfiles = configStore.get("hiddenProfiles");
+  const sshHosts = configStore.get("sshHosts");
+  const hiddenSshHosts = configStore.get("hiddenSshHosts");
+  const serialPorts = configStore.get("serialPorts");
+
   const localCol = document.createElement("div");
   localCol.className = "profile-col";
 
@@ -96,8 +103,6 @@ function populateMenu() {
     localCol.appendChild(createMenuItem(TerminalIcon, "Default shell", "", () => tabManager.createLocalTab()));
   }
 
-  // Debug builds only: mock TTY demo (OSC 9;4 progress + TUI animation).
-  // Mock serial ports come through serial_list_ports enumeration instead.
   if (import.meta.env.DEV) {
     localCol.appendChild(createMenuItem(FlaskConical, "Demo TTY", "debug", () => tabManager.createDemoTab()));
   }
@@ -130,7 +135,6 @@ function populateMenu() {
     serialCol.appendChild(serialTitle);
 
     for (const port of serialPorts) {
-      // Line 1: COM name · friendly name. Line 2 (light small): vendor VID:PID.
       const ids = port.vid && port.pid ? `${port.vid}:${port.pid}` : "";
       const subline = [port.manufacturer, ids].filter(Boolean).join(" ");
       const friendly = port.product || port.driver;
@@ -139,7 +143,6 @@ function populateMenu() {
     }
     profileMenu.appendChild(serialCol);
   }
-
 }
 
 export function initProfileMenu() {
@@ -152,8 +155,8 @@ export function initProfileMenu() {
       positionMenu();
       profileMenu.classList.add("open");
       requestAnimationFrame(() => flipMenu());
-      // Re-enumerate in the background so hot-plugged devices appear
-      loadSerialPorts().then(() => {
+      loadSerialPorts().then(ports => {
+        configStore.set({ serialPorts: ports });
         if (profileMenu.classList.contains("open")) {
           populateMenu();
           flipMenu();

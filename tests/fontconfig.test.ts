@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildFontFamily, parseFontFamily, defaultFontStack,
   updateFontStack, fontStack, BUILTIN_FONTS, NERDFONT_BUILTIN,
-} from "../src/fontconfig";
+} from "../src/util/fontconfig";
 
 describe("buildFontFamily", () => {
   it("quotes families containing spaces", () => {
