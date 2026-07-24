@@ -1,14 +1,16 @@
-﻿import { Terminal } from "@xterm/xterm";
+﻿import { Terminal, IDisposable, IBufferCell } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { invoke } from "@tauri-apps/api/core";
+import { readText as clipboardReadText } from "@tauri-apps/plugin-clipboard-manager";
 import { TabType } from "./types";
 import { hysteresis } from "./hysteresis";
 import { parseOsc9Progress, applyProgressToTabElement } from "./osc";
 import { SizeHint } from "./sizehint";
 import { DisconnectOverlay } from "./disconnect";
 import { ImeBox } from "./imebox";
+import { CursorPositionFilter } from "./imefilter";
 import { SshHost, configFontFamily, configFontSize, configRenderer, configScrollback, configThemeName, trimPasteContent, SerialInputMode, SerialEnterNewline } from "./profiles";
 import { createSerialInputHandler } from "./serialinput";
 import { findTheme } from "./themes";
@@ -43,7 +45,13 @@ export class TerminalTab {
   onSocketClosed?: () => void;
   onReconnectRequested?: () => void;
   private disconnectOverlay!: DisconnectOverlay;
+  // Floating IME composition box — currently disabled, will be toggleable
+  // via a shortcut later. Wiring is kept intact; flip imeBoxEnabled on.
   private imeBox!: ImeBox;
+  private imeBoxEnabled = false;
+  // Stable-run filter feeding the IME anchor position (anti animation jitter).
+  private cursorFilter = new CursorPositionFilter();
+  private onRenderDisposable?: IDisposable;
   private attachAddon?: import("@xterm/addon-attach").AttachAddon;
 
   constructor(id: string, type: TabType, label: string, container: HTMLElement) {
@@ -124,36 +132,74 @@ export class TerminalTab {
         document.body.removeChild(ta);
         this.terminal.clearSelection();
       } else {
-        navigator.clipboard.readText().then(t => {
+        clipboardReadText().then(t => {
           if (t) this.terminal.paste(trimPasteContent(t));
         }).catch(() => { });
       }
     }, true);
 
-    // Freeze IME textarea position during composition to prevent candidate window drift.
+    // Sample cursor position on every render — the dwell filter uses these
+    // samples to pick a stable IME anchor even during animated redraws.
+    this.onRenderDisposable = this.terminal.onRender(() => {
+      const buf = this.terminal.buffer.active;
+      this.cursorFilter.sample(buf.cursorX, buf.cursorY);
+    });
+
+    // Drive the native IME candidate window with the filtered cursor position.
     this._patchImeFreeze();
 
-    // Floating IME composition box: mirrors the composition string at a
-    // position captured once per composition (never drifts mid-composition).
+    // Floating IME composition box (disabled for now — see imeBoxEnabled).
     const textarea = this.element.querySelector(".xterm-helper-textarea") as HTMLElement | null;
-    if (textarea) {
+    if (this.imeBoxEnabled && textarea) {
       this.imeBox.attach(textarea, () => this._cursorPixelPos());
     }
   }
 
-  // Cursor position in pixels, relative to the terminal element.
+  // Filtered cursor position in pixels, relative to the terminal element.
   private _cursorPixelPos(): { x: number; y: number; cellH: number } {
     try {
       const core = (this.terminal as any)._core;
       const dims = core._renderService.dimensions.css.cell;
-      const buf = this.terminal.buffer.active;
+      const cell = this._imeAnchorCell();
       return {
-        x: buf.cursorX * dims.width,
-        y: buf.viewportY * dims.height,
+        x: cell.x * dims.width,
+        y: cell.y * dims.height,
         cellH: dims.height,
       };
     } catch {
       return { x: 8, y: 8, cellH: 16 };
+    }
+  }
+
+  // Anchor cell for the IME candidate window, viewport-relative.
+  // Some TUIs (e.g. pi) hide the hardware cursor (\x1b[?25l) and draw their
+  // own as an inverse-video cell. In that case buffer.cursorX/Y is wherever
+  // the app parked the cursor (often line end), so scan the viewport for the
+  // rendered cursor instead. Falls back to the stable-run filter position.
+  private _imeAnchorCell(): { x: number; y: number } {
+    const buf = this.terminal.buffer.active;
+    const fallback = this.cursorFilter.position() ?? { x: buf.cursorX, y: buf.cursorY };
+    try {
+      const core = (this.terminal as any)._core;
+      if (!core.coreService?.isCursorHidden) return fallback;
+      let best: { x: number; y: number; d: number } | null = null;
+      const ref = buf.cursorY * 10000 + buf.cursorX; // prefer cell nearest the parked cursor
+      for (let y = 0; y < this.terminal.rows; y++) {
+        const line = buf.getLine(buf.viewportY + y);
+        if (!line) continue;
+        let cell: IBufferCell | undefined;
+        for (let x = 0; x < line.length; x++) {
+          cell = line.getCell(x, cell);
+          if (!cell) break;
+          if (cell.isInverse()) {
+            const d = Math.abs(y * 10000 + x - ref);
+            if (!best || d < best.d) best = { x, y, d };
+          }
+        }
+      }
+      return best ? { x: best.x, y: best.y } : fallback;
+    } catch {
+      return fallback;
     }
   }
 
@@ -220,12 +266,15 @@ export class TerminalTab {
   }
 
   private _patchImeFreeze(): void {
-    // Intercept the hidden textarea's style setter to freeze left/top during IME composition.
-    // Strategy: locate xterm.js's internal textarea via _core.textarea, then replace
-    // the style object's `left` and `top` setters. When composition is active, all
-    // writes are redirected to frozen pixel coordinates captured at compositionstart.
+    // Replace xterm.js's own IME textarea positioning with a filtered anchor:
+    //  - anchor = dwell-filter mode position (robust against animation frames,
+    //    where the instantaneous cursor cell at compositionstart is unreliable)
+    //  - during composition the textarea style is frozen via a Proxy, and a
+    //    200ms timer re-anchors from the filter so the native candidate window
+    //    follows once the cursor settles.
     let left: number | null = null;
     let top: number | null = null;
+    let refreshTimer: number | null = null;
 
     const core = (this.terminal as any)._core;
 
@@ -233,6 +282,14 @@ export class TerminalTab {
     // open() runs synchronously in the constructor above, so it's safe here.
     const ta: HTMLTextAreaElement | undefined = core.textarea;
     if (!ta) return;
+
+    // Filtered cursor position in pixels, relative to the terminal element.
+    const pxPos = (): { x: number; y: number } | null => {
+      const dims = core._renderService?.dimensions?.css;
+      if (!dims) return null;
+      const cell = this._imeAnchorCell();
+      return { x: cell.x * dims.cell.width, y: cell.y * dims.cell.height };
+    };
 
     // Replace `ta.style` with a Proxy whose setters for left/top/width are
     // clamped during IME composition.
@@ -266,20 +323,40 @@ export class TerminalTab {
       configurable: true,
     });
 
+    const stopRefresh = () => {
+      if (refreshTimer !== null) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+      }
+    };
+
     // compositionstart/end: capture the frozen anchor position.
     // These fire on the hidden textarea and bubble through document.
-    document.addEventListener("compositionstart", () => {
-      const buf = this.terminal.buffer.active;
-      const dims = core._renderService?.dimensions?.css;
-      const cellW = dims?.cell?.width ?? 8;
-      const cellH = dims?.cell?.height ?? 16;
-      left = (buf.cursorX - 1) * cellW;
-      top = buf.cursorY * cellH;
+    document.addEventListener("compositionstart", (e) => {
+      if (e.target !== ta) return; // only this tab's textarea
+      const p = pxPos();
+      if (p) {
+        left = p.x;
+        top = p.y;
+      }
+      // Periodically re-anchor from the filter while composing. Writes go to
+      // origStyle directly, bypassing the freeze Proxy.
+      stopRefresh();
+      refreshTimer = window.setInterval(() => {
+        const q = pxPos();
+        if (!q || (q.x === left && q.y === top)) return;
+        left = q.x;
+        top = q.y;
+        origStyle.left = q.x + "px";
+        origStyle.top = q.y + "px";
+      }, 200);
     }, true);
 
-    document.addEventListener("compositionend", () => {
+    document.addEventListener("compositionend", (e) => {
+      if (e.target !== ta) return;
       left = null;
       top = null;
+      stopRefresh();
     }, true);
   }
 
@@ -367,6 +444,7 @@ export class TerminalTab {
     this.sizeHint.destroy();
     this.disconnectOverlay.destroy();
     this.imeBox.destroy();
+    this.onRenderDisposable?.dispose();
     this.element.remove();
     this.tabElement.remove();
     this.terminal.dispose();
