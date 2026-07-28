@@ -1,5 +1,5 @@
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
@@ -32,7 +32,7 @@ fn spawn_pty_child(
     id: &str,
     cmd: CommandBuilder,
     size: PtySize,
-) -> Result<(Box<dyn Read + Send>, Box<dyn Write + Send>), String> {
+) -> Result<crate::relay::SessionIo, String> {
     let pty_sys = native_pty_system();
     let pty_pair = pty_sys.openpty(size).map_err(|e| e.to_string())?;
 
@@ -65,7 +65,7 @@ fn spawn_pty_child(
             // Only touch OUR spawn (not a respawn replacement).
             // Drop the master (closes ConPTY, unblocks the relay read pump)
             // but keep the spec for reconnection.
-            if m.get(&id2).map_or(false, |s| s.nonce == nonce) {
+            if m.get(&id2).is_some_and(|s| s.nonce == nonce) {
                 if let Some(s) = m.get_mut(&id2) {
                     s.master = None;
                 }

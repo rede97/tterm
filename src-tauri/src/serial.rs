@@ -20,6 +20,9 @@ pub struct SerialPortInfo {
 
 #[tauri::command]
 pub fn serial_list_ports() -> Vec<SerialPortInfo> {
+    // `mut` is only used by the debug-only mock-port injection below; the
+    // attr keeps release builds warning-free.
+    #[cfg_attr(not(debug_assertions), allow(unused_mut))]
     let mut result: Vec<SerialPortInfo> = serial_enumerator::get_serial_list()
         .into_iter()
         .map(|p| {
@@ -231,6 +234,8 @@ pub(crate) fn serial_io_loop(
 
 // Open a serial port and start the I/O pump + WS relay for session `id`.
 // Shared by serial_spawn (new tab) and the dead-mode respawn hooks.
+// Parameters mirror serial_spawn's invoke args 1:1.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn spawn_serial_session(
     state: &AppState,
     app: &tauri::AppHandle,
@@ -351,6 +356,8 @@ pub(crate) fn start_serial_session(
     Ok(())
 }
 
+// Tauri commands map invoke() args 1:1; grouping would churn the JS side.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub fn serial_spawn(
     state: tauri::State<AppState>,

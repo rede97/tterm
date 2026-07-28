@@ -59,7 +59,7 @@ pub(crate) fn respawn_failed(msg: &str) -> Vec<u8> {
 // `rows` LFs scroll exactly one full viewport.
 pub(crate) fn resume_scroll(rows: u16) -> Vec<u8> {
     let mut v = b"\x1b[999B".to_vec();
-    v.extend(std::iter::repeat(b'\n').take(rows as usize));
+    v.extend(std::iter::repeat_n(b'\n', rows as usize));
     v
 }
 

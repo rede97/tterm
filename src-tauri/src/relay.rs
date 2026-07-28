@@ -141,9 +141,13 @@ fn reject(status: StatusCode, msg: &str) -> ErrorResponse {
 
 // Handle one TCP connection: route + authenticate during the WS handshake,
 // then pump bytes in both directions until either side ends.
+// result_large_err: the ErrorResponse variant is imposed by
+// accept_hdr_async's callback signature; cannot box it here.
+#[allow(clippy::result_large_err)]
 async fn handle_connection(hub: Arc<WsHub>, stream: tokio::net::TcpStream) {
     // Claimed during the handshake callback: (id, downstream rx, writer, generation).
-    let mut claimed: Option<(String, mpsc::Receiver<Vec<u8>>, Arc<Mutex<Box<dyn Write + Send>>>, u64)> = None;
+    type Claimed = (String, mpsc::Receiver<Vec<u8>>, Arc<Mutex<Box<dyn Write + Send>>>, u64);
+    let mut claimed: Option<Claimed> = None;
     // Fired by a LATER handshake that finds this connection still holding the
     // downstream receiver (stale half-open): tells our sender task to release it.
     let (kick_tx, kick_rx) = tokio::sync::oneshot::channel::<()>();
@@ -299,7 +303,7 @@ pub(crate) struct ReconnectHooks {
     pub(crate) notice: Box<dyn Fn() -> Vec<u8> + Send + Sync>,
     // Respawn the session; returns the new (reader, writer). Called from a
     // blocking thread (the relay write path); may take hundreds of ms.
-    pub(crate) respawn: Box<dyn Fn() -> Result<(Box<dyn Read + Send>, Box<dyn Write + Send>), String> + Send + Sync>,
+    pub(crate) respawn: Box<dyn Fn() -> RespawnOutcome + Send + Sync>,
     // Bytes injected downstream right after a successful respawn, BEFORE the
     // new stream's output. PTY sessions scroll the dead viewport up into
     // scrollback here (a fresh ConPTY opens with `\x1b[2J` — erase visible
@@ -310,7 +314,10 @@ pub(crate) struct ReconnectHooks {
     pub(crate) on_state: Box<dyn Fn(bool) + Send + Sync>,
 }
 
-type RespawnOutcome = Result<(Box<dyn Read + Send>, Box<dyn Write + Send>), String>;
+// The two ends of a session byte stream (reader from child, writer to child).
+pub(crate) type SessionIo = (Box<dyn Read + Send>, Box<dyn Write + Send>);
+
+type RespawnOutcome = Result<SessionIo, String>;
 
 // Upstream writer installed while a session is dead: swallows all input
 // except Enter, which runs the respawn (blocking) and hands the outcome to
@@ -388,7 +395,7 @@ where
         // closes and the client gets its Close frame. The generation check
         // avoids removing a newer entry that reused the same id.
         if let Ok(mut entries) = hub2.entries.lock() {
-            if entries.get(&id2).map_or(false, |e| e.generation == generation) {
+            if entries.get(&id2).is_some_and(|e| e.generation == generation) {
                 entries.remove(&id2);
             }
         }
@@ -572,6 +579,7 @@ mod tests {
 
         register_session(&hub, "tab-t", session_reader, session_side, None).unwrap();
 
+        #[allow(clippy::result_large_err)] // tungstenite::client err size
         let connect_ws = |path: &str| {
             let stream = std::net::TcpStream::connect(format!("127.0.0.1:{}", hub.port)).unwrap();
             tungstenite::client(format!("ws://127.0.0.1:{}{}", hub.port, path), stream)
@@ -686,6 +694,7 @@ mod tests {
         register_session(&hub, "tab-k", session_reader, session_side, None).unwrap();
 
         let url = format!("ws://127.0.0.1:{}/pty/tab-k?token={}", hub.port, hub.token);
+        #[allow(clippy::result_large_err)] // tungstenite::client err size
         let connect = |url: &str| {
             let stream = std::net::TcpStream::connect(format!("127.0.0.1:{}", hub.port)).unwrap();
             tungstenite::client(url, stream)
@@ -727,6 +736,7 @@ mod tests {
         register_session(&hub, "tab-c", session_reader, session_side, None).unwrap();
 
         let url = format!("ws://127.0.0.1:{}/pty/tab-c?token={}", hub.port, hub.token);
+        #[allow(clippy::result_large_err)] // tungstenite::client err size
         let connect = |url: &str| {
             let stream = std::net::TcpStream::connect(format!("127.0.0.1:{}", hub.port)).unwrap();
             tungstenite::client(url, stream)
@@ -853,7 +863,7 @@ mod tests {
 
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let session_side = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
-        let (mut shell_side, _) = listener.accept().unwrap();
+        let (shell_side, _) = listener.accept().unwrap();
         let session_reader = session_side.try_clone().unwrap();
 
         let hooks = ReconnectHooks {

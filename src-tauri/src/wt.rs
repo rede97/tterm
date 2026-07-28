@@ -114,14 +114,14 @@ pub(crate) fn load_wt_fragments() -> Vec<String> {
                         if let Ok(sub) = std::fs::read_dir(&p) {
                             for f in sub.flatten() {
                                 let fp = f.path();
-                                if fp.extension().map_or(false, |e| e == "json") {
+                                if fp.extension().is_some_and(|e| e == "json") {
                                     if let Ok(c) = std::fs::read_to_string(&fp) {
                                         result.push(c);
                                     }
                                 }
                             }
                         }
-                    } else if p.extension().map_or(false, |e| e == "json") {
+                    } else if p.extension().is_some_and(|e| e == "json") {
                         if let Ok(c) = std::fs::read_to_string(&p) {
                             result.push(c);
                         }
