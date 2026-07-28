@@ -110,7 +110,7 @@ Frontend → Backend: Tauri `invoke()` commands:
 | `serial_spawn` | `port_name`, `baud_rate`, `data_bits`, `parity`, `stop_bits`, `flow_control` | open serial session + WS relay, return `{ id, port, token }` |
 | `serial_set_baud` | `id`, `baud_rate` | live baud switch via the pump's SerialCtl channel (no reconnect) |
 
-Backend → Frontend: **WebSocket** `ws://127.0.0.1:{port}/pty/{id}?token={token}` — a single hub port multiplexes all sessions (path routing + per-process token auth). Binary frames carry raw PTY bytes directly to xterm.js via `@xterm/addon-attach` (no serialization, no Tauri events). The legacy `pty-output` Tauri event was removed in the WebSocket refactor.
+Backend → Frontend: **WebSocket** `ws://127.0.0.1:{port}/pty/{id}?token={token}` — a single hub port multiplexes all sessions (path routing + per-process token auth). Binary frames carry raw PTY bytes to xterm.js via `BatchAttachAddon` (`src/terminal/batchattach.ts`), which coalesces messages within a 6 ms window before `terminal.write()`: ConPTY splits a full-screen frame into a bare `ESC[2J` + content ~1–3 ms apart, and unbatched writes let xterm present the erase as a blank frame (flicker at large terminal sizes). The legacy `pty-output` Tauri event was removed in the WebSocket refactor.
 
 ## Profile loading flow
 
@@ -256,7 +256,7 @@ Per-tab: `TerminalTab.searchQuery` saved on close and input events, restored on 
 
 ## Key dependencies
 
-- Frontend: `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-search`, `@xterm/addon-webgl`, `@xterm/addon-attach`, `@tauri-apps/api`
+- Frontend: `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-search`, `@xterm/addon-webgl`, `@tauri-apps/api`
 - Backend: `tauri` v2, `portable-pty` (cross-platform PTY), `tokio-tungstenite` (WebSocket bridge), `serde`, `serde_json`
 - Icons: `lucide` (MIT-licensed SVG icon library, stroke-based, consistent 2px weight)
 - Icon generation: `sharp` (devDependency, rasterize `src/assets/tterm.svg` into platform icon formats)

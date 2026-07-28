@@ -17,6 +17,7 @@ import { trimPasteContent } from "../core/common";
 import { configStore } from "../core/store";
 import { createSerialInputHandler } from "../util/serialinput";
 import { findTheme } from "../util/themes";
+import { BatchAttachAddon } from "./batchattach";
 
 export class TerminalTab {
   id: string;
@@ -53,7 +54,7 @@ export class TerminalTab {
   // Stable-run filter feeding the IME anchor position (anti animation jitter).
   private cursorFilter = new CursorPositionFilter();
   private onRenderDisposable?: IDisposable;
-  private attachAddon?: import("@xterm/addon-attach").AttachAddon;
+  private attachAddon?: BatchAttachAddon;
 
   constructor(id: string, type: TabType, label: string, container: HTMLElement) {
     this.id = id;
@@ -230,8 +231,6 @@ export class TerminalTab {
 
   private async _openSocket(): Promise<void> {
     const gen = ++this.socketGen;
-    const { AttachAddon } = await import("@xterm/addon-attach");
-    if (gen !== this.socketGen) return; // superseded while importing
     const socket = new WebSocket(`ws://127.0.0.1:${this.socketPort}/pty/${encodeURIComponent(this.id)}?token=${this.socketToken}`);
 
     socket.addEventListener("open", () => {
@@ -242,11 +241,10 @@ export class TerminalTab {
       if (this.type === "serial") {
         // Serial tabs forward input themselves (input modes: normal/echo/line)
         this.serialSocket = socket;
-        this.attachAddon = new AttachAddon(socket, { bidirectional: false });
+        this.attachAddon = new BatchAttachAddon(socket, this.terminal, { bidirectional: false });
       } else {
-        this.attachAddon = new AttachAddon(socket);
+        this.attachAddon = new BatchAttachAddon(socket, this.terminal);
       }
-      this.terminal.loadAddon(this.attachAddon);
     });
 
     socket.addEventListener("close", (e) => {
