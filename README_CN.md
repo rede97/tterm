@@ -32,6 +32,11 @@
 - **断线不怕** — 会话断开后按一下回车，原地重连
 - **主题画廊** — 12 款内置配色 + 自动导入 Windows Terminal 方案，所见即所得
 
+<p align="center">
+  <img src="docs/images/screenshot-profiles.png" width="410" alt="新建标签菜单：本地 shell、SSH 主机、串口" />
+  <img src="docs/images/screenshot-themes.png" width="410" alt="设置中的主题画廊" />
+</p>
+
 ## 下载
 
 从 [Releases](https://github.com/rede97/tterm/releases/latest) 获取安装包（NSIS / MSI）。

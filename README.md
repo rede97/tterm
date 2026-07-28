@@ -34,6 +34,11 @@
 - **Theme gallery** — 12 built-in schemes plus automatic Windows Terminal
   import, all previewed in your actual terminal font.
 
+<p align="center">
+  <img src="docs/images/screenshot-profiles.png" width="410" alt="Profile menu: local shells, SSH hosts, serial ports" />
+  <img src="docs/images/screenshot-themes.png" width="410" alt="Theme gallery in Settings" />
+</p>
+
 ## Download
 
 Grab the installer (NSIS / MSI) from [Releases](https://github.com/rede97/tterm/releases/latest).
