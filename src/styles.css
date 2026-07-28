@@ -30,7 +30,9 @@ body {
 
 #tabs {
   display: flex;
-  flex: 0 1 auto;
+  /* Fill the tab bar so tabs can share the width equally; shrinks under
+     pressure (drag spacer yields first), then overflow-x scrolls. */
+  flex: 1 1 auto;
   overflow-x: auto;
   overflow-y: hidden;
   height: 100%;
@@ -282,6 +284,10 @@ body {
   display: flex;
   align-items: center;
   position: relative;
+  /* Equal sizing (Chrome/Windows Terminal style): all tabs share the bar
+     width equally, capped at 200px, shrinking together down to 120px,
+     then #tabs scrolls. Full name is available via the hover tooltip. */
+  flex: 1 1 0;
   min-width: 120px;
   max-width: 200px;
   height: 100%;
@@ -290,7 +296,6 @@ body {
   border-right: 1px solid #1e1e1e;
   cursor: pointer;
   user-select: none;
-  flex-shrink: 0;
 }
 
 /* Equal width: all tabs same size */

@@ -96,6 +96,7 @@ export class TerminalTab {
         this.label = title;
         const labelEl = this.tabElement.querySelector(".tab-label") as HTMLElement;
         if (labelEl) labelEl.textContent = title;
+        this.tabElement.title = title;
       }
     });
 
@@ -482,6 +483,7 @@ export class TerminalTab {
     this.command = undefined;
     const labelEl = this.tabElement.querySelector(".tab-label") as HTMLElement;
     if (labelEl) labelEl.textContent = this.label;
+    this.tabElement.title = this.label;
   }
 
   destroy(): void {

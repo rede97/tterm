@@ -84,6 +84,11 @@ export class TabManager {
     label.textContent = tab.label;
     el.appendChild(label);
 
+    // Tabs are equal-width now, so names are often truncated: the hover
+    // tooltip always carries the full label (kept in sync on rename and
+    // OSC title changes).
+    el.title = tab.label;
+
     const closeBtn = document.createElement("button");
     closeBtn.className = "tab-close";
     closeBtn.textContent = "\xd7";

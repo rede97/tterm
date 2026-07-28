@@ -2,6 +2,9 @@
 
 New Features
 
+- Tabs are now always the same width: they share the tab bar equally
+  and shrink together as more are opened (like Windows Terminal), and
+  hovering a tab shows its full name
 - Disconnect handling is now built into the terminal itself: when a session
   ends (shell exit, SSH drop, serial unplug), the terminal resets to a sane
   state, prints the time it happened, and offers Enter to reconnect — no

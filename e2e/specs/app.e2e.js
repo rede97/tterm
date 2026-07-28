@@ -317,6 +317,25 @@ describe("TTerm application", () => {
     });
   });
 
+  it("tabs are equal width and carry the full name in the hover tooltip", async () => {
+    // Equal sizing (Chrome/WT style): every .tab shares the same width at
+    // any moment; the full label lives in the title attribute.
+    await browser.waitUntil(async () => (await $$("#tabs .tab")).length >= 3, { timeout: 15000 });
+    const info = await browser.execute(() =>
+      [...document.querySelectorAll("#tabs .tab")].map(t => ({
+        w: Math.round(t.getBoundingClientRect().width),
+        label: t.querySelector(".tab-label")?.textContent ?? "",
+        title: t.title,
+      })));
+    expect(info.length).toBeGreaterThanOrEqual(3);
+    const widths = new Set(info.map(t => t.w));
+    expect(widths.size).toBe(1);
+    for (const t of info) {
+      expect(t.title).toBe(t.label);
+      expect(t.title.length).toBeGreaterThan(0);
+    }
+  });
+
   it("shows the terminal viewport inside the active tab", async () => {
     // The `active` class lives on the tab-bar element (.tab.active), not on
     // .terminal-instance — the visible instance is the one without display:none.
