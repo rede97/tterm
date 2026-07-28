@@ -1,4 +1,4 @@
-import { createElement, Terminal as TerminalIcon, Globe, Cable, FlaskConical } from "lucide";
+import { createElement, Terminal as TerminalIcon, Globe, Cable, FlaskConical, Film } from "lucide";
 import { configStore } from "../core/store";
 import { hostProp } from "../core/common";
 import { loadSerialPorts } from "../config/wt-profiles";
@@ -105,6 +105,7 @@ function populateMenu() {
 
   if (import.meta.env.DEV) {
     localCol.appendChild(createMenuItem(FlaskConical, "Demo TTY", "debug", () => tabManager.createDemoTab()));
+    localCol.appendChild(createMenuItem(Film, "Anime TTY", "debug", () => tabManager.createAnimeTab()));
   }
   profileMenu.appendChild(localCol);
 

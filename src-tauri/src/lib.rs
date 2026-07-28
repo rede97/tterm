@@ -56,7 +56,7 @@ pub fn run() {
                 wt::read_wt_settings, wt::read_wt_fragments, wt::find_vs_instances,
                 serial::serial_list_ports, serial::serial_spawn, serial::serial_set_baud,
                 serial::serial_set_output_newline,
-                demo::demo_spawn,
+                demo::demo_spawn, demo::anime_spawn,
                 fonts::list_system_fonts,
             ] }
             #[cfg(not(debug_assertions))]

@@ -12,7 +12,8 @@
     "test:e2e": "wdio run e2e/wdio.conf.js",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test:e2e:ime": "wdio run e2e/wdio.conf.js --spec e2e/specs/ime.e2e.js"
+    "test:e2e:ime": "wdio run e2e/wdio.conf.js --spec e2e/specs/ime.e2e.js",
+    "test:e2e:anime": "wdio run e2e/wdio.conf.js --spec e2e/specs/anime.e2e.js"
   },
   "dependencies": {
     "@fontsource/cascadia-mono": "^5.2.3",

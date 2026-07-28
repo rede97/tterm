@@ -271,6 +271,27 @@ export class TabManager {
     return tab;
   }
 
+  async createAnimeTab(): Promise<TerminalTab | null> {
+    let result: { id: string; port: number; token: string };
+    try {
+      result = await invoke("anime_spawn");
+    } catch (e) {
+      showToast(String(e), "error");
+      return null;
+    }
+    const tab = new TerminalTab(result.id, "local", "Anime TTY", this.terminalContainer);
+    this._register(tab, result.port, result.token);
+
+    await this._ensureFontsReady(tab);
+
+    this._hideWelcome();
+    this.switchTo(result.id);
+    tab.fitDeferred();
+    this.refreshBadges();
+
+    return tab;
+  }
+
   // Wait for web fonts to load, then force xterm to re-measure character cells.
   // Without this, the first tab opened measures with a fallback font and caches
   // wrong glyph metrics, causing wide character spacing until next resize.

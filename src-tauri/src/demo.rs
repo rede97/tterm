@@ -139,10 +139,15 @@ fn start_demo() -> (DemoReader, DemoWriter, Arc<AtomicBool>) {
     (DemoReader::new(frame_rx), DemoWriter { tx: key_tx }, cancel)
 }
 
+// Shared spawn path for the in-memory animation sessions (Demo / Anime TTY):
+// registers the relay with reconnect hooks that restart the animation thread.
 #[cfg(debug_assertions)]
-#[tauri::command]
-pub fn demo_spawn(state: tauri::State<AppState>, app: tauri::AppHandle) -> Result<WsConnectResult, String> {
-    let (reader, writer, cancel) = start_demo();
+fn spawn_animation_session(
+    state: tauri::State<AppState>,
+    app: tauri::AppHandle,
+    starter: fn() -> (DemoReader, DemoWriter, Arc<AtomicBool>),
+) -> Result<WsConnectResult, String> {
+    let (reader, writer, cancel) = starter();
 
     let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
     let id = format!("tab-{}", *next);
@@ -164,7 +169,7 @@ pub fn demo_spawn(state: tauri::State<AppState>, app: tauri::AppHandle) -> Resul
             respawn: {
                 let id3 = id.clone();
                 Box::new(move || {
-                    let (r, w, cancel) = start_demo();
+                    let (r, w, cancel) = starter();
                     serial_sessions
                         .lock()
                         .map_err(|e| e.to_string())?
@@ -186,6 +191,133 @@ pub fn demo_spawn(state: tauri::State<AppState>, app: tauri::AppHandle) -> Resul
         .insert(id.clone(), SerialSession { cancel, ctl: std::sync::mpsc::channel::<crate::state::SerialCtl>().0, spec: None });
 
     Ok(state.ws_result(id))
+}
+
+#[cfg(debug_assertions)]
+#[tauri::command]
+pub fn demo_spawn(state: tauri::State<AppState>, app: tauri::AppHandle) -> Result<WsConnectResult, String> {
+    spawn_animation_session(state, app, start_demo)
+}
+
+// ── Anime TTY (gostty port, debug builds) ─────────────────────────
+// Full-screen terminal animation ported from gostty
+// (https://github.com/ashish0kumar/gostty, MIT License — see NOTICE.md).
+// The 235 GIF-derived frames are embedded verbatim; the renderer ports
+// gostty's centering and <c> color-tag processing so the animation is
+// identical to running gostty — with no external binary dependency.
+// Like gostty it enters the alt screen and hides the cursor, which also
+// makes it a deterministic fixture for hidden-cursor (IME) and
+// full-screen-repaint (flicker) testing.
+
+const ANIME_DATA: &str = include_str!("anime-data.json");
+const ANIME_WIDTH: usize = 77;   // gostty ImageWidth
+const ANIME_HEIGHT: usize = 41;  // gostty ImageHeight
+// gostty centers on the real terminal; this in-memory session has no size
+// channel, so it centers within a fixed virtual terminal instead.
+const ANIME_VIRT_COLS: usize = 120;
+const ANIME_VIRT_ROWS: usize = 45;
+const ANIME_FRAME_DELAY_MS: u64 = 35; // gostty MicrosPerFrame = 35000
+const ANIME_HIGHLIGHT: &str = "\x1b[34m"; // gostty default highlight (blue)
+const ANIME_CLEAR_AND_HOME: &str = "\x1b[2J\x1b[H";
+
+fn anime_frames() -> &'static Vec<Vec<String>> {
+    static FRAMES: std::sync::OnceLock<Vec<Vec<String>>> = std::sync::OnceLock::new();
+    FRAMES.get_or_init(|| serde_json::from_str(ANIME_DATA).expect("invalid anime-data.json"))
+}
+
+// Port of gostty's processColorCodes: <c>…</c> → highlight SGR … reset.
+fn anime_process_color_codes(line: &str, out: &mut String) {
+    let mut rest = line;
+    loop {
+        let Some(start) = rest.find("<c>") else {
+            out.push_str(rest);
+            break;
+        };
+        out.push_str(&rest[..start]);
+        let after = &rest[start + 3..];
+        let Some(end) = after.find("</c>") else {
+            out.push_str(rest); // malformed tag: emit remainder verbatim
+            break;
+        };
+        out.push_str(ANIME_HIGHLIGHT);
+        out.push_str(&after[..end]);
+        out.push_str("\x1b[0m");
+        rest = &after[end + 4..];
+    }
+}
+
+pub(crate) fn render_anime_frame(frame_idx: usize) -> Vec<u8> {
+    let frames = anime_frames();
+    let lines = &frames[frame_idx % frames.len()];
+    let vpad = ANIME_VIRT_ROWS.saturating_sub(ANIME_HEIGHT) / 2;
+    let hpad = ANIME_VIRT_COLS.saturating_sub(ANIME_WIDTH) / 2;
+    let mut s = String::with_capacity(4096);
+    s.push_str(ANIME_CLEAR_AND_HOME);
+    for _ in 0..vpad {
+        s.push('\n');
+    }
+    let padding = " ".repeat(hpad);
+    for (i, line) in lines.iter().enumerate() {
+        s.push_str(&padding);
+        anime_process_color_codes(line, &mut s);
+        if i < lines.len() - 1 {
+            s.push('\n');
+        }
+    }
+    s.into_bytes()
+}
+
+pub(crate) fn anime_loop(
+    tx: std::sync::mpsc::Sender<Vec<u8>>,
+    keys: std::sync::mpsc::Receiver<u8>,
+    cancel: Arc<AtomicBool>,
+) {
+    // alt screen + hide cursor (gostty preamble)
+    let _ = tx.send(b"\x1b[?1049h\x1b[?25l".to_vec());
+    let mut frame: usize = 0;
+    let mut paused = false;
+    loop {
+        if cancel.load(Ordering::Relaxed) {
+            break;
+        }
+        while let Ok(k) = keys.try_recv() {
+            match k {
+                b' ' => paused = !paused,
+                b'r' => frame = 0,
+                b'q' => cancel.store(true, Ordering::Relaxed),
+                _ => {}
+            }
+        }
+        if cancel.load(Ordering::Relaxed) {
+            break;
+        }
+        if !paused {
+            if tx.send(render_anime_frame(frame)).is_err() {
+                break;
+            }
+            frame = (frame + 1) % anime_frames().len();
+        }
+        std::thread::sleep(std::time::Duration::from_millis(ANIME_FRAME_DELAY_MS));
+    }
+    // restore cursor + leave alt screen, then the relay's dead mode takes over
+    let _ = tx.send(b"\x1b[?25h\x1b[?1049l\r\n\x1b[2manime session ended\x1b[0m\r\n".to_vec());
+}
+
+fn start_anime() -> (DemoReader, DemoWriter, Arc<AtomicBool>) {
+    let (frame_tx, frame_rx) = std::sync::mpsc::channel::<Vec<u8>>();
+    let (key_tx, key_rx) = std::sync::mpsc::channel::<u8>();
+    let cancel = Arc::new(AtomicBool::new(false));
+    std::thread::spawn({
+        let cancel = cancel.clone();
+        move || anime_loop(frame_tx, key_rx, cancel)
+    });
+    (DemoReader::new(frame_rx), DemoWriter { tx: key_tx }, cancel)
+}
+
+#[cfg(debug_assertions)]
+#[tauri::command]
+pub fn anime_spawn(state: tauri::State<AppState>, app: tauri::AppHandle) -> Result<WsConnectResult, String> {
+    spawn_animation_session(state, app, start_anime)
 }
 
 // ── Mock serial ports (debug builds) ────────────────────────────────
@@ -332,6 +464,65 @@ impl serialport::SerialPort for MockSerialPort {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // -- anime TTY (gostty port) --
+
+    #[test]
+    fn anime_data_parses_and_matches_gostty_shape() {
+        let frames = anime_frames();
+        assert_eq!(frames.len(), 235, "gostty ships 235 frames");
+        assert_eq!(frames[0].len(), 41, "gostty ImageHeight");
+    }
+
+    #[test]
+    fn anime_color_tags_become_sgr() {
+        let mut s = String::new();
+        anime_process_color_codes("ab<c>xyz</c>de", &mut s);
+        assert_eq!(s, "ab\x1b[34mxyz\x1b[0mde");
+        let mut s2 = String::new();
+        anime_process_color_codes("plain $", &mut s2);
+        assert_eq!(s2, "plain $");
+        let mut s3 = String::new();
+        anime_process_color_codes("a<c>b", &mut s3);
+        // gostty quirk: on a malformed tag it re-emits the remainder from the
+        // ORIGINAL index, duplicating pre-tag bytes. Dead path for the
+        // embedded data (all 17858 tags well-formed) — ported for parity.
+        assert_eq!(s3, "aa<c>b");
+    }
+
+    #[test]
+    fn anime_frame_is_clear_home_plus_centered_sgr_content() {
+        let frame = render_anime_frame(0);
+        let text = String::from_utf8(frame).unwrap();
+        assert!(text.starts_with("\x1b[2J\x1b[H"), "frame starts with ClearAndHome");
+        assert!(text.contains("\x1b[34m"), "highlight color present");
+        assert!(!text.contains("<c>"), "no raw color tags leak");
+        assert!(text.starts_with("\x1b[2J\x1b[H\n\n"), "centered vertically");
+        let content_line = text.lines().nth(2).unwrap();
+        assert!(content_line.starts_with(&" ".repeat(21)), "centered horizontally");
+    }
+
+    #[test]
+    fn anime_frames_differ_across_time() {
+        assert_ne!(render_anime_frame(0), render_anime_frame(100));
+    }
+
+    #[test]
+    fn anime_loop_quits_on_q_and_restores_terminal() {
+        let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+        let (key_tx, key_rx) = std::sync::mpsc::channel::<u8>();
+        let cancel = Arc::new(AtomicBool::new(false));
+        key_tx.send(b'q').unwrap();
+        anime_loop(tx, key_rx, cancel.clone());
+        let mut all = Vec::new();
+        while let Ok(chunk) = rx.try_recv() {
+            all.extend(chunk);
+        }
+        let text = String::from_utf8_lossy(&all);
+        assert!(text.contains("\x1b[?1049h\x1b[?25l"), "enters alt screen + hides cursor");
+        assert!(text.contains("\x1b[?25h\x1b[?1049l"), "restores cursor + leaves alt screen");
+        assert!(text.contains("anime session ended"));
+    }
 
     // -- demo TTY --
 
