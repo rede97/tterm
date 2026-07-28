@@ -11,7 +11,8 @@
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
     "test:e2e": "wdio run e2e/wdio.conf.js",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test:e2e:ime": "wdio run e2e/wdio.conf.js --spec e2e/specs/ime.e2e.js"
   },
   "dependencies": {
     "@fontsource/cascadia-mono": "^5.2.3",
@@ -43,7 +44,6 @@
     "@wdio/mocha-framework": "^9.30.0",
     "@wdio/spec-reporter": "^9.29.1",
     "happy-dom": "^20.11.0",
-    "puppeteer-core": "^25.4.0",
     "sharp": "^0.34.5",
     "typescript": "~5.6.2",
     "vite": "^6.0.3",
