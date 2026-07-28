@@ -245,6 +245,78 @@ describe("TTerm application", () => {
     expect(lines.some(l => /^ +beta/.test(l))).toBe(false);
   });
 
+  it("shift+right-click Clear empties scrollback but keeps the prompt line", async () => {
+    // VS Code semantics: xterm clear() wipes scrollback + viewport but
+    // preserves the cursor's line (the prompt), so typing continues without
+    // needing to press Enter first.
+    const firstTab = await $("#tabs .tab");
+    await firstTab.click();
+    await browser.pause(400);
+    await browser.execute(() => {
+      const visible = [...document.querySelectorAll(".terminal-instance")]
+        .find(el => el.style.display !== "none");
+      const tab = [...(window).__tterm.tabs.values()].find(t => t.element === visible);
+      tab.terminal.focus();
+      return 1;
+    });
+    await browser.pause(200);
+
+    // produce some scrollback
+    await browser.keys(["e", "c", "h", "o", " ", "C", "L", "E", "A", "R", "M", "A", "R", "K", "1", "Enter"]);
+    await browser.keys(["e", "c", "h", "o", " ", "C", "L", "E", "A", "R", "M", "A", "R", "K", "2", "Enter"]);
+    const dumpBuffer = () => browser.execute(() => {
+      const visible = [...document.querySelectorAll(".terminal-instance")]
+        .find(el => el.style.display !== "none");
+      const tab = [...(window).__tterm.tabs.values()].find(t => t.element === visible);
+      if (!tab) return "\n0";
+      const buf = tab.terminal.buffer.active;
+      let out = "";
+      for (let i = 0; i < buf.length; i++) out += buf.getLine(i)?.translateToString(true) ?? "";
+      return out + "\n" + buf.baseY;
+    });
+    await browser.waitUntil(async () => (await dumpBuffer()).includes("CLEARMARK2"), { timeout: 10000 });
+
+    // shift+right-click on the terminal -> context menu -> Clear
+    await browser.execute(() => {
+      const visible = [...document.querySelectorAll(".terminal-instance")]
+        .find(el => el.style.display !== "none");
+      const rc = visible.getBoundingClientRect();
+      visible.dispatchEvent(new MouseEvent("contextmenu", {
+        bubbles: true, cancelable: true, shiftKey: true,
+        clientX: Math.round(rc.left + 200), clientY: Math.round(rc.top + 100),
+      }));
+      return 1;
+    });
+    await browser.waitUntil(async () => {
+      return await browser.execute(() => {
+        const menu = document.getElementById("tab-context-menu");
+        return !!menu && [...menu.querySelectorAll(".menu-item")]
+          .some(i => i.textContent === "Clear");
+      });
+    }, { timeout: 5000, timeoutMsg: "context menu with Clear item did not open" });
+    await browser.execute(() => {
+      const menu = document.getElementById("tab-context-menu");
+      const item = [...menu.querySelectorAll(".menu-item")].find(i => i.textContent === "Clear");
+      item.click();
+      return 1;
+    });
+
+    // scrollback wiped (baseY = 0), old marks gone, prompt line preserved
+    await browser.waitUntil(async () => {
+      const dump = await dumpBuffer();
+      const baseY = parseInt(dump.trim().split("\n").pop() || "99", 10);
+      return baseY === 0 && !dump.includes("CLEARMARK1") && !dump.includes("CLEARMARK2");
+    }, { timeout: 5000, timeoutMsg: "scrollback was not wiped" });
+    const afterClear = await dumpBuffer();
+    expect(afterClear.trim().length).toBeGreaterThan(0);
+
+    // typing continues immediately: the shell echoes without any extra Enter
+    await browser.keys(["e", "c", "h", "o", " ", "A", "F", "T", "E", "R", "C", "L", "E", "A", "R", "Enter"]);
+    await browser.waitUntil(async () => (await dumpBuffer()).includes("AFTERCLEAR"), {
+      timeout: 10000, timeoutMsg: "shell did not echo after clear (prompt lost?)",
+    });
+  });
+
   it("shows the terminal viewport inside the active tab", async () => {
     // The `active` class lives on the tab-bar element (.tab.active), not on
     // .terminal-instance — the visible instance is the one without display:none.
