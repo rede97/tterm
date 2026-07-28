@@ -1,10 +1,7 @@
-## Unreleased
+## v0.4.0
 
 New Features
 
-- Tabs are now always the same width: they share the tab bar evenly
-  (capped at a reasonable size, shrinking together as more are opened,
-  like Windows Terminal), and hovering a tab shows its full name
 - Disconnect handling is now built into the terminal itself: when a session
   ends (shell exit, SSH drop, serial unplug), the terminal resets to a sane
   state, prints the time it happened, and offers Enter to reconnect — no
@@ -13,9 +10,15 @@ New Features
 - Sessions now survive sleep/wake and app switching: a dropped connection is
   re-established silently in the background, with anything printed in the
   meantime preserved — local shells no longer show a false disconnect
+- Tabs are now always the same width: they share the tab bar evenly
+  (capped at a reasonable size, shrinking together as more are opened,
+  like Windows Terminal), and hovering a tab shows its full name
 
 Fixes
 
+- Reconnecting no longer loses the screen: the previous screen and
+  the disconnect prompt are kept in the scrollback before the new shell
+  starts
 - Reconnecting after a TUI app (vim, htop…) died no longer leaves the
   terminal stuck on the alternate screen
 - A reconnected session now opens at the current terminal size instead of
