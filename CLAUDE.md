@@ -228,7 +228,7 @@ hysteresis(floatVal, current, th_low, th_high, min=2)
 - Layout: **sidebar** (`flex-direction: row`). `.settings-sidebar` left (200px, `#252526`), `.settings-body` right.
 - Settings tab created in `_openSettings()`, removed from DOM on close. `data-tab-id="#settings"` excluded from badge counting.
 - `toggleSettings()` opens only (no-op if open). Close via: tab close button, or switching to any terminal tab.
-- Four panels: General (renderer, scrollback, paste options, terminal bell, tab width, data), Appearance (font family/size), Profile (default profile, imported WT profile visibility toggles), SSH (host visibility, expand, save, clear known hosts).
+- Four panels: General (renderer, scrollback, paste options, terminal bell, data), Appearance (font family/size), Profile (default profile, imported WT profile visibility toggles), SSH (host visibility, expand, save, clear known hosts).
 - Footer: `[feedback text] … … [Revert] [Apply]`. Apply saves config, turns gray on save, re-enables on any input change. Revert reloads config from disk.
 - Profile panel shows ALL imported profiles including hidden ones (unchecked). Hidden profiles are filtered from the new-tab dropdown only.
 - SSH config parsing/generation is entirely frontend-owned (profiles.ts `parseSshConfig`/`generateSshConfig`). Rust only handles raw file I/O. Keys preserve original SSH config casing (e.g. `ForwardAgent` not `forwardagent`).

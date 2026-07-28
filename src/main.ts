@@ -80,20 +80,9 @@ configStore.subscribe((keys) => {
       tab.terminal.options.scrollback = configStore.get("scrollback");
       tab.terminal.options.theme = findTheme(configStore.get("themeName")).theme;
     }
-    applyTabWidthMode();
     tabManager.triggerResize();
   }
 });
-
-function applyTabWidthMode(): void {
-  if (configStore.get("tabWidthMode") === "equal") {
-    tabsContainer.classList.add("tabs-equal");
-    tabsContainer.classList.remove("tabs-adaptive");
-  } else {
-    tabsContainer.classList.add("tabs-adaptive");
-    tabsContainer.classList.remove("tabs-equal");
-  }
-}
 
 // -- init feature modules --
 
@@ -165,7 +154,6 @@ configStore.load().then(async () => {
     vsInstalls: wt.vsInstalls,
   });
 
-  applyTabWidthMode();
   const defName = configStore.get("defaultLocalProfile") ?? configStore.get("localProfiles")[0]?.name ?? null;
   const p = defName ? configStore.get("localProfiles").find(x => x.name === defName) : null;
   if (p) await tabManager.createLocalTab(p.command, p.name);

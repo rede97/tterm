@@ -284,10 +284,11 @@ body {
   display: flex;
   align-items: center;
   position: relative;
-  /* Width is owned by the tabWidthMode classes below (.tabs-equal /
-     .tabs-adaptive, applied by applyTabWidthMode). This base is only a
-     fallback before the mode class lands. */
-  flex: 0 0 auto;
+  /* Equal sizing (Chrome/Windows Terminal style): all tabs share the bar
+     equally, capped at 200px, shrinking together down to 120px under
+     pressure, then #tabs scrolls. Truncated names are available via the
+     hover tooltip. */
+  flex: 1 1 0;
   min-width: 120px;
   max-width: 200px;
   height: 100%;
@@ -296,23 +297,6 @@ body {
   border-right: 1px solid #1e1e1e;
   cursor: pointer;
   user-select: none;
-}
-
-/* Equal width (Chrome/Windows Terminal style): all tabs share the bar
-   equally, capped at 200px, shrinking together down to 120px under
-   pressure, then #tabs scrolls. Truncated names are available via the
-   hover tooltip. */
-.tabs-equal .tab {
-  flex: 1 1 0;
-  min-width: 120px;
-  max-width: 200px;
-}
-
-/* Adaptive width: tabs fit title */
-.tabs-adaptive .tab {
-  flex: 0 0 auto;
-  min-width: 80px;
-  max-width: 250px;
 }
 
 .tab.active {

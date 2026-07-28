@@ -89,21 +89,6 @@ export function createGeneralPanel(): HTMLElement {
       
     </div>
     <div class="settings-section">
-      <div class="settings-section-title">Tabs</div>
-      <div class="settings-item settings-item-row">
-        <div class="settings-item-info">
-          <div class="settings-item-title">Tab width</div>
-          <div class="settings-item-desc">Equal shares the tab bar evenly (capped, shrinking together as tabs multiply). Adaptive sizes each tab to fit its title.</div>
-        </div>
-        <div class="settings-item-control">
-          <select id="set-tab-width" class="settings-select">
-            <option value="equal" ${configStore.get("tabWidthMode") === "equal" ? "selected" : ""}>Equal</option>
-            <option value="adaptive" ${configStore.get("tabWidthMode") === "adaptive" ? "selected" : ""}>Adaptive</option>
-          </select>
-        </div>
-      </div>
-    </div>
-    <div class="settings-section">
       <div class="settings-section-title">Data</div>
       <div class="settings-item settings-item-row">
         <div class="settings-item-info">
@@ -152,14 +137,12 @@ export function refreshGeneralPanel(root: HTMLElement): void {
   const bellEl = root.querySelector("#set-bell") as HTMLInputElement;
   const rendererEl = root.querySelector("#set-renderer") as HTMLSelectElement;
   const scrollbackEl = root.querySelector("#set-scrollback") as HTMLInputElement;
-  const tabWidthEl = root.querySelector("#set-tab-width") as HTMLSelectElement;
 
   if (pasteWarnEl) pasteWarnEl.checked = configStore.get("pasteWarning");
   if (pasteTrimEl) pasteTrimEl.checked = configStore.get("pasteTrim");
   if (bellEl) bellEl.checked = configStore.get("terminalBell");
   if (rendererEl) rendererEl.value = configStore.get("renderer");
   if (scrollbackEl) scrollbackEl.value = String(configStore.get("scrollback"));
-  if (tabWidthEl) tabWidthEl.value = configStore.get("tabWidthMode");
 }
 
 export function collectGeneralSettings(root: HTMLElement): Partial<ConfigState> {
@@ -169,13 +152,11 @@ export function collectGeneralSettings(root: HTMLElement): Partial<ConfigState> 
   const pasteTrimEl = root.querySelector("#set-paste-trim") as HTMLInputElement;
   const rendererEl = root.querySelector("#set-renderer") as HTMLSelectElement;
   const scrollbackEl = root.querySelector("#set-scrollback") as HTMLInputElement;
-  const tabWidthEl = root.querySelector("#set-tab-width") as HTMLSelectElement;
 
   if (pasteWarnEl) partial.pasteWarning = pasteWarnEl.checked;
   if (pasteTrimEl) partial.pasteTrim = pasteTrimEl.checked;
   if (bellEl) partial.terminalBell = bellEl.checked;
   if (rendererEl) partial.renderer = rendererEl.value;
   if (scrollbackEl) partial.scrollback = Math.max(100, Math.min(100000, parseInt(scrollbackEl.value, 10) || 1000));
-  if (tabWidthEl) partial.tabWidthMode = tabWidthEl.value;
   return partial;
 }

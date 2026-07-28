@@ -29,7 +29,6 @@ export interface ConfigState {
   fontFamily: string;
   fontSize: number;
   scrollback: number;
-  tabWidthMode: string;
   themeName: string;
   renderer: string;
   terminalBell: boolean;
@@ -74,7 +73,6 @@ const SCHEMA = {
   fontFamily:         { default: buildFontFamily(defaultFontStack()), validate: isString },
   fontSize:           { default: 14,                       validate: isNumber(10, 32) },
   scrollback:         { default: 20000,                    validate: isNumber(100, 100000) },
-  tabWidthMode:       { default: "equal",                  validate: isString },
   themeName:          { default: DEFAULT_THEME_NAME,       validate: isString },
   renderer:           { default: "webgl",                  validate: isString },
   terminalBell:       { default: false,                    validate: isBoolean },
