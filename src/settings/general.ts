@@ -93,7 +93,7 @@ export function createGeneralPanel(): HTMLElement {
       <div class="settings-item settings-item-row">
         <div class="settings-item-info">
           <div class="settings-item-title">Tab width</div>
-          <div class="settings-item-desc">Equal makes all tabs the same width. Adaptive sizes each tab to fit its title.</div>
+          <div class="settings-item-desc">Equal shares the tab bar evenly (capped, shrinking together as tabs multiply). Adaptive sizes each tab to fit its title.</div>
         </div>
         <div class="settings-item-control">
           <select id="set-tab-width" class="settings-select">

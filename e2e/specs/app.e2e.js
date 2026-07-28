@@ -319,7 +319,14 @@ describe("TTerm application", () => {
 
   it("tabs are equal width and carry the full name in the hover tooltip", async () => {
     // Equal sizing (Chrome/WT style): every .tab shares the same width at
-    // any moment; the full label lives in the title attribute.
+    // any moment, CAPPED at 200px even when a single tab could fill the
+    // whole bar; the full label lives in the title attribute.
+    await browser.waitUntil(async () => (await $$("#tabs .tab")).length >= 1, { timeout: 15000 });
+    const single = await browser.execute(() =>
+      Math.round(document.querySelector("#tabs .tab").getBoundingClientRect().width));
+    expect(single).toBeLessThanOrEqual(200);
+    expect(single).toBeGreaterThanOrEqual(120);
+
     await browser.waitUntil(async () => (await $$("#tabs .tab")).length >= 3, { timeout: 15000 });
     const info = await browser.execute(() =>
       [...document.querySelectorAll("#tabs .tab")].map(t => ({
@@ -331,6 +338,7 @@ describe("TTerm application", () => {
     const widths = new Set(info.map(t => t.w));
     expect(widths.size).toBe(1);
     for (const t of info) {
+      expect(t.w).toBeLessThanOrEqual(200);
       expect(t.title).toBe(t.label);
       expect(t.title.length).toBeGreaterThan(0);
     }
