@@ -344,6 +344,19 @@ describe("TTerm application", () => {
     }
   });
 
+  it("keeps the new-tab buttons flush against the last tab", async () => {
+    // The + / dropdown group lives inside #tabs as the last flex item, so
+    // it must sit immediately right of the last tab regardless of count.
+    await browser.waitUntil(async () => (await $$("#tabs .tab")).length >= 2, { timeout: 15000 });
+    const gap = await browser.execute(() => {
+      const tabs = [...document.querySelectorAll("#tabs .tab")];
+      const last = tabs[tabs.length - 1].getBoundingClientRect();
+      const btn = document.getElementById("new-tab-group").getBoundingClientRect();
+      return Math.round(btn.left - last.right);
+    });
+    expect(Math.abs(gap)).toBeLessThanOrEqual(1);
+  });
+
   it("shows the terminal viewport inside the active tab", async () => {
     // The `active` class lives on the tab-bar element (.tab.active), not on
     // .terminal-instance — the visible instance is the one without display:none.

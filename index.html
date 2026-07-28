@@ -10,14 +10,18 @@
   <body>
     <div id="tab-bar">
       <button id="settings-btn" aria-label="Settings"></button>
-      <div id="tabs"></div>
-      <div id="new-tab-group">
-        <button id="new-tab">+</button>
-        <button id="new-tab-menu-btn" aria-label="New tab options">
-          <svg width="8" height="8" viewBox="0 0 8 8">
-            <path d="M1 2.5l3 3 3-3" stroke="currentColor" stroke-width="1.2" fill="none"/>
-          </svg>
-        </button>
+      <div id="tabs">
+        <!-- + and dropdown live INSIDE #tabs as the last flex item so they
+             stay flush against the last tab (and scroll with it on
+             overflow). New tab elements are inserted before this group. -->
+        <div id="new-tab-group">
+          <button id="new-tab">+</button>
+          <button id="new-tab-menu-btn" aria-label="New tab options">
+            <svg width="8" height="8" viewBox="0 0 8 8">
+              <path d="M1 2.5l3 3 3-3" stroke="currentColor" stroke-width="1.2" fill="none"/>
+            </svg>
+          </button>
+        </div>
       </div>
       <div id="drag-spacer" data-tauri-drag-region></div>
       <div id="window-controls">

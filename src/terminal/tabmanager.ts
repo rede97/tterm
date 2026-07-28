@@ -121,7 +121,9 @@ export class TabManager {
 
   private _register(tab: TerminalTab, port: number, token: string): void {
     const tabEl = this._createTabElement(tab);
-    this.tabsContainer.appendChild(tabEl);
+    // Keep the + button group as the last child of #tabs (flush after the
+    // last tab).
+    this.tabsContainer.insertBefore(tabEl, document.getElementById("new-tab-group"));
 
     tab.onSocketClosed = () => this._onSessionClosed(tab.id);
     tab.attachSocket(port, token);
