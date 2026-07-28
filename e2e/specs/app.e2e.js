@@ -64,8 +64,10 @@ describe("TTerm application", () => {
     }, { timeout: 10000, timeoutMsg: "no .tab-progress appeared on demo tab" });
   });
 
-  it("shows disconnect overlay on session exit and reconnects with Enter", async () => {
-    // Use the first (local shell) tab: type exit to kill the shell
+  it("prints in-band disconnect prompt on session exit and respawns on Enter", async () => {
+    // Backend dead-mode: killing the shell prints a reset+notice INTO the
+    // terminal stream (no overlay), the tab label gets a strikethrough, and
+    // pressing Enter — a normal keystroke over the socket — respawns.
     const firstTab = await $("#tabs .tab");
     await firstTab.click();
     await browser.pause(500);
@@ -75,22 +77,50 @@ describe("TTerm application", () => {
     await browser.pause(300);
     await browser.keys(["e", "x", "i", "t", "Enter"]);
 
-    // shell exits -> PTY EOF -> WS close -> overlay appears
+    // shell exits -> backend prints the prompt into the terminal buffer…
+    const dumpBuffer = () => browser.execute(() => {
+      const visible = [...document.querySelectorAll(".terminal-instance")]
+        .find(el => el.style.display !== "none");
+      const tab = [...(window).__tterm.tabs.values()]
+        .find(t => t.element === visible);
+      if (!tab) return "";
+      const buf = tab.terminal.buffer.active;
+      let out = "";
+      for (let i = 0; i < buf.length; i++) out += buf.getLine(i)?.translateToString(true) ?? "";
+      return out;
+    });
     await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        const ov = document.querySelector(".disconnect-overlay");
-        return ov && ov.style.display !== "none";
-      });
-    }, { timeout: 10000, timeoutMsg: "disconnect overlay did not appear" });
+      return (await dumpBuffer()).includes("Press Enter to reconnect");
+    }, { timeout: 10000, timeoutMsg: "in-band disconnect prompt not printed into terminal" });
 
-    // Enter triggers session_reconnect -> overlay disappears
+    // …and the tab label shows the dead state (driven by the backend event)
+    await browser.waitUntil(async () => {
+      return await browser.execute(() =>
+        [...document.querySelectorAll("#tabs .tab")].some(t => t.classList.contains("disconnected")));
+    }, { timeout: 5000, timeoutMsg: "tab did not get the disconnected style" });
+
+    // Enter is just a keystroke: the backend respawns the shell in place.
     await browser.keys("Enter");
     await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        const ovs = [...document.querySelectorAll(".disconnect-overlay")];
-        return ovs.every(o => o.style.display === "none");
-      });
-    }, { timeout: 10000, timeoutMsg: "overlay did not disappear after Enter" });
+      return await browser.execute(() =>
+        [...document.querySelectorAll("#tabs .tab")].every(t => !t.classList.contains("disconnected")));
+    }, { timeout: 10000, timeoutMsg: "tab did not recover after Enter" });
+
+    // A fresh ConPTY always opens with ESC[2J (erase visible display). The
+    // backend scrolls the dead viewport into scrollback first, so nothing
+    // is lost: the disconnect prompt must still be in the buffer.
+    await browser.waitUntil(async () => {
+      return (await dumpBuffer()).includes("Press Enter to reconnect");
+    }, { timeout: 5000, timeoutMsg: "disconnect prompt was lost on respawn (not scrolled into scrollback)" });
+
+    // The respawned shell actually works.
+    await browser.pause(500);
+    await viewport.click();
+    await browser.pause(200);
+    await browser.keys(["e", "c", "h", "o", " ", "R", "E", "S", "P", "A", "W", "N", "O", "K", "Enter"]);
+    await browser.waitUntil(async () => {
+      return (await dumpBuffer()).includes("RESPAWNOK");
+    }, { timeout: 10000, timeoutMsg: "respawned shell did not answer" });
   });
 
   it("reorders tabs via drag (SortableJS)", async () => {

@@ -72,10 +72,10 @@ A multi-tab desktop terminal emulator (TTerm) built with Tauri v2. The frontend 
 ### PTY session model
 
 - `AppState` holds `sessions: Arc<Mutex<HashMap<String, PtySession>>>` + `serial_sessions: Mutex<HashMap<String, SerialSession>>` + `next_id` counter + `initial_cwd: Option<PathBuf>` (set via `--working-directory` CLI arg)
-- `PtySession` stores the PTY `master` (`Option`, None after child exit), a `SpawnSpec` (reconnect params), and a `nonce` (per-spawn token guarding the watchdog against reconnect races)
-- A per-spawn **watchdog thread** waits on `child.wait()`; on exit it sets `master = None`, closing ConPTY so the relay read loop unblocks (ConPTY never signals EOF on child death). The spec stays for reconnection
+- `PtySession` stores the PTY `master` (`Option`, None after child exit), a `nonce` (per-spawn token guarding the watchdog against respawn races), and the last known `size` (a respawned PTY is created at this size, not 80x24). The `SpawnSpec` lives in the relay's `ReconnectHooks` closure, not the table
+- A per-spawn **watchdog thread** waits on `child.wait()`; on exit it sets `master = None`, closing ConPTY so the relay read pump unblocks (ConPTY never signals EOF on child death) and dead mode begins
 - `SerialSession` stores an `Arc<AtomicBool>` cancel flag, a `SerialCtl` control channel (live baud switch), and an optional `SpawnSpec`
-- PTY and serial sessions share the unified WebSocket relay hub (`relay.rs`: one loopback listener bound once at startup, all sessions multiplexed on it). Routing is by URL path — `ws://127.0.0.1:{port}/pty/{id}?token={token}` — where `token` is a per-process random 64-hex-char secret generated at startup and returned by every spawn command; handshakes without a valid token are rejected (403), unknown routes/ids 404. When the byte stream ends, the hub sends a WS Close frame — the frontend `close` event is the disconnect signal. `pty_kill` terminates either kind; `session_reconnect` respawns with the same id from the stored spec
+- PTY and serial sessions share the unified WebSocket relay hub (`relay.rs`: one loopback listener bound once at startup, all sessions multiplexed on it). Routing is by URL path — `ws://127.0.0.1:{port}/pty/{id}?token={token}` — where `token` is a per-process random 64-hex-char secret generated at startup and returned by every spawn command; handshakes without a valid token are rejected (403), unknown routes/ids 404. Session death does NOT close the socket: the relay enters dead mode (see "Disconnect & reconnect"). Only `pty_kill` (tab close) tears a slot down, which is when the hub sends a WS Close frame
 - Each tab spawns a dedicated shell process and background read task (tokio `spawn_blocking` → mpsc channel → WebSocket)
 
 ### Communication model
@@ -88,7 +88,6 @@ Frontend → Backend: Tauri `invoke()` commands:
 | `pty_spawn_ssh` | `hostname`, `port`, `user` | create SSH tab, return `{ id, port, token }` |
 | `pty_resize` | `id`, `cols`, `rows` | notify PTY of terminal resize |
 | `pty_kill` | `id` | kill tab's shell, remove session |
-| `session_reconnect` | `id` | respawn a session from its stored SpawnSpec, same id, return `{ id, port, token }` |
 | `window_minimize` | — | minimize the window |
 | `window_toggle_maximize` | — | toggle maximize/restore |
 | `window_close` | — | close the window |
@@ -191,9 +190,17 @@ Noto Sans fonts are per-script variants (SC = Simplified Chinese, JP = Japanese,
 
 ## Disconnect & reconnect
 
-- Relay sends a WS Close frame when the byte stream ends → `TerminalTab.attachSocket`'s close listener → `setDisconnected(true)`: centered overlay + strikethrough red tab label.
-- Enter (capture-phase keydown on tab element) → `reconnectTab` → `session_reconnect` (same id, stored SpawnSpec) → `attachSocket` with the new port.
-- Serial live baud: context menu (shift+right-click) → Baud Rate flyout → `serial_set_baud`; per-port memory in `config.serialPortParams`.
+Reconnect is **backend-managed and in-band** (`deadmode.rs` + `relay.rs` dead mode). When a session's byte stream ends (shell exit, SSH drop, serial unplug), the relay keeps the WebSocket alive and plays a small protocol inside the terminal data stream:
+
+1. Terminal reset sequences pull xterm out of whatever mode the dead process left it in (alt screen, hidden cursor, mouse reporting, bracketed paste, scroll region, origin mode, DEC graphics charset). GOTCHA: `ESC[?1049l`, `ESC[?6l` and `ESC[r` all HOME the cursor (verified against xterm.js even outside alt screen), so the reset is wrapped in `ESC[s`/`ESC[u` (save/restore position only - DECRC would also restore the charset/attrs being reset); without it the notice overwrites the user's last command line
+2. A notice with the local time is printed into the scrollback ("Session ended at ... / Press Enter to reconnect") - no overlay, scrollback stays visible and copyable
+3. The relay hot-swaps the session's upstream writer for a `DeadWatcher` that swallows input except Enter (CR/LF/`ESC O M`); Enter runs the `ReconnectHooks.respawn` closure, which respawns the session in place (same relay slot, same socket) at the last known PTY size. Failure prints a retry line and stays dead
+5. On a successful respawn, `ReconnectHooks.pre_resume` bytes are injected before the new stream's output: a fresh ConPTY ALWAYS opens with `ESC[2J` (erase visible display 鈥?verified empirically), so PTY hooks first scroll the dead viewport into scrollback (`deadmode::resume_scroll`: park cursor at bottom row, then `rows` LFs). `2J` does not touch scrollback, so nothing is lost
+4. A `session-state` Tauri event (`{id, alive}`) drives the tab-label strikethrough - the only frontend involvement. There is no frontend reconnect path and no `session_reconnect` command
+
+Transport-level drops are a separate concern (`TerminalTab._openSocket`, helpers in `src/util/disconnect.ts`): an ABNORMAL close (1006 - OS sleep/wake resetting loopback TCP, WebView2 discarding the socket) triggers a silent auto re-attach with backoff (`REATTACH_DELAYS`). A detaching client returns the downstream `rx` to its slot (generation-checked) so a new client can claim it; output buffers in the channel while detached (including the dead-mode prompt). A stale half-open slot is released by a kick fired from the next handshake's 409 rejection. A CLEAN close now means only one thing: the slot was killed (tab closed).
+
+Serial live baud: context menu (shift+right-click) → Baud Rate flyout → `serial_set_baud`; per-port memory in `config.serialPortParams`.
 
 ## Error notifications
 

@@ -1,44 +1,26 @@
-// Disconnect overlay: shown over a terminal when its session dies
-// (PTY exit, serial unplug). Instructs the user to press Enter to reconnect.
+// Reconnect policy helpers for the session WebSocket.
+//
+// Session death (shell exit, serial unplug) is handled IN-BAND by the
+// backend: the relay keeps the socket alive, prints a reset+notice into the
+// terminal stream, and respawns on Enter (see deadmode.rs). What remains
+// here is the TRANSPORT layer: an abnormal socket drop (OS sleep/wake
+// resetting loopback TCP, WebView2 discarding the socket) is not a session
+// death, so we silently re-attach instead of disturbing the user.
 
-export class DisconnectOverlay {
-  private el: HTMLElement;
+// Should an abnormal socket close trigger a silent re-attach attempt?
+// A CLEAN close (wasClean) means the backend sent a WS Close frame, which
+// only happens when the relay slot is torn down for good (tab kill).
+// Anything else (1006) is transport-level: the session may well be alive.
+export function shouldAutoReattach(wasClean: boolean): boolean {
+  return !wasClean;
+}
 
-  constructor(parent: HTMLElement) {
-    this.el = document.createElement("div");
-    this.el.className = "disconnect-overlay";
-    this.el.style.display = "none";
+// Backoff schedule (ms) for silent re-attach attempts. The first retry is
+// immediate (the common sleep/wake case reconnects invisibly); later retries
+// also cover the relay needing a moment to release a stale half-open slot.
+export const REATTACH_DELAYS = [0, 300, 1000, 3000];
 
-    const box = document.createElement("div");
-    box.className = "disconnect-box";
-
-    const title = document.createElement("div");
-    title.className = "disconnect-title";
-    title.textContent = "⚠ Session disconnected";
-    box.appendChild(title);
-
-    const hint = document.createElement("div");
-    hint.className = "disconnect-hint";
-    hint.textContent = "Press Enter to reconnect";
-    box.appendChild(hint);
-
-    this.el.appendChild(box);
-    parent.appendChild(this.el);
-  }
-
-  show(): void {
-    this.el.style.display = "flex";
-  }
-
-  hide(): void {
-    this.el.style.display = "none";
-  }
-
-  destroy(): void {
-    this.el.remove();
-  }
-
-  get isVisible(): boolean {
-    return this.el.style.display !== "none";
-  }
+// Delay before re-attach attempt `attempt` (0-based), or null to give up.
+export function reattachDelayForAttempt(attempt: number): number | null {
+  return attempt >= 0 && attempt < REATTACH_DELAYS.length ? REATTACH_DELAYS[attempt] : null;
 }

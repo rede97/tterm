@@ -335,38 +335,8 @@ body {
   z-index: 25;
 }
 
-/* disconnect overlay */
-.disconnect-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
-  z-index: 15;
-}
-
-.disconnect-box {
-  text-align: center;
-  padding: 16px 28px;
-  background: #252526;
-  border: 1px solid #be1100;
-  border-radius: 8px;
-}
-
-.disconnect-title {
-  color: #f14c4c;
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 6px;
-}
-
-.disconnect-hint {
-  color: #aaaaaa;
-  font-size: 12px;
-}
-
-/* dimmed tab label while disconnected */
+/* dimmed tab label while the session is dead (in-band prompt in the
+   terminal offers Enter-to-reconnect; see deadmode.rs) */
 .tab.disconnected .tab-label {
   color: #f14c4c;
   text-decoration: line-through;

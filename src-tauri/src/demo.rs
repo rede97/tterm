@@ -6,9 +6,10 @@
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use tauri::Emitter;
 
-use crate::relay::register_session;
-use crate::state::{AppState, SerialSession, WsConnectResult};
+use crate::relay::{register_session, ReconnectHooks};
+use crate::state::{AppState, SerialSession, SessionState, WsConnectResult};
 
 
 pub(crate) struct DemoReader {
@@ -126,26 +127,57 @@ loop {
 }
     let _ = tx.send(b"\r\n\x1b[2mdemo session ended\x1b[0m\r\n".to_vec());
 }
-#[cfg(debug_assertions)]
-#[tauri::command]
-pub fn demo_spawn(state: tauri::State<AppState>) -> Result<WsConnectResult, String> {
+// Spawn a fresh demo animation thread; returns relay ends + the cancel flag.
+fn start_demo() -> (DemoReader, DemoWriter, Arc<AtomicBool>) {
     let (frame_tx, frame_rx) = std::sync::mpsc::channel::<Vec<u8>>();
     let (key_tx, key_rx) = std::sync::mpsc::channel::<u8>();
     let cancel = Arc::new(AtomicBool::new(false));
-
     std::thread::spawn({
         let cancel = cancel.clone();
         move || demo_loop(frame_tx, key_rx, cancel)
     });
+    (DemoReader::new(frame_rx), DemoWriter { tx: key_tx }, cancel)
+}
+
+#[cfg(debug_assertions)]
+#[tauri::command]
+pub fn demo_spawn(state: tauri::State<AppState>, app: tauri::AppHandle) -> Result<WsConnectResult, String> {
+    let (reader, writer, cancel) = start_demo();
 
     let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
     let id = format!("tab-{}", *next);
     *next += 1;
     drop(next);
 
-    let reader = DemoReader::new(frame_rx);
-    let writer = DemoWriter { tx: key_tx };
-    register_session(&state.hub, &id, reader, writer, Some(cancel.clone()))?;
+    // Demo sessions are reconnectable too: 'q' -> dead-mode prompt -> Enter
+    // restarts the animation.
+    let hooks = {
+        let serial_sessions = state.serial_sessions.clone();
+        let app2 = app.clone();
+        let id2 = id.clone();
+        ReconnectHooks {
+            notice: Box::new(crate::deadmode::disconnect_notice),
+            pre_resume: Box::new(Vec::new),
+            on_state: Box::new(move |alive| {
+                let _ = app2.emit("session-state", SessionState { id: id2.clone(), alive });
+            }),
+            respawn: {
+                let id3 = id.clone();
+                Box::new(move || {
+                    let (r, w, cancel) = start_demo();
+                    serial_sessions
+                        .lock()
+                        .map_err(|e| e.to_string())?
+                        .insert(id3.clone(), SerialSession { cancel, ctl: std::sync::mpsc::channel::<crate::state::SerialCtl>().0, spec: None });
+                    Ok((
+                        Box::new(r) as Box<dyn Read + Send>,
+                        Box::new(w) as Box<dyn Write + Send>,
+                    ))
+                })
+            },
+        }
+    };
+    register_session(&state.hub, &id, reader, writer, Some(hooks))?;
 
     state
         .serial_sessions

@@ -1,33 +1,44 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { DisconnectOverlay } from "../src/util/disconnect";
+import { describe, it, expect } from "vitest";
+import {
+  shouldAutoReattach,
+  reattachDelayForAttempt,
+  REATTACH_DELAYS,
+} from "../src/util/disconnect";
 
-describe("DisconnectOverlay", () => {
-  let parent: HTMLElement;
+// Session death is handled in-band by the backend (deadmode.rs: reset +
+// notice printed into the terminal stream, Enter respawns). These helpers
+// only govern the TRANSPORT layer: silent re-attach after abnormal drops
+// (OS sleep/wake resetting loopback TCP).
 
-  beforeEach(() => {
-    document.body.innerHTML = "";
-    parent = document.createElement("div");
-    document.body.appendChild(parent);
+describe("shouldAutoReattach", () => {
+  it("reattaches on abnormal close (sleep/wake, TCP reset)", () => {
+    expect(shouldAutoReattach(false)).toBe(true);
   });
 
-  it("starts hidden with reconnect hint text", () => {
-    const ov = new DisconnectOverlay(parent);
-    expect(ov.isVisible).toBe(false);
-    expect(parent.textContent).toContain("disconnected");
-    expect(parent.textContent).toContain("Enter to reconnect");
+  it("does not reattach on clean close (relay slot torn down)", () => {
+    expect(shouldAutoReattach(true)).toBe(false);
+  });
+});
+
+describe("reattachDelayForAttempt", () => {
+  it("returns the scheduled delay for each attempt", () => {
+    expect(reattachDelayForAttempt(0)).toBe(REATTACH_DELAYS[0]);
+    expect(reattachDelayForAttempt(1)).toBe(REATTACH_DELAYS[1]);
+    expect(reattachDelayForAttempt(REATTACH_DELAYS.length - 1)).toBe(
+      REATTACH_DELAYS[REATTACH_DELAYS.length - 1],
+    );
   });
 
-  it("show/hide toggles visibility", () => {
-    const ov = new DisconnectOverlay(parent);
-    ov.show();
-    expect(ov.isVisible).toBe(true);
-    ov.hide();
-    expect(ov.isVisible).toBe(false);
+  it("returns null once attempts are exhausted", () => {
+    expect(reattachDelayForAttempt(REATTACH_DELAYS.length)).toBeNull();
+    expect(reattachDelayForAttempt(REATTACH_DELAYS.length + 5)).toBeNull();
   });
 
-  it("destroy removes the element", () => {
-    const ov = new DisconnectOverlay(parent);
-    ov.destroy();
-    expect(parent.querySelector(".disconnect-overlay")).toBeNull();
+  it("rejects negative attempts", () => {
+    expect(reattachDelayForAttempt(-1)).toBeNull();
+  });
+
+  it("first retry is immediate so sleep/wake reconnects invisibly", () => {
+    expect(REATTACH_DELAYS[0]).toBe(0);
   });
 });

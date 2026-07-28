@@ -20,8 +20,18 @@ pub struct PtySession {
     // None after the child exits (watchdog drops the master to unblock the
     // relay read loop) — the spec stays behind for reconnection.
     pub(crate) master: Option<Box<dyn MasterPty + Send>>,
-    pub(crate) spec: SpawnSpec,
     pub(crate) nonce: u64,
+    // Last known terminal size; a respawned PTY is created at this size
+    // instead of the 80x24 default.
+    pub(crate) size: portable_pty::PtySize,
+}
+
+// Emitted on the "session-state" Tauri event when a session dies / respawns
+// (drives the tab-label strikethrough; the in-band prompt does the rest).
+#[derive(Clone, Serialize)]
+pub struct SessionState {
+    pub(crate) id: String,
+    pub(crate) alive: bool,
 }
 
 pub struct SerialSession {
@@ -58,7 +68,7 @@ pub enum SerialCtl {
 
 pub struct AppState {
     pub(crate) sessions: Arc<Mutex<HashMap<String, PtySession>>>,
-    pub(crate) serial_sessions: Mutex<HashMap<String, SerialSession>>,
+    pub(crate) serial_sessions: Arc<Mutex<HashMap<String, SerialSession>>>,
     pub(crate) next_id: Mutex<u32>,
     pub(crate) initial_cwd: Option<PathBuf>,
     pub(crate) hub: Arc<WsHub>,

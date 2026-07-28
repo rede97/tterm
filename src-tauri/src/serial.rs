@@ -2,10 +2,11 @@ use serde::Serialize;
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use tauri::{Emitter, Manager};
 
 use crate::newline::{NewlineFilter, NewlineMode};
-use crate::relay::register_session;
-use crate::state::{AppState, SerialCtl, SerialSession, SpawnSpec, WsConnectResult};
+use crate::relay::{register_session, ReconnectHooks};
+use crate::state::{AppState, SerialCtl, SerialSession, SessionState, SpawnSpec, WsConnectResult};
 
 #[derive(Clone, Serialize)]
 pub struct SerialPortInfo {
@@ -229,9 +230,10 @@ pub(crate) fn serial_io_loop(
 }
 
 // Open a serial port and start the I/O pump + WS relay for session `id`.
-// Shared by serial_spawn (new tab) and session_reconnect (same id).
+// Shared by serial_spawn (new tab) and the dead-mode respawn hooks.
 pub(crate) fn spawn_serial_session(
     state: &AppState,
+    app: &tauri::AppHandle,
     id: String,
     port_name: &str,
     baud_rate: u32,
@@ -251,12 +253,80 @@ pub(crate) fn spawn_serial_session(
         flow_control: flow_control.to_string(),
         output_newline: output_newline.to_string(),
     };
-    start_serial_session(state, id, port, Some(spec))
+    start_serial_session(state, app, id, port, Some(spec))
+}
+
+// Start the I/O pump thread for an open port; returns the relay-facing
+// reader/writer plus the pump's cancel flag and control channel.
+fn start_pump(
+    port: Box<dyn serialport::SerialPort>,
+    nl_mode: NewlineMode,
+) -> (SerialIoReader, SerialIoWriter, Arc<AtomicBool>, std::sync::mpsc::Sender<SerialCtl>) {
+    let cancel = Arc::new(AtomicBool::new(false));
+    let (out_tx, out_rx) = std::sync::mpsc::channel::<Vec<u8>>();
+    let (in_tx, in_rx) = std::sync::mpsc::channel::<Vec<u8>>();
+    let (ctl_tx, ctl_rx) = std::sync::mpsc::channel::<SerialCtl>();
+    std::thread::spawn({
+        let cancel = cancel.clone();
+        move || serial_io_loop(port, out_tx, in_rx, ctl_rx, cancel, NewlineFilter::new(nl_mode))
+    });
+    (
+        SerialIoReader { rx: out_rx, cur: std::collections::VecDeque::new() },
+        SerialIoWriter { tx: in_tx },
+        cancel,
+        ctl_tx,
+    )
+}
+
+// Reconnect hooks for serial sessions: the relay calls `respawn` when the
+// user presses Enter at the in-band disconnect prompt (e.g. after unplug).
+// Runs on a blocking relay thread.
+fn serial_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec) -> ReconnectHooks {
+    let serial_sessions = app.state::<AppState>().serial_sessions.clone();
+    ReconnectHooks {
+        notice: Box::new(crate::deadmode::disconnect_notice),
+        // Serial devices emit no startup frame — nothing to preserve against.
+        pre_resume: Box::new(Vec::new),
+        on_state: {
+            let id = id.clone();
+            Box::new(move |alive| {
+                let _ = app.emit("session-state", SessionState { id: id.clone(), alive });
+            })
+        },
+        respawn: Box::new(move || {
+            let SpawnSpec::Serial {
+                port_name, baud_rate, data_bits, parity, stop_bits, flow_control, output_newline,
+            } = &spec
+            else {
+                return Err("not a serial session".into());
+            };
+            let nl_mode = NewlineMode::from_str(output_newline).unwrap_or(NewlineMode::Keep);
+            // Debug builds: mock port names get a virtual port.
+            #[cfg(debug_assertions)]
+            let mock = crate::demo::mock_port_by_name(port_name);
+            #[cfg(not(debug_assertions))]
+            let mock: Option<Box<dyn serialport::SerialPort>> = None;
+            let port = match mock {
+                Some(p) => p,
+                None => open_serial(port_name, *baud_rate, *data_bits, parity, *stop_bits, flow_control)?,
+            };
+            let (reader, writer, cancel, ctl) = start_pump(port, nl_mode);
+            serial_sessions
+                .lock()
+                .map_err(|e| e.to_string())?
+                .insert(id.clone(), SerialSession { cancel, ctl, spec: Some(spec.clone()) });
+            Ok((
+                Box::new(reader) as Box<dyn Read + Send>,
+                Box::new(writer) as Box<dyn Write + Send>,
+            ))
+        }),
+    }
 }
 
 // Start pump + relay for an already-open serial port (real or mock).
 pub(crate) fn start_serial_session(
     state: &AppState,
+    app: &tauri::AppHandle,
     id: String,
     port: Box<dyn serialport::SerialPort>,
     spec: Option<SpawnSpec>,
@@ -268,18 +338,9 @@ pub(crate) fn start_serial_session(
             _ => None,
         })
         .unwrap_or(NewlineMode::Keep);
-    let cancel = Arc::new(AtomicBool::new(false));
-    let (out_tx, out_rx) = std::sync::mpsc::channel::<Vec<u8>>();
-    let (in_tx, in_rx) = std::sync::mpsc::channel::<Vec<u8>>();
-    let (ctl_tx, ctl_rx) = std::sync::mpsc::channel::<SerialCtl>();
-    std::thread::spawn({
-        let cancel = cancel.clone();
-        move || serial_io_loop(port, out_tx, in_rx, ctl_rx, cancel, NewlineFilter::new(nl_mode))
-    });
-
-    let reader = SerialIoReader { rx: out_rx, cur: std::collections::VecDeque::new() };
-    let writer = SerialIoWriter { tx: in_tx };
-    register_session(&state.hub, &id, reader, writer, Some(cancel.clone()))?;
+    let (reader, writer, cancel, ctl_tx) = start_pump(port, nl_mode);
+    let hooks = spec.clone().map(|s| serial_hooks(app.clone(), id.clone(), s));
+    register_session(&state.hub, &id, reader, writer, hooks)?;
 
     state
         .serial_sessions
@@ -293,6 +354,7 @@ pub(crate) fn start_serial_session(
 #[tauri::command]
 pub fn serial_spawn(
     state: tauri::State<AppState>,
+    app: tauri::AppHandle,
     port_name: String,
     baud_rate: u32,
     data_bits: u8,
@@ -321,12 +383,12 @@ pub fn serial_spawn(
             flow_control: flow_control.clone(),
             output_newline: nl.to_string(),
         };
-        start_serial_session(&state, id.clone(), mock, Some(spec))?;
+        start_serial_session(&state, &app, id.clone(), mock, Some(spec))?;
         return Ok(state.ws_result(id));
     }
 
     spawn_serial_session(
-        &state, id.clone(), &port_name, baud_rate, data_bits, &parity, stop_bits, &flow_control, nl,
+        &state, &app, id.clone(), &port_name, baud_rate, data_bits, &parity, stop_bits, &flow_control, nl,
     )?;
 
     Ok(state.ws_result(id))

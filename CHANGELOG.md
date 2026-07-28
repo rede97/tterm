@@ -1,3 +1,23 @@
+## Unreleased
+
+New Features
+
+- Disconnect handling is now built into the terminal itself: when a session
+  ends (shell exit, SSH drop, serial unplug), the terminal resets to a sane
+  state, prints the time it happened, and offers Enter to reconnect — no
+  overlay, all scrollback stays visible and copyable, and reconnecting never
+  requires the mouse
+- Sessions now survive sleep/wake and app switching: a dropped connection is
+  re-established silently in the background, with anything printed in the
+  meantime preserved — local shells no longer show a false disconnect
+
+Fixes
+
+- Reconnecting after a TUI app (vim, htop…) died no longer leaves the
+  terminal stuck on the alternate screen
+- A reconnected session now opens at the current terminal size instead of
+  80×24
+
 ## v0.3.0
 
 New Features

@@ -1,5 +1,6 @@
 mod cmdparse;
 mod config;
+mod deadmode;
 #[cfg(debug_assertions)]
 mod demo;
 mod fonts;
@@ -34,7 +35,7 @@ pub fn run() {
 
             app.manage(AppState {
                 sessions: Arc::new(Mutex::new(HashMap::new())),
-                serial_sessions: Mutex::new(HashMap::new()),
+                serial_sessions: Arc::new(Mutex::new(HashMap::new())),
                 next_id: Mutex::new(1),
                 initial_cwd: pty::launch_working_directory(),
                 hub,
@@ -46,7 +47,7 @@ pub fn run() {
         .invoke_handler({
             #[cfg(debug_assertions)]
             { tauri::generate_handler![
-                pty::pty_spawn, pty::pty_spawn_ssh, pty::pty_resize, pty::pty_kill, pty::session_reconnect,
+                pty::pty_spawn, pty::pty_spawn_ssh, pty::pty_resize, pty::pty_kill,
                 window::window_minimize, window::window_toggle_maximize, window::window_close,
                 window::window_start_drag, window::open_new_window, window::save_text_file,
                 ssh::ssh_read_config_raw, ssh::open_ssh_config, ssh::ssh_clear_known_hosts,
@@ -60,7 +61,7 @@ pub fn run() {
             ] }
             #[cfg(not(debug_assertions))]
             { tauri::generate_handler![
-                pty::pty_spawn, pty::pty_spawn_ssh, pty::pty_resize, pty::pty_kill, pty::session_reconnect,
+                pty::pty_spawn, pty::pty_spawn_ssh, pty::pty_resize, pty::pty_kill,
                 window::window_minimize, window::window_toggle_maximize, window::window_close,
                 window::window_start_drag, window::open_new_window, window::save_text_file,
                 ssh::ssh_read_config_raw, ssh::open_ssh_config, ssh::ssh_clear_known_hosts,

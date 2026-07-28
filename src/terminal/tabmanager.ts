@@ -5,6 +5,7 @@ import { configStore } from "../core/store";
 import { serialParamsFor, serialKeyFor, rememberSerialParams } from "../config/serial-memory";
 import { showToast } from "../ui/toast";
 import { TerminalTab } from "./tab";
+import { listen } from "@tauri-apps/api/event";
 import Sortable from "sortablejs";
 
 export class TabManager {
@@ -32,6 +33,17 @@ export class TabManager {
     this._welcomeEl = welcomeEl;
 
     window.addEventListener("resize", () => this._onResize());
+
+    // Backend session state (dead → in-band prompt / respawned): drives the
+    // tab-label strikethrough. Reconnect itself is fully backend-managed —
+    // the user presses Enter at the prompt printed in the terminal stream.
+    // (Guarded: the module-level singleton is also constructed in unit
+    // tests, where no Tauri IPC bridge exists.)
+    if ("__TAURI_INTERNALS__" in window) {
+      listen<{ id: string; alive: boolean }>("session-state", (e) => {
+        this.tabs.get(e.payload.id)?.setDisconnected(!e.payload.alive);
+      });
+    }
   }
 
   // Tab drag reorder via SortableJS (mature pointer math; forceFallback
@@ -107,36 +119,18 @@ export class TabManager {
     this.tabsContainer.appendChild(tabEl);
 
     tab.onSocketClosed = () => this._onSessionClosed(tab.id);
-    tab.onReconnectRequested = () => this.reconnectTab(tab.id);
     tab.attachSocket(port, token);
 
     this.tabs.set(tab.id, tab);
   }
 
-  // Session socket closed => PTY exited / serial pump died: show the overlay.
+  // Session socket closed for good (relay slot torn down). With backend
+  // dead-mode this only fires on tab kill, so it is effectively a no-op
+  // safety net.
   private _onSessionClosed(tabId: string): void {
     const tab = this.tabs.get(tabId);
-    if (!tab || tab.disconnected || this._reconnecting.has(tabId)) return;
+    if (!tab || tab.disconnected) return;
     tab.setDisconnected(true);
-  }
-
-  private _reconnecting = new Set<string>();
-
-  // Respawn the session backend-side (same id) and re-attach the socket.
-  async reconnectTab(tabId: string): Promise<void> {
-    const tab = this.tabs.get(tabId);
-    if (!tab) return;
-    this._reconnecting.add(tabId);
-    try {
-      const result: { id: string; port: number; token: string } = await invoke("session_reconnect", { id: tabId });
-      tab.setDisconnected(false);
-      tab.attachSocket(result.port, result.token);
-      tab.terminal.focus();
-    } catch (e) {
-      showToast(`Reconnect failed: ${e}`, "error");
-    } finally {
-      this._reconnecting.delete(tabId);
-    }
   }
 
   async createLocalTab(command?: string, label?: string): Promise<TerminalTab | null> {

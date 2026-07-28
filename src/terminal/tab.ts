@@ -9,7 +9,7 @@ import type { TabType } from "../core/types";
 import { hysteresis } from "../util/hysteresis";
 import { parseOsc9Progress, applyProgressToTabElement } from "../util/osc";
 import { SizeHint } from "../util/sizehint";
-import { DisconnectOverlay } from "../util/disconnect";
+import { shouldAutoReattach, reattachDelayForAttempt } from "../util/disconnect";
 import { ImeBox } from "../util/imebox";
 import { CursorPositionFilter } from "../util/imefilter";
 import type { SshHost, SerialInputMode, SerialEnterNewline } from "../core/types";
@@ -44,10 +44,8 @@ export class TerminalTab {
   progress = 0;
   sizeHint!: SizeHint;
   disconnected = false;
-  // set by TabManager: called when the session socket closes / Enter requests reconnect
+  // set by TabManager: called when the session socket closes for good
   onSocketClosed?: () => void;
-  onReconnectRequested?: () => void;
-  private disconnectOverlay!: DisconnectOverlay;
   // Floating IME composition box — currently disabled, will be toggleable
   // via a shortcut later. Wiring is kept intact; flip imeBoxEnabled on.
   private imeBox!: ImeBox;
@@ -67,17 +65,7 @@ export class TerminalTab {
     this.element.style.display = "none";
     container.appendChild(this.element);
     this.sizeHint = new SizeHint(this.element, 1200, configStore.get("fontFamily"));
-    this.disconnectOverlay = new DisconnectOverlay(this.element);
     this.imeBox = new ImeBox(this.element, configStore.get("fontFamily"));
-
-    // Enter on a disconnected session triggers reconnect (capture, before xterm)
-    this.element.addEventListener("keydown", (e: KeyboardEvent) => {
-      if (this.disconnected && e.key === "Enter") {
-        e.preventDefault();
-        e.stopPropagation();
-        this.onReconnectRequested?.();
-      }
-    }, true);
 
     this.terminal = new Terminal({
       allowProposedApi: true,
@@ -149,6 +137,10 @@ export class TerminalTab {
     if (this.imeBoxEnabled && textarea) {
       this.imeBox.attach(textarea, () => this._cursorPixelPos());
     }
+
+    // Serial input handler: registered once; it resolves `this.serialSocket`
+    // at send time, so socket re-attaches need no re-hooking.
+    if (this.type === "serial") this._hookSerialInput();
   }
 
   // Filtered cursor position in pixels, relative to the terminal element.
@@ -202,21 +194,77 @@ export class TerminalTab {
   // Attach (or re-attach) the session WebSocket. Disposes any previous addon.
   // The hub multiplexes all sessions on one port; routing is by path and the
   // per-process token authenticates the handshake.
+  //
+  // Two close paths, handled differently:
+  //  - CLEAN close (server sent a Close frame): the relay slot was torn
+  //    down for good (tab kill) → onSocketClosed. Session death alone never
+  //    closes the socket — the backend prints an in-band prompt and
+  //    respawns on Enter (deadmode.rs).
+  //  - ABNORMAL close (1006, e.g. OS sleep/wake resetting loopback TCP):
+  //    transport-level only, the backend session is likely alive → silently
+  //    re-attach with backoff; the relay buffers session output while
+  //    detached, so the terminal resumes with no visible interruption.
   attachSocket(port: number, token: string): void {
-    this.attachAddon?.dispose();
-    this.attachAddon = undefined;
-    import("@xterm/addon-attach").then(({ AttachAddon }) => {
-      const socket = new WebSocket(`ws://127.0.0.1:${port}/pty/${encodeURIComponent(this.id)}?token=${token}`);
-      socket.addEventListener("close", () => this.onSocketClosed?.());
+    this.socketPort = port;
+    this.socketToken = token;
+    this.reattachAttempt = 0;
+    this._clearReattachTimer();
+    this._openSocket();
+  }
+
+  private socketPort?: number;
+  private socketToken?: string;
+  private reattachAttempt = 0;
+  private reattachTimer: number | null = null;
+  // Monotonic token: stale async continuations (dynamic import, retry
+  // timers, events from superseded sockets) check it and bail out.
+  private socketGen = 0;
+
+  private _clearReattachTimer(): void {
+    if (this.reattachTimer !== null) {
+      clearTimeout(this.reattachTimer);
+      this.reattachTimer = null;
+    }
+  }
+
+  private async _openSocket(): Promise<void> {
+    const gen = ++this.socketGen;
+    const { AttachAddon } = await import("@xterm/addon-attach");
+    if (gen !== this.socketGen) return; // superseded while importing
+    const socket = new WebSocket(`ws://127.0.0.1:${this.socketPort}/pty/${encodeURIComponent(this.id)}?token=${this.socketToken}`);
+
+    socket.addEventListener("open", () => {
+      if (gen !== this.socketGen) { socket.close(); return; }
+      this.reattachAttempt = 0;
+      this.attachAddon?.dispose();
+      this.attachAddon = undefined;
       if (this.type === "serial") {
         // Serial tabs forward input themselves (input modes: normal/echo/line)
-        this.attachAddon = new AttachAddon(socket, { bidirectional: false });
         this.serialSocket = socket;
-        this._hookSerialInput();
+        this.attachAddon = new AttachAddon(socket, { bidirectional: false });
       } else {
         this.attachAddon = new AttachAddon(socket);
       }
       this.terminal.loadAddon(this.attachAddon);
+    });
+
+    socket.addEventListener("close", (e) => {
+      if (gen !== this.socketGen) return; // stale socket, already replaced
+      if (!shouldAutoReattach(e.wasClean)) {
+        this.onSocketClosed?.();
+        return;
+      }
+      const delay = reattachDelayForAttempt(this.reattachAttempt++);
+      if (delay === null) {
+        // Re-attach kept failing (session really gone): fall back to the
+        // disconnected banner + manual reconnect.
+        this.onSocketClosed?.();
+        return;
+      }
+      this.reattachTimer = window.setTimeout(() => {
+        this.reattachTimer = null;
+        if (gen === this.socketGen) this._openSocket();
+      }, delay);
     });
   }
 
@@ -247,10 +295,10 @@ export class TerminalTab {
     if (this.type === "serial") this._hookSerialInput();
   }
 
+  // Mark the session dead/alive (driven by the backend "session-state"
+  // event): the tab label gets a strikethrough while dead.
   setDisconnected(v: boolean): void {
     this.disconnected = v;
-    if (v) this.disconnectOverlay.show();
-    else this.disconnectOverlay.hide();
     this.tabElement?.classList.toggle("disconnected", v);
   }
 
@@ -437,8 +485,10 @@ export class TerminalTab {
   }
 
   destroy(): void {
+    // Stop pending re-attach retries and stale socket callbacks.
+    this.socketGen++;
+    this._clearReattachTimer();
     this.sizeHint.destroy();
-    this.disconnectOverlay.destroy();
     this.imeBox.destroy();
     this.onRenderDisposable?.dispose();
     this.element.remove();

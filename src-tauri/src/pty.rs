@@ -1,12 +1,14 @@
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
-use tauri::Manager;
+use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
+use tauri::{Emitter, Manager};
 
 use crate::cmdparse::parse_command;
-use crate::relay::{register_session, unregister_session};
-use crate::state::{AppState, PtySession, SpawnSpec, WsConnectResult};
+use crate::relay::{register_session, unregister_session, ReconnectHooks};
+use crate::state::{AppState, PtySession, SessionState, SpawnSpec, WsConnectResult};
 
 pub(crate) fn get_shell() -> String {
     #[cfg(target_os = "windows")]
@@ -22,16 +24,17 @@ pub(crate) fn get_shell() -> String {
 // NEWER session that reused the same tab id (reconnect race).
 static SESSION_NONCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
-pub(crate) fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder, spec: SpawnSpec) -> Result<(), String> {
+// Open a PTY, spawn the child, register it in the session table, and arm the
+// exit watchdog. Returns the (reader, writer) ends for the relay. Shared by
+// the initial spawn and the dead-mode respawn (Enter-to-reconnect).
+fn spawn_pty_child(
+    sessions: &Arc<Mutex<HashMap<String, PtySession>>>,
+    id: &str,
+    cmd: CommandBuilder,
+    size: PtySize,
+) -> Result<(Box<dyn Read + Send>, Box<dyn Write + Send>), String> {
     let pty_sys = native_pty_system();
-    let pty_pair = pty_sys
-        .openpty(PtySize {
-            rows: 24,
-            cols: 80,
-            pixel_width: 0,
-            pixel_height: 0,
-        })
-        .map_err(|e| e.to_string())?;
+    let pty_pair = pty_sys.openpty(size).map_err(|e| e.to_string())?;
 
     let mut child = pty_pair
         .slave
@@ -44,36 +47,100 @@ pub(crate) fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBu
     let reader = master.try_clone_reader().map_err(|e| e.to_string())?;
     let writer: Box<dyn Write + Send> = master.take_writer().map_err(|e| e.to_string())?;
 
-    let sessions = app_handle.state::<AppState>();
-    register_session(&sessions.hub, &id, reader, writer, None)?;
-
-    // Store session (master for resize)
     let nonce = SESSION_NONCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    sessions.sessions.lock().map_err(|e| e.to_string())?.insert(
-        id.clone(),
-        PtySession { master: Some(master), spec, nonce },
+    sessions.lock().map_err(|e| e.to_string())?.insert(
+        id.to_string(),
+        PtySession { master: Some(master), nonce, size },
     );
 
     // Watchdog: when the child exits, drop the master from the session table.
     // ConPTY does NOT signal EOF on the output pipe when the child dies, so
-    // the relay's read loop would block forever otherwise. Dropping the master
-    // closes the PseudoConsole, the read fails, and the relay closes the WS —
-    // which is how the frontend learns the session died.
-    let sessions_arc = sessions.sessions.clone();
+    // the relay's read pump would block forever otherwise. Dropping the master
+    // closes the PseudoConsole, the read fails, and the relay enters dead mode.
+    let sessions_arc = sessions.clone();
+    let id2 = id.to_string();
     std::thread::spawn(move || {
         let _ = child.wait();
         if let Ok(mut m) = sessions_arc.lock() {
-            // Only touch OUR spawn (not a reconnect replacement).
-            // Drop the master (closes ConPTY, unblocks the relay read loop)
+            // Only touch OUR spawn (not a respawn replacement).
+            // Drop the master (closes ConPTY, unblocks the relay read pump)
             // but keep the spec for reconnection.
-            if m.get(&id).map_or(false, |s| s.nonce == nonce) {
-                if let Some(s) = m.get_mut(&id) {
+            if m.get(&id2).map_or(false, |s| s.nonce == nonce) {
+                if let Some(s) = m.get_mut(&id2) {
                     s.master = None;
                 }
             }
         }
     });
 
+    Ok((reader, writer))
+}
+
+// Reconnect hooks for PTY/SSH sessions: the relay calls `respawn` when the
+// user presses Enter at the in-band disconnect prompt. Runs on a blocking
+// relay thread.
+fn pty_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec) -> ReconnectHooks {
+    let state = app.state::<AppState>();
+    let sessions = state.sessions.clone();
+    let initial_cwd = state.initial_cwd.clone();
+    ReconnectHooks {
+        notice: Box::new(crate::deadmode::disconnect_notice),
+        pre_resume: {
+            let sessions = sessions.clone();
+            let id = id.clone();
+            Box::new(move || {
+                let rows = sessions
+                    .lock()
+                    .ok()
+                    .and_then(|t| t.get(&id).map(|s| s.size.rows))
+                    .unwrap_or(24);
+                crate::deadmode::resume_scroll(rows)
+            })
+        },
+        on_state: {
+            let id = id.clone();
+            Box::new(move |alive| {
+                let _ = app.emit("session-state", SessionState { id: id.clone(), alive });
+            })
+        },
+        respawn: Box::new(move || {
+            let builder = match &spec {
+                SpawnSpec::Pty { command } => command_builder(command.as_deref(), initial_cwd.as_ref()),
+                SpawnSpec::Ssh { hostname, port, user } => {
+                    let mut cmd = CommandBuilder::new("ssh");
+                    cmd.arg(format!("{}@{}", user, hostname));
+                    cmd.arg("-p");
+                    cmd.arg(port.to_string());
+                    cmd
+                }
+                _ => return Err("not a PTY session".into()),
+            };
+            // Respawn at the last known terminal size (updated by pty_resize),
+            // not the 80x24 default.
+            let size = {
+                let table = sessions.lock().map_err(|e| e.to_string())?;
+                table.get(&id).map(|s| s.size).unwrap_or(PtySize {
+                    rows: 24,
+                    cols: 80,
+                    pixel_width: 0,
+                    pixel_height: 0,
+                })
+            };
+            spawn_pty_child(&sessions, &id, builder, size)
+        }),
+    }
+}
+
+pub(crate) fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder, spec: SpawnSpec) -> Result<(), String> {
+    let sessions = app_handle.state::<AppState>().sessions.clone();
+    let (reader, writer) = spawn_pty_child(
+        &sessions,
+        &id,
+        cmd,
+        PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 },
+    )?;
+    let hub = app_handle.state::<AppState>().hub.clone();
+    register_session(&hub, &id, reader, writer, Some(pty_hooks(app_handle, id.clone(), spec)))?;
     Ok(())
 }
 
@@ -153,15 +220,16 @@ pub fn pty_spawn_ssh(state: tauri::State<AppState>, app: tauri::AppHandle, hostn
 pub fn pty_resize(state: tauri::State<AppState>, id: &str, cols: u16, rows: u16) -> Result<(), String> {
     let mut sessions = state.sessions.lock().map_err(|e| e.to_string())?;
     if let Some(session) = sessions.get_mut(id) {
+        let size = PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        };
+        // Always remember the size — a dead session respawns at it.
+        session.size = size;
         if let Some(master) = &session.master {
-            master
-                .resize(PtySize {
-                    rows,
-                    cols,
-                    pixel_width: 0,
-                    pixel_height: 0,
-                })
-                .map_err(|e| e.to_string())?;
+            master.resize(size).map_err(|e| e.to_string())?;
         }
         // master None (child exited): resize is a no-op until reconnect
     }
@@ -180,48 +248,6 @@ fn kill_session_resources(state: &AppState, id: &str) -> Result<(), String> {
         session.cancel.store(true, Ordering::Relaxed);
     }
     Ok(())
-}
-
-#[tauri::command]
-pub fn session_reconnect(state: tauri::State<AppState>, app: tauri::AppHandle, id: &str) -> Result<WsConnectResult, String> {
-    // 1. Look up the spawn spec in either session table
-    let spec = {
-        let sessions = state.sessions.lock().map_err(|e| e.to_string())?;
-        sessions.get(id).map(|s| s.spec.clone())
-    };
-    let spec = match spec {
-        Some(s) => Some(s),
-        None => {
-            let serial = state.serial_sessions.lock().map_err(|e| e.to_string())?;
-            serial.get(id).and_then(|s| s.spec.clone())
-        }
-    };
-    let spec = spec.ok_or_else(|| format!("Session is not reconnectable: {}", id))?;
-
-    // 2. Tear down the old session
-    kill_session_resources(&state, id)?;
-
-    // 3. Respawn with the same id
-    match spec {
-        SpawnSpec::Pty { command } => {
-            let builder = command_builder(command.as_deref(), state.initial_cwd.as_ref());
-            spawn_pty(app, id.to_string(), builder, SpawnSpec::Pty { command })?
-        }
-        SpawnSpec::Ssh { hostname, port, user } => {
-            let mut cmd = CommandBuilder::new("ssh");
-            cmd.arg(format!("{}@{}", user, hostname));
-            cmd.arg("-p");
-            cmd.arg(port.to_string());
-            spawn_pty(app, id.to_string(), cmd, SpawnSpec::Ssh { hostname, port, user })?
-        }
-        SpawnSpec::Serial { port_name, baud_rate, data_bits, parity, stop_bits, flow_control, output_newline } => {
-            crate::serial::spawn_serial_session(
-                &state, id.to_string(), &port_name, baud_rate, data_bits, &parity, stop_bits, &flow_control, &output_newline,
-            )?
-        }
-    };
-
-    Ok(state.ws_result(id.to_string()))
 }
 
 #[tauri::command]
@@ -275,3 +301,4 @@ mod tests {
     }
 
 }
+
