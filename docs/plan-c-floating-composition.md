@@ -1,7 +1,13 @@
 # Plan C:悬浮组合镜像(Floating Composition Mirror)
 
 > 前置阅读:`docs/bugfix-ime-hidden-cursor.md`(问题定义 + Plan A/B 否决依据)
-> 状态:**设计评审中**,未实施
+> 状态:**M1/M2 已通过**(功能核心 + 真实输入法实测符合预期),剩 M3 样式美化
+>
+> 实施备注:镜像组件落在既有 `src/util/imebox.ts`(扩展 linger/fade/重钳制);
+> 启用模式三档 `auto` / `always` / `off`(`setImeMirrorMode`,持久化
+> localStorage),**测试期默认 `always`** —— 普通 shell 也能看到镜像,无需启动
+> pi;M3 根据实测体验决定是否回落到 `auto` 默认。
+> M2 关键根因(1px textarea 杀死真实组合)已记入 bugfix 文档。
 
 ## 目标与非目标
 

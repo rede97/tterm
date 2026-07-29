@@ -71,6 +71,21 @@ xterm 写回的位置。实测数据:同步逻辑已钉入 (0,221),但 computed 
 **验收标准**(`e2e/specs/ime.e2e.js` 中 `it.skip` 占位):光标隐藏时,组合镜像在锚点
 可见、内容与组合串同步、始终钳制在终端边界内、提交后自动淡出。
 
+## Plan C 实施期根因补充:1px textarea 杀死真实组合(M2 实测)
+
+M1 上真机后出现“镜像只显示第一个字母就被打断,候选窗跳到左上角”。根因:
+xterm 的 `CompositionHelper.updateCompositionElements()` 用 `.composition-view` 的
+`getBoundingClientRect()` 推导 textarea 尺寸;抑制 CSS(`display:none`)使 rect 全 0,
+**textarea 被压成 1px×1px、lineHeight 0px** —— xterm 源码注释自述 "Ensure the
+text area is at least 1x1, otherwise certain IMEs may break"。真实 TSF 组合期间文本
+寄存在 textarea 内,1px 高的编辑框让 IME 在首个 update 后中止组合;冻结随之解除,
+textarea 弹回真实光标处 = 候选窗跳左上角。
+
+**修复**:冻结 Proxy 除 width 外同步钳住 `height`/`lineHeight`(各取一个完整单元格
+尺寸),组合期间 textarea 永远是 1×1 完整格子。辅以镜像布局读取移出事件派发(rAF)。
+合成事件(e2e)不会暴露此问题 —— 派发 CompositionEvent 不经过 TSF,textarea 尺寸
+无关紧要;只有真实 IME 会校验。这再次验证“真实输入法的人工验证是最终裁决”。
+
 ## 验证方法论(本轮积累)
 
 - **真实输入法的人工验证是最终裁决**。合成事件(CDP `Input.imeSetComposition` /

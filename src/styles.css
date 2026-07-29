@@ -307,7 +307,7 @@ body {
   background: #333333;
 }
 
-/* floating IME composition box */
+/* floating IME composition mirror (Plan C) */
 .ime-box {
   position: absolute;
   padding: 4px 12px;
@@ -325,6 +325,18 @@ body {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
   pointer-events: none;
   z-index: 25;
+  opacity: 1;
+  transition: opacity 250ms ease; /* keep in sync with FADE_MS in imebox.ts */
+}
+
+.ime-box.fading {
+  opacity: 0;
+}
+
+/* When the mirror owns composition display, suppress xterm's native
+   composition-view to avoid double rendering. */
+.terminal-instance.ime-mirror-on .composition-view {
+  display: none !important;
 }
 
 /* dimmed tab label while the session is dead (in-band prompt in the

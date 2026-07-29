@@ -91,6 +91,19 @@ configStore.subscribe((keys) => {
 // drag reorder, a captured reference would go stale.
 if (import.meta.env.DEV) {
   (window as any).__tterm = { get tabs() { return tabManager.tabs; }, mgr: tabManager };
+  import("./util/imebox").then(m => {
+    (window as any).__tterm.setImeMirrorMode = (mode: "auto" | "always" | "off") => {
+      m.setImeMirrorMode(mode);
+      for (const t of tabManager.tabs.values()) t.refreshImeClasses();
+    };
+    (window as any).__tterm.getImeMirrorMode = m.getImeMirrorMode;
+    // M2 diagnostics: composition lifecycle tracer + bisection flags
+    (window as any).__tterm.imeTrace = (on: boolean) => m.setImeTrace(on);
+    (window as any).__tterm.imeDebug = (f: { suppress?: boolean; reanchor?: boolean }) => {
+      m.setImeDebugFlags(f);
+      for (const t of tabManager.tabs.values()) t.refreshImeClasses();
+    };
+  });
 }
 
 tabManager.initNewTabButton();

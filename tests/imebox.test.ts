@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ImeBox } from "../src/util/imebox";
 
 function setup(width = 400, height = 300) {
@@ -23,9 +23,14 @@ function composition(textarea: HTMLElement, type: string, data = "") {
 describe("ImeBox", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
+    vi.useFakeTimers();
   });
 
-  it("shows on compositionstart, mirrors updates, hides on end", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows on compositionstart, mirrors updates, lingers then fades on end", () => {
     const { textarea, box } = setup();
     box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }));
     expect(box.isVisible).toBe(false);
@@ -34,7 +39,49 @@ describe("ImeBox", () => {
     composition(textarea, "compositionupdate", "你好");
     expect(box.text).toBe("你好");
     composition(textarea, "compositionend", "你好");
+    // linger: still visible right after commit
+    expect(box.isVisible).toBe(true);
+    expect(box.isFading).toBe(false);
+    vi.advanceTimersByTime(400);
+    expect(box.isVisible).toBe(true);
+    expect(box.isFading).toBe(true);
+    vi.advanceTimersByTime(250);
     expect(box.isVisible).toBe(false);
+    expect(box.isFading).toBe(false);
+  });
+
+  it("a new composition cancels a pending fade and shows immediately", () => {
+    const { textarea, box } = setup();
+    box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }));
+    composition(textarea, "compositionstart");
+    composition(textarea, "compositionend", "a");
+    vi.advanceTimersByTime(400); // now fading
+    expect(box.isFading).toBe(true);
+    composition(textarea, "compositionstart");
+    expect(box.isVisible).toBe(true);
+    expect(box.isFading).toBe(false);
+    vi.advanceTimersByTime(1000); // stale timers must not hide it
+    expect(box.isVisible).toBe(true);
+  });
+
+  it("does not show when shouldMirror returns false", () => {
+    const { textarea, box } = setup();
+    box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }), () => false);
+    composition(textarea, "compositionstart");
+    composition(textarea, "compositionupdate", "nihao");
+    expect(box.isVisible).toBe(false);
+    expect(box.text).toBe("");
+  });
+
+  it("shouldMirror is evaluated per composition (live gate)", () => {
+    const { textarea, box } = setup();
+    let allow = false;
+    box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }), () => allow);
+    composition(textarea, "compositionstart");
+    expect(box.isVisible).toBe(false);
+    allow = true;
+    composition(textarea, "compositionstart");
+    expect(box.isVisible).toBe(true);
   });
 
   it("anchors once: position captured at start, not recomputed on updates", () => {
@@ -48,12 +95,20 @@ describe("ImeBox", () => {
     expect(box.position).toEqual(posAfterStart); // must not drift
   });
 
-  it("flips above the cursor line when near the bottom", () => {
-    const { textarea, box } = setup(400, 100);
+  it("places above the anchor line by default (dodges the OS candidate window)", () => {
+    const { textarea, box } = setup(400, 300);
     box.attach(textarea, () => ({ x: 10, y: 90, cellH: 16 }));
     composition(textarea, "compositionstart");
-    const top = parseInt(box.position.top, 10);
-    expect(top).toBeLessThan(90); // flipped above
+    // happy-dom reports 0 size → fallback boxH=28; above = 90 - 28 - 2 = 60
+    expect(parseInt(box.position.top, 10)).toBe(60);
+  });
+
+  it("flips below the anchor line only when there is no room above", () => {
+    const { textarea, box } = setup(400, 300);
+    box.attach(textarea, () => ({ x: 10, y: 10, cellH: 16 }));
+    composition(textarea, "compositionstart");
+    // 10 - 28 - 2 < 4 → below = 10 + 16 + 2 = 28
+    expect(parseInt(box.position.top, 10)).toBe(28);
   });
 
   it("clamps horizontally inside the parent", () => {

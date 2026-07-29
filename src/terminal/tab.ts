@@ -10,7 +10,7 @@ import { hysteresis } from "../util/hysteresis";
 import { parseOsc9Progress, applyProgressToTabElement } from "../util/osc";
 import { SizeHint } from "../util/sizehint";
 import { shouldAutoReattach, reattachDelayForAttempt } from "../util/disconnect";
-import { ImeBox } from "../util/imebox";
+import { ImeBox, imeMirrorActiveFor, getImeDebugFlags } from "../util/imebox";
 import { CursorPositionFilter } from "../util/imefilter";
 import type { SshHost, SerialInputMode, SerialEnterNewline } from "../core/types";
 import { trimPasteContent } from "../core/common";
@@ -47,10 +47,10 @@ export class TerminalTab {
   disconnected = false;
   // set by TabManager: called when the session socket closes for good
   onSocketClosed?: () => void;
-  // Floating IME composition box — currently disabled, will be toggleable
-  // via a shortcut later. Wiring is kept intact; flip imeBoxEnabled on.
+  // Floating IME composition mirror (Plan C). Shows the composition string
+  // near the anchor when xterm's native composition-view is unreliable
+  // (cursor-hiding TUIs) — or everywhere in "always" test mode.
   private imeBox!: ImeBox;
-  private imeBoxEnabled = false;
   // Stable-run filter feeding the IME anchor position (anti animation jitter).
   private cursorFilter = new CursorPositionFilter();
   private onRenderDisposable?: IDisposable;
@@ -129,20 +129,50 @@ export class TerminalTab {
     this.onRenderDisposable = this.terminal.onRender(() => {
       const buf = this.terminal.buffer.active;
       this.cursorFilter.sample(buf.cursorX, buf.cursorY);
+      this.refreshImeClasses();
     });
+    this.refreshImeClasses();
 
     // Drive the native IME candidate window with the filtered cursor position.
     this._patchImeFreeze();
 
-    // Floating IME composition box (disabled for now — see imeBoxEnabled).
+    // Floating IME composition mirror (Plan C): pure display, never touches
+    // the input path. shouldMirror gates activation per composition so a
+    // cursor-state change mid-session takes effect immediately.
     const textarea = this.element.querySelector(".xterm-helper-textarea") as HTMLElement | null;
-    if (this.imeBoxEnabled && textarea) {
-      this.imeBox.attach(textarea, () => this._cursorPixelPos());
+    if (textarea) {
+      this.imeBox.attach(
+        textarea,
+        () => this._cursorPixelPos(),
+        () => imeMirrorActiveFor(this._isCursorHidden()),
+      );
     }
 
     // Serial input handler: registered once; it resolves `this.serialSocket`
     // at send time, so socket re-attaches need no re-hooking.
     if (this.type === "serial") this._hookSerialInput();
+  }
+
+  private _isCursorHidden(): boolean {
+    try {
+      return !!(this.terminal as any)._core.coreService?.isCursorHidden;
+    } catch {
+      return false;
+    }
+  }
+
+  // Reflect IME-mirror state on the instance element:
+  //  - `cursor-hidden`: the TUI hid the hardware cursor (diagnostics/tests)
+  //  - `ime-mirror-on`: the mirror owns composition display → CSS suppresses
+  //    xterm's native composition-view to avoid double rendering
+  //    (the suppress debug flag can lift suppression while the mirror stays
+  //    on — double display, used for real-IME bisection)
+  // Called on every render and on mirror-mode changes.
+  refreshImeClasses(): void {
+    const hidden = this._isCursorHidden();
+    this.element.classList.toggle("cursor-hidden", hidden);
+    const active = imeMirrorActiveFor(hidden) && getImeDebugFlags().suppress;
+    this.element.classList.toggle("ime-mirror-on", active);
   }
 
   // Filtered cursor position in pixels, relative to the terminal element.
@@ -353,6 +383,15 @@ export class TerminalTab {
             const cellW = dims?.cell?.width ?? 8;
             return Reflect.set(target, prop, Math.max(cellW, 1) + "px", receiver);
           }
+          // With the composition-view suppressed (display:none), xterm measures
+          // its bounds as 0 and would shrink the textarea to 1px x 1px —
+          // xterm's own comment warns "certain IMEs may break" below 1x1.
+          // Keep the textarea a full cell so the TSF composition stays alive.
+          if (prop === "height" || prop === "lineHeight") {
+            const dims = core._renderService?.dimensions?.css;
+            const cellH = dims?.cell?.height ?? 16;
+            return Reflect.set(target, prop, Math.max(cellH, 1) + "px", receiver);
+          }
         }
         return Reflect.set(target, prop, value, receiver);
       }
@@ -385,14 +424,16 @@ export class TerminalTab {
       // Periodically re-anchor from the filter while composing. Writes go to
       // origStyle directly, bypassing the freeze Proxy.
       stopRefresh();
-      refreshTimer = window.setInterval(() => {
-        const q = pxPos();
-        if (!q || (q.x === left && q.y === top)) return;
-        left = q.x;
-        top = q.y;
-        origStyle.left = q.x + "px";
-        origStyle.top = q.y + "px";
-      }, 200);
+      if (getImeDebugFlags().reanchor) {
+        refreshTimer = window.setInterval(() => {
+          const q = pxPos();
+          if (!q || (q.x === left && q.y === top)) return;
+          left = q.x;
+          top = q.y;
+          origStyle.left = q.x + "px";
+          origStyle.top = q.y + "px";
+        }, 200);
+      }
     }, true);
 
     document.addEventListener("compositionend", (e) => {
