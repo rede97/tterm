@@ -1,0 +1,186 @@
+# AGENT.md
+
+Guidance for AI coding agents (pi, Claude Code, Cursor, etc.) working in this repository.
+
+## Runtime
+
+Use **Bun** (`bun run <script>`). Fall back to `npm run` if unavailable.
+
+```sh
+bun run build        # tsc typecheck + vite build (always do this before committing)
+bun run tauri dev    # full Tauri app in dev mode
+bun run tauri build  # production binary
+```
+
+Tests: `bun run test` (Vitest unit + happy-dom DOM tests in `tests/`), `bun run test:rust` (Rust unit tests, colocated in each `src-tauri/src/*.rs` module), `bun run test:e2e` (tauri-driver + WebdriverIO, see `docs/testing.md`). No linters configured.
+
+**Always run `bun run build` before committing.** Before creating a release tag, ensure the build output has zero warnings (including vite `[plugin vite:reporter]` warnings).
+
+## Project
+
+A multi-tab desktop terminal emulator (TTerm) built with Tauri v2. The frontend is vanilla TypeScript + Vite using xterm.js to render terminals. The Rust backend spawns native shells via PTY (pseudo-terminal) and bridges I/O over a local WebSocket loopback connection.
+
+Headline differentiators: serial-port sessions done right, in-band disconnect/reconnect, and **CJK/IME input that works in cursor-hiding agent TUIs** (pi, Claude Code) via a floating composition mirror.
+
+## Repo layout
+
+```
+src/
+  main.ts               app entry: init TabManager, WS bridge, settings button, welcome screen
+  terminal/
+    tab.ts              TerminalTab class (one per tab: terminal, xterm, DOM, IME wiring)
+    tabmanager.ts       TabManager singleton (tab Map, active tab, settings tab, sortable)
+    batchattach.ts      BatchAttachAddon — coalesces WS frames before terminal.write (see below)
+    contextmenu.ts      tab-bar menu + shift-right-click terminal menu
+    search.ts           search bar (per-tab query save/restore)
+    profilemenu.ts      new-tab dropdown (Local / SSH / Serial columns)
+    fontpicker.ts       font picker modal (dynamically imported by settings)
+  core/
+    store.ts            configStore — reactive config, single source of truth (schema + defaults)
+    types.ts            shared TS types (TabType, PtyOutputPayload, ...)
+    common.ts           shared constants/helpers
+    errorlog.ts         logCatch / logError
+  config/
+    ssh-config.ts       ~/.ssh/config parse + generate (frontend-owned)
+    wt-profiles.ts      Windows Terminal settings.json + fragment import
+    serial-memory.ts    per-device serial params (VID:PID keyed)
+  settings/
+    index.ts            settings shell (sidebar nav, footer Apply/Revert, panel routing)
+    general|appearance|profile|ssh|serial.ts   the five panels
+  ui/
+    window.ts           window controls, drag handling, maximize icon toggle
+    toast.ts            showToast — all user-facing errors
+  util/
+    imebox.ts           floating IME composition mirror + enable modes + debug flags
+    imefilter.ts        CursorPositionFilter (stable-run cursor estimate for IME anchoring)
+    hysteresis.ts       fit hysteresis (see below)
+    disconnect.ts       re-attach backoff helpers
+    fontconfig.ts       font stack model, system font enumeration glue
+    themes.ts           built-in theme gallery + WT theme import
+    osc.ts              OSC 9;4 progress parsing
+    serialinput.ts      serial input modes (normal/echo/line)
+    sizehint.ts         cols×rows overlay during resize
+src-tauri/src/
+  lib.rs                crate root (mod wiring + run())
+  state.rs              AppState / session tables
+  relay.rs              unified WS relay hub shared by PTY/serial/demo
+  pty.rs                PTY spawn/resize/kill
+  deadmode.rs           in-band "session ended, Enter to reconnect" protocol
+  serial.rs             serial sessions (+ live baud via SerialCtl)
+  demo.rs               demo/anime TTY (debug builds only)
+  ssh.rs wt.rs config.rs fonts.rs window.rs cmdparse.rs newline.rs
+```
+
+### Hard rules
+
+- `terminal/tab.ts` must NEVER import `terminal/tabmanager.ts` (circular dependency). `fitDeferred()` uses `this` only. `contextmenu.ts` is dynamically imported to avoid cycles.
+- All user-facing errors go through `showToast(message, "error")` (`src/ui/toast.ts`). Settings panels keep their inline feedback elements.
+- Window state save/restore is handled entirely by `tauri-plugin-window-state`. Do NOT write custom save/restore code.
+
+## IME composition mirror (headline feature — read the docs first)
+
+Docs: `docs/plan-c-floating-composition.md` (design + milestones) and `docs/bugfix-ime-hidden-cursor.md` (postmortem: Plans A/B rejected, M2 root causes). Read both before touching `imebox.ts`, the freeze proxy, or composition handling.
+
+Key facts:
+
+- Agent TUIs (pi, Claude Code) hide the hardware cursor (`ESC[?25l`) and draw a fake one. xterm's IME support assumes the real cursor is the input point → pinyin composition renders in a corner or nowhere.
+- The mirror (`util/imebox.ts`) is **pure display**: it listens to composition events on xterm's hidden textarea and floats the composition string at the computed anchor. It never takes focus, never injects text; committed text travels xterm's native textarea → onData → PTY path.
+- Anchor chain (shared with the OS candidate window): `_imeAnchorCell()` (inverse-cell scan for the fake cursor → falls back to `CursorPositionFilter` mode position) feeds both the mirror and `_patchImeFreeze()` (textarea style Proxy that pins the hidden textarea so the OS candidate window lands right).
+- **1px textarea kills real compositions** (M2 root cause): with the composition-view suppressed, xterm derives the textarea size from its (zero) bounds; the freeze proxy must clamp `width`/`height`/`lineHeight` to a full cell or TSF IMEs abort after the first keystroke.
+- Enable modes: `auto` (cursor-hidden only) / `always` / `off` via `setImeMirrorMode`, persisted in localStorage. Dev-console diagnostics: `__tterm.imeTrace(on)`, `__tterm.imeDebug({suppress, reanchor})`.
+- Synthetic CompositionEvent tests cannot reproduce real TSF behavior — **real-IME manual verification is the final arbiter**; e2e (`bun run test:e2e:ime`) guards the event chain and DOM behavior only.
+
+## PTY session model
+
+- `AppState` holds `sessions` (PTY) + `serial_sessions` + `next_id` + `initial_cwd` (from `--working-directory` CLI arg).
+- `PtySession` stores the PTY `master` (`None` after child exit), a per-spawn `nonce` guarding the watchdog against respawn races, and the last known `size` (respawns keep it). A watchdog thread waits on `child.wait()`; on exit it sets `master = None`, closing ConPTY so the relay read pump unblocks (ConPTY never signals EOF on child death).
+- All sessions share one WebSocket relay hub bound once at startup: `ws://127.0.0.1:{port}/pty/{id}?token={token}`, per-process random token, 403/404 on bad auth/route. Session death does NOT close the socket (dead mode); only `pty_kill` tears a slot down (WS Close frame).
+
+Frontend → backend commands (invoke): `pty_spawn`, `pty_spawn_ssh`, `pty_resize`, `pty_kill`, `window_minimize/toggle_maximize/close/start_drag`, `read_wt_settings`, `read_wt_fragments`, `find_vs_instances`, `read_config`, `write_config`, `ssh_list_hosts`, `ssh_read_config_raw`, `ssh_save_config`, `ssh_clear_known_hosts`, `open_ssh_config`, `open_config_dir`, `delete_config`, `save_text_file`, `list_system_fonts`, `serial_list_ports`, `serial_spawn`, `serial_set_baud`.
+
+Backend → frontend: WebSocket binary frames → `BatchAttachAddon`, which coalesces messages within a 6 ms window before `terminal.write()`: ConPTY splits a full-screen frame into a bare `ESC[2J` + content ~1–3 ms apart, and unbatched writes present the erase as a blank frame (flicker). Full postmortem: `docs/bugfix-fullscreen-flicker.md` — **do not remove the batching in refactors.**
+
+## Disconnect & reconnect
+
+Backend-managed and in-band (`deadmode.rs` + relay dead mode): on byte-stream end the relay keeps the socket alive, resets terminal modes (wrapped in save/restore cursor because `ESC[?1049l`/`ESC[?6l`/`ESC[r` home the cursor), prints a timed "Press Enter to reconnect" notice into the scrollback, and a `DeadWatcher` respawns on Enter. PTY respawn injects `resume_scroll` bytes first because a fresh ConPTY always opens with `ESC[2J`. A `session-state` event drives the tab-label strikethrough — the only frontend involvement. Transport-level drops (1006) trigger silent re-attach with backoff (`util/disconnect.ts`).
+
+## Tab system
+
+- `TerminalTab.show()` — `display:""`, add `active`, `terminal.focus()`. `hide()` — `display:"none"`, sets `needsResize = true` (show does NOT fit).
+- `TabManager.switchTo(id)` — closes settings first if open; re-shows a tab hidden by settings. `toggleSettings()` opens only.
+- Closing the rightmost tab must fall back to the previous tab: `#new-tab-group` is the last flex item inside `#tabs`, so sibling scans must skip anything without a live tab id (regression covered in `e2e/specs/app.e2e.js`).
+- Tab drag reorder: SortableJS on `#tabs` (`forceFallback: true` — native HTML5 DnD is unreliable in WebView2), `onEnd` rebuilds the tabs Map from DOM order.
+- Window resize: all tabs marked dirty; only the active tab is fitted immediately (debounced).
+
+## Fit & hysteresis
+
+`TerminalTab.fit()` uses `hysteresis(floatVal, current, th_low, th_high, min=2)` (`util/hysteresis.ts`) — cols grow only past 90% of a char, rows never grow past floor. Pure function; avoids oscillation from intermediate resize frames. `fitDeferred()` uses double-rAF and aborts if hidden.
+
+## Font system
+
+- `util/fontconfig.ts` holds `fontStack: string[]` (no CSS quoting). `buildFontFamily()` quotes names with spaces and appends `monospace` at the CSS boundary; `parseFontFamily()` reverses. `monospace` is never stored in config.
+- Default stack: `["JetBrains Mono", "Noto Sans SC", "Noto Sans JP", "Noto Sans KR", "Consolas"]` (per-script CJK fallback).
+- **Web font loading race**: xterm measures cell metrics during `terminal.open()`; if web fonts aren't loaded yet, metrics are cached wrong. `TabManager` waits for `document.fonts.ready` and re-toggles `fontFamily` before showing the first tab. Do not remove.
+
+## Terminal rendering gotchas
+
+- **Never** add `will-change: transform` or `transform: translateZ(0)` on `.terminal-instance .xterm` — forces GPU compositing, causes sub-pixel glyph gaps.
+- **Always** keep `outline: none !important` on `.terminal-instance .xterm textarea:focus`.
+- `.xterm-viewport` MUST keep `overflow-y: scroll` (custom 4px overlay scrollbar).
+
+## Right-click behavior
+
+| Trigger | Action |
+|---|---|
+| Right-click on **tab** | Tab operations menu |
+| **Shift+right-click** on terminal | Content operations menu |
+| Right-click on terminal (no shift) | Copy if selection, else paste |
+
+Terminal right-click uses capture phase; copy uses `execCommand("copy")` + hidden textarea (not `navigator.clipboard`) to avoid the permission prompt; a global `contextmenu` preventDefault blocks native menus.
+
+## Settings page
+
+Lazy-loaded via `import("./settings")` on first open. Sidebar layout, five panels (General / Appearance / Profile / SSH / Serial). Footer: feedback text + Revert + Apply (Apply grays out after save, re-enables on change). Settings tab uses `data-tab-id="#settings"`, excluded from badge counting. All settings reads/writes go through `configStore` (`src/core/store.ts`) — schema + defaults live there in one declarative table.
+
+## Profile loading flow
+
+1. SSH — Rust reads `~/.ssh/config` raw; frontend parses Host entries with wildcard inheritance and generates the file back (keys preserve original casing).
+2. Windows Terminal profiles — Rust returns raw `settings.json` + fragment JSONs; frontend parses. Profiles without `commandline` resolve via `source`: VisualStudio (vswhere), Wsl (`wsl.exe -d`), Azure (`wt.exe -p`); unrecognized sources are dropped.
+3. Default profile priority: user-set → first profile → cmd.exe fallback.
+
+## Custom window decorations
+
+No native title bar (`decorations: false`). The tab bar is the title bar: tabs left, `#drag-spacer[data-tauri-drag-region]` center, window controls right. Drag starts only after actual mouse movement (so `dblclick` can still toggle maximize). Maximize icon toggles via `.restore` CSS class. Vite dev server binds `127.0.0.1` explicitly (IPv6 loopback is broken on Windows) — same for `devUrl`, never `localhost`.
+
+## E2E testing
+
+`wdio → tauri-driver(:4444) → msedgedriver → WebView2`. Read `docs/testing.md` before modifying; on this repo a skill file (`.pi/skills/tauri-e2e-testing/`) catalogs the fatal pitfalls (IPv6, driver version match, process-tree cleanup, WebDriver element quirks). Run focused specs: `bun run test:e2e:ime`, `bun run test:e2e:anime`, or `--spec e2e/specs/app.e2e.js`. Debug introspection: `window.__tterm` (dev builds only) exposes `tabs`, `mgr`, IME debug hooks.
+
+## Icon generation
+
+App icon source is `src/assets/tterm.svg`. Regenerate platform icons with the `sharp`-based one-liner kept in git history / release docs (`src-tauri/icons/` targets incl. multi-size `icon.ico`).
+
+## Shell tools: Bash vs PowerShell
+
+Windows host: match syntax to the shell you invoke. Bash tool = git-bash (POSIX: `grep`, `tail`, `&&`). PowerShell = PS cmdlets (`Get-Content`, `Select-Object`). Never mix. Note: git-bash mangles `taskkill /pid` flags (treats `/pid` as a path) — use `powershell Stop-Process -Id <pid> -Force` for cleanup.
+
+## Git commits
+
+Plain double-quoted `-m` message (no PowerShell here-strings — they inject a leading `@`). Add your agent identity trailer, e.g. `Co-Authored-By: <agent> <noreply@...>`.
+
+## Documentation principles
+
+Changelog, release notes, and user-facing docs are written for **users, not contributors**: product features, not code details (no file/function/struct names); one line per user-visible change; fixes describe the symptom; terminology matches the UI. Internal work gets one summary line at most. Technical postmortems and design docs live in `docs/` and are the place for implementation detail.
+
+## Release process
+
+**Version bump** — update all three: `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `package.json`.
+
+**Tag and release** — first add a `## vX.Y.Z` section to the top of CHANGELOG.md (the release workflow extracts the first `## v` section as the GitHub Release body), then commit, tag, push:
+
+```sh
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git push origin main && git push origin vX.Y.Z
+```
+
+IMPORTANT: The tag MUST point to a commit that includes the updated CHANGELOG.md. The release workflow (`.github/workflows/release.yml`) triggers on `v*` tags and builds NSIS/MSI installers.
