@@ -58,7 +58,7 @@ export function imeMirrorActiveFor(cursorHidden: boolean): boolean {
   return mode === "always" || (mode === "auto" && cursorHidden);
 }
 
-// ---- Debug flags & tracer (M2 diagnostics — temporary) --------------------
+// ---- Debug flags & tracer (M2 diagnostics) --------------------------------
 // Bisection switches for real-IME issues: flip from the dev console via
 // __tterm.imeDebug({ suppress: false }) etc., then retry the composition.
 export interface ImeDebugFlags {
@@ -86,8 +86,8 @@ function trace(msg: string): void {
 
 // ---- Mirror component ----------------------------------------------------
 
-const LINGER_MS = 400; // stay visible after commit (bridges the echo gap)
-const FADE_MS = 250;   // opacity transition, must match .ime-box CSS
+const LINGER_MS = 0; // stay visible after commit (bridges the echo gap)
+const FADE_MS = 0;   // opacity transition, must match .ime-box CSS
 
 export class ImeBox {
   private el: HTMLElement;
@@ -131,6 +131,9 @@ export class ImeBox {
       trace(`compositionupdate "${e.data ?? ""}"`);
       if (!this.active) return;
       this.el.textContent = e.data ?? "";
+      // Empty composition (all pinyin deleted / IME cleared the string):
+      // an empty shell of a box looks broken — hide it, stay active.
+      this.el.style.display = this.el.textContent ? "block" : "none";
       // Defer the re-clamp layout read out of the event dispatch — forced
       // synchronous layout mid-composition is a composition-stability risk
       // with real TSF IMEs.
@@ -146,6 +149,13 @@ export class ImeBox {
       trace(`compositionend "${(e as CompositionEvent).data ?? ""}"`);
       if (!this.active) return;
       this.active = false;
+      const committed = (e as CompositionEvent).data ?? "";
+      // Cancelled composition (Esc): nothing committed and nothing shown —
+      // skip the linger, disappear immediately.
+      if (!committed && !this.el.textContent) {
+        this._hide();
+        return;
+      }
       // linger → fade → remove
       this.lingerTimer = window.setTimeout(() => {
         this.lingerTimer = null;
@@ -159,10 +169,10 @@ export class ImeBox {
   }
 
   // Position the box around the stored anchor, clamped inside the parent.
-  // Preferred placement is ABOVE the anchor line: the OS candidate window
-  // follows the frozen textarea and pops just below it — a mirror below the
-  // line gets covered by the candidate window. Only top rows (no room
-  // above) fall back to below-the-line.
+  // Bottom-aligned with the anchor row: the box hugs the cursor line like
+  // true inline composition, grows UPWARD as the composition wraps (bottom
+  // edge stays flush), and its top stays clear of the OS candidate window
+  // that pops just below the frozen textarea.
   private _place(): void {
     if (!this.anchor) return;
     const parentW = this.parent.clientWidth;
@@ -170,8 +180,7 @@ export class ImeBox {
     const boxW = this.el.offsetWidth || 120;
     const boxH = this.el.offsetHeight || 28;
     const x = Math.max(4, Math.min(this.anchor.x, parentW - boxW - 4));
-    let y = this.anchor.y - boxH - 2;               // above (candidate dodge)
-    if (y < 4) y = this.anchor.y + this.anchor.cellH + 2; // top rows: below
+    const y = this.anchor.y + this.anchor.cellH - boxH;
     this.el.style.left = `${x}px`;
     this.el.style.top = `${Math.max(4, Math.min(y, parentH - boxH - 4))}px`;
   }

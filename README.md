@@ -25,6 +25,11 @@
 
 - **Fast** — cold start under 1 second. No Electron bloat.
 - **Tiny** — ~5 MB installer, under 30 MB idle memory.
+- **CJK input that works in agent TUIs** — terminals that hide the hardware
+  cursor (pi, Claude Code and friends) lose your IME composition: pinyin
+  vanishes or lands in a far corner. TTerm floats the composition right at
+  the input point, candidate window alongside, gone the instant you commit —
+  typing Chinese in an agent feels as direct as in a plain shell.
 - **Serial, done right** — for hardware hackers: automatic device enumeration
   (USB VID:PID), one-click sessions, live baud switching without reconnecting,
   newline modes (fix staircase LF or overwriting CR output), input modes

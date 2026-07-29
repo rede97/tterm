@@ -312,7 +312,7 @@ body {
   position: absolute;
   padding: 4px 12px;
   background: #252526;
-  border: 1px solid #0e639c;
+  border: none;
   border-radius: 4px;
   color: #ffffff;
   font-size: 14px;
@@ -325,8 +325,8 @@ body {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
   pointer-events: none;
   z-index: 25;
-  opacity: 1;
-  transition: opacity 250ms ease; /* keep in sync with FADE_MS in imebox.ts */
+  opacity: 0.8;
+  transition: opacity 0ms ease; /* keep in sync with FADE_MS in imebox.ts */
 }
 
 .ime-box.fading {

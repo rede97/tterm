@@ -200,9 +200,11 @@ describe("IME with cursor-hiding TUIs", () => {
     expect(m.style.left).not.toBe("0px");
     expect(m.style.left).not.toBe("4px"); // not clamped to the left edge
     expect(parseInt(m.style.left, 10)).toBeLessThanOrEqual(parseInt(s.anchorPx.left, 10) + 1);
-    // placed just ABOVE the anchor line — the OS candidate window pops below
-    // the frozen textarea and would cover a mirror placed underneath
-    expect(parseInt(m.style.top, 10)).toBe(parseInt(s.anchorPx.top, 10) - Math.round(m.rect.h) - 2);
+    // bottom-aligned with the anchor row: box bottom edge flush with the
+    // anchor row's bottom (grows upward on wrap, stays clear of the OS
+    // candidate window below the line)
+    const expectedTop = parseFloat(s.anchorPx.top) + s.cell.h - m.rect.h;
+    expect(Math.abs(parseFloat(m.style.top) - expectedTop)).toBeLessThanOrEqual(1);
     expect(m.rect.h).toBeGreaterThan(0);
     expect(m.inside).toBe(true);
 
@@ -214,15 +216,12 @@ describe("IME with cursor-hiding TUIs", () => {
       return mm && mm.text === "a".repeat(160) && mm.inside;
     }, { timeout: 3000, timeoutMsg: "mirror did not re-clamp inside the terminal" });
 
-    // commit → linger briefly → fade → gone
+    // commit → mirror disappears immediately (0ms linger + 0ms fade)
     await commitComposition("你好");
-    await browser.pause(150); // within the 400ms linger window
-    const ml = await mirrorState();
-    expect(ml.display).toBe("block");
     await browser.waitUntil(async () => {
       const mm = await mirrorState();
       return mm && mm.display === "none";
-    }, { timeout: 3000, timeoutMsg: "mirror did not fade out after commit" });
+    }, { timeout: 3000, timeoutMsg: "mirror did not disappear after commit" });
 
     await leaveHiddenCursorFixture();
   });

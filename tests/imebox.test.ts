@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { ImeBox } from "../src/util/imebox";
+import { ImeBox, setImeDebugFlags } from "../src/util/imebox";
 
 function setup(width = 400, height = 300) {
   document.body.innerHTML = "";
@@ -24,13 +24,15 @@ describe("ImeBox", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
     vi.useFakeTimers();
+    // deterministic defaults regardless of the module-level debug default
+    setImeDebugFlags({ suppress: true, reanchor: true });
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("shows on compositionstart, mirrors updates, lingers then fades on end", () => {
+  it("shows on compositionstart, mirrors updates, hides after commit", () => {
     const { textarea, box } = setup();
     box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }));
     expect(box.isVisible).toBe(false);
@@ -39,25 +41,49 @@ describe("ImeBox", () => {
     composition(textarea, "compositionupdate", "你好");
     expect(box.text).toBe("你好");
     composition(textarea, "compositionend", "你好");
-    // linger: still visible right after commit
+    // hide is deferred to the timer chain even with 0ms linger/fade
     expect(box.isVisible).toBe(true);
-    expect(box.isFading).toBe(false);
-    vi.advanceTimersByTime(400);
-    expect(box.isVisible).toBe(true);
-    expect(box.isFading).toBe(true);
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(1);
     expect(box.isVisible).toBe(false);
     expect(box.isFading).toBe(false);
   });
 
-  it("a new composition cancels a pending fade and shows immediately", () => {
+  it("a cancelled composition (Esc) hides immediately without lingering", () => {
     const { textarea, box } = setup();
     box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }));
     composition(textarea, "compositionstart");
-    composition(textarea, "compositionend", "a");
-    vi.advanceTimersByTime(400); // now fading
-    expect(box.isFading).toBe(true);
+    composition(textarea, "compositionupdate", "ni");
+    composition(textarea, "compositionupdate", ""); // IME clears the string
+    expect(box.isVisible).toBe(false); // empty shell hidden
+    composition(textarea, "compositionend", ""); // cancel: nothing committed
+    expect(box.isVisible).toBe(false);
+    vi.advanceTimersByTime(1000);
+    expect(box.isVisible).toBe(false); // no linger, no fade
+  });
+
+  it("hides while the composition string is empty, reappears on new input", () => {
+    const { textarea, box } = setup();
+    box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }));
     composition(textarea, "compositionstart");
+    composition(textarea, "compositionupdate", "ni");
+    expect(box.isVisible).toBe(true);
+    composition(textarea, "compositionupdate", "");
+    expect(box.isVisible).toBe(false); // hidden, still active
+    composition(textarea, "compositionupdate", "n");
+    expect(box.isVisible).toBe(true);
+    expect(box.text).toBe("n");
+    composition(textarea, "compositionend", "你");
+    expect(box.isVisible).toBe(true); // real commit still lingers
+    vi.advanceTimersByTime(650);
+    expect(box.isVisible).toBe(false);
+  });
+
+  it("a new composition cancels a pending hide and shows immediately", () => {
+    const { textarea, box } = setup();
+    box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }));
+    composition(textarea, "compositionstart");
+    composition(textarea, "compositionend", "a"); // hide timers pending
+    composition(textarea, "compositionstart");   // cancels them synchronously
     expect(box.isVisible).toBe(true);
     expect(box.isFading).toBe(false);
     vi.advanceTimersByTime(1000); // stale timers must not hide it
@@ -95,20 +121,21 @@ describe("ImeBox", () => {
     expect(box.position).toEqual(posAfterStart); // must not drift
   });
 
-  it("places above the anchor line by default (dodges the OS candidate window)", () => {
-    const { textarea, box } = setup(400, 300);
-    box.attach(textarea, () => ({ x: 10, y: 90, cellH: 16 }));
+  it("bottom-aligns with the anchor row and grows upward as the box grows", () => {
+    const { parent, textarea, box } = setup(400, 300);
+    const el = parent.querySelector(".ime-box") as HTMLElement;
+    Object.defineProperty(el, "offsetHeight", { value: 28, configurable: true });
+    box.attach(textarea, () => ({ x: 10, y: 100, cellH: 16 }));
     composition(textarea, "compositionstart");
-    // happy-dom reports 0 size → fallback boxH=28; above = 90 - 28 - 2 = 60
-    expect(parseInt(box.position.top, 10)).toBe(60);
-  });
+    // bottom edge flush with the anchor row bottom: 100 + 16 - 28 = 88
+    expect(parseInt(box.position.top, 10)).toBe(88);
+    composition(textarea, "compositionend", "你");
+    vi.advanceTimersByTime(650); // hide
 
-  it("flips below the anchor line only when there is no room above", () => {
-    const { textarea, box } = setup(400, 300);
-    box.attach(textarea, () => ({ x: 10, y: 10, cellH: 16 }));
+    // box grew (multi-line wrap): extends upward, bottom stays flush
+    Object.defineProperty(el, "offsetHeight", { value: 76, configurable: true });
     composition(textarea, "compositionstart");
-    // 10 - 28 - 2 < 4 → below = 10 + 16 + 2 = 28
-    expect(parseInt(box.position.top, 10)).toBe(28);
+    expect(parseInt(box.position.top, 10)).toBe(100 + 16 - 76);
   });
 
   it("clamps horizontally inside the parent", () => {
