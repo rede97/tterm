@@ -1,3 +1,21 @@
+## v0.5.0
+
+New Features
+
+- Chinese, Japanese and Korean IME input now works in agent TUIs that hide
+  the hardware cursor (pi, Claude Code and friends): the composition string
+  floats right at the input point with the IME candidate window alongside,
+  wraps as it grows, and disappears the instant you commit — previously the
+  composition vanished or landed in a far corner, making CJK input in these
+  apps effectively unusable
+
+Fixes
+
+- Full-screen apps (vim, htop, less…) no longer flash a blank frame when
+  redrawing the whole screen — most noticeable at large window sizes
+- Closing the rightmost tab now moves focus to its neighbor, like a
+  browser, instead of leaving a blank window
+
 ## v0.4.0
 
 New Features
