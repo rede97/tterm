@@ -23,6 +23,41 @@ describe("TTerm application", () => {
     expect((await $$("#tabs .tab")).length).toBeGreaterThanOrEqual(before);
   });
 
+  it("closing the rightmost active tab focuses the previous tab (browser-like)", async () => {
+    // Regression: #new-tab-group is the last flex item inside #tabs, so the
+    // close path's nextElementSibling scan hit it when closing the rightmost
+    // tab, found no live tab id, and left the window blank with no focus.
+    const btn = await $("#new-tab");
+    if ((await $$("#tabs .tab")).length < 2) await btn.click();
+    await browser.waitUntil(async () => (await $$("#tabs .tab")).length >= 2, { timeout: 15000 });
+
+    await browser.execute(() => {
+      const tabs = [...document.querySelectorAll("#tabs .tab")];
+      const last = tabs[tabs.length - 1];
+      window.__tterm.mgr.switchTo(last.dataset.tabId);
+      last.querySelector(".tab-close").click();
+    });
+
+    await browser.waitUntil(async () => {
+      return await browser.execute(() => {
+        const active = document.querySelector("#tabs .tab.active");
+        const inst = [...document.querySelectorAll(".terminal-instance")]
+          .find((el) => el.style.display !== "none");
+        return !!active && !!inst;
+      });
+    }, { timeout: 5000, timeoutMsg: "window left blank after closing the rightmost tab" });
+
+    // focus must land on the tab just left of the closed one
+    const state = await browser.execute(() => {
+      const tabs = [...document.querySelectorAll("#tabs .tab")];
+      return {
+        activeId: document.querySelector("#tabs .tab.active")?.dataset.tabId ?? null,
+        lastId: tabs[tabs.length - 1]?.dataset.tabId ?? null,
+      };
+    });
+    expect(state.activeId).toBe(state.lastId);
+  });
+
   it("switches tabs when clicking the bottom edge of an inactive tab", async () => {
     // Regression: the full tab surface must be clickable, including pixels
     // below the title text (no overlay/scrollbar dead zones).

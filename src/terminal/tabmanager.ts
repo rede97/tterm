@@ -340,8 +340,12 @@ export class TabManager {
 
     await invoke("pty_kill", { id });
 
+    // Find the next live tab to the right. Non-tab elements share the #tabs
+    // container (the new-tab group is the last flex item), and the settings
+    // tab is skipped too — anything without a live tab id must not count,
+    // or closing the rightmost tab silently strands the window blank.
     let nextEl: Element | null = tab.tabElement.nextElementSibling;
-    while (nextEl && (nextEl as HTMLElement).dataset.tabId === "#settings") {
+    while (nextEl && !this.tabs.has((nextEl as HTMLElement).dataset.tabId ?? "")) {
       nextEl = nextEl.nextElementSibling;
     }
 
@@ -353,10 +357,7 @@ export class TabManager {
 
     if (wasActive) {
       if (nextEl) {
-        const nextId = (nextEl as HTMLElement).dataset.tabId!;
-        if (this.tabs.has(nextId)) {
-          this.switchTo(nextId);
-        }
+        this.switchTo((nextEl as HTMLElement).dataset.tabId!);
       } else if (remaining.length > 0) {
         this.switchTo(remaining[remaining.length - 1]);
       } else {
