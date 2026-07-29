@@ -50,6 +50,33 @@ describe("Anime TTY (gostty port)", () => {
     expect(await cursorHidden()).toBe(true);
   });
 
+  it("centers the animation for the live terminal size", async () => {
+    // end-to-end chain: fit() -> pty_resize -> SerialCtl::SetSize -> render.
+    // The gostty frames have their own internal left padding per row, so the
+    // hpad shows up as the MINIMUM leading-space count across content lines.
+    const pad = await browser.execute(() => {
+      const visible = [...document.querySelectorAll(".terminal-instance")].find((el) => el.style.display !== "none");
+      const tab = [...window.__tterm.tabs.values()].find((t) => t.element === visible);
+      if (!tab) return null;
+      const buf = tab.terminal.buffer.active;
+      let minLead = Infinity;
+      for (let i = 0; i < buf.length; i++) {
+        const raw = buf.getLine(i)?.translateToString(false) ?? "";
+        const line = raw.replace(/\s+$/, "");
+        if (line.trim().length > 0) {
+          minLead = Math.min(minLead, (line.match(/^ */) || [""])[0].length);
+        }
+      }
+      return { minLead, cols: tab.terminal.cols };
+    });
+    expect(pad).not.toBeNull();
+    const expected = Math.max(0, Math.floor((pad.cols - 77) / 2)); // gostty ImageWidth = 77
+    // The captured frame's own minimum internal padding varies per frame
+    // (0/2/4/6 across the 235 gostty frames), so assert the delta is one of
+    // those known values — any stale/wrong centering falls outside the set.
+    expect([0, 2, 4, 6]).toContain(pad.minLead - expected);
+  });
+
   it("quits on q, restores the terminal, and respawns on Enter", async () => {
     await browser.execute(() => {
       [...document.querySelectorAll(".terminal-instance .xterm-helper-textarea")].pop().focus();

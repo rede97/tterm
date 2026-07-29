@@ -197,6 +197,7 @@ pub(crate) fn serial_io_loop(
                 SerialCtl::SetOutputNewline(mode) => {
                     newline_filter.set_mode(mode);
                 }
+                SerialCtl::SetSize(..) => {} // meaningless for real serial ports
             }
         }
         // 1. Drain all pending writes immediately (keystrokes -> device)
