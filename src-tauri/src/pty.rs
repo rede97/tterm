@@ -218,6 +218,10 @@ pub fn pty_spawn_ssh(state: tauri::State<AppState>, app: tauri::AppHandle, hostn
 
 #[tauri::command]
 pub fn pty_resize(state: tauri::State<AppState>, id: &str, cols: u16, rows: u16) -> Result<(), String> {
+    resize_session(&state, id, cols, rows)
+}
+
+pub(crate) fn resize_session(state: &AppState, id: &str, cols: u16, rows: u16) -> Result<(), String> {
     let mut sessions = state.sessions.lock().map_err(|e| e.to_string())?;
     if let Some(session) = sessions.get_mut(id) {
         let size = PtySize {
@@ -232,6 +236,14 @@ pub fn pty_resize(state: tauri::State<AppState>, id: &str, cols: u16, rows: u16)
             master.resize(size).map_err(|e| e.to_string())?;
         }
         // master None (child exited): resize is a no-op until reconnect
+    }
+    // Not a PTY: maybe a serial/demo session — forward the size so sessions
+    // that lay out content themselves (Anime TTY centering) can adapt.
+    else {
+        let serial = state.serial_sessions.lock().map_err(|e| e.to_string())?;
+        if let Some(s) = serial.get(id) {
+            let _ = s.ctl.send(crate::state::SerialCtl::SetSize(cols, rows));
+        }
     }
     Ok(())
 }
@@ -258,6 +270,29 @@ pub fn pty_kill(state: tauri::State<AppState>, id: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resize_forwards_set_size_to_serial_session() {
+        let hub = crate::relay::WsHub::start().expect("hub");
+        let state = AppState {
+            sessions: Arc::new(Mutex::new(std::collections::HashMap::new())),
+            serial_sessions: Arc::new(Mutex::new(std::collections::HashMap::new())),
+            next_id: Mutex::new(1),
+            initial_cwd: None,
+            hub,
+        };
+        let (ctl_tx, ctl_rx) = std::sync::mpsc::channel::<crate::state::SerialCtl>();
+        state.serial_sessions.lock().unwrap().insert(
+            "tab-9".to_string(),
+            crate::state::SerialSession { cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)), ctl: ctl_tx, spec: None },
+        );
+        resize_session(&state, "tab-9", 177, 52).unwrap();
+        let msg = ctl_rx.recv_timeout(std::time::Duration::from_secs(2)).expect("SetSize not forwarded");
+        assert_eq!(msg, crate::state::SerialCtl::SetSize(177, 52));
+        // unknown id: no panic, no message
+        resize_session(&state, "nope", 80, 24).unwrap();
+        assert!(ctl_rx.try_recv().is_err());
+    }
 
     // -- parse_working_dir --
 

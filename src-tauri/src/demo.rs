@@ -127,16 +127,25 @@ loop {
 }
     let _ = tx.send(b"\r\n\x1b[2mdemo session ended\x1b[0m\r\n".to_vec());
 }
+// What a demo-style starter hands to spawn_animation_session.
+struct SpawnedDemo {
+    reader: DemoReader,
+    writer: DemoWriter,
+    cancel: Arc<AtomicBool>,
+    ctl: std::sync::mpsc::Sender<crate::state::SerialCtl>,
+}
+
 // Spawn a fresh demo animation thread; returns relay ends + the cancel flag.
-fn start_demo() -> (DemoReader, DemoWriter, Arc<AtomicBool>) {
+fn start_demo() -> SpawnedDemo {
     let (frame_tx, frame_rx) = std::sync::mpsc::channel::<Vec<u8>>();
     let (key_tx, key_rx) = std::sync::mpsc::channel::<u8>();
+    let (ctl_tx, _ctl_rx) = std::sync::mpsc::channel::<crate::state::SerialCtl>();
     let cancel = Arc::new(AtomicBool::new(false));
     std::thread::spawn({
         let cancel = cancel.clone();
         move || demo_loop(frame_tx, key_rx, cancel)
     });
-    (DemoReader::new(frame_rx), DemoWriter { tx: key_tx }, cancel)
+    SpawnedDemo { reader: DemoReader::new(frame_rx), writer: DemoWriter { tx: key_tx }, cancel, ctl: ctl_tx }
 }
 
 // Shared spawn path for the in-memory animation sessions (Demo / Anime TTY):
@@ -145,9 +154,9 @@ fn start_demo() -> (DemoReader, DemoWriter, Arc<AtomicBool>) {
 fn spawn_animation_session(
     state: tauri::State<AppState>,
     app: tauri::AppHandle,
-    starter: fn() -> (DemoReader, DemoWriter, Arc<AtomicBool>),
+    starter: fn() -> SpawnedDemo,
 ) -> Result<WsConnectResult, String> {
-    let (reader, writer, cancel) = starter();
+    let spawned = starter();
 
     let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
     let id = format!("tab-{}", *next);
@@ -169,26 +178,26 @@ fn spawn_animation_session(
             respawn: {
                 let id3 = id.clone();
                 Box::new(move || {
-                    let (r, w, cancel) = starter();
+                    let s = starter();
                     serial_sessions
                         .lock()
                         .map_err(|e| e.to_string())?
-                        .insert(id3.clone(), SerialSession { cancel, ctl: std::sync::mpsc::channel::<crate::state::SerialCtl>().0, spec: None });
+                        .insert(id3.clone(), SerialSession { cancel: s.cancel, ctl: s.ctl, spec: None });
                     Ok((
-                        Box::new(r) as Box<dyn Read + Send>,
-                        Box::new(w) as Box<dyn Write + Send>,
+                        Box::new(s.reader) as Box<dyn Read + Send>,
+                        Box::new(s.writer) as Box<dyn Write + Send>,
                     ))
                 })
             },
         }
     };
-    register_session(&state.hub, &id, reader, writer, Some(hooks))?;
+    register_session(&state.hub, &id, spawned.reader, spawned.writer, Some(hooks))?;
 
     state
         .serial_sessions
         .lock()
         .map_err(|e| e.to_string())?
-        .insert(id.clone(), SerialSession { cancel, ctl: std::sync::mpsc::channel::<crate::state::SerialCtl>().0, spec: None });
+        .insert(id.clone(), SerialSession { cancel: spawned.cancel, ctl: spawned.ctl, spec: None });
 
     Ok(state.ws_result(id))
 }
@@ -212,10 +221,6 @@ pub fn demo_spawn(state: tauri::State<AppState>, app: tauri::AppHandle) -> Resul
 const ANIME_DATA: &str = include_str!("anime-data.json");
 const ANIME_WIDTH: usize = 77;   // gostty ImageWidth
 const ANIME_HEIGHT: usize = 41;  // gostty ImageHeight
-// gostty centers on the real terminal; this in-memory session has no size
-// channel, so it centers within a fixed virtual terminal instead.
-const ANIME_VIRT_COLS: usize = 120;
-const ANIME_VIRT_ROWS: usize = 45;
 const ANIME_FRAME_DELAY_MS: u64 = 35; // gostty MicrosPerFrame = 35000
 const ANIME_HIGHLIGHT: &str = "\x1b[34m"; // gostty default highlight (blue)
 const ANIME_CLEAR_AND_HOME: &str = "\x1b[2J\x1b[H";
@@ -246,11 +251,13 @@ fn anime_process_color_codes(line: &str, out: &mut String) {
     }
 }
 
-pub(crate) fn render_anime_frame(frame_idx: usize) -> Vec<u8> {
+// gostty centers on the real terminal; the size arrives over the SerialCtl
+// channel (pty_resize forwarding). Until the first resize, assume 80x24.
+pub(crate) fn render_anime_frame(frame_idx: usize, cols: u16, rows: u16) -> Vec<u8> {
     let frames = anime_frames();
     let lines = &frames[frame_idx % frames.len()];
-    let vpad = ANIME_VIRT_ROWS.saturating_sub(ANIME_HEIGHT) / 2;
-    let hpad = ANIME_VIRT_COLS.saturating_sub(ANIME_WIDTH) / 2;
+    let vpad = (rows as usize).saturating_sub(ANIME_HEIGHT) / 2;
+    let hpad = (cols as usize).saturating_sub(ANIME_WIDTH) / 2;
     let mut s = String::with_capacity(4096);
     s.push_str(ANIME_CLEAR_AND_HOME);
     for _ in 0..vpad {
@@ -261,7 +268,11 @@ pub(crate) fn render_anime_frame(frame_idx: usize) -> Vec<u8> {
         s.push_str(&padding);
         anime_process_color_codes(line, &mut s);
         if i < lines.len() - 1 {
-            s.push('\n');
+            // NOTE: gostty emits bare "\n" and relies on the Windows console
+            // (ConPTY) treating LF as CR+LF. This session feeds xterm.js
+            // directly, where LF keeps the column — bare LF would make every
+            // line start at the previous line's end column and wrap. Use CRLF.
+            s.push_str("\r\n");
         }
     }
     s.into_bytes()
@@ -270,15 +281,24 @@ pub(crate) fn render_anime_frame(frame_idx: usize) -> Vec<u8> {
 pub(crate) fn anime_loop(
     tx: std::sync::mpsc::Sender<Vec<u8>>,
     keys: std::sync::mpsc::Receiver<u8>,
+    ctl_rx: std::sync::mpsc::Receiver<crate::state::SerialCtl>,
     cancel: Arc<AtomicBool>,
 ) {
     // alt screen + hide cursor (gostty preamble)
     let _ = tx.send(b"\x1b[?1049h\x1b[?25l".to_vec());
     let mut frame: usize = 0;
     let mut paused = false;
+    let mut cols: u16 = 80;
+    let mut rows: u16 = 24;
     loop {
         if cancel.load(Ordering::Relaxed) {
             break;
+        }
+        while let Ok(msg) = ctl_rx.try_recv() {
+            if let crate::state::SerialCtl::SetSize(c, r) = msg {
+                cols = c;
+                rows = r;
+            }
         }
         while let Ok(k) = keys.try_recv() {
             match k {
@@ -292,7 +312,7 @@ pub(crate) fn anime_loop(
             break;
         }
         if !paused {
-            if tx.send(render_anime_frame(frame)).is_err() {
+            if tx.send(render_anime_frame(frame, cols, rows)).is_err() {
                 break;
             }
             frame = (frame + 1) % anime_frames().len();
@@ -303,15 +323,16 @@ pub(crate) fn anime_loop(
     let _ = tx.send(b"\x1b[?25h\x1b[?1049l\r\n\x1b[2manime session ended\x1b[0m\r\n".to_vec());
 }
 
-fn start_anime() -> (DemoReader, DemoWriter, Arc<AtomicBool>) {
+fn start_anime() -> SpawnedDemo {
     let (frame_tx, frame_rx) = std::sync::mpsc::channel::<Vec<u8>>();
     let (key_tx, key_rx) = std::sync::mpsc::channel::<u8>();
+    let (ctl_tx, ctl_rx) = std::sync::mpsc::channel::<crate::state::SerialCtl>();
     let cancel = Arc::new(AtomicBool::new(false));
     std::thread::spawn({
         let cancel = cancel.clone();
-        move || anime_loop(frame_tx, key_rx, cancel)
+        move || anime_loop(frame_tx, key_rx, ctl_rx, cancel)
     });
-    (DemoReader::new(frame_rx), DemoWriter { tx: key_tx }, cancel)
+    SpawnedDemo { reader: DemoReader::new(frame_rx), writer: DemoWriter { tx: key_tx }, cancel, ctl: ctl_tx }
 }
 
 #[cfg(debug_assertions)]
@@ -492,7 +513,7 @@ mod tests {
 
     #[test]
     fn anime_frame_is_clear_home_plus_centered_sgr_content() {
-        let frame = render_anime_frame(0);
+        let frame = render_anime_frame(0, 120, 45);
         let text = String::from_utf8(frame).unwrap();
         assert!(text.starts_with("\x1b[2J\x1b[H"), "frame starts with ClearAndHome");
         assert!(text.contains("\x1b[34m"), "highlight color present");
@@ -503,17 +524,33 @@ mod tests {
     }
 
     #[test]
+    fn anime_frame_centering_follows_terminal_size() {
+        // 120x45 → hpad (120-77)/2 = 21, vpad (45-41)/2 = 2
+        // 100x43 → hpad 11, vpad 1
+        // 60x20 (smaller than image) → no padding at all
+        let big = String::from_utf8(render_anime_frame(0, 120, 45)).unwrap();
+        let mid = String::from_utf8(render_anime_frame(0, 100, 43)).unwrap();
+        let small = String::from_utf8(render_anime_frame(0, 60, 20)).unwrap();
+        assert!(big.lines().nth(2).unwrap().starts_with(&" ".repeat(21)));
+        assert!(mid.lines().nth(1).unwrap().starts_with(&" ".repeat(11)));
+        assert!(small.starts_with("\x1b[2J\x1b[H"), "no vertical padding when shorter than the image");
+        let first_content = small.lines().next().unwrap_or("");
+        assert!(!first_content.starts_with("  "), "no horizontal padding when narrower than the image");
+    }
+
+    #[test]
     fn anime_frames_differ_across_time() {
-        assert_ne!(render_anime_frame(0), render_anime_frame(100));
+        assert_ne!(render_anime_frame(0, 120, 45), render_anime_frame(100, 120, 45));
     }
 
     #[test]
     fn anime_loop_quits_on_q_and_restores_terminal() {
         let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
         let (key_tx, key_rx) = std::sync::mpsc::channel::<u8>();
+        let (_ctl_tx, ctl_rx) = std::sync::mpsc::channel::<crate::state::SerialCtl>();
         let cancel = Arc::new(AtomicBool::new(false));
         key_tx.send(b'q').unwrap();
-        anime_loop(tx, key_rx, cancel.clone());
+        anime_loop(tx, key_rx, ctl_rx, cancel.clone());
         let mut all = Vec::new();
         while let Ok(chunk) = rx.try_recv() {
             all.extend(chunk);
@@ -522,6 +559,28 @@ mod tests {
         assert!(text.contains("\x1b[?1049h\x1b[?25l"), "enters alt screen + hides cursor");
         assert!(text.contains("\x1b[?25h\x1b[?1049l"), "restores cursor + leaves alt screen");
         assert!(text.contains("anime session ended"));
+    }
+
+    #[test]
+    fn anime_loop_applies_set_size_to_centering() {
+        let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+        let (key_tx, key_rx) = std::sync::mpsc::channel::<u8>();
+        let (ctl_tx, ctl_rx) = std::sync::mpsc::channel::<crate::state::SerialCtl>();
+        let cancel = Arc::new(AtomicBool::new(false));
+        ctl_tx.send(crate::state::SerialCtl::SetSize(120, 45)).unwrap();
+        let handle = std::thread::spawn({
+            let cancel = cancel.clone();
+            move || anime_loop(tx, key_rx, ctl_rx, cancel)
+        });
+        std::thread::sleep(std::time::Duration::from_millis(80)); // a couple of frames
+        key_tx.send(b'q').unwrap();
+        handle.join().unwrap();
+        let mut all = Vec::new();
+        while let Ok(chunk) = rx.try_recv() {
+            all.extend(chunk);
+        }
+        let text = String::from_utf8_lossy(&all);
+        assert!(text.contains(&" ".repeat(21)), "frame centered for 120 cols after SetSize");
     }
 
     // -- demo TTY --

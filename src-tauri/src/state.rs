@@ -64,6 +64,10 @@ use crate::newline::NewlineMode;
 pub enum SerialCtl {
     SetBaud(u32),
     SetOutputNewline(NewlineMode),
+    // Terminal size in cells — forwarded from pty_resize for sessions that
+    // render size-dependent content themselves (Anime TTY). Real serial
+    // ports ignore it.
+    SetSize(u16, u16),
 }
 
 pub struct AppState {

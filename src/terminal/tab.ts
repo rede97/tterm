@@ -92,6 +92,14 @@ export class TerminalTab {
     if (configStore.get("renderer") === "webgl") this.terminal.loadAddon(new WebglAddon());
     this.terminal.open(this.element);
 
+    // Single source of truth for backend size tracking: ANY grid change
+    // (fit, font-metric re-measure refits, window resize) fires onResize.
+    // fitDeferred's explicit invoke alone misses font-race refits, which left
+    // size-dependent sessions (Anime TTY) rendering for a stale grid.
+    this.terminal.onResize(({ cols, rows }) => {
+      invoke("pty_resize", { id: this.id, cols, rows }).catch(() => { });
+    });
+
     this.terminal.onTitleChange((title: string) => {
       if (title) {
         this.label = title;
