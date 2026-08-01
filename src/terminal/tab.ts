@@ -379,11 +379,24 @@ export class TerminalTab {
     if (!ta) return;
 
     // Filtered cursor position in pixels, relative to the terminal element.
+    // Clamped into a safe area: if the frozen textarea sits at the window's
+    // right/bottom edge (where cursor-hiding TUIs like btop park the fake
+    // cursor), the OS candidate window overflows the window — and Chromium's
+    // IME avoidance mechanism shifts the whole frame to make room for it
+    // (compositor-level, not a DOM scroll, so clip can't block it). Keeping
+    // the caret clear of the edges removes the trigger entirely.
+    const SAFE_RIGHT = 220; // typical single-row candidate window width
+    const SAFE_BOTTOM = 90; // typical candidate window height
     const pxPos = (): { x: number; y: number } | null => {
       const dims = core._renderService?.dimensions?.css;
       if (!dims) return null;
       const cell = this._imeAnchorCell();
-      return { x: cell.x * dims.cell.width, y: cell.y * dims.cell.height };
+      const maxX = Math.max(0, this.element.clientWidth - dims.cell.width - SAFE_RIGHT);
+      const maxY = Math.max(0, this.element.clientHeight - dims.cell.height - SAFE_BOTTOM);
+      return {
+        x: Math.min(cell.x * dims.cell.width, maxX),
+        y: Math.min(cell.y * dims.cell.height, maxY),
+      };
     };
 
     // Replace `ta.style` with a Proxy whose setters for left/top/width are

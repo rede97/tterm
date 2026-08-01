@@ -501,6 +501,10 @@ body {
 
 #terminal-container {
   flex: 1;
+  /* flex items default to min-height:auto (min-content), which pins the
+     container to the xterm grid's pixel height and blocks window shrinking
+     (fit() then keeps reading the old height and rows never decrease) */
+  min-height: 0;
   position: relative;
   overflow: clip; /* no scroll mechanism — see html,body note above */
   background: #1e1e1e;
