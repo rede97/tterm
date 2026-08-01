@@ -1,3 +1,19 @@
+## v0.5.2
+
+Fixes
+
+- CJK input near the window's right or bottom edge (typical in htop/btop,
+  which park the cursor in a corner) no longer shifts the whole terminal
+  sideways and clips the leftmost column: no element in the app has a
+  horizontal scrolling mechanism anymore, and the IME caret is kept inside
+  a safe margin so the candidate window never overflows the window and
+  never triggers the browser's frame-shift avoidance
+- Shrinking the window below the grid's pixel height now refits the
+  terminal — rows shrink along with the window (previously the layout was
+  pinned by the flex container's minimum content height, and only growing
+  worked)
+- The window now enforces a minimum size of 800×600
+
 ## v0.5.0
 
 New Features
