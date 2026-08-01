@@ -11,6 +11,7 @@ describe("horizontal scroll drift protection", () => {
     await browser.waitUntil(async () => (await $$(".terminal-instance .xterm-viewport")).length > 0, { timeout: 15000 });
     const result = await browser.execute(() => {
       const inst = document.querySelector(".terminal-instance");
+      const xterm = inst.querySelector(".xterm");
       const viewport = inst.querySelector(".xterm-viewport");
       const scrollable = inst.querySelector(".xterm-scrollable-element");
       const container = document.getElementById("terminal-container");
@@ -20,6 +21,7 @@ describe("horizontal scroll drift protection", () => {
       };
       return {
         instance: probe(inst),
+        xterm: probe(xterm),
         viewport: probe(viewport),
         scrollable: probe(scrollable),
         container: probe(container),
@@ -28,6 +30,7 @@ describe("horizontal scroll drift protection", () => {
       };
     });
     expect(result.instance).toBe(0);
+    expect(result.xterm).toBe(0);
     expect(result.viewport).toBe(0);
     expect(result.scrollable).toBe(0);
     expect(result.container).toBe(0);
