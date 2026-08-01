@@ -38,6 +38,12 @@ export class TerminalTab {
   enterNewline: SerialEnterNewline = "cr";
   label: string;
   color?: string;
+  // User-renamed tabs stop following OSC title changes (rename() locks,
+  // internal display updates pass lockTitle=false).
+  titleLocked = false;
+  // Last title the terminal reported — tracked even while locked so
+  // resetTitle() can restore it instantly.
+  private oscTitle?: string;
   needsResize = false;
   index = 0;
   searchQuery = "";
@@ -101,12 +107,13 @@ export class TerminalTab {
     });
 
     this.terminal.onTitleChange((title: string) => {
-      if (title) {
-        this.label = title;
-        const labelEl = this.tabElement.querySelector(".tab-label") as HTMLElement;
-        if (labelEl) labelEl.textContent = title;
-        this.tabElement.title = title;
-      }
+      if (!title) return;
+      this.oscTitle = title;
+      if (this.titleLocked) return;
+      this.label = title;
+      const labelEl = this.tabElement.querySelector(".tab-label") as HTMLElement;
+      if (labelEl) labelEl.textContent = title;
+      this.tabElement.title = title;
     });
 
     this.xtermEl = this.element.querySelector(".xterm") as HTMLElement;
@@ -566,9 +573,20 @@ export class TerminalTab {
     }
   }
 
-  rename(newName: string): void {
+  rename(newName: string, lockTitle = true): void {
     this.label = newName.trim();
     this.command = undefined;
+    if (lockTitle) this.titleLocked = true;
+    const labelEl = this.tabElement.querySelector(".tab-label") as HTMLElement;
+    if (labelEl) labelEl.textContent = this.label;
+    this.tabElement.title = this.label;
+  }
+
+  // Undo a user rename (rename dialog committed empty): follow OSC title
+  // changes again, restoring the last title the terminal reported.
+  resetTitle(): void {
+    this.titleLocked = false;
+    if (this.oscTitle) this.label = this.oscTitle;
     const labelEl = this.tabElement.querySelector(".tab-label") as HTMLElement;
     if (labelEl) labelEl.textContent = this.label;
     this.tabElement.title = this.label;

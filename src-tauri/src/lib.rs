@@ -49,7 +49,7 @@ pub fn run() {
             { tauri::generate_handler![
                 pty::pty_spawn, pty::pty_spawn_ssh, pty::pty_resize, pty::pty_kill,
                 window::window_minimize, window::window_toggle_maximize, window::window_close,
-                window::window_start_drag, window::open_new_window, window::save_text_file,
+                window::window_start_drag, window::open_new_window, window::pick_directory, window::save_text_file,
                 ssh::ssh_read_config_raw, ssh::open_ssh_config, ssh::ssh_clear_known_hosts,
                 ssh::ssh_save_config,
                 config::read_config, config::write_config, config::delete_config, config::open_config_dir,
@@ -63,7 +63,7 @@ pub fn run() {
             { tauri::generate_handler![
                 pty::pty_spawn, pty::pty_spawn_ssh, pty::pty_resize, pty::pty_kill,
                 window::window_minimize, window::window_toggle_maximize, window::window_close,
-                window::window_start_drag, window::open_new_window, window::save_text_file,
+                window::window_start_drag, window::open_new_window, window::pick_directory, window::save_text_file,
                 ssh::ssh_read_config_raw, ssh::open_ssh_config, ssh::ssh_clear_known_hosts,
                 ssh::ssh_save_config,
                 config::read_config, config::write_config, config::delete_config, config::open_config_dir,

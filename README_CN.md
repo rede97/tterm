@@ -5,8 +5,8 @@
 <h1 align="center">TTerm</h1>
 
 <p align="center">
-  一个快、小、专注的 Windows 终端。<br/>
-  本地 Shell、SSH、串口，一个不少 —— 安装包却只有 ~5 MB。
+  为 AI Agent 适配的新一代快速轻量 Windows 终端。<br/>
+  冷启动 < 1 秒 · agent TUI 里也能流畅打中文 · 为嵌入式工程师把串口做到极致。
 </p>
 
 <p align="center">
@@ -15,31 +15,36 @@
   <a href="https://github.com/rede97/tterm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/rede97/tterm" alt="License" /></a>
 </p>
 
-<p align="center">
-  <img src="docs/images/screenshot.png" width="820" alt="TTerm 运行截图" />
-</p>
-
 > [English](README.md)
 
 ## 为什么选 TTerm
 
-- **快** — 冷启动 < 1 秒，打开即用，没有 Electron 的臃肿
-- **小** — 安装包 ~5 MB，空闲内存 < 30 MB
+### 为 AI Agent 工作流而生
+
+- **快** — 冷启动 < 1 秒，安装包 ~5 MB，空闲内存 < 30 MB，没有 Electron 的臃肿
 - **中文输入，为 Agent TUI 而生** — pi、Claude Code 这类隐藏光标的 TUI 里，
   其他终端的拼音组合串要么彻底消失、要么飘到远处角落。TTerm 把组合串直接
   悬浮在输入点上，候选窗如影随形，上屏即隐——在 agent 里打中文和在普通
   shell 里一样跟手
+- **SSH 一键直达任意主机** — 自动读取 `~/.ssh/config`，秒连服务器，无需任何配置
+- **直达工作目录，开箱即用** — Shift+点击 `+` 选择文件夹（右键弹出最近目录），默认 shell 直接在所选目录启动——切到项目目录就能开始 agent 开发（pi、Claude Code）
+
+### 为嵌入式工程师优化
+
 - **串口利器** — 硬件开发友好：设备自动枚举（USB VID:PID）、一键打开、
   波特率即点即切不断连、换行模式（LF 阶梯、CR 覆盖都有解）、输入模式
   （直发 / 本地回显 / 整行编辑），设备参数按 VID:PID 记忆
-- **SSH 原生集成** — 自动读取 `~/.ssh/config`，主机一键连接
 - **断线不怕** — 会话断开后按一下回车，原地重连
+
+### 更多亮点
+
 - **主题画廊** — 12 款内置配色 + 自动导入 Windows Terminal 方案，所见即所得
 
-<p align="center">
-  <img src="docs/images/screenshot-profiles.png" width="410" alt="新建标签菜单：本地 shell、SSH 主机、串口" />
-  <img src="docs/images/screenshot-themes.png" width="410" alt="设置中的主题画廊" />
-</p>
+| 主界面 | 新建标签菜单 |
+| :---: | :---: |
+| <img src="docs/images/screenshot.png" width="410" alt="主界面" /> | <img src="docs/images/screenshot-profiles.png" width="410" alt="新建标签菜单：本地 shell、SSH 主机、串口" /> |
+| 主题画廊 | 快速进入工作目录 |
+| <img src="docs/images/screenshot-themes.png" width="410" alt="设置中的主题画廊" /> | <img src="docs/images/screenshot-browse.png" width="410" alt="文件夹选择 + 最近目录 —— 一键在任意工作目录启动 shell" /> |
 
 ## 下载
 

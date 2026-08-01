@@ -105,7 +105,11 @@ fn pty_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec) -> ReconnectHoo
         },
         respawn: Box::new(move || {
             let builder = match &spec {
-                SpawnSpec::Pty { command } => command_builder(command.as_deref(), initial_cwd.as_ref()),
+                // Per-tab cwd (already resolved at spawn, falling back to the
+                // launch-time --working-directory when the tab has none).
+                SpawnSpec::Pty { command, cwd } => {
+                    command_builder(command.as_deref(), cwd.as_ref().or(initial_cwd.as_ref()))
+                }
                 SpawnSpec::Ssh { hostname, port, user } => {
                     let mut cmd = CommandBuilder::new("ssh");
                     cmd.arg(format!("{}@{}", user, hostname));
@@ -172,14 +176,20 @@ pub(crate) fn command_builder(command: Option<&str>, initial_cwd: Option<&PathBu
 }
 
 #[tauri::command]
-pub fn pty_spawn(state: tauri::State<AppState>, app: tauri::AppHandle, command: Option<String>) -> Result<WsConnectResult, String> {
+pub fn pty_spawn(state: tauri::State<AppState>, app: tauri::AppHandle, command: Option<String>, cwd: Option<String>) -> Result<WsConnectResult, String> {
     let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
     let id = format!("tab-{}", *next);
     *next += 1;
     drop(next);
 
-    let spec = SpawnSpec::Pty { command: command.clone() };
-    let builder = command_builder(command.as_deref(), state.initial_cwd.as_ref());
+    // Per-tab working directory (directory picker / recent-dirs menu);
+    // falls back to the launch-time --working-directory when absent.
+    let cwd = cwd
+        .map(PathBuf::from)
+        .filter(|p| p.is_dir())
+        .or_else(|| state.initial_cwd.clone());
+    let spec = SpawnSpec::Pty { command: command.clone(), cwd: cwd.clone() };
+    let builder = command_builder(command.as_deref(), cwd.as_ref());
     spawn_pty(app.clone(), id.clone(), builder, spec)?;
 
     Ok(state.ws_result(id))

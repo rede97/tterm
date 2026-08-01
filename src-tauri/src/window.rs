@@ -36,6 +36,14 @@ pub fn open_new_window(state: tauri::State<crate::state::AppState>) -> Result<()
 }
 
 #[tauri::command]
+pub fn pick_directory(app: tauri::AppHandle) -> Option<String> {
+    app.dialog()
+        .file()
+        .blocking_pick_folder()
+        .and_then(|p| p.as_path().map(|p| p.to_string_lossy().to_string()))
+}
+
+#[tauri::command]
 pub fn save_text_file(app: tauri::AppHandle, content: String) -> Result<(), String> {
     let file = app.dialog()
         .file()

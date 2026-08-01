@@ -1,3 +1,22 @@
+## v0.6.0
+
+New Features
+
+- Windows Explorer context menu: after installing (NSIS), right-click a
+  folder or a folder's background to "Open in TTerm" — launches a window
+  with the terminal in that directory. Removed on uninstall. (WiX/MSI
+  bundles do not register the entry; use the NSIS setup.)
+- The "+" button: Shift+click opens a folder picker and starts the default
+  shell in the chosen directory (hovering with Shift held swaps the plus
+  for a folder icon with a blue hover tint); right-click shows a
+  recent-folders menu (persisted in config, most-recent first) plus a
+  Browse… entry
+- A tab renamed by the user no longer follows terminal (OSC) title changes;
+  internal display updates (e.g. serial baud changes) still refresh the
+  label without locking the title. Renaming now edits inline in the tab
+  label instead of the native prompt() dialog (which showed the page URL
+  as its title); committing an empty name restores OSC title tracking
+
 ## v0.5.2
 
 Fixes

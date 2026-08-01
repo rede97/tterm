@@ -75,6 +75,25 @@ body {
   color: #ffffff;
 }
 
+/* Shift held while hovering: the button opens a folder picker, so swap the
+   plus for a folder icon and tint the hover blue to signal the difference. */
+#new-tab .folder-icon {
+  display: none;
+}
+
+#new-tab.shift-mode .plus {
+  display: none;
+}
+
+#new-tab.shift-mode .folder-icon {
+  display: block;
+}
+
+#new-tab.shift-mode:hover {
+  background: #094771;
+  color: #ffffff;
+}
+
 #new-tab-menu-btn {
   display: flex;
   align-items: center;
@@ -470,6 +489,18 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
+}
+
+.tab-rename-input {
+  width: 100%;
+  min-width: 40px;
+  background: #1e1e1e;
+  color: #ffffff;
+  border: 1px solid #094771;
+  border-radius: 2px;
+  outline: none;
+  font: inherit;
+  padding: 0 2px;
 }
 
 .tab-close {

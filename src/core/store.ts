@@ -39,6 +39,7 @@ export interface ConfigState {
   serialOutputNewline: SerialOutputNewline;
   serialEnterNewline: SerialEnterNewline;
   defaultLocalProfile: string | null;
+  recentDirectories: string[];
   // Runtime flag
   loaded: boolean;
 }
@@ -83,6 +84,7 @@ const SCHEMA = {
   serialOutputNewline:{ default: "keep" as SerialOutputNewline, validate: isOneOf(OUTPUT_NEWLINE_VALUES) },
   serialEnterNewline: { default: "cr" as SerialEnterNewline,  validate: isOneOf(SERIAL_ENTER_MODES) },
   defaultLocalProfile: { default: null as string | null,    validate: isOrNull(isString) },
+  recentDirectories:  { default: [] as string[],           validate: isArray<string> },
   loaded:             { default: false,                    validate: isBoolean },
 } satisfies Record<string, SchemaEntry<unknown>>;
 

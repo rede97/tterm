@@ -1,4 +1,5 @@
 ﻿import { invoke } from "@tauri-apps/api/core";
+import { createElement, FolderOpen } from "lucide";
 import type { SshHost, SerialPort, SerialOutputNewline, SerialEnterNewline } from "../core/types";
 import { hostProp } from "../core/common";
 import { configStore } from "../core/store";
@@ -140,10 +141,13 @@ export class TabManager {
     tab.setDisconnected(true);
   }
 
-  async createLocalTab(command?: string, label?: string): Promise<TerminalTab | null> {
+  async createLocalTab(command?: string, label?: string, cwd?: string): Promise<TerminalTab | null> {
     let result: { id: string; port: number; token: string };
     try {
-      result = await invoke("pty_spawn", command ? { command } : {});
+      result = await invoke("pty_spawn", {
+        ...(command ? { command } : {}),
+        ...(cwd ? { cwd } : {}),
+      });
     } catch (e) {
       showToast(`Failed to start shell: ${e}`, "error");
       return null;
@@ -247,7 +251,8 @@ export class TabManager {
     await invoke("serial_set_baud", { id: tabId, baudRate: baud });
     tab.serialBaud = baud;
     await rememberSerialParams(tab.serialKey, { baud });
-    tab.rename(`${tab.serialPortName} · ${baud}`);
+    // Baud display update, not a user rename — keep OSC title tracking live.
+    tab.rename(`${tab.serialPortName} · ${baud}`, false);
   }
 
   async createDemoTab(): Promise<TerminalTab | null> {
@@ -402,10 +407,44 @@ export class TabManager {
   renameTab(id: string): void {
     const tab = this.tabs.get(id);
     if (!tab) return;
-    const newName = prompt("Rename tab", tab.label);
-    if (newName && newName.trim()) {
-      tab.rename(newName);
+    const labelEl = tab.tabElement.querySelector(".tab-label") as HTMLElement | null;
+    if (!labelEl || labelEl.querySelector("input")) return;
+
+    // Inline editing: the native prompt() dialog shows the dev URL as its
+    // title ("127.0.0.1:1420 says…") and looks foreign to the app.
+    const input = document.createElement("input");
+    input.className = "tab-rename-input";
+    input.value = tab.label;
+    labelEl.textContent = "";
+    labelEl.appendChild(input);
+
+    // Editing must not trigger tab switching or SortableJS drag.
+    for (const ev of ["click", "dblclick", "mousedown", "pointerdown"]) {
+      input.addEventListener(ev, e => e.stopPropagation());
     }
+
+    let done = false;
+    const finish = (save: boolean) => {
+      if (done) return;
+      done = true;
+      const name = input.value.trim();
+      if (save && name && name !== tab.label) {
+        tab.rename(name); // also locks the OSC title
+      } else if (save && !name && tab.titleLocked) {
+        tab.resetTitle(); // emptied: back to tracking the terminal title
+      } else {
+        labelEl.textContent = tab.label;
+      }
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); finish(true); }
+      else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+      e.stopPropagation();
+    });
+    input.addEventListener("blur", () => finish(true));
+
+    input.focus();
+    input.select();
   }
 
   clearTab(id: string): void {
@@ -565,11 +604,40 @@ export class TabManager {
 
   initNewTabButton(): void {
     const btn = document.getElementById("new-tab")!;
-    btn.addEventListener("click", () => {
+    btn.title = "New tab (Shift+click: open in folder, right-click: recent folders)";
+
+    // Same lucide icon as the recent-dirs menu's "Browse…" entry; shown in
+    // place of the plus while Shift is held (see .shift-mode in styles.css).
+    const folderIcon = createElement(FolderOpen, { stroke: "currentColor", width: 14, height: 14 });
+    folderIcon.classList.add("folder-icon");
+    btn.appendChild(folderIcon);
+
+    // Shift+click opens a folder picker: reflect that while Shift is held
+    // over the button (folder icon + blue hover via .shift-mode).
+    const setShiftMode = (on: boolean) => btn.classList.toggle("shift-mode", on);
+    btn.addEventListener("mouseenter", (e) => setShiftMode(e.shiftKey));
+    btn.addEventListener("mousemove", (e) => setShiftMode(e.shiftKey));
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Shift" && btn.matches(":hover")) setShiftMode(true);
+    });
+    document.addEventListener("keyup", (e) => {
+      if (e.key === "Shift") setShiftMode(false);
+    });
+
+    btn.addEventListener("click", (e) => {
+      if (e.shiftKey) {
+        import("./dirmenu").then(m => m.pickAndLaunchDirectory());
+        return;
+      }
       const defName = configStore.get("defaultLocalProfile") ?? configStore.get("localProfiles")[0]?.name ?? null;
       const p = defName ? configStore.get("localProfiles").find(x => x.name === defName) : null;
       if (p) this.createLocalTab(p.command, p.name);
       else this.createLocalTab();
+    });
+    btn.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      import("./dirmenu").then(m => m.showDirectoryMenu(btn));
     });
   }
 

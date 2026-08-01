@@ -44,7 +44,7 @@ pub struct SerialSession {
 // Parameters needed to respawn a session (reconnect).
 #[derive(Clone)]
 pub enum SpawnSpec {
-    Pty { command: Option<String> },
+    Pty { command: Option<String>, cwd: Option<PathBuf> },
     Ssh { hostname: String, port: u16, user: String },
     Serial {
         port_name: String,
