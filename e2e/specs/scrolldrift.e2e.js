@@ -13,6 +13,7 @@ describe("horizontal scroll drift protection", () => {
       const inst = document.querySelector(".terminal-instance");
       const viewport = inst.querySelector(".xterm-viewport");
       const scrollable = inst.querySelector(".xterm-scrollable-element");
+      const container = document.getElementById("terminal-container");
       const probe = (el) => {
         el.scrollLeft = 25;
         return el.scrollLeft;
@@ -21,11 +22,17 @@ describe("horizontal scroll drift protection", () => {
         instance: probe(inst),
         viewport: probe(viewport),
         scrollable: probe(scrollable),
+        container: probe(container),
+        body: probe(document.body),
+        documentElement: probe(document.documentElement),
       };
     });
     expect(result.instance).toBe(0);
     expect(result.viewport).toBe(0);
     expect(result.scrollable).toBe(0);
+    expect(result.container).toBe(0);
+    expect(result.body).toBe(0);
+    expect(result.documentElement).toBe(0);
   });
 
   it("keeps vertical scrolling intact (overflow-y unaffected)", async () => {

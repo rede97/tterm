@@ -7,7 +7,10 @@
 html, body {
   width: 100%;
   height: 100%;
-  overflow: hidden;
+  /* clip (not hidden): remove the scrolling mechanism entirely, so neither
+     script nor Chromium's implicit scroll-into-view (IME caret) can move
+     the page horizontally — nothing in this fixed-layout app ever scrolls. */
+  overflow: clip;
   background: #1e1e1e;
   color: #d4d4d4;
   font-family: Consolas, "Courier New", monospace;
@@ -499,7 +502,7 @@ body {
 #terminal-container {
   flex: 1;
   position: relative;
-  overflow: hidden;
+  overflow: clip; /* no scroll mechanism — see html,body note above */
   background: #1e1e1e;
   padding: 2px;
 }
