@@ -655,6 +655,21 @@ body {
   overflow-x: hidden !important;
 }
 
+/* Horizontal scroll drift (htop/btop IME bug): Chromium's implicit
+   scroll-into-view on the IME textarea/caret can scroll ANY scrollable
+   ancestor — not just .xterm-viewport (which JS clamps back to 0) but also
+   .terminal-instance and .xterm-scrollable-element (undefended), leaving
+   scrollLeft > 0 and clipping the leftmost column.
+   overflow-x: clip (unlike hidden) removes the scrolling mechanism entirely,
+   so neither xterm.js, programmatic scrolls, nor implicit scroll-into-view
+   can shift the content horizontally. The JS clamps in tab.ts remain as a
+   second line of defense. */
+.terminal-instance,
+.terminal-instance .xterm .xterm-scrollable-element,
+.terminal-instance .xterm .xterm-viewport {
+  overflow-x: clip !important;
+}
+
 .terminal-instance .xterm .xterm-screen {
   padding-right: 6px; /* safe space for overlay scrollbar */
   z-index: 0;

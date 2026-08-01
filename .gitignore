@@ -18,6 +18,8 @@ e2e/drivers/
 .claude/
 .reasonix/
 
+experiments/
+
 # pi local state (skills stay committed)
 .pi/settings.local.json
 .pi/sessions/

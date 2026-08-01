@@ -111,6 +111,19 @@ export class TerminalTab {
 
     this.xtermEl = this.element.querySelector(".xterm") as HTMLElement;
 
+    // Prevent horizontal scroll drift: xterm.js sets scrollLeft on the
+    // viewport when a line briefly exceeds the visible width (common during
+    // TUI redraws). CSS overflow-x:hidden hides the scrollbar but does NOT
+    // block programmatic scrollLeft in Chromium, so a race can leave
+    // scrollLeft > 0 after the redraw completes — clipping the leftmost
+    // column. Clamp it back to 0 on every scroll event.
+    const viewport = this.element.querySelector(".xterm-viewport") as HTMLElement | null;
+    if (viewport) {
+      viewport.addEventListener("scroll", () => {
+        if (viewport.scrollLeft !== 0) viewport.scrollLeft = 0;
+      }, { passive: true });
+    }
+
     // right-click: copy/paste normally, shift+right-click for context menu
     // use capture phase so this fires before xterm.js internal handler
     this.element.addEventListener("contextmenu", (e: MouseEvent) => {
@@ -449,6 +462,15 @@ export class TerminalTab {
       left = null;
       top = null;
       stopRefresh();
+      // Reset horizontal scroll drift: in cursor-hidden TUI apps (htop/btop)
+      // the cursor is parked at a fixed position, often the end of a line.
+      // IME composition positions the textarea there, which can trigger
+      // xterm.js to scroll the viewport right. On compositionend the scroll
+      // should reset, but cursor-hidden mode + the frozen-textarea Proxy
+      // can prevent xterm.js's own reset from firing — leaving scrollLeft
+      // > 0 and clipping the leftmost column.
+      const vp = this.element.querySelector(".xterm-viewport") as HTMLElement | null;
+      if (vp && vp.scrollLeft !== 0) vp.scrollLeft = 0;
     }, true);
   }
 
@@ -494,6 +516,11 @@ export class TerminalTab {
 
     if (this.terminal.cols !== cols || this.terminal.rows !== rows) {
       this.terminal.resize(cols, rows);
+      // Reset any horizontal scroll drift that may have accumulated
+      // before the resize — the new grid dimensions invalidate the old
+      // scroll offset and leaving it non-zero would clip column 0.
+      const vp = this.xtermEl.querySelector(".xterm-viewport") as HTMLElement | null;
+      if (vp && vp.scrollLeft !== 0) vp.scrollLeft = 0;
       this.sizeHint.show(cols, rows);
     }
 
