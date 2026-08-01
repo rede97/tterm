@@ -34,6 +34,7 @@ src/
     contextmenu.ts      tab-bar menu + shift-right-click terminal menu
     search.ts           search bar (per-tab query save/restore)
     profilemenu.ts      new-tab dropdown (Local / SSH / Serial columns)
+    dirmenu.ts          "+" button folder picker + recent-folders menu (Shift+click / right-click)
     fontpicker.ts       font picker modal (dynamically imported by settings)
   core/
     store.ts            configStore — reactive config, single source of truth (schema + defaults)
@@ -93,10 +94,11 @@ Key facts:
 ## PTY session model
 
 - `AppState` holds `sessions` (PTY) + `serial_sessions` + `next_id` + `initial_cwd` (from `--working-directory` CLI arg).
+- Per-tab working directory: `pty_spawn` accepts an optional `cwd` (folder picker / recent-folders menu on the `+` button) which overrides `initial_cwd` and is stored in `SpawnSpec::Pty`, so in-band respawns reopen in the same directory. The NSIS installer (`src-tauri/installer-hooks.nsh`, wired via `bundle.windows.nsis.installerHooks`) registers Explorer "Open in TTerm" entries that run `tterm.exe --working-directory "<folder>"`; `open_new_window` forwards the launch cwd to new windows.
 - `PtySession` stores the PTY `master` (`None` after child exit), a per-spawn `nonce` guarding the watchdog against respawn races, and the last known `size` (respawns keep it). A watchdog thread waits on `child.wait()`; on exit it sets `master = None`, closing ConPTY so the relay read pump unblocks (ConPTY never signals EOF on child death).
 - All sessions share one WebSocket relay hub bound once at startup: `ws://127.0.0.1:{port}/pty/{id}?token={token}`, per-process random token, 403/404 on bad auth/route. Session death does NOT close the socket (dead mode); only `pty_kill` tears a slot down (WS Close frame).
 
-Frontend → backend commands (invoke): `pty_spawn`, `pty_spawn_ssh`, `pty_resize`, `pty_kill`, `window_minimize/toggle_maximize/close/start_drag`, `read_wt_settings`, `read_wt_fragments`, `find_vs_instances`, `read_config`, `write_config`, `ssh_list_hosts`, `ssh_read_config_raw`, `ssh_save_config`, `ssh_clear_known_hosts`, `open_ssh_config`, `open_config_dir`, `delete_config`, `save_text_file`, `list_system_fonts`, `serial_list_ports`, `serial_spawn`, `serial_set_baud`.
+Frontend → backend commands (invoke): `pty_spawn`, `pty_spawn_ssh`, `pty_resize`, `pty_kill`, `window_minimize/toggle_maximize/close/start_drag`, `open_new_window`, `pick_directory`, `save_text_file`, `read_wt_settings`, `read_wt_fragments`, `find_vs_instances`, `read_config`, `write_config`, `delete_config`, `open_config_dir`, `ssh_read_config_raw`, `ssh_save_config`, `ssh_clear_known_hosts`, `open_ssh_config`, `list_system_fonts`, `serial_list_ports`, `serial_spawn`, `serial_set_baud`, `serial_set_output_newline` (debug builds add `demo_spawn`, `anime_spawn`).
 
 Backend → frontend: WebSocket binary frames → `BatchAttachAddon`, which coalesces messages within a 6 ms window before `terminal.write()`: ConPTY splits a full-screen frame into a bare `ESC[2J` + content ~1–3 ms apart, and unbatched writes present the erase as a blank frame (flicker). Full postmortem: `docs/bugfix-fullscreen-flicker.md` — **do not remove the batching in refactors.**
 
@@ -110,6 +112,7 @@ Backend-managed and in-band (`deadmode.rs` + relay dead mode): on byte-stream en
 - `TabManager.switchTo(id)` — closes settings first if open; re-shows a tab hidden by settings. `toggleSettings()` opens only.
 - Closing the rightmost tab must fall back to the previous tab: `#new-tab-group` is the last flex item inside `#tabs`, so sibling scans must skip anything without a live tab id (regression covered in `e2e/specs/app.e2e.js`).
 - Tab drag reorder: SortableJS on `#tabs` (`forceFallback: true` — native HTML5 DnD is unreliable in WebView2), `onEnd` rebuilds the tabs Map from DOM order.
+- Tab titles track OSC title sequences. A user rename (inline edit in the tab label — no native prompt) sets `titleLocked` and OSC updates stop; committing an empty name clears the lock and restores the last OSC title. Internal label refreshes (e.g. serial baud display) call `rename(name, false)` so they never lock.
 - Window resize: all tabs marked dirty; only the active tab is fitted immediately (debounced).
 
 ## Fit & hysteresis
@@ -135,6 +138,8 @@ Backend-managed and in-band (`deadmode.rs` + relay dead mode): on byte-stream en
 | Right-click on **tab** | Tab operations menu |
 | **Shift+right-click** on terminal | Content operations menu |
 | Right-click on terminal (no shift) | Copy if selection, else paste |
+| **Shift+click** the `+` button | Folder picker → shell starts in that directory |
+| Right-click the `+` button | Recent-folders menu (+ Browse…) |
 
 Terminal right-click uses capture phase; copy uses `execCommand("copy")` + hidden textarea (not `navigator.clipboard`) to avoid the permission prompt; a global `contextmenu` preventDefault blocks native menus.
 
@@ -160,9 +165,9 @@ No native title bar (`decorations: false`). The tab bar is the title bar: tabs l
 
 App icon source is `src/assets/tterm.svg`. Regenerate platform icons with the `sharp`-based one-liner kept in git history / release docs (`src-tauri/icons/` targets incl. multi-size `icon.ico`).
 
-## Shell tools: Bash vs PowerShell
+## Shell syntax: Bash vs PowerShell
 
-Windows host: match syntax to the shell you invoke. Bash tool = git-bash (POSIX: `grep`, `tail`, `&&`). PowerShell = PS cmdlets (`Get-Content`, `Select-Object`). Never mix. Note: git-bash mangles `taskkill /pid` flags (treats `/pid` as a path) — use `powershell Stop-Process -Id <pid> -Force` for cleanup.
+Windows host: match syntax to the shell your tool calls actually land in. A POSIX shell on Windows is typically git-bash (`grep`, `tail`, `&&`); PowerShell uses cmdlets (`Get-Content`, `Select-Object`). Never mix. Note: git-bash mangles `taskkill /pid` flags (treats `/pid` as a path) — use `powershell Stop-Process -Id <pid> -Force` for cleanup.
 
 ## Git commits
 

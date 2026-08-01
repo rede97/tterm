@@ -32,7 +32,8 @@
   instantly, no server setup needed.
 - **Start right in your working directory** — Shift+click the `+` to pick a
   folder, or right-click it for recent folders; the default shell opens
-  there, ready for agent work in a project (pi, Claude Code…).
+  there, ready for agent work in a project (pi, Claude Code…). Installed via
+  NSIS? Right-click any folder in Explorer → **Open in TTerm**.
 
 ### For embedded engineers
 

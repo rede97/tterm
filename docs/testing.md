@@ -11,8 +11,8 @@
 
 ## L0 — Rust 后端单元测试
 
-测试内嵌在 `src-tauri/src/lib.rs` 的 `#[cfg(test)] mod tests`（24 个用例）。
-为可测性提取的纯函数：`parse_working_dir`、`encode_pipe_frame`、`encode_resize_frame`、`strip_font_suffix`。
+测试与源码同文件（各 `src-tauri/src/*.rs` 模块尾部的 `#[cfg(test)] mod tests`）。
+为可测性提取的纯函数：`parse_working_dir`（pty.rs）、命令行解析（cmdparse.rs）、换行规范化（newline.rs）、`strip_font_suffix`（fonts.rs）等。
 
 ```sh
 bun run test:rust        # = cargo test --manifest-path src-tauri/Cargo.toml
@@ -23,7 +23,7 @@ bun run test:rust        # = cargo test --manifest-path src-tauri/Cargo.toml
 ## L1/L2 — Vitest（前端）
 
 - 配置：`vitest.config.ts`（happy-dom 环境）
-- 用例：`tests/hysteresis.test.ts`、`tests/sshconfig.test.ts`、`tests/fontconfig.test.ts`、`tests/profilemenu.test.ts`
+- 用例：`tests/*.test.ts`（hysteresis 适配、SSH 配置解析/生成、字体栈构建、profile/context 菜单渲染、OSC 解析等）
 - L2 通过 `vi.mock("@tauri-apps/api/core")` 替换 IPC 层，在 happy-dom 中渲染真实菜单 DOM
 
 ```sh
