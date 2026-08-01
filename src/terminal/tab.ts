@@ -89,10 +89,7 @@ export class TerminalTab {
       this.setProgress(p.state, p.progress);
       return true;
     });
-    if (configStore.get("renderer") === "webgl") {
-      this.webglAddon = new WebglAddon();
-      this.terminal.loadAddon(this.webglAddon);
-    }
+    if (configStore.get("renderer") === "webgl") this.terminal.loadAddon(new WebglAddon());
     this.terminal.open(this.element);
 
     // Single source of truth for backend size tracking: ANY grid change
@@ -494,59 +491,7 @@ export class TerminalTab {
    * Pure calculation: how many rows/cols fit in the current container.
    * No dead zone, no oscillation just available space / char size.
    */
-  // WebView2 multi-monitor DPI bug (runtime 150.0.4078.105+): on mixed-DPI
-  // setups Chromium can allocate the WebGL drawing buffer at the wrong scale
-  // factor (e.g. 1.5x on a DPR-1.0 window) — at canvas creation AND later
-  // when the canvas is recreated (IME composition provokes recreations,
-  // which is why the bug only shows while typing with an IME). xterm trusts
-  // the buffer size for device metrics, which shifts the rendered grid
-  // (~half a cell, leftmost glyphs clipped). The guard checks the buffer
-  // scale at layout time AND continuously, and falls back to the DOM
-  // renderer (one-way) as soon as a mismatch appears.
-  private webglAddon?: WebglAddon;
-  private webglGuardTimer?: number;
-  webglFallbackReason?: string; // set when the guard fell back (diagnostics/tests)
-
-  private _webglBufferScale(): number | null {
-    const canvas = this.element.querySelector(".xterm-screen canvas:not(.xterm-link-layer)") as HTMLCanvasElement | null;
-    if (!canvas || canvas.clientWidth === 0) return null; // hidden / not laid out
-    const gl = (canvas.getContext("webgl2") || canvas.getContext("webgl")) as WebGLRenderingContext | null;
-    if (!gl || gl.drawingBufferWidth === 0) return null;
-    return gl.drawingBufferWidth / canvas.clientWidth;
-  }
-
-  private _webglFallback(reason: string): void {
-    if (!this.webglAddon) return; // already on DOM renderer
-    this.webglFallbackReason = reason;
-    console.warn(`[tterm] WebGL renderer disabled (${reason}); falling back to DOM renderer (WebView2 mixed-DPI bug)`);
-    this.webglAddon.dispose();
-    this.webglAddon = undefined;
-  }
-
-  private _webglGuard(): void {
-    if (!this.webglAddon || this.webglGuardTimer !== undefined) return;
-    const scale = this._webglBufferScale();
-    if (scale === null) return; // not laid out yet — retry on next fit
-    if (Math.abs(scale - devicePixelRatio) / devicePixelRatio > 0.05) {
-      this._webglFallback(`buffer scale ${scale.toFixed(2)} != devicePixelRatio ${devicePixelRatio.toFixed(2)}`);
-      return;
-    }
-    // Startup check passed. Keep watching: the misallocation can strike at
-    // any later canvas recreation (IME composition, resize, monitor move).
-    this.webglGuardTimer = window.setInterval(() => {
-      const s = this._webglBufferScale();
-      if (s !== null && Math.abs(s - devicePixelRatio) / devicePixelRatio > 0.05) {
-        this._webglFallback(`buffer scale changed to ${s.toFixed(2)} (expected ${devicePixelRatio.toFixed(2)})`);
-        if (this.webglGuardTimer !== undefined) {
-          clearInterval(this.webglGuardTimer);
-          this.webglGuardTimer = undefined;
-        }
-      }
-    }, 1000);
-  }
-
   fit(): { cols: number; rows: number } {
-    this._webglGuard();
     const core = (this.terminal as any)._core;
     const dims = core._renderService.dimensions;
     const charWidth = dims.css.cell.width;
@@ -622,10 +567,6 @@ export class TerminalTab {
     this._clearReattachTimer();
     this.sizeHint.destroy();
     this.imeBox.destroy();
-    if (this.webglGuardTimer !== undefined) {
-      clearInterval(this.webglGuardTimer);
-      this.webglGuardTimer = undefined;
-    }
     this.onRenderDisposable?.dispose();
     this.element.remove();
     this.tabElement.remove();
