@@ -121,9 +121,10 @@ export class TerminalTab {
     // scrollLeft > 0 after the redraw completes — clipping the leftmost
     // column. Clamp it back to 0 on every scroll event.
     const viewport = this.element.querySelector(".xterm-viewport") as HTMLElement | null;
-    if (viewport) {
-      viewport.addEventListener("scroll", () => {
-        if (viewport.scrollLeft !== 0) viewport.scrollLeft = 0;
+    const xtermEl = this.element.querySelector(".xterm") as HTMLElement | null;
+    for (const el of [viewport, xtermEl]) {
+      el?.addEventListener("scroll", () => {
+        if (el.scrollLeft !== 0) el.scrollLeft = 0;
       }, { passive: true });
     }
 

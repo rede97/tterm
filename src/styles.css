@@ -668,6 +668,7 @@ body {
    can shift the content horizontally. The JS clamps in tab.ts remain as a
    second line of defense. */
 .terminal-instance,
+.terminal-instance .xterm,
 .terminal-instance .xterm .xterm-scrollable-element,
 .terminal-instance .xterm .xterm-viewport {
   overflow-x: clip !important;
