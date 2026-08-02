@@ -1,3 +1,18 @@
+## v0.7.0
+
+New Features
+
+- **AI session sharing** — hand any live terminal session (shell / SSH /
+  serial) to a local AI agent. Right-click a tab → "Share with AI" and
+  paste the link to the agent: the link itself explains how to use it.
+  The agent pulls character-level screen snapshots — full screen text,
+  terminal size, cursor state, even the fake cursor position in agent TUIs
+  (no screenshots, no OCR) — and can type keystrokes for you. Long-polling
+  wakes on screen changes, plain polling is rate-limited. You watch every
+  move live, a teal dot marks shared tabs (right-click → "Copy Share Link"
+  / "Stop Sharing"), and revoking cuts access instantly. Everything stays
+  on 127.0.0.1 — nothing is exposed to the network
+
 ## v0.6.0
 
 New Features
