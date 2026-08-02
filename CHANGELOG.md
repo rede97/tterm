@@ -1,3 +1,18 @@
+## v0.7.1
+
+New Features
+
+- The recent-folders menu (right-click the "+" button) now has a "Clear
+  history" entry
+
+Fixes
+
+- Typing Chinese with the cursor on the bottom row: the IME candidate
+  window no longer covers the floating pinyin mirror — it opens below the
+  cursor and may extend past the window's bottom edge (candidate windows
+  are top-level OS windows). The right-edge safe margin stays, so the
+  frame-shift fix from v0.5.2 is unaffected
+
 ## v0.7.0
 
 New Features
