@@ -4,7 +4,7 @@
 // Recent folders persist in config.recentDirectories (most-recent first).
 
 import { invoke } from "@tauri-apps/api/core";
-import { createElement, FolderOpen, Folder } from "lucide";
+import { createElement, FolderOpen, Folder, Trash2 } from "lucide";
 import { configStore } from "../core/store";
 import { tabManager } from "./tabmanager";
 import { logCatch } from "../core/errorlog";
@@ -95,6 +95,12 @@ export function showDirectoryMenu(anchor: HTMLElement): void {
       item.title = dir;
       col.appendChild(item);
     }
+    const sep2 = document.createElement("div");
+    sep2.className = "profile-separator";
+    col.appendChild(sep2);
+    col.appendChild(mkItem(Trash2, "Clear history", () => {
+      configStore.set({ recentDirectories: [] });
+    }));
   }
 
   document.body.appendChild(menu);
