@@ -1,4 +1,5 @@
 ﻿import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { createElement, Cog } from "lucide";
 import "@xterm/xterm/css/xterm.css";
@@ -133,8 +134,19 @@ import("./terminal/contextmenu").then(m => {
     getSerialOutputNewline: (id) => tabManager.get(id)?.outputNewline,
     getSerialEnterNewline: (id) => tabManager.get(id)?.enterNewline,
     getActiveTabId: () => tabManager.activeTabId,
+    shareTab: (id) => tabManager.shareTab(id),
+    isTabShared: (id) => tabManager.get(id)?.shared ?? false,
+    getShareUrl: (id) => tabManager.get(id)?.shareUrl,
   });
   m.initContextMenu();
+});
+
+// AI session sharing: the hub asks the frontend for a screen snapshot —
+// the xterm buffer is the ground-truth character grid.
+listen<{ id: string; req: number }>("share-screen-request", (e) => {
+  const tab = tabManager.get(e.payload.id);
+  const snapshot = tab ? tab.buildShareSnapshot() : { error: "session has no terminal" };
+  invoke("share_screen_response", { req: e.payload.req, snapshot }).catch(logCatch("share.screenResponse"));
 });
 initWindowControls();
 

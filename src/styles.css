@@ -321,6 +321,17 @@ body {
   user-select: none;
 }
 
+/* AI session sharing indicator: small teal dot on the shared tab. */
+.tab.shared::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ec9b0;
+  flex-shrink: 0;
+  margin: 0 6px;
+}
+
 .tab.active {
   background: #1e1e1e;
 }

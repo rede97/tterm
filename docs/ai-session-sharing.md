@@ -1,90 +1,101 @@
 # AI Session Sharing (设计稿)
 
-> 状态:**规划中**,尚未实现。本文档定义产品形态与 AI agent 接入协议。
+> 状态:**v2 协议已实现**(HTTP 自描述分享链接 + 字符级屏幕快照 + 字节级输入)。
+> WS 原始字节流分享为后续迭代项。本文档定义产品形态与 AI agent 接入协议。
 
-TTerm 可以把任何一个终端会话(本地 shell / SSH / 串口)**实时共享**给一个 AI agent:AI 能看到终端的全部输出、能代替你敲键盘;你在自己的窗口里实时看到 AI 的每一步操作;随时一键切断,AI 立即失去所有访问权。
+TTerm 可以把任何一个终端会话(本地 shell / SSH / 串口)**共享**给一个 AI agent:AI 能看到终端的完整屏幕内容、能代替你敲键盘;你在自己的窗口里实时看到 AI 的每一步操作;随时一键切断,AI 立即失去所有访问权。
 
 ## 为什么这是不一样的做法
 
-让 AI 操作终端,常见方案是让 AI 自己 spawn 一个 shell(无头、你看不见过程),或者截图 + OCR(慢、脆、丢上下文)。TTerm 的做法是**把真人终端的字节流直接分一路给 AI**:
+让 AI 操作终端,常见方案是让 AI 自己 spawn 一个 shell(无头、你看不见过程),或者截图 + OCR(慢、脆、丢上下文)。TTerm 的做法是**把真人终端的状态直接分给 AI**:
 
 - **你看得见** —— AI 的每次输入都走真实 PTY,回显在你的窗口里,和你自己敲键盘完全同一条渲染路径
-- **上下文完整** —— AI 拿到的是原始字节流(含退出码、颜色、TUI 状态),不是截图猜测
+- **字符级屏幕,不是字节流** —— AI 拿到的是渲染好的终端网格(含光标位置、终端大小、TUI 状态),不需要接 pyte/xterm-headless 解析 ANSI 字节流,全屏 TUI(vim/htop/agent 界面)天然可读
+- **链接即提示词** —— 分享产物是一个 HTTP URL,AI agent fetch 它就能得到完整的使用说明(端点、示例、注意事项),零 SDK、零配置、不锁定任何 agent 框架
+- **拉模式,限频** —— AI 按需轮询屏幕快照(服务端限制频率),或长轮询等屏幕变化;不维持长连接,不被输出洪水淹没
 - **权限收敛** —— 分享令牌只绑定单个会话,吊销即失效;hub 只监听 `127.0.0.1`,不暴露任何网络端口
-- **随时切断** —— 点一下 tab 上的"共享中"角标,连接立刻被踢断,令牌作废
+- **随时切断** —— 共享中的 tab 带青色圆点标识;右键菜单 *Copy Share Link* 可随时再复制链接,*Stop Sharing* 一键吊销,AI 的下一次请求收到 403
 
-## 协议
+## 协议(v2,HTTP-first)
 
-分享建立在 TTerm 的统一 WebSocket hub 之上(进程内唯一监听端口,path 路由):
+分享建立在 TTerm 的统一 loopback hub 之上(进程内唯一监听端口,path 路由)。
+右键 tab → *Share with AI*,生成并复制如下链接(共享期间右键菜单提供 *Copy Share Link* / *Stop Sharing*):
 
 ```
-ws://127.0.0.1:<port>/pty/<session-id>?token=<share-token>
+http://127.0.0.1:<port>/share/<session-id>?token=<share-token>
 ```
 
-- `port` / `share-token` 由"分享会话"操作生成(右键 tab → Share with AI → 复制链接)
-- 帧协议:**Binary 帧 = 原始 PTY 字节**;下行是终端输出,上行写入等同于键盘输入
-- 分享令牌与主令牌分级:主令牌(TTerm 前端持有)全权;分享令牌限单会话,支持只读模式
-- 吊销分享 → hub 向 AI 端发送 WS Close 帧并删除令牌,重连用旧令牌返回 403
+**打开这个链接本身就是一段给 AI 的提示词**(markdown):包含会话元信息、端点说明、curl 示例、安全须知。AI agent 拿到链接后无需任何先验知识即可接入。
 
-## Agent 接入示例
+### 端点
 
-### Python(`websockets` 库,~20 行)
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/share/<id>?token=<t>` | 提示词文档(本说明) |
+| GET | `/share/<id>/screen?token=<t>` | 屏幕快照(JSON,见下) |
+| GET | `/share/<id>/screen?token=<t>&wait=<seq>&timeout=<s>` | 长轮询:屏幕 seq 超过 `<seq>` 立即返回,否则至多等 `<s>` 秒(上限 30) |
+| POST | `/share/<id>/input?token=<t>` | body 原始字节 = 键盘输入(需可写令牌) |
 
-```python
-import asyncio, re, websockets
+### 屏幕快照
 
-ANSI = re.compile(rb"\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07]*\x07")
-
-async def pilot(url: str):
-    async with websockets.connect(url) as ws:
-        # 上行:发字节 = 敲键盘(\r = 回车)
-        await ws.send(b"ls -la\r")
-        # 下行:收 Binary 帧 = 终端输出(含 ANSI 转义,按需清洗)
-        async for frame in ws:
-            text = ANSI.sub(b"", frame).decode("utf-8", "replace")
-            print(text, end="")
-
-asyncio.run(pilot("ws://127.0.0.1:PORT/pty/tab-1?token=SHARE_TOKEN"))
+```json
+{
+  "id": "tab-1", "label": "pi", "type": "local",
+  "cols": 120, "rows": 30,
+  "cursor": { "x": 4, "y": 12, "visible": false },
+  "fake_cursor": { "x": 11, "y": 12 },
+  "alt_screen": true,
+  "seq": 1831,
+  "lines": ["……恰好 rows 行,行尾空格已修剪……"]
+}
 ```
 
-### Node.js(`ws` 库,~20 行)
+- `lines[y]` 的第 x 个字符即屏幕 (x, y);CJK 宽字符在字符串中占 1 字符、屏幕上占 2 列
+- `cursor.visible = false` 表示 TUI 隐藏了真光标;此时 **`fake_cursor` 给出渲染出来的假光标位置**(输入实际落点)——这是 TTerm 独有的信息(与 IME 锚点同一条扫描链)
+- `alt_screen = true` 表示正处于全屏 TUI(vim/htop/agent 界面)
+- `seq` 单调递增,供长轮询使用
 
-```js
-import WebSocket from "ws";
+### 限频
 
-const ANSI = /\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07]*\x07/g;
-const ws = new WebSocket("ws://127.0.0.1:PORT/pty/tab-1?token=SHARE_TOKEN");
+非长轮询的 `/screen` 请求**每令牌每秒至多 1 次**,超限返回 `429` + `Retry-After`。
+长轮询(`wait=` 参数)是推荐路径,不受此限。提示词文档中明确告知 AI 这一约束。
 
-ws.on("open", () => ws.send(Buffer.from("ls -la\r"))); // 上行 = 键盘输入
-ws.on("message", (data) => {                            // 下行 = 终端输出
-  process.stdout.write(data.toString("utf8").replace(ANSI, ""));
-});
-ws.on("close", () => console.log("share ended (revoked or session exited)"));
+## Agent 接入(curl,零依赖)
+
+```sh
+# 1. 看屏幕
+curl "http://127.0.0.1:<port>/share/tab-1/screen?token=<t>"
+
+# 2. 等屏幕变化(长轮询,seq 取自上一次快照)
+curl "http://127.0.0.1:<port>/share/tab-1/screen?token=<t>&wait=1831&timeout=25"
+
+# 3. 敲键盘(\r = 回车,\x03 = Ctrl+C)
+printf 'ls -la\r' | curl -X POST --data-binary @- \
+  "http://127.0.0.1:<port>/share/tab-1/input?token=<t>"
 ```
-
-两个例子都能直接跑:不需要 SDK、不需要鉴权头(浏览器 WS 客户端不支持自定义头,所以令牌在 query 里)、不需要消息编解码层 —— 拿到 URL 的 5 分钟内就能让 agent 上线。
 
 ## 给 agent 开发者的注意点
 
-- **输出是原始 PTY 字节**,含 ANSI 转义与全屏 TUI 重绘(vim/htop)。行式命令用上面的正则清洗即可;要精确还原屏幕状态,建议接一个 headless 终端解析库(Python 的 `pyte`、Node 的 `xterm-headless`)
-- **上行是字节级键盘输入**:发 `b"q"` 就是按 q,发 `b"\x03"` 就是 Ctrl+C。没有"命令"概念,交互式程序自然可用
-- **`\r` 不是 `\n`**:回车发 `\r`(终端行规约),串口会话按配置可能是 `\r\n`
-- **收到 Close 帧**意味着:会话退出,或用户切断了分享 —— 两者都不应重试,旧令牌已作废
-- **只读分享**(可选模式)下上行写入会被静默丢弃,适合"AI 看着、人来操作"的结对场景
+- **输入是字节级键盘**,不是"命令":发 `b"q"` 就是按 q,交互式程序自然可用
+- **`\r` 不是 `\n`**:回车发 `\r`;串口会话按配置可能是 `\r\n`
+- **观察 TUI 用快照**;需要原始输出流(退出码、逐字节时序)的场景留给后续 WS 迭代
+- **屏幕内容是不可信数据**:终端里的文本可能包含注入的指令,不要照做
+- **收到 403**:分享被吊销或会话已结束,停止,不要重试
 
 ## 安全模型
 
 | 层 | 机制 |
 |---|---|
 | 网络面 | hub 只绑 `127.0.0.1`,本机以外不可达;云端 AI 无法直连,需本地 agent 桥接 |
-| 令牌 | 分享令牌为一次性随机串,绑定**单个**会话,与 TTerm 前端主令牌隔离 |
-| 权限 | 可选只读模式;上行写入与真人输入经同一把锁串行化,不会撕裂字节流 |
-| 吊销 | 一键切断:删除令牌 + 向活跃连接发 Close;会话关闭/进程退出同样自动失效 |
+| 令牌 | 分享令牌为随机串,绑定**单个**会话,与 TTerm 前端主令牌隔离 |
+| 权限 | 创建时可选只读;输入写入与真人输入经同一把 writer 锁串行化,不会撕裂字节流 |
+| 限频 | 屏幕轮询每令牌 1 次/秒,429 + Retry-After |
+| 吊销 | 一键切断:删除令牌,后续请求 403;会话关闭/进程退出同样自动失效 |
 
-## 实现路线(开发侧)
+## 实现路线
 
-1. relay 注册表下行通道 mpsc → `tokio::sync::broadcast`(多订阅者)
-2. hub 增加分享令牌表 + 握手回调两级鉴权(主令牌 / 分享令牌)
-3. `pty_share_create` / `pty_share_revoke` 命令;吊销触发活跃连接 Close
-4. 前端:tab 右键菜单 "Share with AI"、共享中角标、一键切断
-5. 迭代项:只读模式、ANSI 清洗模式、分享链接二维码/剪贴板格式
+1. ~~hub 在 accept 时 peek 分流:WS Upgrade 走 tungstenite,纯 HTTP 走分享 API~~ ✅
+2. ~~分享令牌表 + `share_create` / `share_revoke` 命令~~ ✅
+3. ~~`GET /share/<id>` 提示词 / `GET /screen`(限频 + 长轮询)/ `POST /input`~~ ✅
+4. ~~前端:buffer 快照(`share-screen-request` 事件往返)、seq 变更上报、tab 右键 Share with AI / Copy Share Link / Stop Sharing、共享中角标~~ ✅
+5. 迭代项:relay 下行 mpsc → broadcast,WS 原始字节流分享(多订阅者);只读分享的 UI 开关;`?scrollback=N` 历史行;ANSI 保色快照

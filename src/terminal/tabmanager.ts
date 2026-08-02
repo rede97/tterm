@@ -1,8 +1,10 @@
 ﻿import { invoke } from "@tauri-apps/api/core";
+import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
 import { createElement, FolderOpen } from "lucide";
 import type { SshHost, SerialPort, SerialOutputNewline, SerialEnterNewline } from "../core/types";
 import { hostProp } from "../core/common";
 import { configStore } from "../core/store";
+import { logCatch } from "../core/errorlog";
 import { serialParamsFor, serialKeyFor, rememberSerialParams } from "../config/serial-memory";
 import { showToast } from "../ui/toast";
 import { TerminalTab } from "./tab";
@@ -343,6 +345,7 @@ export class TabManager {
     const tab = this.tabs.get(id);
     if (!tab) return;
 
+    if (tab.shared) invoke("share_revoke", { id }).catch(() => { });
     await invoke("pty_kill", { id });
 
     // Find the next live tab to the right. Non-tab elements share the #tabs
@@ -445,6 +448,34 @@ export class TabManager {
 
     input.focus();
     input.select();
+  }
+
+  async shareTab(id: string): Promise<void> {
+    const tab = this.tabs.get(id);
+    if (!tab) return;
+    if (tab.shared) {
+      await invoke("share_revoke", { id }).catch(logCatch("share.revoke"));
+      tab.shared = false;
+      tab.shareUrl = undefined;
+      tab.tabElement.classList.remove("shared");
+      showToast("AI sharing stopped", "info");
+      return;
+    }
+    try {
+      const res = await invoke<{ url: string }>("share_create", {
+        id,
+        label: tab.label,
+        kind: tab.type,
+        allowWrite: true,
+      });
+      await clipboardWriteText(res.url).catch(logCatch("clipboard.write"));
+      tab.shared = true;
+      tab.shareUrl = res.url;
+      tab.tabElement.classList.add("shared");
+      showToast("Share link copied — paste it to your AI agent", "info", 6000);
+    } catch (e) {
+      showToast(`Failed to share session: ${e}`, "error");
+    }
   }
 
   clearTab(id: string): void {

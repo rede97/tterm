@@ -22,7 +22,7 @@ use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, 
 use tokio_tungstenite::tungstenite::Message as WsMessage;
 
 // One relay slot per session id.
-struct RelayEntry {
+pub(crate) struct RelayEntry {
     // Downstream direction (session → client). `rx` is Some until a WS
     // client claims it during the handshake; a disconnecting client returns
     // it so a later client can RE-ATTACH (transport drops — e.g. OS sleep —
@@ -37,7 +37,7 @@ struct RelayEntry {
     // Upstream direction (client → session). The boxed writer is HOT-SWAPPED:
     // while the session is dead it is a DeadWatcher (Enter → respawn), and a
     // successful respawn installs the new child writer.
-    writer: Arc<Mutex<Box<dyn Write + Send>>>,
+    pub(crate) writer: Arc<Mutex<Box<dyn Write + Send>>>,
     // Guards the EOF cleanup against a reconnect that reused the same id.
     generation: u64,
     // Set by the currently attached connection. A new handshake that finds
@@ -54,11 +54,34 @@ struct RelayEntry {
 pub struct WsHub {
     pub(crate) port: u16,
     pub(crate) token: String,
-    entries: Mutex<HashMap<String, RelayEntry>>,
+    pub(crate) entries: Mutex<HashMap<String, RelayEntry>>,
+    pub(crate) shares: crate::share::ShareRegistry,
+    pub(crate) pending_screens: crate::share::PendingScreens,
+    pub(crate) next_screen_req: AtomicU64,
+    // Type-erased event emitter set at app setup (share.rs emits
+    // "share-screen-request" through it). NOTE: a plain
+    // `Mutex<Option<tauri::AppHandle>>` field here makes the test binary
+    // fail to load (0xc0000139) — keep this erasure.
+    emit_fn: Mutex<Option<Box<dyn Fn(&str, serde_json::Value) + Send + Sync>>>,
     next_generation: AtomicU64,
 }
 
 impl WsHub {
+    pub(crate) fn set_emitter(&self, f: Box<dyn Fn(&str, serde_json::Value) + Send + Sync>) {
+        if let Ok(mut guard) = self.emit_fn.lock() {
+            *guard = Some(f);
+        }
+    }
+
+    pub(crate) fn emit(&self, event: &str, payload: serde_json::Value) -> Result<(), String> {
+        let guard = self.emit_fn.lock().map_err(|e| e.to_string())?;
+        let f = guard.as_ref().ok_or("event emitter not ready")?;
+        f(event, payload);
+        Ok(())
+    }
+
+
+
     // Bind the loopback listener, generate the auth token, spawn the accept
     // loop. Called exactly once at app startup.
     pub(crate) fn start() -> Result<Arc<WsHub>, String> {
@@ -76,6 +99,10 @@ impl WsHub {
             port,
             token: generate_token(),
             entries: Mutex::new(HashMap::new()),
+            shares: crate::share::new_share_registry(),
+            pending_screens: crate::share::new_pending_screens(),
+            next_screen_req: AtomicU64::new(1),
+            emit_fn: Mutex::new(None),
             next_generation: AtomicU64::new(1),
         });
 
@@ -120,7 +147,7 @@ fn parse_route(path: &str) -> Option<String> {
 
 // Extract a single query parameter value ("a=1&b=2" form, no percent-decoding
 // — the token is plain hex and needs none).
-fn query_param<'a>(query: Option<&'a str>, key: &str) -> Option<&'a str> {
+pub(crate) fn query_param<'a>(query: Option<&'a str>, key: &str) -> Option<&'a str> {
     let query = query?;
     let prefix = format!("{}=", key);
     for pair in query.split('&') {
@@ -139,12 +166,22 @@ fn reject(status: StatusCode, msg: &str) -> ErrorResponse {
     resp
 }
 
-// Handle one TCP connection: route + authenticate during the WS handshake,
-// then pump bytes in both directions until either side ends.
+// Handle one TCP connection: the share API speaks plain HTTP/1.1, terminal
+// data speaks WebSocket — peek (non-consuming) to split the two, then route
+// + authenticate during the WS handshake and pump bytes until either side
+// ends.
+async fn handle_connection(hub: Arc<WsHub>, stream: tokio::net::TcpStream) {
+    if crate::share::is_plain_http(&stream).await {
+        crate::share::handle_http(hub, stream).await;
+    } else {
+        handle_ws(hub, stream).await;
+    }
+}
+
 // result_large_err: the ErrorResponse variant is imposed by
 // accept_hdr_async's callback signature; cannot box it here.
 #[allow(clippy::result_large_err)]
-async fn handle_connection(hub: Arc<WsHub>, stream: tokio::net::TcpStream) {
+async fn handle_ws(hub: Arc<WsHub>, stream: tokio::net::TcpStream) {
     // Claimed during the handshake callback: (id, downstream rx, writer, generation).
     type Claimed = (String, mpsc::Receiver<Vec<u8>>, Arc<Mutex<Box<dyn Write + Send>>>, u64);
     let mut claimed: Option<Claimed> = None;

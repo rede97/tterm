@@ -6,6 +6,7 @@ import { openFind } from "./search";
 import { trimPasteContent, SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES } from "../core/common";
 import type { SerialEnterNewline, SerialOutputNewline } from "../core/types";
 import { readText as clipboardReadText, writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
+import { showToast } from "../ui/toast";
 import { configStore } from "../core/store";
 import { logCatch } from "../core/errorlog";
 
@@ -34,6 +35,9 @@ export interface ContextMenuHandlers {
   getSerialEnterNewline: (tabId: string) => string | undefined;
   getActiveTabId: () => string | null;
   newWindow: () => void;
+  shareTab: (tabId: string) => void;
+  isTabShared: (tabId: string) => boolean;
+  getShareUrl: (tabId: string) => string | undefined;
 }
 
 let _handlers: ContextMenuHandlers | null = null;
@@ -136,6 +140,13 @@ colorItem.addEventListener("mouseleave", () => colorSub.classList.remove("open")
 
 tabMenuGroup.appendChild(mkItem("Rename", "rename"));
 tabMenuGroup.appendChild(mkItem("Duplicate Tab", "duplicate"));
+// Share state decides which of these three is visible (showTabContextMenu).
+const shareItem = mkItem("Share with AI", "share");
+const copyShareItem = mkItem("Copy Share Link", "copy-share");
+const stopShareItem = mkItem("Stop Sharing", "share");
+tabMenuGroup.appendChild(shareItem);
+tabMenuGroup.appendChild(copyShareItem);
+tabMenuGroup.appendChild(stopShareItem);
 tabMenuGroup.appendChild(mkSeparator());
 tabMenuGroup.appendChild(mkItem("Close", "close"));
 tabMenuGroup.appendChild(mkItem("Close Right", "close-right"));
@@ -300,6 +311,18 @@ function dispatch(action: string) {
     case "duplicate":
       h.duplicateTab(tabId);
       break;
+    case "share":
+      h.shareTab(tabId);
+      break;
+    case "copy-share": {
+      const url = h.getShareUrl(tabId);
+      if (url) {
+        clipboardWriteText(url)
+          .then(() => showToast("Share link copied", "info"))
+          .catch(logCatch("clipboard.write"));
+      }
+      break;
+    }
     case "close":
       h.closeTab(tabId);
       break;
@@ -347,6 +370,10 @@ function dispatch(action: string) {
 // -- Public API --
 export function showTabContextMenu(tabId: string, x: number, y: number) {
   currentTabId = tabId;
+  const shared = _handlers?.isTabShared(tabId) ?? false;
+  shareItem.style.display = shared ? "none" : "";
+  copyShareItem.style.display = shared ? "" : "none";
+  stopShareItem.style.display = shared ? "" : "none";
   tabMenuGroup.style.display = "";
   termMenuGroup.style.display = "none";
   showAt(x, y);

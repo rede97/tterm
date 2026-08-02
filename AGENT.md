@@ -68,6 +68,8 @@ src-tauri/src/
   pty.rs                PTY spawn/resize/kill
   deadmode.rs           in-band "session ended, Enter to reconnect" protocol
   serial.rs             serial sessions (+ live baud via SerialCtl)
+  share.rs              AI session sharing: HTTP API on the hub (prompt doc, screen
+                        snapshots w/ rate limit + long-poll, input POST), share tokens
   demo.rs               demo/anime TTY (debug builds only)
   ssh.rs wt.rs config.rs fonts.rs window.rs cmdparse.rs newline.rs
 ```
@@ -96,11 +98,17 @@ Key facts:
 - `AppState` holds `sessions` (PTY) + `serial_sessions` + `next_id` + `initial_cwd` (from `--working-directory` CLI arg).
 - Per-tab working directory: `pty_spawn` accepts an optional `cwd` (folder picker / recent-folders menu on the `+` button) which overrides `initial_cwd` and is stored in `SpawnSpec::Pty`, so in-band respawns reopen in the same directory. The NSIS installer (`src-tauri/installer-hooks.nsh`, wired via `bundle.windows.nsis.installerHooks`) registers Explorer "Open in TTerm" entries that run `tterm.exe --working-directory "<folder>"`; `open_new_window` forwards the launch cwd to new windows.
 - `PtySession` stores the PTY `master` (`None` after child exit), a per-spawn `nonce` guarding the watchdog against respawn races, and the last known `size` (respawns keep it). A watchdog thread waits on `child.wait()`; on exit it sets `master = None`, closing ConPTY so the relay read pump unblocks (ConPTY never signals EOF on child death).
-- All sessions share one WebSocket relay hub bound once at startup: `ws://127.0.0.1:{port}/pty/{id}?token={token}`, per-process random token, 403/404 on bad auth/route. Session death does NOT close the socket (dead mode); only `pty_kill` tears a slot down (WS Close frame).
+- All sessions share one WebSocket relay hub bound once at startup: `ws://127.0.0.1:{port}/pty/{id}?token={token}`, per-process random token, 403/404 on bad auth/route. Session death does NOT close the socket (dead mode); only `pty_kill` tears a slot down (WS Close frame). The same port also serves plain HTTP: the accept loop peeks (non-consuming) — `Upgrade: websocket` goes to tungstenite, anything else to the share API in `share.rs` (see "AI session sharing" below).
 
-Frontend → backend commands (invoke): `pty_spawn`, `pty_spawn_ssh`, `pty_resize`, `pty_kill`, `window_minimize/toggle_maximize/close/start_drag`, `open_new_window`, `pick_directory`, `save_text_file`, `read_wt_settings`, `read_wt_fragments`, `find_vs_instances`, `read_config`, `write_config`, `delete_config`, `open_config_dir`, `ssh_read_config_raw`, `ssh_save_config`, `ssh_clear_known_hosts`, `open_ssh_config`, `list_system_fonts`, `serial_list_ports`, `serial_spawn`, `serial_set_baud`, `serial_set_output_newline` (debug builds add `demo_spawn`, `anime_spawn`).
+Frontend → backend commands (invoke): `pty_spawn`, `pty_spawn_ssh`, `pty_resize`, `pty_kill`, `window_minimize/toggle_maximize/close/start_drag`, `open_new_window`, `pick_directory`, `save_text_file`, `read_wt_settings`, `read_wt_fragments`, `find_vs_instances`, `read_config`, `write_config`, `delete_config`, `open_config_dir`, `ssh_read_config_raw`, `ssh_save_config`, `ssh_clear_known_hosts`, `open_ssh_config`, `list_system_fonts`, `serial_list_ports`, `serial_spawn`, `serial_set_baud`, `serial_set_output_newline`, `share_create`, `share_revoke`, `share_screen_response`, `share_screen_changed` (debug builds add `demo_spawn`, `anime_spawn`).
 
 Backend → frontend: WebSocket binary frames → `BatchAttachAddon`, which coalesces messages within a 6 ms window before `terminal.write()`: ConPTY splits a full-screen frame into a bare `ESC[2J` + content ~1–3 ms apart, and unbatched writes present the erase as a blank frame (flicker). Full postmortem: `docs/bugfix-fullscreen-flicker.md` — **do not remove the batching in refactors.**
+
+## AI session sharing
+
+Right-click a tab → Share with AI copies a self-describing HTTP URL (`/share/<id>?token=…` on the hub port): opening it returns a prompt document teaching the agent the API. `GET /screen` returns a character-level snapshot of the xterm buffer (cols/rows/cursor/`fake_cursor`/`alt_screen`/`seq`/`lines`) — the frontend is the ground truth, reached via a `share-screen-request` event + `share_screen_response` command round-trip. Plain polls are rate-limited to 1/s per share token (429); `?wait=<seq>&timeout=<s>` long-polls wake on `share_screen_changed` (frontend bumps seq on render, throttled 200 ms). `POST /input` writes raw bytes through the relay's session writer (same lock as human keystrokes). Revoke = registry removal → 403.
+
+**Gotcha**: do NOT store `tauri::AppHandle` in `WsHub` — a `Mutex<Option<AppHandle>>` field there makes the test binary fail to load with 0xc0000139. The hub uses a type-erased `emit_fn` closure set in `setup()` instead.
 
 ## Disconnect & reconnect
 
@@ -159,7 +167,7 @@ No native title bar (`decorations: false`). The tab bar is the title bar: tabs l
 
 ## E2E testing
 
-`wdio → tauri-driver(:4444) → msedgedriver → WebView2`. Read `docs/testing.md` before modifying; on this repo a skill file (`.pi/skills/tauri-e2e-testing/`) catalogs the fatal pitfalls (IPv6, driver version match, process-tree cleanup, WebDriver element quirks). Run focused specs: `bun run test:e2e:ime`, `bun run test:e2e:anime`, or `--spec e2e/specs/app.e2e.js`. Debug introspection: `window.__tterm` (dev builds only) exposes `tabs`, `mgr`, IME debug hooks.
+`wdio → tauri-driver(:4444) → msedgedriver → WebView2`. Read `docs/testing.md` before modifying; on this repo a skill file (`.pi/skills/tauri-e2e-testing/`) catalogs the fatal pitfalls (IPv6, driver version match, process-tree cleanup, WebDriver element quirks). Run focused specs: `bun run test:e2e:ime`, `bun run test:e2e:anime`, `bun run test:e2e:share`, or `--spec e2e/specs/app.e2e.js`. Debug introspection: `window.__tterm` (dev builds only) exposes `tabs`, `mgr`, IME debug hooks.
 
 ## Icon generation
 

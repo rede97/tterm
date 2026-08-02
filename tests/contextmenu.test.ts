@@ -27,6 +27,9 @@ const handlers: ContextMenuHandlers = {
   getSerialOutputNewline: vi.fn(),
   getSerialEnterNewline: vi.fn(),
   getActiveTabId: vi.fn(),
+  shareTab: vi.fn(),
+  isTabShared: vi.fn(),
+  getShareUrl: vi.fn(),
 };
 
 setContextMenuHandlers(handlers);

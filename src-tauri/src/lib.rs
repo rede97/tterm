@@ -8,6 +8,7 @@ mod newline;
 mod pty;
 mod relay;
 mod serial;
+mod share;
 mod ssh;
 mod state;
 mod window;
@@ -32,6 +33,15 @@ pub fn run() {
             // Unified WebSocket relay hub: single loopback port, path routing,
             // per-process auth token. Must start before any session spawns.
             let hub = relay::WsHub::start()?;
+            // The share API (share.rs) requests screen snapshots from the
+            // frontend through this event emitter.
+            {
+                let app_handle = app.handle().clone();
+                hub.set_emitter(Box::new(move |event, payload| {
+                    use tauri::Emitter;
+                    let _ = app_handle.emit(event, payload);
+                }));
+            }
 
             app.manage(AppState {
                 sessions: Arc::new(Mutex::new(HashMap::new())),
@@ -56,6 +66,7 @@ pub fn run() {
                 wt::read_wt_settings, wt::read_wt_fragments, wt::find_vs_instances,
                 serial::serial_list_ports, serial::serial_spawn, serial::serial_set_baud,
                 serial::serial_set_output_newline,
+                share::share_create, share::share_revoke, share::share_screen_response, share::share_screen_changed,
                 demo::demo_spawn, demo::anime_spawn,
                 fonts::list_system_fonts,
             ] }
@@ -70,6 +81,7 @@ pub fn run() {
                 wt::read_wt_settings, wt::read_wt_fragments, wt::find_vs_instances,
                 serial::serial_list_ports, serial::serial_spawn, serial::serial_set_baud,
                 serial::serial_set_output_newline,
+                share::share_create, share::share_revoke, share::share_screen_response, share::share_screen_changed,
                 fonts::list_system_fonts,
             ] }
         })

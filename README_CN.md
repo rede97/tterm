@@ -21,6 +21,10 @@
 
 ### 为 AI Agent 工作流而生
 
+- **把活会话交给你的 AI agent** — 右键标签页 → *Share with AI*，把链接贴给本地
+  agent 即可。链接本身就是说明书：agent 拉取字符级屏幕快照（不截图、不 OCR、
+ 兼容 TUI——连假光标在哪都知道），还能替你敲键盘；你实时看着它每一步操作，
+ 一键即可切断。一切不出 127.0.0.1。（[协议](docs/ai-session-sharing.md)）
 - **快** — 冷启动 < 1 秒，安装包 ~5 MB，空闲内存 < 30 MB，没有 Electron 的臃肿
 - **中文输入，为 Agent TUI 而生** — pi、Claude Code 这类隐藏光标的 TUI 里，
   其他终端的拼音组合串要么彻底消失、要么飘到远处角落。TTerm 把组合串直接
@@ -70,7 +74,7 @@ bun run tauri build
 
 ## 路线图
 
-- [ ] **AI 会话共享** —— 把任意活跃会话（本地 shell / SSH / 串口）通过一条可吊销的 WebSocket 链接交给本地 AI agent：你实时看着它每一步操作，一键即可切断。不截图、不 OCR,agent 直接拿原始字节流。（[设计稿 + agent 接入指南](docs/ai-session-sharing.md)）
+- [x] ~~**AI 会话共享**~~ —— 把任意活跃会话（本地 shell / SSH / 串口）通过一条可吊销的链接交给本地 AI agent：agent 打开链接即读懂用法，拉取字符级屏幕快照（不截图、不 OCR、兼容 TUI），还能代替你敲键盘。你实时看着它每一步操作，一键即可切断。（[设计稿 + agent 接入指南](docs/ai-session-sharing.md)）
 - [ ] 分屏显示
 - [ ] 配色方案自定义编辑器
 - [x] ~~串口终端~~ · ~~断线重连~~ · ~~主题系统~~ · ~~OSC 9;4 进度条~~

@@ -51,6 +51,12 @@ export class TerminalTab {
   progress = 0;
   sizeHint!: SizeHint;
   disconnected = false;
+  // AI session sharing: set by TabManager.shareTab. While shared, renders
+  // bump shareSeq (throttled) to the backend so long-poll clients wake.
+  shared = false;
+  shareUrl?: string;
+  shareSeq = 0;
+  private lastShareSeqSent = 0;
   // set by TabManager: called when the session socket closes for good
   onSocketClosed?: () => void;
   // Floating IME composition mirror (Plan C). Shows the composition string
@@ -159,6 +165,14 @@ export class TerminalTab {
       const buf = this.terminal.buffer.active;
       this.cursorFilter.sample(buf.cursorX, buf.cursorY);
       this.refreshImeClasses();
+      this.shareSeq++;
+      if (this.shared) {
+        const now = Date.now();
+        if (now - this.lastShareSeqSent > 200) {
+          this.lastShareSeqSent = now;
+          invoke("share_screen_changed", { id: this.id, seq: this.shareSeq }).catch(() => { });
+        }
+      }
     });
     this.refreshImeClasses();
 
@@ -590,6 +604,32 @@ export class TerminalTab {
     const labelEl = this.tabElement.querySelector(".tab-label") as HTMLElement;
     if (labelEl) labelEl.textContent = this.label;
     this.tabElement.title = this.label;
+  }
+
+  // Character-level screen snapshot for AI session sharing (the xterm
+  // buffer is the ground-truth grid — no OCR, no ANSI parsing needed).
+  buildShareSnapshot(): Record<string, unknown> {
+    const buf = this.terminal.buffer.active;
+    const lines: string[] = [];
+    for (let y = 0; y < this.terminal.rows; y++) {
+      lines.push(buf.getLine(buf.viewportY + y)?.translateToString(true) ?? "");
+    }
+    const cursorHidden = this._isCursorHidden();
+    const snap: Record<string, unknown> = {
+      id: this.id,
+      label: this.label,
+      type: this.type,
+      cols: this.terminal.cols,
+      rows: this.terminal.rows,
+      cursor: { x: buf.cursorX, y: buf.cursorY, visible: !cursorHidden },
+      alt_screen: buf.type === "alternate",
+      seq: this.shareSeq,
+      lines,
+    };
+    // The TUI hides the hardware cursor and draws its own: expose where
+    // input actually lands (same scan chain as the IME anchor).
+    if (cursorHidden) snap.fake_cursor = this._imeAnchorCell();
+    return snap;
   }
 
   destroy(): void {

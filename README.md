@@ -21,6 +21,12 @@
 
 ### For AI agent workflows
 
+- **Hand a live session to your AI agent** — right-click a tab → *Share with
+  AI*, paste the link to any local agent. The link teaches the agent how to
+  use it: it pulls character-level screen snapshots (no screenshots, no OCR,
+  TUI-aware — it even knows where the fake cursor is) and can type for you,
+  while you watch every move in real time. One click revokes everything;
+  nothing ever leaves 127.0.0.1. ([protocol](docs/ai-session-sharing.md))
 - **Fast** — cold start under 1 second, ~5 MB installer, under 30 MB idle
   memory. No Electron bloat.
 - **CJK input that works in agent TUIs** — terminals that hide the hardware
@@ -78,7 +84,7 @@ Dev and testing docs live in [docs/testing.md](docs/testing.md).
 
 ## Roadmap
 
-- [ ] **AI session sharing** — hand any live session (shell / SSH / serial) to a local AI agent over a scoped, revocable WebSocket link; you watch every keystroke in real time and cut it off with one click. No screenshots, no OCR — the agent gets the raw byte stream. ([design + agent integration guide](docs/ai-session-sharing.md))
+- [x] ~~**AI session sharing**~~ — hand any live session (shell / SSH / serial) to a local AI agent over a scoped, revocable link: the agent opens the link, reads how it works, pulls character-level screen snapshots (no screenshots, no OCR, TUI-aware) and types keystrokes. You watch every move in real time and cut it off with one click. ([design + agent integration guide](docs/ai-session-sharing.md))
 - [ ] Split panes
 - [ ] Custom color scheme editor
 - [x] ~~Serial terminal~~ · ~~Session reconnect~~ · ~~Theme system~~ · ~~OSC 9;4 progress~~
