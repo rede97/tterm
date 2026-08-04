@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { configStore, type ConfigState } from "../core/store";
-import { logError } from "../core/errorlog";
+import { logCatch, logError } from "../core/errorlog";
 
 export function createGeneralPanel(): HTMLElement {
   const panel = document.createElement("div");
@@ -24,6 +24,29 @@ export function createGeneralPanel(): HTMLElement {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:middle"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
             Homepage
           </button>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">Updates</div>
+      <div class="settings-item settings-item-row">
+        <div class="settings-item-info">
+          <div class="settings-item-title">Check for updates automatically</div>
+          <div class="settings-item-desc">Check GitHub Releases for a new version when the app starts.</div>
+        </div>
+        <div class="settings-item-control">
+          <label class="settings-toggle-row" style="padding:0;gap:0;">
+            <input type="checkbox" id="set-auto-update" ${configStore.get("autoCheckUpdates") ? "checked" : ""} />
+          </label>
+        </div>
+      </div>
+      <div class="settings-item settings-item-row">
+        <div class="settings-item-info">
+          <div class="settings-item-title">Manual check</div>
+          <div class="settings-item-desc">Check for a new version right now.</div>
+        </div>
+        <div class="settings-item-control">
+          <button id="set-check-update" class="settings-link-btn">Check for Updates</button>
         </div>
       </div>
     </div>
@@ -114,6 +137,11 @@ export function createGeneralPanel(): HTMLElement {
     openUrl("https://github.com/rede97/tterm");
   });
 
+  // manual update check
+  panel.querySelector("#set-check-update")!.addEventListener("click", () => {
+    import("../core/updater").then(m => m.checkForUpdates(true)).catch(logCatch("updater.manual"));
+  });
+
   // open config directory
   panel.querySelector("#set-open-config-dir")!.addEventListener("click", () => {
     invoke("open_config_dir").catch(logError.bind(null, "config.openDir"));
@@ -143,6 +171,9 @@ export function refreshGeneralPanel(root: HTMLElement): void {
   if (bellEl) bellEl.checked = configStore.get("terminalBell");
   if (rendererEl) rendererEl.value = configStore.get("renderer");
   if (scrollbackEl) scrollbackEl.value = String(configStore.get("scrollback"));
+
+  const autoUpdateEl = root.querySelector("#set-auto-update") as HTMLInputElement;
+  if (autoUpdateEl) autoUpdateEl.checked = configStore.get("autoCheckUpdates");
 }
 
 export function collectGeneralSettings(root: HTMLElement): Partial<ConfigState> {
@@ -158,5 +189,7 @@ export function collectGeneralSettings(root: HTMLElement): Partial<ConfigState> 
   if (bellEl) partial.terminalBell = bellEl.checked;
   if (rendererEl) partial.renderer = rendererEl.value;
   if (scrollbackEl) partial.scrollback = Math.max(100, Math.min(100000, parseInt(scrollbackEl.value, 10) || 1000));
+  const autoUpdateEl = root.querySelector("#set-auto-update") as HTMLInputElement;
+  if (autoUpdateEl) partial.autoCheckUpdates = autoUpdateEl.checked;
   return partial;
 }

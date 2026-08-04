@@ -143,6 +143,15 @@ export class TabManager {
     tab.setDisconnected(true);
   }
 
+  // Resolve the user's default local profile (settings → Profiles), falling
+  // back to the first known profile. Returns null when no profiles are
+  // loaded (backend get_shell() fallback kicks in).
+  defaultLocalProfile(): { command: string; name: string } | null {
+    const defName = configStore.get("defaultLocalProfile") ?? configStore.get("localProfiles")[0]?.name ?? null;
+    const p = defName ? configStore.get("localProfiles").find(x => x.name === defName) : null;
+    return p ? { command: p.command, name: p.name } : null;
+  }
+
   async createLocalTab(command?: string, label?: string, cwd?: string): Promise<TerminalTab | null> {
     let result: { id: string; port: number; token: string };
     try {
@@ -660,8 +669,7 @@ export class TabManager {
         import("./dirmenu").then(m => m.pickAndLaunchDirectory());
         return;
       }
-      const defName = configStore.get("defaultLocalProfile") ?? configStore.get("localProfiles")[0]?.name ?? null;
-      const p = defName ? configStore.get("localProfiles").find(x => x.name === defName) : null;
+      const p = this.defaultLocalProfile();
       if (p) this.createLocalTab(p.command, p.name);
       else this.createLocalTab();
     });

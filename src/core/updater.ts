@@ -7,6 +7,16 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { showToast } from "../ui/toast";
 import { logCatch } from "./errorlog";
+import { configStore } from "./store";
+
+// Launch-time update check, skipped when the user disabled it
+// (Settings → General → Updates).
+export function scheduleAutoUpdateCheck(delayMs = 3000): void {
+  setTimeout(() => {
+    if (!configStore.get("autoCheckUpdates")) return;
+    checkForUpdates().catch(logCatch("updater"));
+  }, delayMs);
+}
 
 export async function checkForUpdates(manual = false): Promise<void> {
   try {

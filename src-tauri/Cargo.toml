@@ -1,6 +1,6 @@
 [package]
 name = "tterm"
-version = "0.7.2"
+version = "0.7.3"
 description = "A Tauri App"
 authors = ["rede97"]
 license = "MIT"

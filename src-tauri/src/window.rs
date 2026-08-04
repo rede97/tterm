@@ -35,22 +35,31 @@ pub fn open_new_window(state: tauri::State<crate::state::AppState>) -> Result<()
     Ok(())
 }
 
+// Async + non-blocking dialog: a blocking_pick_folder() on the main thread
+// freezes the WebView2 message pump, so Windows marks the window
+// "Not Responding" while the folder picker is open.
 #[tauri::command]
-pub fn pick_directory(app: tauri::AppHandle) -> Option<String> {
-    app.dialog()
-        .file()
-        .blocking_pick_folder()
-        .and_then(|p| p.as_path().map(|p| p.to_string_lossy().to_string()))
+pub async fn pick_directory(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog().file().pick_folder(move |path| {
+        let _ = tx.send(path);
+    });
+    let path = rx.await.map_err(|e| e.to_string())?;
+    Ok(path.and_then(|p| p.as_path().map(|p| p.to_string_lossy().to_string())))
 }
 
 #[tauri::command]
-pub fn save_text_file(app: tauri::AppHandle, content: String) -> Result<(), String> {
-    let file = app.dialog()
+pub async fn save_text_file(app: tauri::AppHandle, content: String) -> Result<(), String> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
         .file()
         .add_filter("Text", &["txt", "log"])
         .set_file_name("terminal-output.txt")
-        .blocking_save_file();
+        .save_file(move |path| {
+            let _ = tx.send(path);
+        });
 
+    let file = rx.await.map_err(|e| e.to_string())?;
     if let Some(path) = file {
         if let Some(p) = path.as_path() {
             std::fs::write(p, &content).map_err(|e| e.to_string())?;

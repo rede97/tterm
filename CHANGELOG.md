@@ -1,3 +1,20 @@
+## v0.7.3
+
+New Features
+
+- **Update settings** — Settings → General → Updates now has a "Check for
+  Updates" button for a manual check, and a toggle to disable the
+  automatic update check on startup
+
+Fixes
+
+- Opening a directory (Shift+click "+" or the recent-folders menu) now
+  launches your configured default profile (e.g. PowerShell) instead of
+  always falling back to cmd.exe
+- The main window no longer goes "Not Responding" while the folder
+  picker or the save-output dialog is open — both dialogs are now
+  non-blocking
+
 ## v0.7.2
 
 New Features

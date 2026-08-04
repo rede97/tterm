@@ -24,7 +24,10 @@ export function rememberDirectory(dir: string): void {
 
 export async function launchDirectoryTab(dir: string): Promise<void> {
   rememberDirectory(dir);
-  await tabManager.createLocalTab(undefined, dirName(dir), dir);
+  // Launch the user's default profile (settings → Profiles), not the
+  // backend's hardcoded fallback shell.
+  const p = tabManager.defaultLocalProfile();
+  await tabManager.createLocalTab(p?.command, dirName(dir), dir);
 }
 
 export async function pickAndLaunchDirectory(): Promise<void> {

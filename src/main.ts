@@ -22,7 +22,7 @@ import { loadAllWtData } from "./config/wt-profiles";
 import { setWtThemes } from "./util/themes";
 import { findTheme } from "./util/themes";
 import { logCatch } from "./core/errorlog";
-import { checkForUpdates } from "./core/updater";
+import { scheduleAutoUpdateCheck } from "./core/updater";
 
 // -- DOM refs ---
 
@@ -180,13 +180,13 @@ configStore.load().then(async () => {
     vsInstalls: wt.vsInstalls,
   });
 
-  const defName = configStore.get("defaultLocalProfile") ?? configStore.get("localProfiles")[0]?.name ?? null;
-  const p = defName ? configStore.get("localProfiles").find(x => x.name === defName) : null;
+  const p = tabManager.defaultLocalProfile();
   if (p) await tabManager.createLocalTab(p.command, p.name);
   else await tabManager.createLocalTab();
 }).catch(() => {
   welcomeEl.style.display = "flex";
 });
 
-// Check for updates in the background (no-op in dev builds without a signed release)
-setTimeout(() => { checkForUpdates().catch(logCatch("updater")); }, 3000);
+// Check for updates in the background (no-op in dev builds without a signed release;
+// skipped when disabled in Settings → General → Updates)
+scheduleAutoUpdateCheck();
