@@ -1,3 +1,12 @@
+## v0.7.2
+
+New Features
+
+- **Automatic updates** — TTerm now checks for new versions on startup
+  and offers to download and install them in place, restarting itself to
+  finish. Update packages are cryptographically signed; the check is
+  silent when you're already up to date
+
 ## v0.7.1
 
 New Features
