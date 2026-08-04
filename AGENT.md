@@ -187,7 +187,7 @@ Changelog, release notes, and user-facing docs are written for **users, not cont
 
 ## Release process
 
-**Version bump** — update all three: `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `package.json`.
+**Version bump** — update all three: `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `package.json`. (Safety net: the release workflow syncs all three from the tag name before building, so installer filenames and the updater manifest always follow the tag even if a bump was missed — still bump them so dev builds report the right version. Verify the bump actually landed: `grep '"version"' package.json src-tauri/tauri.conf.json`.)
 
 **Tag and release** — first add a `## vX.Y.Z` section to the top of CHANGELOG.md (the release workflow extracts the first `## v` section as the GitHub Release body), then commit, tag, push:
 

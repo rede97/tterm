@@ -53,6 +53,18 @@ jobs:
           echo "EOF" >> $env:GITHUB_OUTPUT
           Write-Host "Release notes: $($lines.Count) lines, $($body.Length) chars"
 
+      - name: Sync version from tag
+        # The tag is the single source of truth for the release version:
+        # installer filenames (and the updater manifest) always follow it,
+        # even if the in-repo version fields were not bumped beforehand.
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}" -replace '^v', ''
+          Write-Host "Syncing version $v from tag"
+          (Get-Content src-tauri/tauri.conf.json -Raw) -replace '"version": "[^"]*"', "`"version`": `"$v`"" | Set-Content src-tauri/tauri.conf.json -NoNewline
+          (Get-Content package.json -Raw) -replace '"version": "[^"]*"', "`"version`": `"$v`"" | Set-Content package.json -NoNewline
+          (Get-Content src-tauri/Cargo.toml -Raw) -replace '(?m)^version = "[^"]*"', "version = `"$v`"" | Set-Content src-tauri/Cargo.toml -NoNewline
+
       - name: Build and publish release
         uses: tauri-apps/tauri-action@v0
         env:
