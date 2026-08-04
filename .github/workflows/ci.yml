@@ -28,7 +28,11 @@ jobs:
           workspaces: src-tauri
 
       - name: Build
-        run: bun run tauri build
+        # Updater artifacts (.sig) are only produced by the release workflow,
+        # which holds TAURI_SIGNING_PRIVATE_KEY. CI (esp. fork PRs, where
+        # secrets are unavailable) skips them so tauri build doesn't demand
+        # the signing key.
+        run: bun run tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'
 
       - name: Upload NSIS installer
         uses: actions/upload-artifact@v4
