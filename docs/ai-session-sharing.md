@@ -34,7 +34,32 @@ http://127.0.0.1:<port>/share/<session-id>?token=<share-token>
 | GET | `/share/<id>?token=<t>` | 提示词文档(本说明) |
 | GET | `/share/<id>/screen?token=<t>` | 屏幕快照(JSON,见下) |
 | GET | `/share/<id>/screen?token=<t>&wait=<seq>&timeout=<s>` | 长轮询:屏幕 seq 超过 `<seq>` 立即返回,否则至多等 `<s>` 秒(上限 30) |
-| POST | `/share/<id>/input?token=<t>` | body 原始字节 = 键盘输入(需可写令牌) |
+| GET | `/share/<id>/screenshot?token=<t>&scale=<1-4>` | 屏幕 PNG 截图(限频 1/s;前端按主题色重绘 buffer) |
+| POST | `/share/<id>/input?token=<t>` | 键盘输入:JSON 形式或原始字节(**均须 UTF-8**,见下) |
+
+### 输入编码:一律 UTF-8
+
+本 API 所有请求/响应正文均为 UTF-8。发送文本**必须**是 UTF-8——终端输入管道按
+UTF-8 解码,GBK/Latin-1/UTF-16 字节会显示为乱码。推荐用 JSON 形式,从根上避免编码歧义:
+
+```sh
+# JSON 形式(推荐,Unicode 安全):text 按 UTF-8 写入,与真人 IME 键入同一路径
+curl -X POST -H "Content-Type: application/json" \
+  --data '{"text": "中文命令", "enter": true}' \
+  "http://127.0.0.1:<port>/share/tab-1/input?token=<t>"
+
+# 命名按键:enter/esc/tab/backspace/space/方向键/home/end/insert/delete/
+# pageup/pagedown/f1–f12/单字符,修饰键 ctrl+ alt+ shift+
+curl -X POST -H "Content-Type: application/json" \
+  --data '{"keys": ["ctrl+c", "enter"]}' \
+  "http://127.0.0.1:<port>/share/tab-1/input?token=<t>"
+
+# 原始字节(必须是 UTF-8)
+printf 'ls -la\r' | curl -X POST --data-binary @- \
+  "http://127.0.0.1:<port>/share/tab-1/input?token=<t>"
+```
+
+JSON 字段:`text`(字符串,可含 `\r`)、`keys`(按键数组,按序发送)、`enter`(布尔,追加回车)。
 
 ### 屏幕快照
 
@@ -69,8 +94,9 @@ curl "http://127.0.0.1:<port>/share/tab-1/screen?token=<t>"
 # 2. 等屏幕变化(长轮询,seq 取自上一次快照)
 curl "http://127.0.0.1:<port>/share/tab-1/screen?token=<t>&wait=1831&timeout=25"
 
-# 3. 敲键盘(\r = 回车,\x03 = Ctrl+C)
-printf 'ls -la\r' | curl -X POST --data-binary @- \
+# 3. 敲键盘(JSON 形式:\r = 回车,中文直接写)
+curl -X POST -H "Content-Type: application/json" \
+  --data '{"text": "ls -la\r"}' \
   "http://127.0.0.1:<port>/share/tab-1/input?token=<t>"
 ```
 
@@ -98,4 +124,5 @@ printf 'ls -la\r' | curl -X POST --data-binary @- \
 2. ~~分享令牌表 + `share_create` / `share_revoke` 命令~~ ✅
 3. ~~`GET /share/<id>` 提示词 / `GET /screen`(限频 + 长轮询)/ `POST /input`~~ ✅
 4. ~~前端:buffer 快照(`share-screen-request` 事件往返)、seq 变更上报、tab 右键 Share with AI / Copy Share Link / Stop Sharing、共享中角标~~ ✅
-5. 迭代项:relay 下行 mpsc → broadcast,WS 原始字节流分享(多订阅者);只读分享的 UI 开关;`?scrollback=N` 历史行;ANSI 保色快照
+5. ~~JSON 输入形式(Unicode 文本 + 命名按键编码器)、PNG 截图(前端 2D canvas 重绘)~~ ✅
+6. 迭代项:relay 下行 mpsc → broadcast,WS 原始字节流分享(多订阅者);只读分享的 UI 开关;`?scrollback=N` 历史行;ANSI 保色快照

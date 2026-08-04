@@ -781,12 +781,25 @@ body {
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 6px 16px;
   font-size: 13px;
   color: #cccccc;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.tab-context-menu .menu-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: #999999;
+}
+
+.tab-context-menu .menu-item:hover .menu-icon {
+  color: #ffffff;
 }
 
 .tab-context-menu .menu-item:hover {
@@ -795,7 +808,8 @@ body {
 }
 
 .tab-context-menu .menu-arrow {
-  margin-left: 24px;
+  margin-left: auto;
+  padding-left: 24px;
   font-size: 14px;
   color: #888;
 }

@@ -3,6 +3,7 @@
 // the circular dependency: contextmenu ↔ tabmanager ↔ tab.
 
 import { openFind } from "./search";
+import { createElement, Plus, ExternalLink, Palette, Pencil, Copy, Share2, Link, Unlink, X, ArrowRightToLine, CircleX } from "lucide";
 import { trimPasteContent, SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES } from "../core/common";
 import type { SerialEnterNewline, SerialOutputNewline } from "../core/types";
 import { readText as clipboardReadText, writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
@@ -81,10 +82,18 @@ function showAt(x: number, y: number) {
   });
 }
 
-function mkItem(label: string, action: string): HTMLElement {
+function mkItem(label: string, action: string, iconFn?: Parameters<typeof createElement>[0]): HTMLElement {
   const el = document.createElement("div");
   el.className = "menu-item";
-  el.textContent = label;
+  if (iconFn) {
+    const icon = document.createElement("span");
+    icon.className = "menu-icon";
+    icon.appendChild(createElement(iconFn, { stroke: "currentColor", width: 14, height: 14 }));
+    el.appendChild(icon);
+  }
+  const text = document.createElement("span");
+  text.textContent = label;
+  el.appendChild(text);
   el.dataset.action = action;
   return el;
 }
@@ -100,13 +109,17 @@ const tabMenuGroup = document.createElement("div");
 tabMenuGroup.dataset.group = "tab";
 tabMenuGroup.style.display = "none";
 
-tabMenuGroup.appendChild(mkItem("New Tab", "new-tab"));
-tabMenuGroup.appendChild(mkItem("Open in New Window", "new-window"));
+tabMenuGroup.appendChild(mkItem("New Tab", "new-tab", Plus));
+tabMenuGroup.appendChild(mkItem("Open in New Window", "new-window", ExternalLink));
 tabMenuGroup.appendChild(mkSeparator());
 
 // Color submenu
 const colorItem = document.createElement("div");
 colorItem.className = "menu-item has-submenu";
+const colorIcon = document.createElement("span");
+colorIcon.className = "menu-icon";
+colorIcon.appendChild(createElement(Palette, { stroke: "currentColor", width: 14, height: 14 }));
+colorItem.appendChild(colorIcon);
 const colorLabel = document.createElement("span");
 colorLabel.textContent = "Change Tab Color";
 colorItem.appendChild(colorLabel);
@@ -138,19 +151,19 @@ colorItem.appendChild(colorSub);
 colorItem.addEventListener("mouseenter", () => colorSub.classList.add("open"));
 colorItem.addEventListener("mouseleave", () => colorSub.classList.remove("open"));
 
-tabMenuGroup.appendChild(mkItem("Rename", "rename"));
-tabMenuGroup.appendChild(mkItem("Duplicate Tab", "duplicate"));
+tabMenuGroup.appendChild(mkItem("Rename", "rename", Pencil));
+tabMenuGroup.appendChild(mkItem("Duplicate Tab", "duplicate", Copy));
 // Share state decides which of these three is visible (showTabContextMenu).
-const shareItem = mkItem("Share with AI", "share");
-const copyShareItem = mkItem("Copy Share Link", "copy-share");
-const stopShareItem = mkItem("Stop Sharing", "share");
+const shareItem = mkItem("Share with AI", "share", Share2);
+const copyShareItem = mkItem("Copy Share Link", "copy-share", Link);
+const stopShareItem = mkItem("Stop Sharing", "share", Unlink);
 tabMenuGroup.appendChild(shareItem);
 tabMenuGroup.appendChild(copyShareItem);
 tabMenuGroup.appendChild(stopShareItem);
 tabMenuGroup.appendChild(mkSeparator());
-tabMenuGroup.appendChild(mkItem("Close", "close"));
-tabMenuGroup.appendChild(mkItem("Close Right", "close-right"));
-tabMenuGroup.appendChild(mkItem("Close Others", "close-others"));
+tabMenuGroup.appendChild(mkItem("Close", "close", X));
+tabMenuGroup.appendChild(mkItem("Close Right", "close-right", ArrowRightToLine));
+tabMenuGroup.appendChild(mkItem("Close Others", "close-others", CircleX));
 
 contextMenu.appendChild(tabMenuGroup);
 

@@ -144,10 +144,17 @@ import("./terminal/contextmenu").then(m => {
 
 // AI session sharing: the hub asks the frontend for a screen snapshot —
 // the xterm buffer is the ground-truth character grid.
-listen<{ id: string; req: number }>("share-screen-request", (e) => {
+listen<{ id: string; req: number; format?: string; scale?: number }>("share-screen-request", (e) => {
+  const respond = (snapshot: unknown) =>
+    invoke("share_screen_response", { req: e.payload.req, snapshot }).catch(logCatch("share.screenResponse"));
   const tab = tabManager.get(e.payload.id);
-  const snapshot = tab ? tab.buildShareSnapshot() : { error: "session has no terminal" };
-  invoke("share_screen_response", { req: e.payload.req, snapshot }).catch(logCatch("share.screenResponse"));
+  if (!tab) {
+    respond({ error: "session has no terminal" });
+  } else if (e.payload.format === "png") {
+    tab.buildShareScreenshot(e.payload.scale ?? 2).then(respond);
+  } else {
+    respond(tab.buildShareSnapshot());
+  }
 });
 initWindowControls();
 

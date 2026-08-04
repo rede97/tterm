@@ -37,6 +37,8 @@ describe("AI session sharing", () => {
     const doc = await resp.text();
     expect(doc).toContain("/screen");
     expect(doc).toContain("/input");
+    expect(doc).toContain("/screenshot");
+    expect(doc).toContain("UTF-8");
     expect(doc).toContain("untrusted");
     // Wrong token → 403.
     const bad = await fetch(shareUrl.replace(/token=[0-9a-f]+/, "token=deadbeef"));
@@ -77,6 +79,60 @@ describe("AI session sharing", () => {
       found = snap.lines.some((l) => l.includes(marker));
     }
     expect(found).toBe(true);
+  });
+
+  it("sends Unicode text via JSON input (Chinese-safe)", async () => {
+    const marker = "SHARE_UNI_\u4e2d\u6587";
+    const resp = await fetch(inputUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: `echo ${marker}\r` }),
+    });
+    expect(resp.status).toBe(200);
+
+    let found = false;
+    for (let i = 0; i < 5 && !found; i++) {
+      const seq = globalThis.__shareSeq;
+      const r = await fetch(`${screenUrl}&wait=${seq}&timeout=10`);
+      expect(r.status).toBe(200);
+      const snap = await r.json();
+      globalThis.__shareSeq = snap.seq;
+      found = snap.lines.some((l) => l.includes(marker));
+    }
+    expect(found).toBe(true);
+  });
+
+  it("sends named keys and shortcuts via JSON input", async () => {
+    // ctrl+c then enter — cmd.exe echoes "^C".
+    const resp = await fetch(inputUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keys: ["ctrl+c", "enter"] }),
+    });
+    expect(resp.status).toBe(200);
+
+    let found = false;
+    for (let i = 0; i < 5 && !found; i++) {
+      const seq = globalThis.__shareSeq;
+      const r = await fetch(`${screenUrl}&wait=${seq}&timeout=10`);
+      expect(r.status).toBe(200);
+      const snap = await r.json();
+      globalThis.__shareSeq = snap.seq;
+      found = snap.lines.some((l) => l.includes("^C"));
+    }
+    expect(found).toBe(true);
+  });
+
+  it("returns a PNG screenshot of the screen", async () => {
+    const u = new URL(screenUrl);
+    const shotUrl = `${u.origin}${u.pathname.replace(/screen$/, "screenshot")}${u.search}`;
+    const resp = await fetch(shotUrl);
+    expect(resp.status).toBe(200);
+    expect(resp.headers.get("content-type")).toContain("image/png");
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    expect(bytes.length).toBeGreaterThan(1000);
+    // PNG magic: 89 50 4E 47
+    expect([...bytes.slice(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
   });
 
   it("revocation cuts access immediately (403)", async () => {

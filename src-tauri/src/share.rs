@@ -40,6 +40,7 @@ pub(crate) struct ShareEntry {
     pub seq: AtomicU64,
     pub notify: tokio::sync::Notify,
     pub last_screen_poll: Mutex<Option<Instant>>,
+    pub last_shot_poll: Mutex<Option<Instant>>,
 }
 
 pub(crate) type ShareRegistry = Arc<Mutex<HashMap<String, Arc<ShareEntry>>>>;
@@ -85,6 +86,7 @@ pub fn share_create(state: tauri::State<AppState>, id: String, label: String, ki
         seq: AtomicU64::new(0),
         notify: tokio::sync::Notify::new(),
         last_screen_poll: Mutex::new(None),
+        last_shot_poll: Mutex::new(None),
     });
     state.hub.shares.lock().map_err(|e| e.to_string())?.insert(token.clone(), entry);
     Ok(ShareCreated {
@@ -310,8 +312,9 @@ async fn route(hub: &Arc<WsHub>, req: &HttpRequest) -> Vec<u8> {
             "",
         ),
         ("GET", "screen") => handle_screen(hub, &entry, token, req).await,
+        ("GET", "screenshot") => handle_screenshot(hub, &entry, req).await,
         ("POST", "input") => handle_input(&entry, writer, req).await,
-        ("GET", "input") | ("POST", "screen") => text(405, "method not allowed\n"),
+        ("GET", "input") | ("POST", "screen") | ("POST", "screenshot") => text(405, "method not allowed\n"),
         _ => text(404, "unknown route\n"),
     }
 }
@@ -367,15 +370,22 @@ async fn handle_screen(hub: &Arc<WsHub>, entry: &Arc<ShareEntry>, token: &str, r
 }
 
 // Ask the frontend for the current screen (the xterm buffer is the ground
-// truth character grid) via an event + command round-trip.
-async fn fetch_screen(hub: &Arc<WsHub>, id: &str) -> Result<serde_json::Value, String> {
+// truth character grid) via an event + command round-trip. `extra` is merged
+// into the request payload (e.g. format/scale for PNG screenshots).
+async fn fetch_snapshot(hub: &Arc<WsHub>, id: &str, extra: serde_json::Value) -> Result<serde_json::Value, String> {
     let req_id = hub.next_screen_req.fetch_add(1, Ordering::Relaxed);
     let (tx, rx) = tokio::sync::oneshot::channel();
     hub.pending_screens
         .lock()
         .map_err(|e| e.to_string())?
         .insert(req_id, tx);
-    hub.emit("share-screen-request", serde_json::json!({ "id": id, "req": req_id }))?;
+    let mut payload = serde_json::json!({ "id": id, "req": req_id });
+    if let (Some(p), Some(e)) = (payload.as_object_mut(), extra.as_object()) {
+        for (k, v) in e {
+            p.insert(k.clone(), v.clone());
+        }
+    }
+    hub.emit("share-screen-request", payload)?;
     match tokio::time::timeout(SCREEN_ROUNDTRIP_TIMEOUT, rx).await {
         Ok(Ok(v)) => Ok(v),
         Ok(Err(_)) => Err("frontend dropped the request".into()),
@@ -384,6 +394,161 @@ async fn fetch_screen(hub: &Arc<WsHub>, id: &str) -> Result<serde_json::Value, S
             Err("screen snapshot timed out".into())
         }
     }
+}
+
+async fn fetch_screen(hub: &Arc<WsHub>, id: &str) -> Result<serde_json::Value, String> {
+    fetch_snapshot(hub, id, serde_json::json!({})).await
+}
+
+// GET /share/<id>/screenshot — PNG render of the screen (rate-limited like
+// plain /screen polls; the frontend redraws the buffer on a 2D canvas —
+// xterm's WebGL canvas has no preserveDrawingBuffer and reads back blank).
+async fn handle_screenshot(hub: &Arc<WsHub>, entry: &Arc<ShareEntry>, req: &HttpRequest) -> Vec<u8> {
+    {
+        let mut last = match entry.last_shot_poll.lock() {
+            Ok(l) => l,
+            Err(_) => return text(500, "rate-limit lock poisoned\n"),
+        };
+        if let Some(t) = *last {
+            if t.elapsed() < SCREEN_MIN_INTERVAL {
+                return text(429, "rate limited: at most one screenshot per second\n");
+            }
+        }
+        *last = Some(Instant::now());
+    }
+    let scale = query_param(Some(&req.query), "scale")
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(2)
+        .clamp(1, 4);
+    let snap = match fetch_snapshot(hub, &entry.session_id, serde_json::json!({ "format": "png", "scale": scale })).await {
+        Ok(v) => v,
+        Err(e) => return text(503, &format!("screenshot unavailable: {}\n", e)),
+    };
+    let Some(b64) = snap.get("png").and_then(|p| p.as_str()) else {
+        let err = snap.get("error").and_then(|e| e.as_str()).unwrap_or("no png data");
+        return text(503, &format!("screenshot unavailable: {}\n", err));
+    };
+    use base64::Engine;
+    match base64::engine::general_purpose::STANDARD.decode(b64) {
+        Ok(png) => respond(200, "image/png", &png, ""),
+        Err(e) => text(500, &format!("png decode failed: {}\n", e)),
+    }
+}
+
+// POST /share/<id>/input — keystrokes for the session. Two body forms:
+//
+//   raw bytes          → written verbatim (MUST be UTF-8 encoded text or
+//                        control bytes; anything else garbles — ConPTY
+//                        decodes the input pipe as UTF-8)
+//   JSON {"text","keys","enter"} → text is a JSON string (Unicode by
+//                        definition) written as UTF-8; keys are named key
+//                        specs encoded below; enter appends \r
+#[derive(serde::Deserialize)]
+struct InputJson {
+    text: Option<String>,
+    keys: Option<Vec<String>>,
+    enter: Option<bool>,
+}
+
+fn build_input_bytes(body: &[u8]) -> Result<Vec<u8>, String> {
+    let trimmed = {
+        let mut t = body;
+        while t.first().is_some_and(|b| b.is_ascii_whitespace()) {
+            t = &t[1..];
+        }
+        t
+    };
+    if trimmed.first() != Some(&b'{') {
+        return Ok(body.to_vec());
+    }
+    let j: InputJson = serde_json::from_slice(body).map_err(|e| format!("invalid JSON input: {}", e))?;
+    let mut out = Vec::new();
+    if let Some(keys) = j.keys {
+        for k in keys {
+            out.extend_from_slice(&encode_key(&k).ok_or(format!("unknown key: {}", k))?);
+        }
+    }
+    if let Some(t) = j.text {
+        out.extend_from_slice(t.as_bytes());
+    }
+    if j.enter == Some(true) {
+        out.push(b'\r');
+    }
+    if out.is_empty() {
+        return Err("empty input".into());
+    }
+    Ok(out)
+}
+
+// Map a key spec ("enter", "ctrl+c", "alt+f4", "shift+tab", "f5", …) to
+// the byte sequence a real keyboard produces on a terminal.
+pub(crate) fn encode_key(spec: &str) -> Option<Vec<u8>> {
+    let parts: Vec<String> = spec
+        .split('+')
+        .map(|p| p.trim().to_ascii_lowercase())
+        .filter(|p| !p.is_empty())
+        .collect();
+    if parts.is_empty() {
+        return None;
+    }
+    let (mods, key) = parts.split_at(parts.len() - 1);
+    let key = &key[0];
+    let (mut ctrl, mut alt, mut shift) = (false, false, false);
+    for m in mods {
+        match m.as_str() {
+            "ctrl" | "control" => ctrl = true,
+            "alt" | "meta" => alt = true,
+            "shift" => shift = true,
+            _ => return None,
+        }
+    }
+    let base: Vec<u8> = match key.as_str() {
+        "enter" | "return" => vec![b'\r'],
+        "esc" | "escape" => vec![0x1b],
+        "tab" if shift => b"\x1b[Z".to_vec(),
+        "tab" => vec![b'\t'],
+        "backspace" => vec![0x7f],
+        "space" => vec![b' '],
+        "up" => b"\x1b[A".to_vec(),
+        "down" => b"\x1b[B".to_vec(),
+        "right" => b"\x1b[C".to_vec(),
+        "left" => b"\x1b[D".to_vec(),
+        "home" => b"\x1b[H".to_vec(),
+        "end" => b"\x1b[F".to_vec(),
+        "insert" => b"\x1b[2~".to_vec(),
+        "delete" | "del" => b"\x1b[3~".to_vec(),
+        "pageup" => b"\x1b[5~".to_vec(),
+        "pagedown" => b"\x1b[6~".to_vec(),
+        "f1" => b"\x1bOP".to_vec(),
+        "f2" => b"\x1bOQ".to_vec(),
+        "f3" => b"\x1bOR".to_vec(),
+        "f4" => b"\x1bOS".to_vec(),
+        "f5" => b"\x1b[15~".to_vec(),
+        "f6" => b"\x1b[17~".to_vec(),
+        "f7" => b"\x1b[18~".to_vec(),
+        "f8" => b"\x1b[19~".to_vec(),
+        "f9" => b"\x1b[20~".to_vec(),
+        "f10" => b"\x1b[21~".to_vec(),
+        "f11" => b"\x1b[23~".to_vec(),
+        "f12" => b"\x1b[24~".to_vec(),
+        single if single.chars().count() == 1 => {
+            let c = single.chars().next().unwrap();
+            if ctrl && c.is_ascii() {
+                vec![(c as u8) & 0x1f]
+            } else if shift && c.is_ascii_alphabetic() {
+                c.to_ascii_uppercase().to_string().into_bytes()
+            } else {
+                c.to_string().into_bytes()
+            }
+        }
+        _ => return None,
+    };
+    if alt {
+        let mut v = vec![0x1b];
+        v.extend_from_slice(&base);
+        return Some(v);
+    }
+    Some(base)
 }
 
 // POST /share/<id>/input — body bytes are keystrokes for the session.
@@ -398,7 +563,10 @@ async fn handle_input(
     if req.body.is_empty() {
         return text(400, "empty body\n");
     }
-    let data = req.body.clone();
+    let data = match build_input_bytes(&req.body) {
+        Ok(d) => d,
+        Err(e) => return text(400, &format!("{}\n", e)),
+    };
     let result = tokio::task::spawn_blocking(move || {
         let mut guard = writer.lock().map_err(|e| e.to_string())?;
         use std::io::Write;
@@ -422,9 +590,32 @@ fn prompt_document(hub: &WsHub, entry: &ShareEntry, token: &str) -> String {
         format!(
             r#"### Typing (keystrokes, not commands)
 
-`POST {base}/input?token={token}` — the request body IS keyboard input:
-`\r` = Enter, `\x03` = Ctrl+C, `q` quits a pager. Interactive programs work
-naturally. Send `\r` (not `\n`) for Enter; serial sessions may need `\r\n`.
+`POST {base}/input?token={token}` — two body forms:
+
+**A. JSON (recommended; Unicode-safe — use this for Chinese/CJK text)**
+
+```sh
+curl -s -X POST -H "Content-Type: application/json" \
+  --data '{{"text": "dir\u4e2d\u6587", "enter": true}}' \
+  "{base}/input?token={token}"
+```
+
+- `text` — a JSON string, written as UTF-8 (identical to typed IME input)
+- `enter` — `true` appends Enter (`\r`) after the text
+- `keys` — array of named keys, sent in order, e.g.
+  `{{"keys": ["ctrl+c", "enter"]}}`
+
+Key names: `enter`, `esc`, `tab`, `backspace`, `space`, `up`/`down`/`left`/`right`,
+`home`, `end`, `insert`, `delete`, `pageup`, `pagedown`, `f1`–`f12`, single
+characters; modifiers `ctrl+`, `alt+`, `shift+` (e.g. `ctrl+shift+t`,
+`alt+f4`, `shift+tab`).
+
+**B. Raw bytes (must be UTF-8!)**
+
+The body IS keyboard input: `\r` = Enter, `\x03` = Ctrl+C, `q` quits a pager.
+**Text MUST be UTF-8 encoded** — the terminal decodes the input pipe as
+UTF-8, so GBK/Latin-1/UTF-16 bytes come out garbled. When in doubt, use
+the JSON form instead.
 
 ```sh
 printf 'ls -la\r' | curl -s -X POST --data-binary @- "{base}/input?token={token}"
@@ -446,6 +637,10 @@ requests will start returning 403 — stop then, do not retry).
 - Session: `{id}` ("{label}", type: {kind})
 - Access: {access}
 
+> **Encoding: UTF-8 everywhere.** All request/response bodies on this API
+> are UTF-8. Text you send MUST be UTF-8 (use the JSON input form for
+> non-ASCII text); text you receive IS UTF-8.
+
 ## Endpoints (all require the token from this URL)
 
 | Method | URL | Purpose |
@@ -453,7 +648,8 @@ requests will start returning 403 — stop then, do not retry).
 | GET | `{base}?token={token}` | this document |
 | GET | `{base}/screen?token={token}` | screen snapshot (JSON) |
 | GET | `{base}/screen?token={token}&wait=<seq>&timeout=<s>` | long-poll: returns as soon as the screen changes after `seq` (max 30 s) |
-| POST | `{base}/input?token={token}` | raw bytes = keystrokes |
+| GET | `{base}/screenshot?token={token}&scale=<1-4>` | PNG image of the screen (rate limit: 1/s) |
+| POST | `{base}/input?token={token}` | keystrokes (JSON form or raw UTF-8 bytes) |
 
 ## Screen snapshots
 
@@ -539,6 +735,7 @@ mod tests {
                 seq: AtomicU64::new(0),
                 notify: tokio::sync::Notify::new(),
                 last_screen_poll: Mutex::new(None),
+                last_shot_poll: Mutex::new(None),
             }),
         );
     }
@@ -651,6 +848,72 @@ mod tests {
         let r = http(&hub, "GET /share/tab-lp/screen?token=toklp&wait=1&timeout=25 HTTP/1.1\r\nHost: x\r\n\r\n");
         assert!(start.elapsed() < Duration::from_secs(5), "long-poll should wake on seq bump");
         assert_eq!(status(&r), 503);
+    }
+
+    #[test]
+    fn key_encoder_maps_named_keys() {
+        assert_eq!(encode_key("enter"), Some(b"\r".to_vec()));
+        assert_eq!(encode_key("Return"), Some(b"\r".to_vec()));
+        assert_eq!(encode_key("esc"), Some(vec![0x1b]));
+        assert_eq!(encode_key("tab"), Some(b"\t".to_vec()));
+        assert_eq!(encode_key("shift+tab"), Some(b"\x1b[Z".to_vec()));
+        assert_eq!(encode_key("backspace"), Some(vec![0x7f]));
+        assert_eq!(encode_key("up"), Some(b"\x1b[A".to_vec()));
+        assert_eq!(encode_key("f1"), Some(b"\x1bOP".to_vec()));
+        assert_eq!(encode_key("f12"), Some(b"\x1b[24~".to_vec()));
+        assert_eq!(encode_key("ctrl+c"), Some(vec![0x03]));
+        assert_eq!(encode_key("ctrl+a"), Some(vec![0x01]));
+        assert_eq!(encode_key("alt+x"), Some(b"\x1bx".to_vec()));
+        assert_eq!(encode_key("shift+a"), Some(b"A".to_vec()));
+        assert_eq!(encode_key("q"), Some(b"q".to_vec()));
+        assert_eq!(encode_key("bogus"), None);
+        assert_eq!(encode_key("ctrl+"), None);
+        assert_eq!(encode_key("hyper+x"), None);
+    }
+
+    #[test]
+    fn input_builder_raw_passthrough_and_json() {
+        // Raw bytes pass through untouched (UTF-8 by contract).
+        assert_eq!(build_input_bytes(b"ls\r").unwrap(), b"ls\r".to_vec());
+        // JSON text is written as UTF-8 — the Chinese-safe path.
+        let j = serde_json::to_vec(&serde_json::json!({"text": "中文", "enter": true})).unwrap();
+        assert_eq!(build_input_bytes(&j).unwrap(), "中文\r".as_bytes().to_vec());
+        // Keys then text then enter, in the documented order.
+        let j = serde_json::to_vec(&serde_json::json!({"keys": ["ctrl+c"], "text": "q"})).unwrap();
+        assert_eq!(build_input_bytes(&j).unwrap(), vec![0x03, b'q']);
+        // Errors: unknown key, bad JSON, empty effective input.
+        let j = serde_json::to_vec(&serde_json::json!({"keys": ["bogus"]})).unwrap();
+        assert!(build_input_bytes(&j).is_err());
+        assert!(build_input_bytes(b"{not json").is_err());
+        assert!(build_input_bytes(b"{}").is_err());
+    }
+
+    #[test]
+    fn share_input_json_delivers_utf8_chinese() {
+        let (hub, mut shell) = start_hub_with_session("tab-j");
+        add_share(&hub, "tab-j", "tokj", true);
+        let body = serde_json::to_string(&serde_json::json!({"text": "中文\r"})).unwrap();
+        let req = format!(
+            "POST /share/tab-j/input?token=tokj HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        assert_eq!(status(&http(&hub, &req)), 200);
+        let mut buf = [0u8; 16];
+        let n = shell.read(&mut buf).unwrap();
+        assert_eq!(&buf[..n], "中文\r".as_bytes());
+    }
+
+    #[test]
+    fn share_screenshot_auth_and_rate_limit() {
+        let (hub, _shell) = start_hub_with_session("tab-ss");
+        add_share(&hub, "tab-ss", "tokss", true);
+        // Bad token → 403.
+        assert_eq!(status(&http(&hub, "GET /share/tab-ss/screenshot?token=no HTTP/1.1\r\nHost: x\r\n\r\n")), 403);
+        // First call: 503 (no frontend attached in tests) — but it counts.
+        assert_eq!(status(&http(&hub, "GET /share/tab-ss/screenshot?token=tokss HTTP/1.1\r\nHost: x\r\n\r\n")), 503);
+        // Immediate second → 429.
+        assert_eq!(status(&http(&hub, "GET /share/tab-ss/screenshot?token=tokss HTTP/1.1\r\nHost: x\r\n\r\n")), 429);
     }
 
     // The WS data path must be unaffected by the HTTP/WS peek split.
