@@ -10,6 +10,9 @@
     "opener:default",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",
-    "window-state:default"
+    "window-state:default",
+    "updater:default",
+    "process:default",
+    "dialog:default"
   ]
 }

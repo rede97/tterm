@@ -32,18 +32,8 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Build
-        run: bun run tauri build
-
-      - name: Find installer
-        id: find
-        shell: pwsh
-        run: |
-          $exe = Get-ChildItem src-tauri/target/release/bundle/nsis/*.exe | Select-Object -First 1
-          echo "path=$exe" >> $env:GITHUB_OUTPUT
-          echo "name=$($exe.Name)" >> $env:GITHUB_OUTPUT
-
       - name: Extract release notes from CHANGELOG.md
+        id: notes
         shell: pwsh
         run: |
           $changelog = Get-Content CHANGELOG.md -Raw
@@ -58,12 +48,21 @@ jobs:
             if ($inSection) { $lines += $line }
           }
           $body = ($lines -join "`n").Trim()
-          $body | Out-File -FilePath release-notes.md -Encoding utf8 -NoNewline
+          echo "body<<EOF" >> $env:GITHUB_OUTPUT
+          echo $body >> $env:GITHUB_OUTPUT
+          echo "EOF" >> $env:GITHUB_OUTPUT
           Write-Host "Release notes: $($lines.Count) lines, $($body.Length) chars"
 
-      - name: Create release
-        uses: softprops/action-gh-release@v2
+      - name: Build and publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          files: ${{ steps.find.outputs.path }}
-          name: ${{ github.ref_name }}
-          body_path: release-notes.md
+          tagName: ${{ github.ref_name }}
+          releaseName: ${{ github.ref_name }}
+          releaseBody: ${{ steps.notes.outputs.body }}
+          releaseDraft: false
+          prerelease: false
+          updaterJsonPreferNsis: true

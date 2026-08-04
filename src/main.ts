@@ -22,6 +22,7 @@ import { loadAllWtData } from "./config/wt-profiles";
 import { setWtThemes } from "./util/themes";
 import { findTheme } from "./util/themes";
 import { logCatch } from "./core/errorlog";
+import { checkForUpdates } from "./core/updater";
 
 // -- DOM refs ---
 
@@ -186,3 +187,6 @@ configStore.load().then(async () => {
 }).catch(() => {
   welcomeEl.style.display = "flex";
 });
+
+// Check for updates in the background (no-op in dev builds without a signed release)
+setTimeout(() => { checkForUpdates().catch(logCatch("updater")); }, 3000);
