@@ -11,6 +11,7 @@ import {
   deleteCustomTheme,
 } from "../config/custom-themes";
 import { showToast } from "../ui/toast";
+import { createModal } from "../ui/modal";
 import { logCatch } from "../core/errorlog";
 
 const COLOR_LABELS: Record<string, string> = {
@@ -51,8 +52,6 @@ function colorRow(key: string, value: string): string {
 }
 
 export function showThemeEditor(opts: ThemeEditorOptions): void {
-  document.querySelector(".te-overlay")?.remove();
-
   const working: Record<string, string> = {};
   for (const key of THEME_COLOR_KEYS) {
     working[key] =
@@ -66,8 +65,8 @@ export function showThemeEditor(opts: ThemeEditorOptions): void {
     .join("");
   const paletteRows = THEME_COLOR_KEYS.slice(5).map((k) => colorRow(k, working[k])).join("");
 
-  const overlay = document.createElement("div");
-  overlay.className = "te-overlay";
+  const modal = createModal({ className: "te-overlay" });
+  const overlay = modal.overlay;
   overlay.innerHTML = `
     <div class="te-dialog">
       <div class="te-header">${opts.editName ? "Edit Theme" : "New Theme"}</div>
@@ -127,19 +126,8 @@ export function showThemeEditor(opts: ThemeEditorOptions): void {
     el.addEventListener("input", () => syncColor(el.dataset.key!, el.value.trim(), "hex"));
   });
 
-  function close(): void {
-    overlay.remove();
-    document.removeEventListener("keydown", onKeydown, true);
-  }
-  function onKeydown(e: KeyboardEvent): void {
-    if (e.key === "Escape") close();
-  }
-  document.addEventListener("keydown", onKeydown, true);
-
+  const close = modal.close;
   overlay.querySelector(".te-cancel")!.addEventListener("click", close);
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) close();
-  });
 
   overlay.querySelector(".te-save")!.addEventListener("click", () => {
     const name = nameInput.value.trim();

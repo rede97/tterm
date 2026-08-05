@@ -5,6 +5,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { showToast } from "../ui/toast";
+import { createModal } from "../ui/modal";
 
 interface SshAuthRequest {
   reqId: number;
@@ -38,8 +39,17 @@ function reportError(err: unknown): void {
 // -- password / passphrase prompt --
 
 function showAuthDialog(payload: SshAuthRequest): void {
-  const overlay = document.createElement("div");
-  overlay.className = "sshauth-overlay";
+  let responded = false;
+  const respond = (secret: string | null): void => {
+    if (responded) return;
+    responded = true;
+    invoke("ssh_auth_response", { reqId: payload.reqId, secret }).catch(reportError);
+    modal.close();
+  };
+  // Every dismissal path (Cancel, Escape, backdrop) answers null — an
+  // unanswered prompt would wedge the backend connect.
+  const modal = createModal({ className: "sshauth-overlay", onClose: () => respond(null), singleton: false });
+  const overlay = modal.overlay;
   overlay.innerHTML = `
     <div class="sshauth-dialog">
       <div class="sshauth-header">SSH Authentication</div>
@@ -57,24 +67,6 @@ function showAuthDialog(payload: SshAuthRequest): void {
   document.body.appendChild(overlay);
 
   const input = overlay.querySelector<HTMLInputElement>(".sshauth-input")!;
-  let responded = false;
-
-  function respond(secret: string | null): void {
-    if (responded) return;
-    responded = true;
-    document.removeEventListener("keydown", onKeydown, true);
-    overlay.remove();
-    invoke("ssh_auth_response", { reqId: payload.reqId, secret }).catch(reportError);
-  }
-
-  function onKeydown(e: KeyboardEvent): void {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      respond(null);
-    }
-  }
-  document.addEventListener("keydown", onKeydown, true);
-
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -83,9 +75,6 @@ function showAuthDialog(payload: SshAuthRequest): void {
   });
   overlay.querySelector(".sshauth-btn-ok")!.addEventListener("click", () => respond(input.value));
   overlay.querySelector(".sshauth-btn-cancel")!.addEventListener("click", () => respond(null));
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) respond(null);
-  });
 
   input.focus();
 }
@@ -93,8 +82,16 @@ function showAuthDialog(payload: SshAuthRequest): void {
 // -- host key confirmation (TOFU / mismatch) --
 
 function showHostkeyDialog(payload: SshHostkeyRequest): void {
-  const overlay = document.createElement("div");
-  overlay.className = "sshauth-overlay";
+  let responded = false;
+  const respond = (accept: boolean): void => {
+    if (responded) return;
+    responded = true;
+    invoke("ssh_hostkey_response", { reqId: payload.reqId, accept }).catch(reportError);
+    modal.close();
+  };
+  // Escape/backdrop = Reject (never auto-trust).
+  const modal = createModal({ className: "sshauth-overlay", onClose: () => respond(false), singleton: false });
+  const overlay = modal.overlay;
 
   const dialog = document.createElement("div");
   dialog.className = payload.mismatch ? "sshauth-dialog sshauth-dialog-danger" : "sshauth-dialog";
@@ -155,29 +152,8 @@ function showHostkeyDialog(payload: SshHostkeyRequest): void {
   overlay.appendChild(dialog);
   document.body.appendChild(overlay);
 
-  let responded = false;
-
-  function respond(accept: boolean): void {
-    if (responded) return;
-    responded = true;
-    document.removeEventListener("keydown", onKeydown, true);
-    overlay.remove();
-    invoke("ssh_hostkey_response", { reqId: payload.reqId, accept }).catch(reportError);
-  }
-
-  function onKeydown(e: KeyboardEvent): void {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      respond(false);
-    }
-  }
-  document.addEventListener("keydown", onKeydown, true);
-
   trustBtn.addEventListener("click", () => respond(true));
   rejectBtn.addEventListener("click", () => respond(false));
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) respond(false);
-  });
 
   trustBtn.focus();
 }

@@ -29,6 +29,11 @@ export const SERIAL_OUTPUT_NEWLINES: [SerialOutputNewline, string][] = [
 
 // ---- Utility functions ----
 
+/** HTML-escape for values interpolated into innerHTML templates. */
+export function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 export function hostProp(h: SshHost, key: string): string | undefined {
   if (h[key] !== undefined) return h[key];
   const lower = key.toLowerCase();

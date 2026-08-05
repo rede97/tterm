@@ -15,6 +15,13 @@ export interface LocalProfile {
   command: string;
 }
 
+// Backend session-spawn result: hub endpoint + auth token for the WS attach.
+export interface WsConnectResult {
+  id: string;
+  port: number;
+  token: string;
+}
+
 export interface VsInstallation {
   path: string;
   version: string;

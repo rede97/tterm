@@ -18,6 +18,8 @@ import { configStore } from "../core/store";
 import { createSerialInputHandler } from "../util/serialinput";
 import { findTheme } from "../util/themes";
 import { BatchAttachAddon } from "./batchattach";
+import { cursorIsHidden, cellDimensions, terminalTextarea } from "../util/xterm-internals";
+import { buildShareSnapshot, buildShareScreenshot } from "./sharescreen";
 import { setupTerminalLinks } from "./links";
 
 export class TerminalTab {
@@ -71,6 +73,9 @@ export class TerminalTab {
   private cursorFilter = new CursorPositionFilter();
   private onRenderDisposable?: IDisposable;
   private attachAddon?: BatchAttachAddon;
+  // document-level IME listeners (capture phase) — removed in destroy().
+  private _imeCompStart?: (e: CompositionEvent) => void;
+  private _imeCompEnd?: (e: CompositionEvent) => void;
 
   constructor(id: string, type: TabType, label: string, container: HTMLElement) {
     this.id = id;
@@ -203,11 +208,7 @@ export class TerminalTab {
   }
 
   private _isCursorHidden(): boolean {
-    try {
-      return !!(this.terminal as any)._core.coreService?.isCursorHidden;
-    } catch {
-      return false;
-    }
+    return cursorIsHidden(this.terminal);
   }
 
   // Reflect IME-mirror state on the instance element:
@@ -227,8 +228,7 @@ export class TerminalTab {
   // Filtered cursor position in pixels, relative to the terminal element.
   private _cursorPixelPos(): { x: number; y: number; cellH: number } {
     try {
-      const core = (this.terminal as any)._core;
-      const dims = core._renderService.dimensions.css.cell;
+      const dims = cellDimensions(this.terminal)!;
       const cell = this._imeAnchorCell();
       return {
         x: cell.x * dims.width,
@@ -249,8 +249,7 @@ export class TerminalTab {
     const buf = this.terminal.buffer.active;
     const fallback = this.cursorFilter.position() ?? { x: buf.cursorX, y: buf.cursorY };
     try {
-      const core = (this.terminal as any)._core;
-      if (!core.coreService?.isCursorHidden) return fallback;
+      if (!cursorIsHidden(this.terminal)) return fallback;
       let best: { x: number; y: number; d: number } | null = null;
       const ref = buf.cursorY * 10000 + buf.cursorX; // prefer cell nearest the parked cursor
       for (let y = 0; y < this.terminal.rows; y++) {
@@ -398,11 +397,9 @@ export class TerminalTab {
     let top: number | null = null;
     let refreshTimer: number | null = null;
 
-    const core = (this.terminal as any)._core;
-
-    // Need to wait for xterm.open() to complete before _core.textarea exists.
+    // Need to wait for xterm.open() to complete before the textarea exists.
     // open() runs synchronously in the constructor above, so it's safe here.
-    const ta: HTMLTextAreaElement | undefined = core.textarea;
+    const ta = terminalTextarea(this.terminal);
     if (!ta) return;
 
     // Filtered cursor position in pixels, relative to the terminal element.
@@ -419,20 +416,21 @@ export class TerminalTab {
     // whenever the cursor sat on the bottom row.
     const SAFE_RIGHT = 220; // typical single-row candidate window width
     const pxPos = (): { x: number; y: number } | null => {
-      const dims = core._renderService?.dimensions?.css;
-      if (!dims) return null;
+      const cellDims = cellDimensions(this.terminal);
+      if (!cellDims) return null;
       const cell = this._imeAnchorCell();
-      const maxX = Math.max(0, this.element.clientWidth - dims.cell.width - SAFE_RIGHT);
-      const maxY = Math.max(0, this.element.clientHeight - dims.cell.height);
+      const maxX = Math.max(0, this.element.clientWidth - cellDims.width - SAFE_RIGHT);
+      const maxY = Math.max(0, this.element.clientHeight - cellDims.height);
       return {
-        x: Math.min(cell.x * dims.cell.width, maxX),
-        y: Math.min(cell.y * dims.cell.height, maxY),
+        x: Math.min(cell.x * cellDims.width, maxX),
+        y: Math.min(cell.y * cellDims.height, maxY),
       };
     };
 
     // Replace `ta.style` with a Proxy whose setters for left/top/width are
     // clamped during IME composition.
     const origStyle = ta.style;
+    const terminal = this.terminal; // handler `this` is the ProxyHandler
     const proxyHandler: ProxyHandler<CSSStyleDeclaration> = {
       set(target, prop, value, receiver) {
         if (left !== null && top !== null) {
@@ -445,8 +443,7 @@ export class TerminalTab {
           // Prevent xterm.js from setting width to a huge value (screen width).
           // Clamp to one cell width so IME candidate window stays at correct position.
           if (prop === "width") {
-            const dims = core._renderService?.dimensions?.css;
-            const cellW = dims?.cell?.width ?? 8;
+            const cellW = cellDimensions(terminal)?.width ?? 8;
             return Reflect.set(target, prop, Math.max(cellW, 1) + "px", receiver);
           }
           // With the composition-view suppressed (display:none), xterm measures
@@ -454,8 +451,7 @@ export class TerminalTab {
           // xterm's own comment warns "certain IMEs may break" below 1x1.
           // Keep the textarea a full cell so the TSF composition stays alive.
           if (prop === "height" || prop === "lineHeight") {
-            const dims = core._renderService?.dimensions?.css;
-            const cellH = dims?.cell?.height ?? 16;
+            const cellH = cellDimensions(terminal)?.height ?? 16;
             return Reflect.set(target, prop, Math.max(cellH, 1) + "px", receiver);
           }
         }
@@ -480,7 +476,9 @@ export class TerminalTab {
 
     // compositionstart/end: capture the frozen anchor position.
     // These fire on the hidden textarea and bubble through document.
-    document.addEventListener("compositionstart", (e) => {
+    // Handlers live on fields so destroy() can remove them — an anonymous
+    // listener would leak the whole tab via its closure.
+    this._imeCompStart = (e: CompositionEvent) => {
       if (e.target !== ta) return; // only this tab's textarea
       const p = pxPos();
       if (p) {
@@ -500,9 +498,9 @@ export class TerminalTab {
           origStyle.top = q.y + "px";
         }, 200);
       }
-    }, true);
+    };
 
-    document.addEventListener("compositionend", (e) => {
+    this._imeCompEnd = (e: CompositionEvent) => {
       if (e.target !== ta) return;
       left = null;
       top = null;
@@ -516,7 +514,9 @@ export class TerminalTab {
       // > 0 and clipping the leftmost column.
       const vp = this.element.querySelector(".xterm-viewport") as HTMLElement | null;
       if (vp && vp.scrollLeft !== 0) vp.scrollLeft = 0;
-    }, true);
+    };
+    document.addEventListener("compositionstart", this._imeCompStart, true);
+    document.addEventListener("compositionend", this._imeCompEnd, true);
   }
 
   show(): void {
@@ -536,10 +536,9 @@ export class TerminalTab {
    * No dead zone, no oscillation just available space / char size.
    */
   fit(): { cols: number; rows: number } {
-    const core = (this.terminal as any)._core;
-    const dims = core._renderService.dimensions;
-    const charWidth = dims.css.cell.width;
-    const charHeight = dims.css.cell.height;
+    const dims = cellDimensions(this.terminal)!;
+    const charWidth = dims.width;
+    const charHeight = dims.height;
 
     const parent = this.element.parentElement!;
     const ps = getComputedStyle(parent);
@@ -616,134 +615,33 @@ export class TerminalTab {
     this.tabElement.title = this.label;
   }
 
+  // ShareScreenSource adapters (sharescreen.ts never sees TerminalTab).
+  cursorHidden(): boolean {
+    return this._isCursorHidden();
+  }
+
+  fakeCursorCell(): { x: number; y: number } {
+    return this._imeAnchorCell();
+  }
+
   // Character-level screen snapshot for AI session sharing (the xterm
   // buffer is the ground-truth grid — no OCR, no ANSI parsing needed).
   buildShareSnapshot(): Record<string, unknown> {
-    const buf = this.terminal.buffer.active;
-    const lines: string[] = [];
-    for (let y = 0; y < this.terminal.rows; y++) {
-      lines.push(buf.getLine(buf.viewportY + y)?.translateToString(true) ?? "");
-    }
-    const cursorHidden = this._isCursorHidden();
-    const snap: Record<string, unknown> = {
-      id: this.id,
-      label: this.label,
-      type: this.type,
-      cols: this.terminal.cols,
-      rows: this.terminal.rows,
-      cursor: { x: buf.cursorX, y: buf.cursorY, visible: !cursorHidden },
-      alt_screen: buf.type === "alternate",
-      seq: this.shareSeq,
-      lines,
-    };
-    // The TUI hides the hardware cursor and draws its own: expose where
-    // input actually lands (same scan chain as the IME anchor).
-    if (cursorHidden) snap.fake_cursor = this._imeAnchorCell();
-    return snap;
+    return buildShareSnapshot(this);
   }
 
-  // PNG screenshot of the visible screen for AI session sharing. Redraws
-  // the buffer on a 2D canvas (xterm's WebGL canvas has no
-  // preserveDrawingBuffer, so reading it back yields a blank image).
+  // PNG screenshot of the visible screen for AI session sharing.
   // Returns { png: base64, cols, rows, seq } or { error }.
-  async buildShareScreenshot(scale = 2): Promise<Record<string, unknown>> {
-    try {
-      const buf = this.terminal.buffer.active;
-      const core = (this.terminal as any)._core;
-      const dims = core._renderService?.dimensions?.css?.cell;
-      const cellW = dims?.width ?? 8;
-      const cellH = dims?.height ?? 16;
-      const cols = this.terminal.cols;
-      const rows = this.terminal.rows;
-      const theme: any = this.terminal.options.theme ?? {};
-      const fontSize = this.terminal.options.fontSize ?? 14;
-      const fontFamily = this.terminal.options.fontFamily ?? "monospace";
-      scale = Math.min(4, Math.max(1, Math.floor(scale) || 2));
-
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.ceil(cols * cellW * scale);
-      canvas.height = Math.ceil(rows * cellH * scale);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return { error: "no 2d canvas context" };
-      ctx.scale(scale, scale);
-
-      const DEFAULT16 = [
-        "#000000", "#cd3131", "#00bc00", "#949800", "#0451a5", "#bc05bc", "#0598bc", "#555555",
-        "#666666", "#f14c4c", "#23d18b", "#f5f543", "#3b8eea", "#d670d6", "#29b8db", "#e5e5e5",
-      ];
-      const THEME16 = [
-        "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
-        "brightBlack", "brightRed", "brightGreen", "brightYellow", "brightBlue", "brightMagenta", "brightCyan", "brightWhite",
-      ];
-      const CUBE = [0, 95, 135, 175, 215, 255];
-      const palette = (i: number): string => {
-        if (i < 16) return theme[THEME16[i]] ?? DEFAULT16[i];
-        if (i < 232) {
-          const n = i - 16;
-          return `rgb(${CUBE[Math.floor(n / 36)]},${CUBE[Math.floor((n % 36) / 6)]},${CUBE[n % 6]})`;
-        }
-        const g = 8 + (i - 232) * 10;
-        return `rgb(${g},${g},${g})`;
-      };
-
-      const defaultFg = theme.foreground ?? "#cccccc";
-      const defaultBg = theme.background ?? "#1e1e1e";
-      const resolve = (mode: number, color: number, isFg: boolean): string => {
-        if (mode === 2) return `#${(color & 0xffffff).toString(16).padStart(6, "0")}`;
-        if (mode === 1) return palette(color & 0xff);
-        return isFg ? defaultFg : defaultBg;
-      };
-
-      ctx.fillStyle = defaultBg;
-      ctx.fillRect(0, 0, cols * cellW, rows * cellH);
-      ctx.textBaseline = "middle";
-
-      for (let y = 0; y < rows; y++) {
-        const line = buf.getLine(buf.viewportY + y);
-        if (!line) continue;
-        let cell: IBufferCell | undefined;
-        for (let x = 0; x < line.length; x++) {
-          cell = line.getCell(x, cell);
-          if (!cell) break;
-          const w = cell.getWidth();
-          if (w === 0) continue; // second half of a wide char
-          let fg = resolve(cell.getFgColorMode(), cell.getFgColor(), true);
-          let bg = resolve(cell.getBgColorMode(), cell.getBgColor(), false);
-          if (cell.isInverse()) [fg, bg] = [bg, fg];
-          if (bg !== defaultBg) {
-            ctx.fillStyle = bg;
-            ctx.fillRect(x * cellW, y * cellH, cellW * w, cellH);
-          }
-          const chars = cell.getChars();
-          if (chars && chars !== " ") {
-            ctx.font = `${cell.isItalic() ? "italic " : ""}${cell.isBold() ? "bold " : ""}${fontSize}px ${fontFamily}`;
-            ctx.fillStyle = fg;
-            ctx.globalAlpha = cell.isDim() ? 0.6 : 1;
-            ctx.fillText(chars, x * cellW, y * cellH + cellH / 2);
-            ctx.globalAlpha = 1;
-            if (cell.isUnderline()) ctx.fillRect(x * cellW, y * cellH + cellH - 2, cellW * w, 1);
-            if (cell.isStrikethrough()) ctx.fillRect(x * cellW, y * cellH + cellH / 2, cellW * w, 1);
-          }
-        }
-      }
-
-      const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/png"));
-      if (!blob) return { error: "png encode failed" };
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      let bin = "";
-      for (let i = 0; i < bytes.length; i += 0x8000) {
-        bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-      }
-      return { png: btoa(bin), cols, rows, seq: this.shareSeq };
-    } catch (e) {
-      return { error: String(e) };
-    }
+  buildShareScreenshot(scale = 2): Promise<Record<string, unknown>> {
+    return buildShareScreenshot(this, scale);
   }
 
   destroy(): void {
     // Stop pending re-attach retries and stale socket callbacks.
     this.socketGen++;
     this._clearReattachTimer();
+    if (this._imeCompStart) document.removeEventListener("compositionstart", this._imeCompStart, true);
+    if (this._imeCompEnd) document.removeEventListener("compositionend", this._imeCompEnd, true);
     this.sizeHint.destroy();
     this.imeBox.destroy();
     this.onRenderDisposable?.dispose();

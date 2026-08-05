@@ -1,3 +1,16 @@
+## v0.9.1
+
+Fixes
+
+- Closing a tab no longer leaks its IME event listeners — repeated
+  open/close cycles used to keep the whole terminal alive in memory
+
+Internal
+
+- Frontend cleanup: shared modal scaffolding for all dialogs, single HTML
+  escaping helper, deduplicated tab-creation flow, and typed accessors for
+  xterm internals (no behavioral changes)
+
 ## v0.9.0
 
 New Features

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
 import { createElement, FolderOpen } from "lucide";
-import type { SshHost, SerialPort, SerialOutputNewline, SerialEnterNewline } from "../core/types";
+import type { SshHost, SerialPort, SerialOutputNewline, SerialEnterNewline, WsConnectResult } from "../core/types";
 import { hostProp } from "../core/common";
 import { configStore } from "../core/store";
 import { logCatch } from "../core/errorlog";
@@ -153,7 +153,7 @@ export class TabManager {
   }
 
   async createLocalTab(command?: string, label?: string, cwd?: string): Promise<TerminalTab | null> {
-    let result: { id: string; port: number; token: string };
+    let result: WsConnectResult;
     try {
       result = await invoke("pty_spawn", {
         ...(command ? { command } : {}),
@@ -165,20 +165,11 @@ export class TabManager {
     }
     const tab = new TerminalTab(result.id, "local", label || "Terminal", this.terminalContainer);
     if (command) { tab.command = command; }
-    this._register(tab, result.port, result.token);
-
-    await this._ensureFontsReady(tab);
-
-    this._hideWelcome();
-    this.switchTo(result.id);
-    tab.fitDeferred();
-    this.refreshBadges();
-
-    return tab;
+    return this._finalizeTab(tab, result);
   }
 
   async createSshTab(host: SshHost): Promise<TerminalTab | null> {
-    let result: { id: string; port: number; token: string };
+    let result: WsConnectResult;
     try {
       if (configStore.get("sshEmbedded")) {
         // Built-in client: password/key prompts and host-key confirmation
@@ -205,21 +196,12 @@ export class TabManager {
     const tab = new TerminalTab(result.id, "ssh", host.name, this.terminalContainer);
     tab.sshHost = host;
     tab.sshEmbedded = configStore.get("sshEmbedded");
-    this._register(tab, result.port, result.token);
-
-    await this._ensureFontsReady(tab);
-
-    this._hideWelcome();
-    this.switchTo(result.id);
-    tab.fitDeferred();
-    this.refreshBadges();
-
-    return tab;
+    return this._finalizeTab(tab, result);
   }
 
   async createSerialTab(port: SerialPort): Promise<TerminalTab | null> {
     const params = serialParamsFor(port);
-    let result: { id: string; port: number; token: string };
+    let result: WsConnectResult;
     try {
       result = await invoke("serial_spawn", {
         portName: port.name,
@@ -240,16 +222,7 @@ export class TabManager {
     tab.outputNewline = params.outputNewline;
     tab.enterNewline = params.enterNewline;
     tab.inputMode = params.inputMode;
-    this._register(tab, result.port, result.token);
-
-    await this._ensureFontsReady(tab);
-
-    this._hideWelcome();
-    this.switchTo(result.id);
-    tab.fitDeferred();
-    this.refreshBadges();
-
-    return tab;
+    return this._finalizeTab(tab, result);
   }
 
   // Live Enter-key newline switch (frontend-side); persists memory.
@@ -281,7 +254,7 @@ export class TabManager {
   }
 
   async createDemoTab(): Promise<TerminalTab | null> {
-    let result: { id: string; port: number; token: string };
+    let result: WsConnectResult;
     try {
       result = await invoke("demo_spawn");
     } catch (e) {
@@ -289,20 +262,11 @@ export class TabManager {
       return null;
     }
     const tab = new TerminalTab(result.id, "local", "Demo TTY", this.terminalContainer);
-    this._register(tab, result.port, result.token);
-
-    await this._ensureFontsReady(tab);
-
-    this._hideWelcome();
-    this.switchTo(result.id);
-    tab.fitDeferred();
-    this.refreshBadges();
-
-    return tab;
+    return this._finalizeTab(tab, result);
   }
 
   async createAnimeTab(): Promise<TerminalTab | null> {
-    let result: { id: string; port: number; token: string };
+    let result: WsConnectResult;
     try {
       result = await invoke("anime_spawn");
     } catch (e) {
@@ -310,15 +274,18 @@ export class TabManager {
       return null;
     }
     const tab = new TerminalTab(result.id, "local", "Anime TTY", this.terminalContainer);
+    return this._finalizeTab(tab, result);
+  }
+
+  // Shared tail of every create*Tab: register with the hub, wait out the
+  // web-font race, then show + fit.
+  private async _finalizeTab(tab: TerminalTab, result: WsConnectResult): Promise<TerminalTab> {
     this._register(tab, result.port, result.token);
-
     await this._ensureFontsReady(tab);
-
     this._hideWelcome();
     this.switchTo(result.id);
     tab.fitDeferred();
     this.refreshBadges();
-
     return tab;
   }
 

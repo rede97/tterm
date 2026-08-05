@@ -3,7 +3,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { configStore, type ConfigState } from "../core/store";
-import { hostProp } from "../core/common";
+import { hostProp, esc} from "../core/common";
 import { loadSshHosts, generateSshConfig } from "../config/ssh-config";
 import { logError } from "../core/errorlog";
 
@@ -203,6 +203,3 @@ export function collectSshSettings(root: HTMLElement): Partial<ConfigState> {
   return partial;
 }
 
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}

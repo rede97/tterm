@@ -6,6 +6,7 @@ import { buildFontFamily, updateFontStack } from "../util/fontconfig";
 import { allThemes, findTheme, DEFAULT_THEME_NAME, type ThemeDef } from "../util/themes";
 import { dedupeThemeName } from "../config/custom-themes";
 import { showThemeEditor } from "./themeeditor";
+import { esc } from "../core/common";
 
 export function createAppearancePanel(): HTMLElement {
   const panel = document.createElement("div");
@@ -226,6 +227,3 @@ export function renderThemeGallerySelection(root: HTMLElement): void {
   });
 }
 
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}

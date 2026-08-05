@@ -2,6 +2,7 @@
 // Default profile selection, WT profile visibility toggles
 
 import { configStore, type ConfigState } from "../core/store";
+import { esc } from "../core/common";
 
 export function createProfilePanel(): HTMLElement {
   const panel = document.createElement("div");
@@ -80,6 +81,3 @@ export function refreshProfilePanelForm(root: HTMLElement): void {
   });
 }
 
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}

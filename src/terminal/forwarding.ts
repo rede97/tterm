@@ -3,6 +3,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { showToast } from "../ui/toast";
+import { createModal } from "../ui/modal";
 
 interface ForwardInfo {
   forwardId: number;
@@ -37,10 +38,8 @@ export function showPortForwardingDialog(tabId: string): void {
 }
 
 function openDialog(tabId: string, initial: ForwardInfo[]): void {
-  document.querySelector(".fwd-overlay")?.remove();
-
-  const overlay = document.createElement("div");
-  overlay.className = "fwd-overlay";
+  const modal = createModal({ className: "fwd-overlay" });
+  const overlay = modal.overlay;
   overlay.innerHTML = `
     <div class="fwd-dialog" role="dialog" aria-modal="true" aria-label="Port Forwarding">
       <div class="fwd-header">
@@ -78,15 +77,6 @@ function openDialog(tabId: string, initial: ForwardInfo[]): void {
   const listenPortInput = overlay.querySelector<HTMLInputElement>(".fwd-listen-port")!;
   const targetHostInput = overlay.querySelector<HTMLInputElement>(".fwd-target-host")!;
   const targetPortInput = overlay.querySelector<HTMLInputElement>(".fwd-target-port")!;
-
-  function close() {
-    document.removeEventListener("keydown", onKeydown);
-    overlay.remove();
-  }
-
-  function onKeydown(e: KeyboardEvent) {
-    if (e.key === "Escape") close();
-  }
 
   function renderList(forwards: ForwardInfo[]) {
     listEl.innerHTML = "";
@@ -151,11 +141,7 @@ function openDialog(tabId: string, initial: ForwardInfo[]): void {
       .catch((err) => showToast(`Failed to add port forward: ${errText(err)}`, "error"));
   });
 
-  overlay.querySelector(".fwd-close")!.addEventListener("click", close);
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) close();
-  });
-  document.addEventListener("keydown", onKeydown);
+  overlay.querySelector(".fwd-close")!.addEventListener("click", modal.close);
 
   renderList(initial);
 }

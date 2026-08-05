@@ -1,6 +1,7 @@
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import Sortable from "sortablejs";
+import { createModal } from "../ui/modal";
 import { BUILTIN_FONTS, NERDFONT_BUILTIN, FontDef, buildFontFamily, parseFontFamily, systemFontDefs } from "../util/fontconfig";
 import { configStore } from "../core/store";
 
@@ -26,11 +27,11 @@ const PREVIEW_CONTENT = [
 export function showFontPickerDialog(
   onApply: (stack: string[]) => void
 ): void {
-  const existing = document.querySelector(".font-picker-overlay");
-  if (existing) existing.remove();
-
-  const overlay = document.createElement("div");
-  overlay.className = "font-picker-overlay";
+  const modal = createModal({
+    className: "font-picker-overlay",
+    onClose: () => previewTerminal?.dispose(),
+  });
+  const overlay = modal.overlay;
   overlay.innerHTML = `
     <div class="font-picker">
       <div class="font-picker-header">Font Settings</div>
@@ -269,22 +270,12 @@ export function showFontPickerDialog(
     previewFontLabel.textContent = buildFontFamily(selected);
   }
 
-  // --- buttons ---
-  overlay.querySelector(".fp-btn-cancel")!.addEventListener("click", () => {
-    previewTerminal?.dispose();
-    overlay.remove();
-  });
+  // --- buttons --- (Escape/backdrop also close, via createModal)
+  overlay.querySelector(".fp-btn-cancel")!.addEventListener("click", modal.close);
   overlay.querySelector(".fp-btn-apply")!.addEventListener("click", () => {
     if (selected.length === 0) return;
     onApply(selected);
-    previewTerminal?.dispose();
-    overlay.remove();
-  });
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) {
-      previewTerminal?.dispose();
-      overlay.remove();
-    }
+    modal.close();
   });
 
   // --- init ---
