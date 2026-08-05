@@ -31,6 +31,9 @@ export class TerminalTab {
   type: TabType;
   command?: string;
   sshHost?: SshHost;
+  // True when this SSH tab runs on the built-in client (port forwarding
+  // available); false/undefined for the spawned-ssh-binary path.
+  sshEmbedded = false;
   serialPortName?: string;
   serialKey?: string;
   serialBaud?: number;

@@ -254,6 +254,12 @@ pub(crate) fn resize_session(state: &AppState, id: &str, cols: u16, rows: u16) -
         if let Some(s) = serial.get(id) {
             let _ = s.ctl.send(crate::state::SerialCtl::SetSize(cols, rows));
         }
+        drop(serial);
+        // Embedded SSH: SIGWINCH-equivalent via window_change.
+        let ssh = state.ssh_sessions.lock().map_err(|e| e.to_string())?;
+        if let Some(s) = ssh.get(id) {
+            crate::sshclient::resize_ssh_session(s, cols, rows);
+        }
     }
     Ok(())
 }
@@ -268,6 +274,11 @@ fn kill_session_resources(state: &AppState, id: &str) -> Result<(), String> {
     let mut serial = state.serial_sessions.lock().map_err(|e| e.to_string())?;
     if let Some(session) = serial.remove(id) {
         session.cancel.store(true, Ordering::Relaxed);
+    }
+    drop(serial);
+    let mut ssh = state.ssh_sessions.lock().map_err(|e| e.to_string())?;
+    if let Some(session) = ssh.remove(id) {
+        crate::sshclient::kill_ssh_session(&session);
     }
     Ok(())
 }
@@ -287,6 +298,8 @@ mod tests {
         let state = AppState {
             sessions: Arc::new(Mutex::new(std::collections::HashMap::new())),
             serial_sessions: Arc::new(Mutex::new(std::collections::HashMap::new())),
+            ssh_sessions: Arc::new(Mutex::new(std::collections::HashMap::new())),
+            pending_prompts: Arc::new(Mutex::new(std::collections::HashMap::new())),
             next_id: Mutex::new(1),
             initial_cwd: None,
             hub,

@@ -73,6 +73,9 @@ pub enum SerialCtl {
 pub struct AppState {
     pub(crate) sessions: Arc<Mutex<HashMap<String, PtySession>>>,
     pub(crate) serial_sessions: Arc<Mutex<HashMap<String, SerialSession>>>,
+    pub(crate) ssh_sessions: Arc<Mutex<HashMap<String, crate::sshclient::SshSession>>>,
+    // Frontend dialog roundtrips in flight (ssh auth / host-key confirm).
+    pub(crate) pending_prompts: crate::sshclient::PendingPrompts,
     pub(crate) next_id: Mutex<u32>,
     pub(crate) initial_cwd: Option<PathBuf>,
     pub(crate) hub: Arc<WsHub>,

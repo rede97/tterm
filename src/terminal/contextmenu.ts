@@ -3,7 +3,8 @@
 // the circular dependency: contextmenu ↔ tabmanager ↔ tab.
 
 import { openFind } from "./search";
-import { createElement, Plus, ExternalLink, Palette, Pencil, Copy, Share2, Link, Unlink, X, ArrowRightToLine, CircleX } from "lucide";
+import { showPortForwardingDialog } from "./forwarding";
+import { createElement, Plus, ExternalLink, Palette, Pencil, Copy, Share2, Link, Unlink, X, ArrowRightToLine, CircleX, ArrowLeftRight } from "lucide";
 import { trimPasteContent, SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES } from "../core/common";
 import type { SerialEnterNewline, SerialOutputNewline } from "../core/types";
 import { readText as clipboardReadText, writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
@@ -39,6 +40,9 @@ export interface ContextMenuHandlers {
   shareTab: (tabId: string) => void;
   isTabShared: (tabId: string) => boolean;
   getShareUrl: (tabId: string) => string | undefined;
+  // Optional: true when the tab is a built-in-client SSH session; gates the
+  // "Port Forwarding…" tab-menu item.
+  isEmbeddedSshTab?: (tabId: string) => boolean;
 }
 
 let _handlers: ContextMenuHandlers | null = null;
@@ -160,6 +164,10 @@ const stopShareItem = mkItem("Stop Sharing", "share", Unlink);
 tabMenuGroup.appendChild(shareItem);
 tabMenuGroup.appendChild(copyShareItem);
 tabMenuGroup.appendChild(stopShareItem);
+// Visible only for embedded-SSH tabs (see showTabContextMenu).
+const portForwardItem = mkItem("Port Forwarding…", "port-forward", ArrowLeftRight);
+portForwardItem.style.display = "none";
+tabMenuGroup.appendChild(portForwardItem);
 tabMenuGroup.appendChild(mkSeparator());
 tabMenuGroup.appendChild(mkItem("Close", "close", X));
 tabMenuGroup.appendChild(mkItem("Close Right", "close-right", ArrowRightToLine));
@@ -377,6 +385,9 @@ function dispatch(action: string) {
     case "export":
       h.exportTab(tabId);
       break;
+    case "port-forward":
+      showPortForwardingDialog(tabId);
+      break;
   }
 }
 
@@ -387,6 +398,7 @@ export function showTabContextMenu(tabId: string, x: number, y: number) {
   shareItem.style.display = shared ? "none" : "";
   copyShareItem.style.display = shared ? "" : "none";
   stopShareItem.style.display = shared ? "" : "none";
+  portForwardItem.style.display = (_handlers?.isEmbeddedSshTab?.(tabId) ?? false) ? "" : "none";
   tabMenuGroup.style.display = "";
   termMenuGroup.style.display = "none";
   showAt(x, y);

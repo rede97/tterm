@@ -1,5 +1,6 @@
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import Sortable from "sortablejs";
 import { BUILTIN_FONTS, NERDFONT_BUILTIN, FontDef, buildFontFamily, parseFontFamily, systemFontDefs } from "../util/fontconfig";
 import { configStore } from "../core/store";
 
@@ -80,7 +81,7 @@ export function showFontPickerDialog(
   // --- render lists ---
   const builtinList = overlay.querySelector("#fp-builtin")!;
   const systemList = overlay.querySelector("#fp-system")!;
-  const selectedList = overlay.querySelector("#fp-selected")!;
+  const selectedList = overlay.querySelector<HTMLElement>("#fp-selected")!;
   const searchInput = overlay.querySelector<HTMLInputElement>(".fp-search")!;
   const previewFontLabel = overlay.querySelector("#fp-preview-font")!;
   const systemCount = overlay.querySelector(".fp-system-count")!;
@@ -134,7 +135,7 @@ export function showFontPickerDialog(
     return row;
   }
 
-  function renderSelectedItem(family: string, idx: number): HTMLElement {
+  function renderSelectedItem(family: string): HTMLElement {
     const row = document.createElement("div");
     row.className = "fp-selected-item";
     row.dataset.family = family;
@@ -143,36 +144,15 @@ export function showFontPickerDialog(
       .find(f => f.family.toLowerCase() === family.toLowerCase());
 
     row.innerHTML = `
+      <span class="fp-drag-grip" title="Drag to reorder">⠿</span>
       <span class="fp-selected-name">${def?.label ?? family}</span>
       <span class="fp-remove-btn" data-family="${family}">×</span>
-      <span class="fp-move-btns">
-        <button class="fp-move-btn fp-move-up" ${idx === 0 ? "disabled" : ""}>▲</button>
-        <button class="fp-move-btn fp-move-down" ${idx === selected.length - 1 ? "disabled" : ""}>▼</button>
-      </span>
     `;
 
     row.querySelector(".fp-remove-btn")!.addEventListener("click", (e) => {
       e.stopPropagation();
       selected = selected.filter(s => s.toLowerCase() !== family.toLowerCase());
       refreshAll();
-    });
-
-    row.querySelector(".fp-move-up")?.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (idx > 0) {
-        const [item] = selected.splice(idx, 1);
-        selected.splice(idx - 1, 0, item);
-        refreshAll();
-      }
-    });
-
-    row.querySelector(".fp-move-down")?.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (idx < selected.length - 1) {
-        const [item] = selected.splice(idx, 1);
-        selected.splice(idx + 1, 0, item);
-        refreshAll();
-      }
     });
 
     return row;
@@ -201,10 +181,30 @@ export function showFontPickerDialog(
 
   function refreshSelected() {
     selectedList.innerHTML = "";
-    selected.forEach((family, idx) => {
-      selectedList.appendChild(renderSelectedItem(family, idx));
+    selected.forEach((family) => {
+      selectedList.appendChild(renderSelectedItem(family));
     });
   }
+
+  // Drag-to-reorder the fallback chain — same Sortable setup as the tab bar
+  // (forceFallback: native HTML5 DnD is unreliable in WebView2). Bound once
+  // on the container; refreshSelected only swaps children, which is fine.
+  new Sortable(selectedList, {
+    animation: 150,
+    forceFallback: true,
+    fallbackTolerance: 5,
+    filter: ".fp-remove-btn",
+    preventOnFilter: false,
+    onEnd: () => {
+      // Sortable already reordered the DOM; adopt it as the source of truth,
+      // then re-render so rows keep their × wiring.
+      selected = [...selectedList.children].map(
+        (el) => (el as HTMLElement).dataset.family!,
+      );
+      refreshSelected();
+      updatePreview();
+    },
+  });
 
   function updatePreview() {
     if (!previewTerminal || !previewFitAddon) return;

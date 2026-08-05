@@ -1,4 +1,4 @@
-﻿import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
 import { createElement, FolderOpen } from "lucide";
 import type { SshHost, SerialPort, SerialOutputNewline, SerialEnterNewline } from "../core/types";
@@ -180,17 +180,31 @@ export class TabManager {
   async createSshTab(host: SshHost): Promise<TerminalTab | null> {
     let result: { id: string; port: number; token: string };
     try {
-      result = await invoke("pty_spawn_ssh", {
-        hostname: hostProp(host, "hostname") || host.name,
-        port: parseInt(hostProp(host, "port") || "22", 10),
-        user: hostProp(host, "user") || "root",
-      });
+      if (configStore.get("sshEmbedded")) {
+        // Built-in client: password/key prompts and host-key confirmation
+        // come up as dialogs; port forwarding is available on the tab menu.
+        result = await invoke("ssh_spawn_embedded", {
+          spec: {
+            hostname: hostProp(host, "hostname") || host.name,
+            port: parseInt(hostProp(host, "port") || "22", 10),
+            user: hostProp(host, "user") || "root",
+            identityFile: hostProp(host, "identityfile") || null,
+          },
+        });
+      } else {
+        result = await invoke("pty_spawn_ssh", {
+          hostname: hostProp(host, "hostname") || host.name,
+          port: parseInt(hostProp(host, "port") || "22", 10),
+          user: hostProp(host, "user") || "root",
+        });
+      }
     } catch (e) {
       showToast(`Failed to start SSH session: ${e}`, "error");
       return null;
     }
     const tab = new TerminalTab(result.id, "ssh", host.name, this.terminalContainer);
     tab.sshHost = host;
+    tab.sshEmbedded = configStore.get("sshEmbedded");
     this._register(tab, result.port, result.token);
 
     await this._ensureFontsReady(tab);

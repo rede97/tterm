@@ -3,7 +3,9 @@
 
 import { configStore, type ConfigState } from "../core/store";
 import { buildFontFamily, updateFontStack } from "../util/fontconfig";
-import { allThemes } from "../util/themes";
+import { allThemes, findTheme, DEFAULT_THEME_NAME, type ThemeDef } from "../util/themes";
+import { dedupeThemeName } from "../config/custom-themes";
+import { showThemeEditor } from "./themeeditor";
 
 export function createAppearancePanel(): HTMLElement {
   const panel = document.createElement("div");
@@ -80,7 +82,7 @@ export function renderThemeGallery(root: HTMLElement): void {
   root.dataset.themeName = root.dataset.themeName || configStore.get("themeName");
   gallery.innerHTML = "";
 
-  for (const t of allThemes()) {
+  const renderCard = (t: ThemeDef, grid: HTMLElement) => {
     const th = t.theme;
     const card = document.createElement("div");
     card.className = "theme-card";
@@ -113,15 +115,108 @@ export function renderThemeGallery(root: HTMLElement): void {
     name.textContent = t.source === "wt" ? `${t.name} (WT)` : t.name;
     card.appendChild(name);
 
+    // Card actions: duplicate any theme into a custom copy; custom themes
+    // can also be edited. Clicks must not select the card.
+    const actions = document.createElement("div");
+    actions.className = "theme-card-actions";
+    const dupBtn = document.createElement("button");
+    dupBtn.className = "theme-card-action";
+    dupBtn.textContent = "Duplicate";
+    dupBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openThemeEditor(root, t, undefined);
+    });
+    actions.appendChild(dupBtn);
+    if (t.source === "custom") {
+      const editBtn = document.createElement("button");
+      editBtn.className = "theme-card-action";
+      editBtn.textContent = "Edit";
+      editBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openThemeEditor(root, t, t.name);
+      });
+      actions.appendChild(editBtn);
+    }
+    card.appendChild(actions);
+
     card.addEventListener("click", () => {
       root.dataset.themeName = t.name;
       renderThemeGallerySelection(root);
       const evt = new CustomEvent("tterm-settings-changed");
       root.dispatchEvent(evt);
     });
-    gallery.appendChild(card);
-  }
+    grid.appendChild(card);
+  };
+
+  const themes = allThemes();
+  const builtin = themes.filter((t) => t.source !== "custom");
+  const custom = themes.filter((t) => t.source === "custom");
+
+  // Built-in (and imported WT) schemes.
+  const builtinHeader = document.createElement("div");
+  builtinHeader.className = "theme-group-title";
+  builtinHeader.textContent = "Built-in";
+  gallery.appendChild(builtinHeader);
+  const builtinGrid = document.createElement("div");
+  builtinGrid.className = "theme-grid";
+  for (const t of builtin) renderCard(t, builtinGrid);
+  gallery.appendChild(builtinGrid);
+
+  // User's own themes (themes.json) — always shown so the affordance exists.
+  const customHeader = document.createElement("div");
+  customHeader.className = "theme-group-title";
+  customHeader.textContent = "Custom";
+  gallery.appendChild(customHeader);
+  const customGrid = document.createElement("div");
+  customGrid.className = "theme-grid";
+  for (const t of custom) renderCard(t, customGrid);
+
+  // "New Theme" — duplicate the currently selected theme as a starting point.
+  const newBtn = document.createElement("button");
+  newBtn.id = "set-theme-new";
+  newBtn.className = "settings-link-btn";
+  newBtn.textContent = "+ New Theme";
+  newBtn.addEventListener("click", () => {
+    const base = findTheme(root.dataset.themeName);
+    openThemeEditor(root, base, undefined);
+  });
+  customGrid.appendChild(newBtn);
+  gallery.appendChild(customGrid);
+
   renderThemeGallerySelection(root);
+}
+
+/** Open the theme editor and reconcile the gallery/selection afterwards. */
+function openThemeEditor(root: HTMLElement, base: ThemeDef, editName: string | undefined): void {
+  showThemeEditor({
+    base,
+    editName,
+    suggestedName: editName ?? dedupeThemeName(`${base.name} Copy`),
+    onSaved: (savedName) => {
+      // Renaming the theme that is currently selected: follow the new name
+      // everywhere (pending gallery selection + live terminals).
+      if (editName && (root.dataset.themeName === editName || configStore.get("themeName") === editName)) {
+        root.dataset.themeName = savedName;
+      }
+      // The saved theme is the live one: re-apply (colors may have changed
+      // under the same name). set() re-notifies even for an unchanged value.
+      const active = configStore.get("themeName");
+      if (active === savedName || (editName && active === editName)) {
+        configStore.set({ themeName: savedName });
+      }
+      renderThemeGallery(root);
+    },
+    onDeleted: (deletedName) => {
+      // Deleted the active theme: fall back to the default.
+      if (configStore.get("themeName") === deletedName) {
+        configStore.set({ themeName: DEFAULT_THEME_NAME });
+      }
+      if (root.dataset.themeName === deletedName) {
+        root.dataset.themeName = DEFAULT_THEME_NAME;
+      }
+      renderThemeGallery(root);
+    },
+  });
 }
 
 export function renderThemeGallerySelection(root: HTMLElement): void {

@@ -1,4 +1,4 @@
-﻿import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { createElement, Cog } from "lucide";
@@ -15,12 +15,13 @@ import { parseFontFamily, updateFontStack, setSystemFonts } from "./util/fontcon
 import { tabManager, initTabManager } from "./terminal/tabmanager";
 import { initSearchBar } from "./terminal/search";
 import { initProfileMenu } from "./terminal/profilemenu";
+import { initSshAuthDialogs } from "./terminal/sshauth";
 import { initWindowControls } from "./ui/window";
 import { configStore } from "./core/store";
 import { loadSshHosts } from "./config/ssh-config";
 import { loadAllWtData } from "./config/wt-profiles";
-import { setWtThemes } from "./util/themes";
-import { findTheme } from "./util/themes";
+import { setWtThemes, findTheme, applyTerminalBackground } from "./util/themes";
+import { loadCustomThemes } from "./config/custom-themes";
 import { logCatch } from "./core/errorlog";
 import { scheduleAutoUpdateCheck } from "./core/updater";
 
@@ -76,11 +77,15 @@ settingsBtn.addEventListener("click", () => {
 // Subscribe to config changes — update all open terminals when relevant keys change
 configStore.subscribe((keys) => {
   if (keys.some(k => ["fontFamily", "fontSize", "scrollback", "themeName"].includes(k))) {
+    const theme = findTheme(configStore.get("themeName")).theme;
+    // The whole terminal chrome (active tab, container frame, xterm edge
+    // strips) follows the theme background via one CSS variable.
+    applyTerminalBackground(theme);
     for (const tab of tabManager.tabs.values()) {
       tab.terminal.options.fontFamily = configStore.get("fontFamily");
       tab.terminal.options.fontSize = configStore.get("fontSize");
       tab.terminal.options.scrollback = configStore.get("scrollback");
-      tab.terminal.options.theme = findTheme(configStore.get("themeName")).theme;
+      tab.terminal.options.theme = theme;
     }
     tabManager.triggerResize();
   }
@@ -111,6 +116,7 @@ if (import.meta.env.DEV) {
 tabManager.initNewTabButton();
 initSearchBar();
 initProfileMenu();
+initSshAuthDialogs();
 import("./terminal/contextmenu").then(m => {
   m.setContextMenuHandlers({
     createLocalTab: () => tabManager.createLocalTab(),
@@ -138,6 +144,10 @@ import("./terminal/contextmenu").then(m => {
     shareTab: (id) => tabManager.shareTab(id),
     isTabShared: (id) => tabManager.get(id)?.shared ?? false,
     getShareUrl: (id) => tabManager.get(id)?.shareUrl,
+    isEmbeddedSshTab: (id) => {
+      const t = tabManager.get(id);
+      return !!t && t.type === "ssh" && t.sshEmbedded === true;
+    },
   });
   m.initContextMenu();
 });
@@ -178,10 +188,14 @@ invoke<string[]>("list_system_fonts").then(fonts => {
 // Load config, then profiles, then open initial tab
 configStore.load().then(async () => {
   updateFontStack(parseFontFamily(configStore.get("fontFamily")));
+  // Terminal chrome background tracks the active theme from the start.
+  applyTerminalBackground(findTheme(configStore.get("themeName")).theme);
 
-  // Load WT profiles + VS installs + themes
+  // Load WT profiles + VS installs + themes, plus user custom themes
+  // (themes.json — separate from config.json by design).
   const wt = await loadAllWtData();
   setWtThemes(wt.themes);
+  await loadCustomThemes();
   configStore.set({
     localProfiles: wt.profiles,
     vsInstalls: wt.vsInstalls,

@@ -66,6 +66,9 @@ src-tauri/src/
   state.rs              AppState / session tables
   relay.rs              unified WS relay hub shared by PTY/serial/demo
   pty.rs                PTY spawn/resize/kill
+  sshclient.rs          embedded SSH client (russh): auth via frontend dialogs,
+                        known_hosts TOFU, dynamic port forwarding (see
+                        docs/embedded-ssh-plan.md)
   deadmode.rs           in-band "session ended, Enter to reconnect" protocol
   serial.rs             serial sessions (+ live baud via SerialCtl)
   share.rs              AI session sharing: HTTP API on the hub (prompt doc, screen

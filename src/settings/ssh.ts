@@ -69,6 +69,17 @@ function renderSshPanel(container: HTMLElement) {
       <div class="settings-section-title">SSH Configuration</div>
       <div class="settings-item settings-item-row">
         <div class="settings-item-info">
+          <div class="settings-item-title">Built-in SSH Client</div>
+          <div class="settings-item-desc">Use TTerm's integrated SSH client — password dialogs, host-key confirmation, and dynamic port forwarding (tab right-click menu). Off: spawn the system ssh command instead.</div>
+        </div>
+        <div class="settings-item-control">
+          <label class="settings-toggle-row" style="padding:0;gap:0;">
+            <input type="checkbox" id="set-ssh-embedded" ${configStore.get("sshEmbedded") ? "checked" : ""} />
+          </label>
+        </div>
+      </div>
+      <div class="settings-item settings-item-row">
+        <div class="settings-item-info">
           <div class="settings-item-title">SSH Config File</div>
           <div class="settings-item-desc">Hosts are read from your OpenSSH config file. Check to show in new-tab menu. Changes to the host list are pending until saved.</div>
         </div>
@@ -185,10 +196,11 @@ function wireSshEvents(container: HTMLElement) {
   });
 }
 
-export function collectSshSettings(_root: HTMLElement): Partial<ConfigState> {
-  // SSH settings are persisted immediately (visibility) or via Save SSH Config button.
-  // Nothing to collect at Apply time.
-  return {};
+export function collectSshSettings(root: HTMLElement): Partial<ConfigState> {
+  const partial: Partial<ConfigState> = {};
+  const embeddedEl = root.querySelector<HTMLInputElement>("#set-ssh-embedded");
+  if (embeddedEl) partial.sshEmbedded = embeddedEl.checked;
+  return partial;
 }
 
 function esc(s: string): string {

@@ -1,3 +1,29 @@
+## v0.9.0
+
+New Features
+
+- **Built-in SSH client** — SSH tabs no longer depend on the system ssh
+  command. Passwords and key passphrases are asked in a proper dialog,
+  first-time host keys get a trust-on-first-use confirmation (a changed key
+  raises a loud warning), and your `~/.ssh/known_hosts` stays shared with
+  OpenSSH. Prefer the old behavior? Settings → SSH → "Built-in SSH Client"
+  switches back to the system ssh
+- **Dynamic port forwarding** — right-click an SSH tab → "Port Forwarding…"
+  to add or remove local (-L) and remote (-R) tunnels while the session is
+  running; forwards are restored automatically after a reconnect
+- **Custom color themes** — Settings → Appearance: duplicate any built-in or
+  Windows Terminal scheme and adjust every color with live preview. Your
+  themes live in their own `themes.json` next to the config file, shown in
+  a separate "Custom" section of the gallery
+- **Drag to reorder font fallbacks** — the font picker's "used fonts" list
+  now reorders by drag & drop instead of arrow buttons
+
+Fixes
+
+- The strips of background around the character grid (and the frame visible
+  while resizing the window) now follow the terminal's color scheme instead
+  of staying dark — no more color seam with light themes
+
 ## v0.8.1
 
 New Features

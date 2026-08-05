@@ -4,7 +4,7 @@ export interface ThemeDef {
   name: string;
   label: string;
   theme: ITheme;
-  source: "builtin" | "wt";
+  source: "builtin" | "wt" | "custom";
 }
 
 export const DEFAULT_THEME_NAME = "TTerm Dark";
@@ -109,8 +109,16 @@ export function setWtThemes(themes: ThemeDef[]) {
   wtThemes = themes;
 }
 
+// -- Custom themes (user-edited, persisted in themes.json) --
+
+let customThemes: ThemeDef[] = [];
+
+export function setCustomThemes(themes: ThemeDef[]) {
+  customThemes = themes;
+}
+
 export function allThemes(): ThemeDef[] {
-  return [...BUILTIN_THEMES, ...wtThemes];
+  return [...BUILTIN_THEMES, ...wtThemes, ...customThemes];
 }
 
 export function findTheme(name: string | null | undefined): ThemeDef {
@@ -119,6 +127,18 @@ export function findTheme(name: string | null | undefined): ThemeDef {
     if (hit) return hit;
   }
   return BUILTIN_THEMES[0];
+}
+
+/**
+ * Sync the --term-bg CSS variable to the theme's background. xterm only
+ * paints whole cells, so edge strips, the container's 2px frame and the
+ * active tab all show the underlying chrome color — keeping it identical
+ * to the theme background avoids a visible seam (esp. during resize).
+ */
+export function applyTerminalBackground(theme: ITheme): void {
+  if (theme.background) {
+    document.documentElement.style.setProperty("--term-bg", theme.background);
+  }
 }
 
 // Parse the "schemes" array from WT settings.json raw content.

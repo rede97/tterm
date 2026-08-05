@@ -1,7 +1,13 @@
-﻿* {
+* {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+:root {
+  /* Terminal theme background — synced from the active color scheme so the
+     tab bar, container frame and xterm edge strips never show a seam. */
+  --term-bg: #1e1e1e;
 }
 
 html, body {
@@ -11,7 +17,7 @@ html, body {
      script nor Chromium's implicit scroll-into-view (IME caret) can move
      the page horizontally — nothing in this fixed-layout app ever scrolls. */
   overflow: clip;
-  background: #1e1e1e;
+  background: var(--term-bg);
   color: #d4d4d4;
   font-family: Consolas, "Courier New", monospace;
   font-size: 13px;
@@ -541,6 +547,10 @@ body {
   color: #ffffff;
 }
 
+#terminal-container:has(> .settings-page) {
+  padding: 0;
+}
+
 #terminal-container {
   flex: 1;
   /* flex items default to min-height:auto (min-content), which pins the
@@ -549,7 +559,7 @@ body {
   min-height: 0;
   position: relative;
   overflow: clip; /* no scroll mechanism — see html,body note above */
-  background: #1e1e1e;
+  background: var(--term-bg);
   padding: 2px;
 }
 
@@ -566,7 +576,7 @@ body {
   width: 100%;
   height: 100%;
   position: relative;
-  background: #1e1e1e;
+  background: var(--term-bg);
   /* isolate paint: prevent layout recalc from cascading into xterm canvas */
   contain: layout style paint;
   overflow: hidden;
@@ -684,7 +694,7 @@ body {
 .terminal-instance .xterm .xterm-viewport,
 .terminal-instance .xterm .xterm-screen,
 .terminal-instance .xterm {
-  background: #1e1e1e !important;
+  background: var(--term-bg) !important;
 }
 
 /* hide native scrollbars inside terminal -- xterm DOM scrollbar replaces them */
@@ -1209,10 +1219,22 @@ body {
 
 /* theme gallery cards (Appearance > Color Scheme) */
 .theme-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+}
+
+.theme-group-title {
+  font-size: 12px;
+  color: #888;
+  margin: 8px 0 2px;
+}
+
+.theme-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 10px;
-  padding: 8px 0;
 }
 
 .theme-card {
@@ -1265,6 +1287,202 @@ body {
 
 .theme-card.selected .theme-card-name {
   color: #ffffff;
+}
+
+/* Card action buttons (Duplicate / Edit) — visible on hover. */
+.theme-card {
+  position: relative;
+}
+
+.theme-card-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: none;
+  gap: 4px;
+}
+
+.theme-card:hover .theme-card-actions {
+  display: flex;
+}
+
+.theme-card-action {
+  padding: 2px 8px;
+  font-size: 11px;
+  background: rgba(30, 30, 30, 0.9);
+  color: #ccc;
+  border: 1px solid #555;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.theme-card-action:hover {
+  background: #3a3a3a;
+  color: #fff;
+}
+
+#set-theme-new {
+  align-self: center;
+  justify-self: center;
+  padding: 8px 16px;
+}
+
+/* Theme editor modal */
+.te-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.te-dialog {
+  background: #252526;
+  border: 1px solid #3e3e42;
+  border-radius: 8px;
+  padding: 16px;
+  width: 640px;
+  max-width: 92vw;
+  max-height: 86vh;
+  overflow-y: auto;
+  color: #cccccc;
+  font-size: 13px;
+}
+
+.te-header {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 12px;
+}
+
+.te-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.te-name {
+  flex: 1;
+  background: #1e1e1e;
+  border: 1px solid #3e3e42;
+  border-radius: 4px;
+  color: #eee;
+  padding: 5px 8px;
+  font-size: 13px;
+}
+
+.te-preview {
+  border: 1px solid #3e3e42;
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.te-swatches {
+  display: flex;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.te-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.te-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 20px;
+}
+
+.te-group-title {
+  font-size: 12px;
+  color: #888;
+  margin: 4px 0;
+}
+
+.te-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.te-label {
+  flex: 1;
+  color: #aaa;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.te-color {
+  width: 28px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid #3e3e42;
+  border-radius: 3px;
+  background: none;
+  cursor: pointer;
+}
+
+.te-hex {
+  width: 72px;
+  background: #1e1e1e;
+  border: 1px solid #3e3e42;
+  border-radius: 3px;
+  color: #ccc;
+  padding: 2px 6px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.te-footer {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.te-spacer {
+  flex: 1;
+}
+
+.te-btn {
+  padding: 6px 16px;
+  border-radius: 4px;
+  border: 1px solid #3e3e42;
+  background: #3a3a3a;
+  color: #ddd;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.te-btn:hover {
+  background: #4a4a4a;
+}
+
+.te-save {
+  background: #0e639c;
+  border-color: #0e639c;
+  color: #fff;
+}
+
+.te-save:hover {
+  background: #1177bb;
+}
+
+.te-delete {
+  border-color: #a1260d;
+  color: #f48771;
 }
 
 /* theme preview swatches */
@@ -1718,6 +1936,28 @@ body {
   background: #2a2a2a;
   border-radius: 3px;
   user-select: none;
+  cursor: grab;
+}
+
+.fp-selected-item:active {
+  cursor: grabbing;
+}
+
+.fp-drag-grip {
+  color: #666;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* SortableJS drag state (forceFallback mode): the row left behind dims,
+   the dragged clone follows the pointer. */
+.fp-selected-item.sortable-ghost {
+  opacity: 0.4;
+}
+
+.fp-selected-item.sortable-fallback {
+  background: #3a3a3a;
+  cursor: grabbing;
 }
 
 .fp-selected-name {
@@ -1726,39 +1966,6 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.fp-move-btns {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  flex-shrink: 0;
-}
-
-.fp-move-btn {
-  width: 22px;
-  height: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #3a3a3a;
-  border: none;
-  border-radius: 2px;
-  color: #888;
-  cursor: pointer;
-  font-size: 8px;
-  line-height: 1;
-  padding: 0;
-}
-
-.fp-move-btn:hover:not(:disabled) {
-  background: #4a4a4a;
-  color: #fff;
-}
-
-.fp-move-btn:disabled {
-  opacity: 0.3;
-  cursor: default;
 }
 
 .fp-remove-btn {
@@ -1838,7 +2045,356 @@ body {
   background: #1177bb;
 }
 
+/* ===== SSH Auth Dialogs ===== */
+
+.sshauth-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.sshauth-dialog {
+  width: 420px;
+  max-width: 90vw;
+  background: #252526;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sshauth-dialog-danger {
+  border-color: #c94c4c;
+  box-shadow: 0 0 12px rgba(201, 76, 76, 0.4);
+}
+
+.sshauth-header {
+  padding: 14px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px solid #3a3a3a;
+  user-select: none;
+}
+
+.sshauth-header-danger {
+  color: #f48771;
+  border-bottom-color: #c94c4c;
+}
+
+.sshauth-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sshauth-label {
+  font-size: 13px;
+  color: #d4d4d4;
+  word-break: break-all;
+}
+
+.sshauth-text {
+  font-size: 13px;
+  color: #d4d4d4;
+  line-height: 1.5;
+}
+
+.sshauth-input {
+  width: 100%;
+  padding: 7px 10px;
+  background: #3a3a3a;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  color: #d4d4d4;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.sshauth-input:focus {
+  border-color: #6bb8ff;
+}
+
+.sshauth-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+}
+
+.sshauth-detail-row {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.sshauth-detail-key {
+  flex: 0 0 80px;
+  color: #888;
+  user-select: none;
+}
+
+.sshauth-detail-val {
+  color: #d4d4d4;
+  word-break: break-all;
+}
+
+.sshauth-mono {
+  font-family: "JetBrains Mono", "Cascadia Mono", monospace;
+}
+
+.sshauth-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid #3a3a3a;
+}
+
+.sshauth-btn {
+  padding: 6px 16px;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  background: #3a3a3a;
+  color: #d4d4d4;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.sshauth-btn:hover {
+  background: #4a4a4a;
+}
+
+.sshauth-btn-ok {
+  background: #0e639c;
+  border-color: #0e639c;
+}
+
+.sshauth-btn-ok:hover {
+  background: #1177bb;
+}
+
+.sshauth-btn-danger {
+  background: #a1260d;
+  border-color: #a1260d;
+}
+
+.sshauth-btn-danger:hover {
+  background: #c93a1d;
+}
+
 /* Disable ligatures in terminal */
 .terminal-instance .xterm {
   font-feature-settings: "calt" off, "liga" off;
+}
+
+/* ===== Port Forwarding Dialog ===== */
+
+.fwd-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.fwd-dialog {
+  width: 480px;
+  max-width: 92vw;
+  max-height: 80vh;
+  background: #252526;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fwd-header {
+  padding: 14px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px solid #3a3a3a;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fwd-close {
+  background: none;
+  border: none;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.fwd-close:hover {
+  color: #fff;
+}
+
+.fwd-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fwd-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fwd-empty {
+  color: #666;
+  font-size: 12px;
+  padding: 4px 0;
+}
+
+.fwd-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.fwd-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.fwd-badge-local {
+  background: #0e639c;
+  color: #fff;
+}
+
+.fwd-badge-remote {
+  background: #7c3aed;
+  color: #fff;
+}
+
+.fwd-route {
+  flex: 1;
+  min-width: 0;
+  font-family: Consolas, "JetBrains Mono", monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fwd-remove {
+  background: #4a4a4a;
+  border: none;
+  border-radius: 3px;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 3px 8px;
+  flex-shrink: 0;
+}
+
+.fwd-remove:hover {
+  background: #a1260d;
+  color: #fff;
+}
+
+.fwd-add-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  margin-bottom: 6px;
+  user-select: none;
+}
+
+.fwd-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fwd-kind {
+  width: 100%;
+  padding: 6px 8px;
+  background: #3a3a3a;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  color: #d4d4d4;
+  font-size: 12px;
+  outline: none;
+}
+
+.fwd-form-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fwd-form-row input {
+  padding: 6px 8px;
+  background: #3a3a3a;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  color: #d4d4d4;
+  font-size: 12px;
+  outline: none;
+}
+
+.fwd-form-row input:focus {
+  border-color: #6bb8ff;
+}
+
+.fwd-host {
+  flex: 1;
+  min-width: 0;
+}
+
+.fwd-port {
+  width: 90px;
+  flex-shrink: 0;
+}
+
+.fwd-arrow {
+  color: #888;
+  font-size: 11px;
+  text-align: center;
+  user-select: none;
+}
+
+.fwd-add-btn {
+  align-self: flex-end;
+  background: #0e639c;
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 6px 14px;
+}
+
+.fwd-add-btn:hover {
+  background: #1177bb;
 }

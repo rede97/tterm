@@ -10,6 +10,7 @@ mod relay;
 mod serial;
 mod share;
 mod ssh;
+mod sshclient;
 mod state;
 mod window;
 mod wt;
@@ -48,6 +49,8 @@ pub fn run() {
             app.manage(AppState {
                 sessions: Arc::new(Mutex::new(HashMap::new())),
                 serial_sessions: Arc::new(Mutex::new(HashMap::new())),
+                ssh_sessions: Arc::new(Mutex::new(HashMap::new())),
+                pending_prompts: Arc::new(Mutex::new(HashMap::new())),
                 next_id: Mutex::new(1),
                 initial_cwd: pty::launch_working_directory(),
                 hub,
@@ -63,8 +66,11 @@ pub fn run() {
                 window::window_minimize, window::window_toggle_maximize, window::window_close,
                 window::window_start_drag, window::open_new_window, window::pick_directory, window::save_text_file,
                 ssh::ssh_read_config_raw, ssh::open_ssh_config, ssh::ssh_clear_known_hosts,
+                sshclient::ssh_spawn_embedded, sshclient::ssh_auth_response, sshclient::ssh_hostkey_response,
+                sshclient::ssh_forward_add, sshclient::ssh_forward_remove, sshclient::ssh_forward_list,
                 ssh::ssh_save_config,
                 config::read_config, config::write_config, config::delete_config, config::open_config_dir,
+                config::read_themes, config::write_themes,
                 wt::read_wt_settings, wt::read_wt_fragments, wt::find_vs_instances,
                 serial::serial_list_ports, serial::serial_spawn, serial::serial_set_baud,
                 serial::serial_set_output_newline,
@@ -78,8 +84,11 @@ pub fn run() {
                 window::window_minimize, window::window_toggle_maximize, window::window_close,
                 window::window_start_drag, window::open_new_window, window::pick_directory, window::save_text_file,
                 ssh::ssh_read_config_raw, ssh::open_ssh_config, ssh::ssh_clear_known_hosts,
+                sshclient::ssh_spawn_embedded, sshclient::ssh_auth_response, sshclient::ssh_hostkey_response,
+                sshclient::ssh_forward_add, sshclient::ssh_forward_remove, sshclient::ssh_forward_list,
                 ssh::ssh_save_config,
                 config::read_config, config::write_config, config::delete_config, config::open_config_dir,
+                config::read_themes, config::write_themes,
                 wt::read_wt_settings, wt::read_wt_fragments, wt::find_vs_instances,
                 serial::serial_list_ports, serial::serial_spawn, serial::serial_set_baud,
                 serial::serial_set_output_newline,
