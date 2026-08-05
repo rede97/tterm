@@ -9,9 +9,11 @@ import { showToast } from "../ui/toast";
 import { logCatch } from "./errorlog";
 import { configStore } from "./store";
 
-// Launch-time update check, skipped when the user disabled it
+// Launch-time update check, skipped in dev/debug builds (frontend served by
+// the vite dev server) and when the user disabled it
 // (Settings → General → Updates).
 export function scheduleAutoUpdateCheck(delayMs = 3000): void {
+  if (import.meta.env.DEV) return;
   setTimeout(() => {
     if (!configStore.get("autoCheckUpdates")) return;
     checkForUpdates().catch(logCatch("updater"));

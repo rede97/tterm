@@ -1,4 +1,4 @@
-﻿import { Terminal, IDisposable, IBufferCell } from "@xterm/xterm";
+import { Terminal, IDisposable, IBufferCell } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -18,6 +18,7 @@ import { configStore } from "../core/store";
 import { createSerialInputHandler } from "../util/serialinput";
 import { findTheme } from "../util/themes";
 import { BatchAttachAddon } from "./batchattach";
+import { setupTerminalLinks } from "./links";
 
 export class TerminalTab {
   id: string;
@@ -93,6 +94,8 @@ export class TerminalTab {
     this.terminal.loadAddon(this.fitAddon);
     this.searchAddon = new SearchAddon();
     this.terminal.loadAddon(this.searchAddon);
+    // Clickable links: plain-click OSC 8 hyperlinks, Ctrl+click URLs.
+    setupTerminalLinks(this.terminal);
 
     // OSC 9;4 progress reporting (build tasks etc.)
     this.terminal.parser.registerOscHandler(9, (data: string) => {

@@ -76,8 +76,15 @@ describe("settings — updates", () => {
 });
 
 describe("scheduleAutoUpdateCheck", () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
+  beforeEach(() => {
+    vi.useFakeTimers();
+    // Tests exercise production behavior; vitest itself runs with DEV=true.
+    vi.stubEnv("DEV", false);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
 
   it("checks for updates after the delay when enabled", async () => {
     configStore.set({ autoCheckUpdates: true });
@@ -89,6 +96,14 @@ describe("scheduleAutoUpdateCheck", () => {
 
   it("does nothing when the user disabled update checks", async () => {
     configStore.set({ autoCheckUpdates: false });
+    scheduleAutoUpdateCheck(1000);
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(checkMock).not.toHaveBeenCalled();
+  });
+
+  it("never schedules a check in dev builds, even when enabled", async () => {
+    vi.stubEnv("DEV", true);
+    configStore.set({ autoCheckUpdates: true });
     scheduleAutoUpdateCheck(1000);
     await vi.advanceTimersByTimeAsync(60000);
     expect(checkMock).not.toHaveBeenCalled();

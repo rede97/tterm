@@ -1,3 +1,31 @@
+## v0.8.1
+
+New Features
+
+- Clickable links — Ctrl+click any web address printed in the terminal to
+  open it in your browser; hyperlink text emitted by apps (OSC 8) opens
+  with a plain click
+
+## v0.8.0
+
+New Features
+
+- AI session sharing: agents can now type Unicode text directly — Chinese
+  works — plus named keys and shortcuts ("enter", "ctrl+c", "alt+f4",
+  arrows, F1–F12) via a documented JSON input form; raw-byte input still
+  works and the share link's built-in help page now states clearly that
+  all text must be UTF-8
+- AI session sharing: image screenshots — agents can pull a PNG render of
+  the shared screen in addition to the character-level snapshot
+- Tab context menu items now have icons; "Share with AI", "Copy Share
+  Link" and "Stop Sharing" use distinct icons
+
+Fixes
+
+- Chinese sent through an AI share came out garbled when the agent's
+  client didn't encode it as UTF-8 — the JSON input form (Unicode by
+  definition) removes the ambiguity
+
 ## v0.7.3
 
 New Features
@@ -23,26 +51,6 @@ New Features
   and offers to download and install them in place, restarting itself to
   finish. Update packages are cryptographically signed; the check is
   silent when you're already up to date
-
-## v0.8.0
-
-New Features
-
-- AI session sharing: agents can now type Unicode text directly — Chinese
-  works — plus named keys and shortcuts ("enter", "ctrl+c", "alt+f4",
-  arrows, F1–F12) via a documented JSON input form; raw-byte input still
-  works and the share link's built-in help page now states clearly that
-  all text must be UTF-8
-- AI session sharing: image screenshots — agents can pull a PNG render of
-  the shared screen in addition to the character-level snapshot
-- Tab context menu items now have icons; "Share with AI", "Copy Share
-  Link" and "Stop Sharing" use distinct icons
-
-Fixes
-
-- Chinese sent through an AI share came out garbled when the agent's
-  client didn't encode it as UTF-8 — the JSON input form (Unicode by
-  definition) removes the ambiguity
 
 ## v0.7.1
 
