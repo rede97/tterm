@@ -329,8 +329,9 @@ body {
 .quick-panel {
   position: fixed;
   z-index: 110;
-  min-width: 280px;
-  max-width: 340px;
+  /* Fixed width: content (e.g. the share link row) must not resize the
+     panel; long values ellipsize inside their rows instead. */
+  width: 340px;
   background: #252526;
   border: 1px solid #3e3e42;
   border-radius: 6px;
@@ -503,6 +504,24 @@ body {
 
 .qp-line-val.on {
   color: #4ec9b0;
+}
+
+/* Flow control: unsupported-port hint and greyed-out control. */
+.qp-hint {
+  font-size: 11px;
+  color: #888888;
+  padding: 2px 8px 4px;
+}
+
+.qp-row.qp-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.qp-signals {
+  border-top: 1px solid #3e3e42;
+  margin-top: 2px;
+  padding-top: 2px;
 }
 
 .qp-fwd-list {
@@ -733,14 +752,17 @@ body {
 }
 
 .toast {
-  max-width: 360px;
-  padding: 10px 14px;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #ffffff;
-  background: #333333;
-  border: 1px solid #3e3e42;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  max-width: 320px;
+  padding: 7px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #c8c8c8;
+  /* Quiet: translucent chrome-matching surface, severity shown only by a
+     thin left accent bar instead of a loud solid block. */
+  background: rgba(37, 37, 38, 0.92);
+  border: 1px solid #3a3a3d;
+  border-left: 2px solid #6a6a6a;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
   opacity: 0;
   transform: translateY(8px);
   transition: opacity 0.2s ease, transform 0.2s ease;
@@ -753,8 +775,8 @@ body {
 }
 
 .toast-error {
-  background: #5a1d1d;
-  border-color: #be1100;
+  border-left-color: #c5392f;
+  color: #e0b0a8;
 }
 
 /* OSC 9;4 progress bar on tabs */
@@ -2759,4 +2781,127 @@ input[type="number"] {
 
 .fwd-add-btn:hover {
   background: #1177bb;
+}
+
+/* Serial profile cards (gallery reuses .theme-card/.theme-grid) */
+.sp-card-summary {
+  padding: 0 10px 6px;
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Serial profile editor modal (mirrors .te-* theme editor) */
+.sp-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.sp-dialog {
+  background: #252526;
+  border: 1px solid #3e3e42;
+  border-radius: 8px;
+  padding: 16px;
+  width: 440px;
+  max-width: 92vw;
+  max-height: 86vh;
+  overflow-y: auto;
+  color: #cccccc;
+  font-size: 13px;
+}
+
+.sp-header {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 12px;
+}
+
+.sp-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.sp-name {
+  flex: 1;
+  background: #1e1e1e;
+  border: 1px solid #3e3e42;
+  border-radius: 4px;
+  color: #eee;
+  padding: 5px 8px;
+  font-size: 13px;
+}
+
+.sp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.sp-label {
+  flex: 1;
+  color: #aaa;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sp-select {
+  flex: 1.4;
+  background: #1e1e1e;
+  border: 1px solid #3e3e42;
+  border-radius: 4px;
+  color: #ccc;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.sp-footer {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.sp-spacer {
+  flex: 1;
+}
+
+.sp-btn {
+  padding: 6px 16px;
+  border-radius: 4px;
+  border: 1px solid #3e3e42;
+  background: #3a3a3a;
+  color: #ddd;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.sp-btn:hover {
+  background: #4a4a4a;
+}
+
+.sp-save {
+  background: #0e639c;
+  border-color: #0e639c;
+  color: #fff;
+}
+
+.sp-save:hover {
+  background: #1177bb;
+}
+
+.sp-delete {
+  border-color: #a1260d;
+  color: #f48771;
 }

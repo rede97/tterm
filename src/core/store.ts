@@ -10,9 +10,7 @@ import { DEFAULT_THEME_NAME } from "../util/themes";
 import { logError } from "./errorlog";
 import type {
   SshHost, LocalProfile, VsInstallation, SerialPort,
-  SerialParams, SerialInputMode, SerialOutputNewline, SerialEnterNewline,
 } from "./types";
-import { SERIAL_OUTPUT_NEWLINES } from "./common";
 
 // ---- All config state in one interface ----
 
@@ -23,7 +21,6 @@ export interface ConfigState {
   vsInstalls: VsInstallation[];
   serialPorts: SerialPort[];
   // Persisted config
-  serialPortParams: Record<string, SerialParams>;
   hiddenProfiles: string[];
   hiddenSshHosts: string[];
   fontFamily: string;
@@ -35,9 +32,9 @@ export interface ConfigState {
   pasteWarning: boolean;
   pasteTrim: boolean;
   serialBaud: number;
-  serialInputMode: SerialInputMode;
-  serialOutputNewline: SerialOutputNewline;
-  serialEnterNewline: SerialEnterNewline;
+  // Default serial profile name (built-in or custom). The rest of the
+  // serial defaults live in profiles (serial-profiles.json), not here.
+  serialProfile: string;
   defaultLocalProfile: string | null;
   autoCheckUpdates: boolean;
   // Built-in SSH client (russh) instead of spawning the system ssh binary.
@@ -58,20 +55,14 @@ const isString = (v: unknown): v is string => typeof v === "string";
 const isBoolean = (v: unknown): v is boolean => typeof v === "boolean";
 const isNumber = (min: number, max: number) => (v: unknown): v is number => typeof v === "number" && v >= min && v <= max;
 const isArray = <T = unknown>(v: unknown): v is T[] => Array.isArray(v);
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-const isOneOf = <T extends string>(values: readonly T[]) => (v: unknown): v is T => typeof v === "string" && (values as readonly string[]).includes(v);
 const isOrNull = <T>(guard: (v: unknown) => v is T) => (v: unknown): v is T | null => v === null || guard(v);
 
-const SERIAL_INPUT_MODES = ["normal", "echo", "line"] as const;
-const SERIAL_ENTER_MODES = ["cr", "lf", "crlf"] as const;
-const OUTPUT_NEWLINE_VALUES = SERIAL_OUTPUT_NEWLINES.map(([v]) => v) as readonly SerialOutputNewline[];
 
 const SCHEMA = {
   sshHosts:           { default: [] as SshHost[],          validate: isArray<SshHost> },
   localProfiles:      { default: [] as LocalProfile[],     validate: isArray<LocalProfile> },
   vsInstalls:         { default: [] as VsInstallation[],   validate: isArray<VsInstallation> },
   serialPorts:        { default: [] as SerialPort[],       validate: isArray<SerialPort> },
-  serialPortParams:   { default: {} as Record<string, SerialParams>, validate: isObject },
   hiddenProfiles:     { default: [] as string[],           validate: isArray<string> },
   hiddenSshHosts:     { default: [] as string[],           validate: isArray<string> },
   fontFamily:         { default: buildFontFamily(defaultFontStack()), validate: isString },
@@ -83,9 +74,7 @@ const SCHEMA = {
   pasteWarning:       { default: true,                     validate: isBoolean },
   pasteTrim:          { default: true,                     validate: isBoolean },
   serialBaud:         { default: 115200,                   validate: isNumber(300, 921600) },
-  serialInputMode:    { default: "normal" as SerialInputMode, validate: isOneOf(SERIAL_INPUT_MODES) },
-  serialOutputNewline:{ default: "keep" as SerialOutputNewline, validate: isOneOf(OUTPUT_NEWLINE_VALUES) },
-  serialEnterNewline: { default: "cr" as SerialEnterNewline,  validate: isOneOf(SERIAL_ENTER_MODES) },
+  serialProfile:      { default: "Normal",                  validate: isString },
   defaultLocalProfile: { default: null as string | null,    validate: isOrNull(isString) },
   autoCheckUpdates:   { default: true,                     validate: isBoolean },
   sshEmbedded:        { default: true,                     validate: isBoolean },

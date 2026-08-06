@@ -4,8 +4,9 @@
 //   every tab : AI share toggle (+ link copy)
 //   ssh       : auto-reconnect toggle (timed retry); embedded client also
 //               lists port forwards and adds new ones inline
-//   serial    : auto-reconnect toggle (re-plug detection), baud / newline
-//               selects, RTS line toggle, CTS line status
+//   serial    : profile select (built-in/custom), baud / input-mode /
+//               newline selects, auto-reconnect toggle (re-plug detection),
+//               flow control + modem lines (RTS/DTR drive, CTS/DSR status)
 //
 // Like contextmenu, this module never imports TabManager: actions go
 // through handlers injected by main.ts (setQuickPanelHandlers), keeping the
@@ -17,7 +18,8 @@ import { listen } from "@tauri-apps/api/event";
 import { createElement, SlidersHorizontal } from "lucide";
 import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
 import { SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES } from "../core/common";
-import type { SerialEnterNewline, SerialOutputNewline } from "../core/types";
+import type { SerialEnterNewline, SerialFlowControl, SerialInputMode, SerialOutputNewline } from "../core/types";
+import { allSerialProfiles, DEFAULT_SERIAL_PROFILE } from "../config/serial-profiles";
 import { showToast } from "../ui/toast";
 import { logCatch } from "../core/errorlog";
 import {
@@ -37,6 +39,8 @@ export interface QuickPanelHandlers {
   getTab: (tabId: string) => TerminalTab | undefined;
   shareTab: (tabId: string) => Promise<void>;
   setSerialBaud: (tabId: string, baud: number) => Promise<void>;
+  setSerialProfile: (tabId: string, name: string) => Promise<void>;
+  setSerialInputMode: (tabId: string, mode: SerialInputMode) => void;
   setSerialOutputNewline: (tabId: string, mode: SerialOutputNewline) => Promise<void>;
   setSerialEnterNewline: (tabId: string, mode: SerialEnterNewline) => Promise<void>;
 }
@@ -50,6 +54,10 @@ export function setQuickPanelHandlers(h: QuickPanelHandlers): void {
 interface SerialLineState {
   rts: boolean;
   cts: boolean;
+  dtr: boolean;
+  dsr: boolean;
+  // false when the port driver can't report/drive modem lines.
+  supported: boolean;
 }
 
 // A toggle row whose visual state can be corrected asynchronously (backend
@@ -281,21 +289,187 @@ function forwardsBlock(tab: TerminalTab): HTMLElement {
   return wrap;
 }
 
+const SERIAL_INPUT_MODES: [SerialInputMode, string][] = [
+  ["normal", "Normal"],
+  ["echo", "Echo"],
+  ["line", "Line-by-line"],
+];
+
+const SERIAL_FLOW_CONTROLS: [SerialFlowControl, string][] = [
+  ["none", "None"],
+  ["software", "Software (XON/XOFF)"],
+  ["hardware", "Hardware (RTS/CTS)"],
+];
+
+// Profile select, grouped Built-in/Custom like the theme gallery. Applying a
+// profile goes through the handler (live session apply + new global default),
+// then the section re-renders so the parameter rows reflect the profile.
+function serialProfileRow(tab: TerminalTab): HTMLElement {
+  const row = el("div", "qp-row");
+  row.appendChild(el("span", "qp-label", "Profile"));
+  const sel = document.createElement("select");
+  sel.className = "qp-select";
+  sel.setAttribute("aria-label", "Profile");
+  const profiles = allSerialProfiles();
+  for (const [label, source] of [["Built-in", "builtin"], ["Custom", "custom"]] as const) {
+    const group = profiles.filter((p) => p.source === source);
+    if (group.length === 0) continue;
+    const og = document.createElement("optgroup");
+    og.label = label;
+    for (const p of group) {
+      const opt = document.createElement("option");
+      opt.value = p.name;
+      opt.textContent = p.name;
+      og.appendChild(opt);
+    }
+    sel.appendChild(og);
+  }
+  sel.value = tab.serialProfile ?? DEFAULT_SERIAL_PROFILE;
+  sel.addEventListener("change", () => {
+    if (!_handlers) return;
+    _handlers.setSerialProfile(tab.id, sel.value)
+      .then(() => { if (panelTabId === tab.id) renderPanel(tab); })
+      .catch(logCatch("serial.setProfile"));
+  });
+  row.appendChild(sel);
+  return row;
+}
+
+// Flow control + modem signal lines. While flow !== "none" a signal block
+// expands: RTS/DTR are ours to drive (toggles), CTS/DSR are the device's
+// answer (read-only status). Ports whose driver can't report modem lines
+// (or a failed status query) grey the whole control out.
+function serialFlowBlock(tab: TerminalTab): HTMLElement {
+  const wrap = el("div", "qp-flow");
+  const signalWrap = el("div", "qp-signals");
+  let supported = true;
+  let rtsRow: ToggleRow | null = null;
+  let dtrRow: ToggleRow | null = null;
+  let ctsVal: HTMLElement | null = null;
+  let dsrVal: HTMLElement | null = null;
+
+  const statusRow = (label: string): [HTMLElement, HTMLElement] => {
+    const row = el("div", "qp-row");
+    row.appendChild(el("span", "qp-label", label));
+    const val = el("span", "qp-line-val", "…");
+    row.appendChild(val);
+    return [row, val];
+  };
+
+  const renderSignals = (): void => {
+    signalWrap.innerHTML = "";
+    rtsRow = dtrRow = null;
+    ctsVal = dsrVal = null;
+    if (!supported || (tab.flowControl ?? "none") === "none") return;
+    rtsRow = mkToggle("RTS", true, (on) => {
+      invoke("serial_set_rts", { id: tab.id, on })
+        .catch((e) => showToast(`RTS: ${e}`, "error"));
+    });
+    dtrRow = mkToggle("DTR", true, (on) => {
+      invoke("serial_set_dtr", { id: tab.id, on })
+        .catch((e) => showToast(`DTR: ${e}`, "error"));
+    });
+    signalWrap.appendChild(rtsRow);
+    signalWrap.appendChild(dtrRow);
+    const [ctsRow, cv] = statusRow("CTS");
+    ctsVal = cv;
+    signalWrap.appendChild(ctsRow);
+    const [dsrRow, dv] = statusRow("DSR");
+    dsrVal = dv;
+    signalWrap.appendChild(dsrRow);
+  };
+
+  const applyStatus = (s: SerialLineState): void => {
+    rtsRow?.setOn(s.rts);
+    dtrRow?.setOn(s.dtr);
+    for (const [val, on] of [[ctsVal, s.cts], [dsrVal, s.dsr]] as const) {
+      if (!val) continue;
+      val.textContent = on ? "asserted" : "deasserted";
+      val.classList.toggle("on", on);
+    }
+  };
+
+  const flowRow = mkSelectRow(
+    "Flow control",
+    SERIAL_FLOW_CONTROLS,
+    tab.flowControl ?? "none",
+    (v) => {
+      tab.flowControl = v;
+      renderSignals();
+      invoke("serial_set_flow_control", { id: tab.id, flow: v })
+        .then(queryStatus)
+        .catch((e) => showToast(`Flow control: ${e}`, "error"));
+    },
+  );
+  const flowSelect = flowRow.querySelector("select")!;
+
+  const hint = el("div", "qp-hint", "Flow control not supported by this port");
+  hint.style.display = "none";
+
+  const setSupported = (ok: boolean): void => {
+    supported = ok;
+    flowSelect.disabled = !ok;
+    flowRow.classList.toggle("qp-disabled", !ok);
+    hint.style.display = ok ? "none" : "";
+    renderSignals();
+  };
+
+  function queryStatus(): void {
+    invoke<SerialLineState>("serial_line_status", { id: tab.id })
+      .then((s) => { setSupported(s.supported); applyStatus(s); })
+      .catch(() => setSupported(false));
+  }
+
+  wrap.appendChild(flowRow);
+  wrap.appendChild(hint);
+  wrap.appendChild(signalWrap);
+  renderSignals();
+  queryStatus();
+  return wrap;
+}
+
+// Manual release/reconnect of the port: Disconnect frees the device for
+// other tools (Arduino uploads…), Reconnect re-enters through the relay's
+// dead-mode respawn path. State comes from tab.disconnected (session-state
+// events); the panel re-renders shortly after the action lands.
+function connectionRow(tab: TerminalTab): HTMLElement {
+  const row = el("div", "qp-row");
+  row.appendChild(el("span", "qp-label", "Connection"));
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "qp-mini-btn qp-connect-btn";
+  btn.textContent = tab.disconnected ? "Reconnect" : "Disconnect";
+  btn.addEventListener("click", () => {
+    const reconnecting = tab.disconnected;
+    btn.disabled = true;
+    invoke(reconnecting ? "serial_reconnect" : "serial_disconnect", { id: tab.id })
+      .then(() => setTimeout(() => { if (panelTabId === tab.id) renderPanel(tab); }, 600))
+      .catch((e) => {
+        btn.disabled = false;
+        showToast(`${reconnecting ? "Reconnect" : "Disconnect"}: ${e}`, "error");
+      });
+  });
+  row.appendChild(btn);
+  return row;
+}
+
 function serialSection(tab: TerminalTab): HTMLElement {
   const sec = mkSection("Serial", "serial");
-  sec.appendChild(autoReconnectRow(tab));
-
+  sec.appendChild(connectionRow(tab));
+  sec.appendChild(serialProfileRow(tab));
   sec.appendChild(mkSelectRow(
     "Baud rate",
     SERIAL_BAUD_RATES.map((b) => [String(b), String(b)] as const),
     String(tab.serialBaud ?? 115200),
     (v) => _handlers?.setSerialBaud(tab.id, parseInt(v, 10)).catch(logCatch("serial.setBaud")),
   ));
+  sec.appendChild(autoReconnectRow(tab));
+  // Live, session-only profile parameter tweaks (not persisted).
   sec.appendChild(mkSelectRow(
-    "Output newlines",
-    SERIAL_OUTPUT_NEWLINES,
-    tab.outputNewline ?? "keep",
-    (v) => _handlers?.setSerialOutputNewline(tab.id, v as SerialOutputNewline).catch(logCatch("serial.setOutputNewline")),
+    "Input mode",
+    SERIAL_INPUT_MODES,
+    tab.inputMode ?? "normal",
+    (v) => _handlers?.setSerialInputMode(tab.id, v as SerialInputMode),
   ));
   sec.appendChild(mkSelectRow(
     "Enter sends",
@@ -303,29 +477,13 @@ function serialSection(tab: TerminalTab): HTMLElement {
     tab.enterNewline ?? "cr",
     (v) => _handlers?.setSerialEnterNewline(tab.id, v as SerialEnterNewline).catch(logCatch("serial.setEnterNewline")),
   ));
-
-  // Modem lines: RTS is ours to drive, CTS is the device's answer (status).
-  const rtsRow = mkToggle("RTS line", true, (on) => {
-    invoke("serial_set_rts", { id: tab.id, on })
-      .catch((e) => showToast(`RTS: ${e}`, "error"));
-  });
-  sec.appendChild(rtsRow);
-
-  const ctsRow = el("div", "qp-row");
-  ctsRow.appendChild(el("span", "qp-label", "CTS line"));
-  const ctsVal = el("span", "qp-line-val", "…");
-  ctsRow.appendChild(ctsVal);
-  sec.appendChild(ctsRow);
-
-  invoke<SerialLineState>("serial_line_status", { id: tab.id })
-    .then((s) => {
-      rtsRow.setOn(s.rts);
-      ctsVal.textContent = s.cts ? "asserted" : "deasserted";
-      ctsVal.classList.toggle("on", s.cts);
-    })
-    .catch(() => {
-      ctsVal.textContent = "n/a";
-    });
+  sec.appendChild(mkSelectRow(
+    "Output newlines",
+    SERIAL_OUTPUT_NEWLINES,
+    tab.outputNewline ?? "keep",
+    (v) => _handlers?.setSerialOutputNewline(tab.id, v as SerialOutputNewline).catch(logCatch("serial.setOutputNewline")),
+  ));
+  sec.appendChild(serialFlowBlock(tab));
   return sec;
 }
 

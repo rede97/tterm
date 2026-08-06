@@ -184,7 +184,7 @@ fn spawn_animation_session(
                     serial_sessions
                         .lock()
                         .map_err(|e| e.to_string())?
-                        .insert(id3.clone(), SerialSession { cancel: s.cancel, ctl: s.ctl, spec: None });
+                        .insert(id3.clone(), SerialSession { cancel: s.cancel, ctl: s.ctl, spec: None, auto_hold_restore: false });
                     Ok((
                         Box::new(s.reader) as Box<dyn Read + Send>,
                         Box::new(s.writer) as Box<dyn Write + Send>,
@@ -199,7 +199,7 @@ fn spawn_animation_session(
         .serial_sessions
         .lock()
         .map_err(|e| e.to_string())?
-        .insert(id.clone(), SerialSession { cancel: spawned.cancel, ctl: spawned.ctl, spec: None });
+        .insert(id.clone(), SerialSession { cancel: spawned.cancel, ctl: spawned.ctl, spec: None, auto_hold_restore: false });
 
     Ok(state.ws_result(id))
 }

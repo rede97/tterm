@@ -39,6 +39,9 @@ pub struct SerialSession {
     pub(crate) ctl: std::sync::mpsc::Sender<SerialCtl>,
     // None = not reconnectable (e.g. demo TTY)
     pub(crate) spec: Option<SpawnSpec>,
+    // Auto-reconnect preference saved when the port is manually released
+    // (serial_disconnect suppresses the retry; serial_reconnect restores it).
+    pub(crate) auto_hold_restore: bool,
 }
 
 // Parameters needed to respawn a session (reconnect).
@@ -59,12 +62,17 @@ pub enum SpawnSpec {
 
 use crate::newline::NewlineMode;
 
-// Live modem-line snapshot for the serial quick panel. `rts` is the state we
-// last drove (the line cannot be read back); `cts` is sampled from the device.
+// Live modem-line snapshot for the serial quick panel. `rts`/`dtr` are the
+// states we last drove (the lines cannot be read back); `cts`/`dsr` are
+// sampled from the device. `supported` is false when the driver cannot
+// report modem lines at all — the UI greys the flow-control block then.
 #[derive(Clone, Copy, Debug, serde::Serialize)]
 pub struct SerialLineState {
     pub rts: bool,
     pub cts: bool,
+    pub dtr: bool,
+    pub dsr: bool,
+    pub supported: bool,
 }
 
 // Control messages for the serial I/O pump thread.
@@ -74,6 +82,10 @@ pub enum SerialCtl {
     SetOutputNewline(NewlineMode),
     // Drive the RTS modem line (default asserted at open).
     SetRts(bool),
+    // Drive the DTR modem line (default asserted at open).
+    SetDtr(bool),
+    // Switch flow control live: "none" | "software" | "hardware".
+    SetFlowControl(String),
     // Sample modem lines; the pump answers on this channel.
     QueryLines(std::sync::mpsc::Sender<SerialLineState>),
     // Terminal size in cells — forwarded from pty_resize for sessions that

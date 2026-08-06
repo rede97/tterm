@@ -38,7 +38,9 @@ export class TerminalTab {
   // available); false/undefined for the spawned-ssh-binary path.
   sshEmbedded = false;
   serialPortName?: string;
-  serialKey?: string;
+  // Active serial profile name + its live-adjustable fields.
+  serialProfile?: string;
+  flowControl?: string;
   serialBaud?: number;
   outputNewline?: string;
   inputMode: SerialInputMode = "normal";

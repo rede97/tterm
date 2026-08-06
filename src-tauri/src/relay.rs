@@ -559,6 +559,15 @@ fn read_pump(
 // from a blocking read timeout / dead-mode park) and drops the entry; the
 // channel closes once the pump exits, and the underlying stream dies with it
 // (or its own cancel, e.g. serial, fires in kill_session_resources).
+/// Feed bytes into a session's upstream writer as if the client typed them.
+/// serial_reconnect uses this to press Enter at the dead-mode prompt.
+pub(crate) fn feed_upstream(hub: &Arc<WsHub>, id: &str, bytes: &[u8]) -> Result<(), String> {
+    let entries = hub.entries.lock().map_err(|e| e.to_string())?;
+    let entry = entries.get(id).ok_or_else(|| format!("no relay session: {id}"))?;
+    let mut w = entry.writer.lock().map_err(|e| e.to_string())?;
+    w.write_all(bytes).map_err(|e| e.to_string())
+}
+
 pub(crate) fn unregister_session(hub: &Arc<WsHub>, id: &str) {
     if let Ok(mut entries) = hub.entries.lock() {
         if let Some(entry) = entries.remove(id) {

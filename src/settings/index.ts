@@ -7,7 +7,7 @@ import { createGeneralPanel, refreshGeneralPanel, collectGeneralSettings } from 
 import { createAppearancePanel, refreshAppearancePanel, collectAppearanceSettings, renderThemeGallery } from "./appearance";
 import { createProfilePanel, collectProfileSettings, refreshProfilePanelForm } from "./profile";
 import { createSshPanel, refreshSshPanel, collectSshSettings } from "./ssh";
-import { createSerialPanel, collectSerialSettings, refreshSerialPanelForm } from "./serial";
+import { createSerialPanel, collectSerialSettings, refreshSerialPanel } from "./serial";
 import { loadAllWtData } from "../config/wt-profiles";
 import { setWtThemes } from "../util/themes";
 
@@ -146,7 +146,7 @@ function refreshAll(root: HTMLElement) {
   refreshAppearancePanel(root);
   refreshProfilePanelForm(root);
   refreshSshPanel(root);
-  refreshSerialPanelForm(root);
+  refreshSerialPanel(root);
   renderThemeGallery(root);
 }
 

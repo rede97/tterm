@@ -10,15 +10,21 @@ describe("Quick-status button and panel", () => {
       const park = document.getElementById("btn-park-tray");
       const min = document.getElementById("btn-minimize");
       const group = document.getElementById("quick-actions");
-      const divider = document.querySelector(".win-divider");
+      const dividers = [...document.querySelectorAll(".win-divider")];
+      const innerDiv = dividers.find((d) => group.contains(d));
+      const outerDiv = dividers.find((d) => !group.contains(d));
       const qsRect = qs.getBoundingClientRect();
       const parkRect = park.getBoundingClientRect();
-      const divRect = divider.getBoundingClientRect();
+      const divRect = outerDiv.getBoundingClientRect();
+      const innerRect = innerDiv ? innerDiv.getBoundingClientRect() : null;
       const minRect = min.getBoundingClientRect();
       return {
-        // Both buttons live in the shared group, quick-status first.
+        // Both buttons live in the shared group, quick-status first, with a
+        // vertical divider between them.
         grouped: group.contains(qs) && group.contains(park),
-        order: qsRect.right <= parkRect.left,
+        order: innerRect
+          ? qsRect.right <= innerRect.left && innerRect.right <= parkRect.left
+          : false,
         sameWidth: Math.abs(qsRect.width - parkRect.width) < 1,
         // All four bar buttons share one width.
         allFourWidth: (() => {
@@ -104,7 +110,7 @@ describe("Quick-status button and panel", () => {
     await browser.execute(() => document.getElementById("quick-status").click()); // close
   });
 
-  it("serial tab shows baud/newline selects, RTS toggle and CTS status", async () => {
+  it("serial tab: profile select, live params, flow signals on demand", async () => {
     // Mock loopback port (debug builds inject it into serial_list_ports).
     await browser.executeAsync((done) => {
       (async () => {
@@ -120,29 +126,73 @@ describe("Quick-status button and panel", () => {
     const sec = await $('.quick-panel.open [data-section="serial"]');
     await sec.waitForExist({ timeout: 5000 });
 
+    // Row order: Profile first, then baud, auto-reconnect, live params, flow.
     const info = await browser.execute(() => {
       const sec = document.querySelector('.quick-panel [data-section="serial"]');
       const selects = [...sec.querySelectorAll("select")].map((s) => s.getAttribute("aria-label"));
+      return { selects, text: sec.textContent };
+    });
+    expect(info.selects).toEqual([
+      "Profile", "Baud rate", "Input mode", "Enter sends", "Output newlines", "Flow control",
+    ]);
+    expect(info.text).toContain("Auto-reconnect");
+
+    // Default profile Normal, flow none: the signal block stays collapsed
+    // (no RTS/DTR toggles, no CTS/DSR status rows).
+    const noSignals = await browser.execute(() => {
+      const sec = document.querySelector('.quick-panel [data-section="serial"]');
       return {
-        selects,
-        text: sec.textContent,
+        toggles: sec.querySelectorAll(".qp-signals .qp-toggle-row").length,
+        vals: sec.querySelectorAll(".qp-signals .qp-line-val").length,
       };
     });
-    expect(info.selects).toEqual(["Baud rate", "Output newlines", "Enter sends"]);
-    expect(info.text).toContain("Auto-reconnect");
-    expect(info.text).toContain("RTS line");
-    expect(info.text).toContain("CTS line");
+    expect(noSignals.toggles).toBe(0);
+    expect(noSignals.vals).toBe(0);
 
-    // CTS is read live from the (mock) device: mocked ports report asserted.
-    await browser.waitUntil(async () => {
-      return await browser.execute(() =>
-        document.querySelector('.quick-panel .qp-line-val')?.textContent === "asserted");
-    }, { timeout: 5000, timeoutMsg: "CTS status never resolved" });
+    // Switch profile to AT: the section re-renders with its parameters
+    // (echo input, CRLF enter) reflected in the live selects.
+    await browser.execute(() => {
+      const sel = document.querySelector('.quick-panel [data-section="serial"] select[aria-label="Profile"]');
+      sel.value = "AT";
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await browser.waitUntil(
+      () => browser.execute(() => {
+        const mgr = window.__tterm.mgr;
+        const tab = mgr.get(mgr.activeTabId);
+        const inputSel = document.querySelector('.quick-panel [data-section="serial"] select[aria-label="Input mode"]');
+        return tab.serialProfile === "AT" && tab.inputMode === "echo" && inputSel && inputSel.value === "echo";
+      }),
+      { timeout: 5000, timeoutMsg: "AT profile did not apply to the live session" }
+    );
+
+    // Enable hardware flow control: the signal block expands with RTS/DTR
+    // toggles and live CTS/DSR status (mock port reports asserted).
+    await browser.execute(() => {
+      const sel = document.querySelector('.quick-panel [data-section="serial"] select[aria-label="Flow control"]');
+      sel.value = "hardware";
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await browser.waitUntil(
+      () => browser.execute(() =>
+        document.querySelector('.quick-panel [data-section="serial"] .qp-line-val')?.textContent === "asserted"),
+      { timeout: 5000, timeoutMsg: "CTS status never resolved" }
+    );
+    const signals = await browser.execute(() => {
+      const sec = document.querySelector('.quick-panel [data-section="serial"]');
+      return {
+        text: sec.textContent,
+        toggleLabels: [...sec.querySelectorAll(".qp-signals .qp-toggle-row")].map((r) => r.textContent),
+      };
+    });
+    expect(signals.toggleLabels).toEqual(["RTS", "DTR"]);
+    expect(signals.text).toContain("CTS");
+    expect(signals.text).toContain("DSR");
 
     // RTS toggle round-trips through the backend without error.
     await browser.execute(() => {
-      const rows = [...document.querySelectorAll('.quick-panel [data-section="serial"] .qp-toggle-row')];
-      rows.find((r) => r.textContent.includes("RTS line")).querySelector(".qp-switch").click();
+      const rows = [...document.querySelectorAll('.quick-panel .qp-signals .qp-toggle-row')];
+      rows.find((r) => r.textContent.includes("RTS")).querySelector(".qp-switch").click();
     });
 
     // Auto-reconnect toggle persists in the backend.
@@ -154,12 +204,39 @@ describe("Quick-status button and panel", () => {
       (async () => {
         const mgr = window.__tterm.mgr;
         const id = mgr.activeTabId;
-        // Reach the backend through the same bridge the panel uses.
         const v = await window.__TAURI_INTERNALS__.invoke("session_get_auto_reconnect", { id });
         done(v === true);
       })();
     });
     expect(autoOn).toBe(true);
+
+    // Manual release: Disconnect frees the port (dead mode, auto-reconnect
+    // suppressed while held), Reconnect brings the session back.
+    await browser.execute(() => {
+      document.querySelector('.quick-panel [data-section="serial"] .qp-connect-btn').click();
+    });
+    await browser.waitUntil(
+      () => browser.execute(() => {
+        const mgr = window.__tterm.mgr;
+        return mgr.get(mgr.activeTabId)?.disconnected === true;
+      }),
+      { timeout: 8000, timeoutMsg: "disconnect did not dead the session" }
+    );
+    await browser.waitUntil(
+      () => browser.execute(() =>
+        document.querySelector('.quick-panel [data-section="serial"] .qp-connect-btn')?.textContent === "Reconnect"),
+      { timeout: 5000, timeoutMsg: "panel did not flip to Reconnect" }
+    );
+    await browser.execute(() => {
+      document.querySelector('.quick-panel [data-section="serial"] .qp-connect-btn').click();
+    });
+    await browser.waitUntil(
+      () => browser.execute(() => {
+        const mgr = window.__tterm.mgr;
+        return mgr.get(mgr.activeTabId)?.disconnected === false;
+      }),
+      { timeout: 8000, timeoutMsg: "reconnect did not revive the session" }
+    );
 
     // Baud select switches the live session and renames the tab.
     await browser.execute(() => {

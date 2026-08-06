@@ -22,6 +22,7 @@ import { loadSshHosts } from "./config/ssh-config";
 import { loadAllWtData } from "./config/wt-profiles";
 import { setWtThemes, findTheme, applyTerminalBackground } from "./util/themes";
 import { loadCustomThemes } from "./config/custom-themes";
+import { loadSerialProfiles } from "./config/serial-profiles";
 import { logCatch } from "./core/errorlog";
 import { scheduleAutoUpdateCheck } from "./core/updater";
 
@@ -123,6 +124,8 @@ import("./terminal/quickpanel").then(m => {
     getTab: (id) => tabManager.get(id),
     shareTab: (id) => tabManager.shareTab(id),
     setSerialBaud: (id, baud) => tabManager.setSerialBaud(id, baud),
+    setSerialProfile: (id, name) => tabManager.setSerialProfile(id, name),
+    setSerialInputMode: (id, mode) => tabManager.setSerialInputMode(id, mode),
     setSerialOutputNewline: (id, mode) => tabManager.setSerialOutputNewline(id, mode),
     setSerialEnterNewline: (id, mode) => tabManager.setSerialEnterNewline(id, mode),
   });
@@ -200,6 +203,7 @@ configStore.load().then(async () => {
   const wt = await loadAllWtData();
   setWtThemes(wt.themes);
   await loadCustomThemes();
+  await loadSerialProfiles();
   configStore.set({
     localProfiles: wt.profiles,
     vsInstalls: wt.vsInstalls,

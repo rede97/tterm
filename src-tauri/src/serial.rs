@@ -2,6 +2,7 @@ use serde::Serialize;
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tauri::{Emitter, Manager};
 
 use crate::newline::{NewlineFilter, NewlineMode};
@@ -184,9 +185,10 @@ pub(crate) fn serial_io_loop(
     mut newline_filter: NewlineFilter,
 ) {
     let mut buf = [0u8; 16384];
-    // RTS is asserted at open (open_serial); tracked here because the line
-    // state cannot be read back from the device.
+    // RTS/DTR are asserted at open (open_serial); tracked here because the
+    // lines cannot be read back from the device.
     let mut rts = true;
+    let mut dtr = true;
     'outer: loop {
         if cancel.load(Ordering::Relaxed) {
             break;
@@ -205,9 +207,29 @@ pub(crate) fn serial_io_loop(
                         rts = on;
                     }
                 }
+                SerialCtl::SetDtr(on) => {
+                    if port.write_data_terminal_ready(on).is_ok() {
+                        dtr = on;
+                    }
+                }
+                SerialCtl::SetFlowControl(flow) => {
+                    if let Ok(mode) = map_flow_control(&flow) {
+                        let _ = port.set_flow_control(mode);
+                    }
+                }
                 SerialCtl::QueryLines(reply) => {
-                    let cts = port.read_clear_to_send().unwrap_or(false);
-                    let _ = reply.send(crate::state::SerialLineState { rts, cts });
+                    let cts = port.read_clear_to_send();
+                    let dsr = port.read_data_set_ready();
+                    // A driver that can't report modem lines errors here —
+                    // the panel greys the flow-control block.
+                    let supported = cts.is_ok() && dsr.is_ok();
+                    let _ = reply.send(crate::state::SerialLineState {
+                        rts,
+                        cts: cts.unwrap_or(false),
+                        dtr,
+                        dsr: dsr.unwrap_or(false),
+                        supported,
+                    });
                 }
                 SerialCtl::SetSize(..) => {} // meaningless for real serial ports
             }
@@ -333,7 +355,7 @@ fn serial_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec, auto_retry: 
             serial_sessions
                 .lock()
                 .map_err(|e| e.to_string())?
-                .insert(id.clone(), SerialSession { cancel, ctl, spec: Some(spec.clone()) });
+                .insert(id.clone(), SerialSession { cancel, ctl, spec: Some(spec.clone()), auto_hold_restore: false });
             Ok((
                 Box::new(reader) as Box<dyn Read + Send>,
                 Box::new(writer) as Box<dyn Write + Send>,
@@ -368,7 +390,7 @@ pub(crate) fn start_serial_session(
         .serial_sessions
         .lock()
         .map_err(|e| e.to_string())?
-        .insert(id, SerialSession { cancel, ctl: ctl_tx, spec });
+        .insert(id, SerialSession { cancel, ctl: ctl_tx, spec, auto_hold_restore: false });
 
     Ok(())
 }
@@ -445,6 +467,86 @@ pub fn serial_set_rts(state: tauri::State<AppState>, id: &str, on: bool) -> Resu
         .ctl
         .send(SerialCtl::SetRts(on))
         .map_err(|e| format!("Serial session closed: {}", e))
+}
+
+// Drive the DTR modem line (quick panel toggle).
+#[tauri::command]
+pub fn serial_set_dtr(state: tauri::State<AppState>, id: &str, on: bool) -> Result<(), String> {
+    let sessions = state.serial_sessions.lock().map_err(|e| e.to_string())?;
+    let session = sessions
+        .get(id)
+        .ok_or_else(|| format!("No serial session: {}", id))?;
+    session
+        .ctl
+        .send(SerialCtl::SetDtr(on))
+        .map_err(|e| format!("Serial session closed: {}", e))
+}
+
+// Switch flow control on a live session (no port reopen).
+#[tauri::command]
+pub fn serial_set_flow_control(state: tauri::State<AppState>, id: &str, flow: &str) -> Result<(), String> {
+    map_flow_control(flow)?; // validate before touching the session
+    let mut sessions = state.serial_sessions.lock().map_err(|e| e.to_string())?;
+    let session = sessions
+        .get_mut(id)
+        .ok_or_else(|| format!("No serial session: {}", id))?;
+    // Keep the spec in sync so (auto-)reconnect reopens with it.
+    if let Some(SpawnSpec::Serial { flow_control, .. }) = &mut session.spec {
+        *flow_control = flow.to_string();
+    }
+    session
+        .ctl
+        .send(SerialCtl::SetFlowControl(flow.to_string()))
+        .map_err(|e| format!("Serial session closed: {}", e))
+}
+
+// Manually release the port (quick panel "Disconnect"): the pump stops and
+// the OS handle is dropped, so other tools (Arduino uploads, …) can claim
+// the device. The relay slot enters dead mode; auto-reconnect is suppressed
+// while held (the preference is restored on reconnect).
+#[tauri::command]
+pub fn serial_disconnect(state: tauri::State<AppState>, id: &str) -> Result<(), String> {
+    let mut sessions = state.serial_sessions.lock().map_err(|e| e.to_string())?;
+    let session = sessions
+        .get_mut(id)
+        .ok_or_else(|| format!("No serial session: {}", id))?;
+    if let Ok(map) = state.auto_reconnect.lock() {
+        if let Some(flag) = map.get(id) {
+            session.auto_hold_restore = flag.swap(false, Ordering::Relaxed);
+        }
+    }
+    session.cancel.store(true, Ordering::Relaxed);
+    Ok(())
+}
+
+// Reconnect after a manual release. Refuses when the session is still alive
+// (feeding Enter would send a stray CR to the device instead of respawning).
+#[tauri::command]
+pub async fn serial_reconnect(state: tauri::State<'_, AppState>, id: String) -> Result<(), String> {
+    let (ctl, restore) = {
+        let sessions = state.serial_sessions.lock().map_err(|e| e.to_string())?;
+        let s = sessions
+            .get(id.as_str())
+            .ok_or_else(|| format!("No serial session: {}", id))?;
+        (s.ctl.clone(), s.auto_hold_restore)
+    };
+    // Liveness probe: a live pump answers QueryLines; a dead one's sender is
+    // dropped (or never replies) once the thread exited.
+    let (tx, rx) = std::sync::mpsc::channel();
+    let alive = ctl.send(SerialCtl::QueryLines(tx)).is_ok()
+        && rx.recv_timeout(Duration::from_millis(300)).is_ok();
+    if alive {
+        return Err("Session is still connected".into());
+    }
+    if let Ok(map) = state.auto_reconnect.lock() {
+        if let Some(flag) = map.get(id.as_str()) {
+            flag.store(restore, Ordering::Relaxed);
+        }
+    }
+    // Let the relay notice the EOF and install the dead-mode Enter watcher,
+    // then press Enter — the exact same respawn path as the user's keyboard.
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    crate::relay::feed_upstream(&state.hub, &id, b"\r")
 }
 
 // Sample the modem lines for the quick panel (RTS tracked, CTS read live).

@@ -43,3 +43,15 @@ export interface SerialParams {
   outputNewline?: SerialOutputNewline;
   enterNewline?: SerialEnterNewline;
 }
+
+export type SerialFlowControl = "none" | "software" | "hardware";
+
+// A named serial session mode (built-in or user-defined). Baud is NOT part
+// of the profile — it's a physical link parameter, configured separately.
+export interface SerialProfile {
+  name: string;
+  inputMode: SerialInputMode;
+  enterNewline: SerialEnterNewline;
+  outputNewline: SerialOutputNewline;
+  flowControl: SerialFlowControl;
+}

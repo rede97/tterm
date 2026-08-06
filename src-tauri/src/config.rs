@@ -49,3 +49,18 @@ pub fn write_themes(app: tauri::AppHandle, content: String) -> Result<(), String
     std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
     std::fs::write(config_dir.join("themes.json"), content).map_err(|e| e.to_string())
 }
+
+// Serial profiles also get their own file (serial-profiles.json) — same
+// rationale as themes.json. Raw I/O only; the frontend parses.
+#[tauri::command]
+pub fn read_serial_profiles(app: tauri::AppHandle) -> String {
+    let config_dir = app.path().app_config_dir().unwrap_or_default();
+    std::fs::read_to_string(config_dir.join("serial-profiles.json")).unwrap_or_else(|_| "[]".into())
+}
+
+#[tauri::command]
+pub fn write_serial_profiles(app: tauri::AppHandle, content: String) -> Result<(), String> {
+    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
+    std::fs::write(config_dir.join("serial-profiles.json"), content).map_err(|e| e.to_string())
+}

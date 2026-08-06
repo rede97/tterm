@@ -1,55 +1,31 @@
 // Settings — Serial panel
-// Serial port defaults, connected ports, parameter history
+// Default baud rate, default serial profile, profile gallery.
+// Per-device parameter memory is gone: named profiles (serial-profiles.json)
+// replace it.
 
 import { configStore, type ConfigState } from "../core/store";
-import type { SerialInputMode, SerialOutputNewline, SerialEnterNewline } from "../core/types";
-import { SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES, esc} from "../core/common";
-import { loadSerialPorts } from "../config/wt-profiles";
-import { serialKeyFor, rememberSerialParams, forgetSerialParams } from "../config/serial-memory";
-import { showToast } from "../ui/toast";
+import { SERIAL_BAUD_RATES, esc } from "../core/common";
+import {
+  allSerialProfiles,
+  findSerialProfile,
+  dedupeSerialProfileName,
+  DEFAULT_SERIAL_PROFILE,
+  type SerialProfileDef,
+} from "../config/serial-profiles";
+import { showSerialProfileEditor, serialProfileSummary } from "./serialprofileeditor";
 
 export function createSerialPanel(): HTMLElement {
   const panel = document.createElement("div");
   panel.className = "settings-panel-content";
   panel.dataset.panel = "serial";
   panel.style.display = "none";
-  renderSerialPanel(panel);
-  return panel;
-}
-
-export function refreshSerialPanel(root: HTMLElement): void {
-  renderSerialPanel(root);
-}
-
-function baudOptionsHtml(current: number): string {
-  return SERIAL_BAUD_RATES.map(b =>
-    `<option value="${b}" ${current === b ? "selected" : ""}>${b}</option>`).join("");
-}
-
-function inputModeOptionsHtml(current: SerialInputMode): string {
-  const modes: [SerialInputMode, string][] = [["normal", "Normal"], ["echo", "Echo"], ["line", "Line by Line"]];
-  return modes.map(([v, label]) =>
-    `<option value="${v}" ${current === v ? "selected" : ""}>${label}</option>`).join("");
-}
-
-function enterNewlineOptionsHtml(current: string): string {
-  return SERIAL_ENTER_NEWLINES.map(([v, label]) =>
-    `<option value="${v}" ${current === v ? "selected" : ""}>${label}</option>`).join("");
-}
-
-function outputNewlineOptionsHtml(current: string): string {
-  return SERIAL_OUTPUT_NEWLINES.map(([v, label]) =>
-    `<option value="${v}" ${current === v ? "selected" : ""}>${label}</option>`).join("");
-}
-
-function renderSerialPanel(container: HTMLElement) {
-  container.innerHTML = `
+  panel.innerHTML = `
     <div class="settings-section">
       <div class="settings-section-title">Defaults</div>
       <div class="settings-item settings-item-row">
         <div class="settings-item-info">
           <div class="settings-item-title">Default baud rate</div>
-          <div class="settings-item-desc">Baud rate for ports without remembered settings (8N1, no flow control).</div>
+          <div class="settings-item-desc">Baud rate for new serial sessions (8N1).</div>
         </div>
         <div class="settings-item-control">
           <select id="set-serial-baud" class="settings-select">${baudOptionsHtml(configStore.get("serialBaud"))}</select>
@@ -57,169 +33,172 @@ function renderSerialPanel(container: HTMLElement) {
       </div>
       <div class="settings-item settings-item-row">
         <div class="settings-item-info">
-          <div class="settings-item-title">Default input mode</div>
-          <div class="settings-item-desc">Normal: send keys directly. ECHO: also echo locally. Line by Line: edit locally, send whole line on Enter.</div>
+          <div class="settings-item-title">Default profile</div>
+          <div class="settings-item-desc">Input mode, newline handling and flow control for new serial sessions.</div>
         </div>
         <div class="settings-item-control">
-          <select id="set-serial-input-mode" class="settings-select">${inputModeOptionsHtml(configStore.get("serialInputMode"))}</select>
-        </div>
-      </div>
-      <div class="settings-item settings-item-row">
-        <div class="settings-item-info">
-          <div class="settings-item-title">Default output newlines</div>
-          <div class="settings-item-desc">How device output line endings are rewritten before display.</div>
-        </div>
-        <div class="settings-item-control">
-          <select id="set-serial-output-newline" class="settings-select">${outputNewlineOptionsHtml(configStore.get("serialOutputNewline"))}</select>
-        </div>
-      </div>
-      <div class="settings-item settings-item-row">
-        <div class="settings-item-info">
-          <div class="settings-item-title">Enter sends</div>
-          <div class="settings-item-desc">Line terminator sent when pressing Enter (AT-command devices usually want CRLF).</div>
-        </div>
-        <div class="settings-item-control">
-          <select id="set-serial-enter-newline" class="settings-select">${enterNewlineOptionsHtml(configStore.get("serialEnterNewline"))}</select>
+          <select id="set-serial-profile" class="settings-select"></select>
         </div>
       </div>
     </div>
     <div class="settings-section">
-      <div class="settings-section-title">Connected Ports</div>
-      <div id="serial-port-list">
-        <div class="settings-item-desc">Enumerating\u2026</div>
-      </div>
-    </div>
-    <div class="settings-section">
-      <div class="settings-section-title">History</div>
-      <div id="serial-history-list"></div>
+      <div class="settings-section-title">Profiles</div>
+      <div class="settings-item-desc" style="margin-bottom:6px">Named session modes. Duplicate a built-in profile to customize it.</div>
+      <div id="set-serial-profile-gallery" class="theme-gallery"></div>
     </div>
   `;
+  const baudEl = panel.querySelector<HTMLSelectElement>("#set-serial-baud")!;
+  baudEl.value = String(configStore.get("serialBaud"));
+  refreshProfileSelect(panel);
+  renderProfileGallery(panel);
+  return panel;
+}
 
-  const listEl = container.querySelector("#serial-port-list")!;
-  const historyEl = container.querySelector("#serial-history-list")!;
+export function refreshSerialPanel(root: HTMLElement): void {
+  const baudEl = root.querySelector<HTMLSelectElement>("#set-serial-baud");
+  if (baudEl) baudEl.value = String(configStore.get("serialBaud"));
+  refreshProfileSelect(root, configStore.get("serialProfile"));
+  renderProfileGallery(root);
+}
 
-  const renderHistory = () => {
-    const serialPortParams = configStore.get("serialPortParams");
-    const keys = Object.keys(serialPortParams);
-    if (keys.length === 0) {
-      historyEl.innerHTML = `<div class="settings-item-desc">No remembered port settings.</div>`;
-      return;
-    }
-    historyEl.innerHTML = keys.map(key => {
-      const p = serialPortParams[key];
-      const label = key.startsWith("usb:") ? `USB ${key.slice(4)}` : key.slice(4);
-      return `
-        <div class="settings-item settings-item-row serial-history-row" data-key="${esc(key)}">
-          <div class="settings-item-info">
-            <div class="settings-item-title">${esc(label)}</div>
-            <div class="settings-item-desc">${p.baud} baud \u00b7 ${esc(p.inputMode ?? "normal")} \u00b7 ${esc(p.outputNewline ?? "keep")}</div>
-          </div>
-          <div class="settings-item-control">
-            <button class="settings-link-btn serial-history-forget" data-key="${esc(key)}">Forget</button>
-          </div>
-        </div>`;
-    }).join("");
-    historyEl.querySelectorAll<HTMLButtonElement>(".serial-history-forget").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        await forgetSerialParams(btn.dataset.key!);
-        renderHistory();
-        showToast(`Forgot ${btn.dataset.key}`, "info", 1500);
-      });
+// Legacy name kept for src/settings/index.ts (Revert flow).
+function baudOptionsHtml(current: number): string {
+  return SERIAL_BAUD_RATES.map(b =>
+    `<option value="${b}" ${current === b ? "selected" : ""}>${b}</option>`).join("");
+}
+
+function profileOptionsHtml(selected: string): string {
+  const profiles = allSerialProfiles();
+  const group = (label: string, list: SerialProfileDef[]): string =>
+    `<optgroup label="${label}">` +
+    list.map(p =>
+      `<option value="${esc(p.name)}" ${p.name === selected ? "selected" : ""}>${esc(p.name)}</option>`).join("") +
+    `</optgroup>`;
+  return group("Built-in", profiles.filter(p => p.source === "builtin")) +
+         group("Custom", profiles.filter(p => p.source === "custom"));
+}
+
+/** Rebuild the default-profile select, keeping the pending choice when valid. */
+function refreshProfileSelect(root: HTMLElement, selected?: string): void {
+  const sel = root.querySelector<HTMLSelectElement>("#set-serial-profile");
+  if (!sel) return;
+  const want = selected ?? (sel.value || configStore.get("serialProfile"));
+  const valid = allSerialProfiles().some(p => p.name === want) ? want : DEFAULT_SERIAL_PROFILE;
+  sel.innerHTML = profileOptionsHtml(valid);
+  sel.value = valid;
+}
+
+export function renderProfileGallery(root: HTMLElement): void {
+  const gallery = root.querySelector<HTMLElement>("#set-serial-profile-gallery");
+  if (!gallery) return;
+  gallery.innerHTML = "";
+
+  const renderCard = (p: SerialProfileDef, grid: HTMLElement) => {
+    const card = document.createElement("div");
+    card.className = "theme-card sp-card";
+    card.dataset.profile = p.name;
+
+    const name = document.createElement("div");
+    name.className = "theme-card-name";
+    name.textContent = p.name;
+    card.appendChild(name);
+
+    const summary = document.createElement("div");
+    summary.className = "sp-card-summary";
+    summary.textContent = serialProfileSummary(p);
+    card.appendChild(summary);
+
+    // Card actions: duplicate any profile into a custom copy; custom
+    // profiles can also be edited.
+    const actions = document.createElement("div");
+    actions.className = "theme-card-actions";
+    const dupBtn = document.createElement("button");
+    dupBtn.className = "theme-card-action";
+    dupBtn.textContent = "Duplicate";
+    dupBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openProfileEditor(root, p, undefined);
     });
+    actions.appendChild(dupBtn);
+    if (p.source === "custom") {
+      const editBtn = document.createElement("button");
+      editBtn.className = "theme-card-action";
+      editBtn.textContent = "Edit";
+      editBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openProfileEditor(root, p, p.name);
+      });
+      actions.appendChild(editBtn);
+    }
+    card.appendChild(actions);
+    grid.appendChild(card);
   };
-  renderHistory();
 
-  loadSerialPorts().then(ports => {
-    configStore.set({ serialPorts: ports });
-    if (ports.length === 0) {
-      listEl.innerHTML = `<div class="settings-item-desc">No serial devices detected.</div>`;
-      return;
-    }
-    const serialPortParams = configStore.get("serialPortParams");
-    listEl.innerHTML = ports.map(p => {
-      const ids = p.vid && p.pid ? `${p.vid}:${p.pid}` : "";
-      const sub = [p.product || p.driver, p.manufacturer, ids].filter(Boolean).join(" \u00b7 ");
-      const key = serialKeyFor(p);
-      const mem = serialPortParams[key];
-      const baud = mem?.baud ?? configStore.get("serialBaud");
-      const mode = mem?.inputMode ?? configStore.get("serialInputMode");
-      const nl = mem?.outputNewline ?? configStore.get("serialOutputNewline");
-      const enter = mem?.enterNewline ?? configStore.get("serialEnterNewline");
-      return `
-        <div class="settings-item settings-item-row serial-port-row">
-          <div class="settings-item-info">
-            <div class="settings-item-title">${esc(p.name)}</div>
-            <div class="settings-item-desc">${esc(sub)}</div>
-          </div>
-          <div class="settings-item-control" style="display:flex;gap:6px;">
-            <select class="settings-select serial-port-baud" data-key="${esc(key)}">
-              ${baudOptionsHtml(baud)}
-            </select>
-            <select class="settings-select serial-port-mode" data-key="${esc(key)}">
-              ${inputModeOptionsHtml(mode)}
-            </select>
-            <select class="settings-select serial-port-nl" data-key="${esc(key)}">
-              ${outputNewlineOptionsHtml(nl)}
-            </select>
-            <select class="settings-select serial-port-enter" data-key="${esc(key)}">
-              ${enterNewlineOptionsHtml(enter)}
-            </select>
-          </div>
-        </div>`;
-    }).join("");
+  const profiles = allSerialProfiles();
+  const builtin = profiles.filter(p => p.source === "builtin");
+  const custom = profiles.filter(p => p.source === "custom");
 
-    listEl.querySelectorAll<HTMLSelectElement>(".serial-port-baud").forEach(sel => {
-      sel.addEventListener("change", async () => {
-        await rememberSerialParams(sel.dataset.key!, { baud: parseInt(sel.value, 10) });
-        showToast(`Baud saved: ${sel.value}`, "info", 1500);
-        renderHistory();
-      });
-    });
-    listEl.querySelectorAll<HTMLSelectElement>(".serial-port-mode").forEach(sel => {
-      sel.addEventListener("change", async () => {
-        await rememberSerialParams(sel.dataset.key!, { inputMode: sel.value as SerialInputMode });
-        showToast(`Input mode saved: ${sel.value}`, "info", 1500);
-        renderHistory();
-      });
-    });
-    listEl.querySelectorAll<HTMLSelectElement>(".serial-port-nl").forEach(sel => {
-      sel.addEventListener("change", async () => {
-        await rememberSerialParams(sel.dataset.key!, { outputNewline: sel.value as SerialOutputNewline });
-        showToast(`Output newlines saved: ${sel.value}`, "info", 1500);
-        renderHistory();
-      });
-    });
-    listEl.querySelectorAll<HTMLSelectElement>(".serial-port-enter").forEach(sel => {
-      sel.addEventListener("change", async () => {
-        await rememberSerialParams(sel.dataset.key!, { enterNewline: sel.value as SerialEnterNewline });
-        showToast(`Enter sends saved: ${sel.value}`, "info", 1500);
-        renderHistory();
-      });
-    });
+  const builtinHeader = document.createElement("div");
+  builtinHeader.className = "theme-group-title";
+  builtinHeader.textContent = "Built-in";
+  gallery.appendChild(builtinHeader);
+  const builtinGrid = document.createElement("div");
+  builtinGrid.className = "theme-grid";
+  for (const p of builtin) renderCard(p, builtinGrid);
+  gallery.appendChild(builtinGrid);
+
+  // User's own profiles (serial-profiles.json) — always shown so the
+  // affordance exists.
+  const customHeader = document.createElement("div");
+  customHeader.className = "theme-group-title";
+  customHeader.textContent = "Custom";
+  gallery.appendChild(customHeader);
+  const customGrid = document.createElement("div");
+  customGrid.className = "theme-grid";
+  for (const p of custom) renderCard(p, customGrid);
+
+  // "New Profile" — always starts from Normal's plain values.
+  const newBtn = document.createElement("button");
+  newBtn.id = "set-serial-profile-new";
+  newBtn.className = "settings-link-btn";
+  newBtn.textContent = "+ New Profile";
+  newBtn.addEventListener("click", () => {
+    openProfileEditor(root, findSerialProfile(DEFAULT_SERIAL_PROFILE), undefined);
+  });
+  customGrid.appendChild(newBtn);
+  gallery.appendChild(customGrid);
+}
+
+/** Open the profile editor and reconcile the gallery/default afterwards. */
+function openProfileEditor(root: HTMLElement, base: SerialProfileDef, editName: string | undefined): void {
+  showSerialProfileEditor({
+    base,
+    editName,
+    suggestedName: editName ?? dedupeSerialProfileName(`${base.name} Copy`),
+    onSaved: (savedName) => {
+      // Renaming the profile that is the global default: follow the new name.
+      if (editName && configStore.get("serialProfile") === editName) {
+        configStore.set({ serialProfile: savedName });
+      }
+      refreshProfileSelect(root);
+      renderProfileGallery(root);
+    },
+    onDeleted: (deletedName) => {
+      // Deleted the default profile: fall back to Normal.
+      if (configStore.get("serialProfile") === deletedName) {
+        configStore.set({ serialProfile: DEFAULT_SERIAL_PROFILE });
+      }
+      refreshProfileSelect(root);
+      renderProfileGallery(root);
+    },
   });
 }
 
 export function collectSerialSettings(root: HTMLElement): Partial<ConfigState> {
   const partial: Partial<ConfigState> = {};
-  const baudEl = root.querySelector("#set-serial-baud") as HTMLSelectElement;
-  const modeEl = root.querySelector("#set-serial-input-mode") as HTMLSelectElement;
-  const nlEl = root.querySelector("#set-serial-output-newline") as HTMLSelectElement;
-  const enterEl = root.querySelector("#set-serial-enter-newline") as HTMLSelectElement;
+  const baudEl = root.querySelector<HTMLSelectElement>("#set-serial-baud");
+  const profileEl = root.querySelector<HTMLSelectElement>("#set-serial-profile");
   if (baudEl) partial.serialBaud = parseInt(baudEl.value, 10) || 115200;
-  if (modeEl) partial.serialInputMode = modeEl.value as SerialInputMode;
-  if (nlEl) partial.serialOutputNewline = nlEl.value as SerialOutputNewline;
-  if (enterEl) partial.serialEnterNewline = enterEl.value as SerialEnterNewline;
+  if (profileEl) partial.serialProfile = profileEl.value || DEFAULT_SERIAL_PROFILE;
   return partial;
 }
-
-export function refreshSerialPanelForm(root: HTMLElement): void {
-  const baudEl = root.querySelector("#set-serial-baud") as HTMLSelectElement;
-  const modeEl = root.querySelector("#set-serial-input-mode") as HTMLSelectElement;
-  const nlEl = root.querySelector("#set-serial-output-newline") as HTMLSelectElement;
-  const enterEl = root.querySelector("#set-serial-enter-newline") as HTMLSelectElement;
-  if (baudEl) baudEl.value = String(configStore.get("serialBaud"));
-  if (modeEl) modeEl.value = configStore.get("serialInputMode");
-  if (nlEl) nlEl.value = configStore.get("serialOutputNewline");
-  if (enterEl) enterEl.value = configStore.get("serialEnterNewline");
-}
-

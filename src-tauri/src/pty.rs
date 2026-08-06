@@ -314,7 +314,7 @@ mod tests {
         let (ctl_tx, ctl_rx) = std::sync::mpsc::channel::<crate::state::SerialCtl>();
         state.serial_sessions.lock().unwrap().insert(
             "tab-9".to_string(),
-            crate::state::SerialSession { cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)), ctl: ctl_tx, spec: None },
+            crate::state::SerialSession { cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)), ctl: ctl_tx, spec: None, auto_hold_restore: false },
         );
         resize_session(&state, "tab-9", 177, 52).unwrap();
         let msg = ctl_rx.recv_timeout(std::time::Duration::from_secs(2)).expect("SetSize not forwarded");

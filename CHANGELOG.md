@@ -1,3 +1,35 @@
+## v0.12.0
+
+New Features
+
+- **Serial profiles** — session behavior is now a named profile: Normal
+  (interactive shells and embedded TUIs like uboot/UEFI), Log (records
+  device output, LF becomes CRLF), and AT (local echo, Enter sends CRLF).
+  Duplicate any profile to create your own — stored in a separate
+  `serial-profiles.json`, with Built-in and Custom sections in Settings →
+  Serial. Per-device connection history is gone; settings keep only the
+  default baud rate and default profile
+- **Serial quick panel rework** — switch profile and baud on the fly, tweak
+  the profile's parameters live for the current session, and keep the
+  auto-reconnect toggle. Profiles with flow control expand a signal block:
+  RTS/DTR toggles and live CTS/DSR status (greyed out when the port can't
+  report modem lines)
+- **Release the serial port without closing the tab** — Disconnect frees
+  the device for other tools (Arduino uploads…), Reconnect brings the
+  session back with one click
+- **Title bar polish** — quick actions and park-to-tray form one equal-width
+  button group set off by vertical dividers; the + and dropdown buttons
+  stay pinned when the tab strip overflows; a minimum empty strip is always
+  reserved for dragging the window; the quick-actions button is disabled
+  while Settings is open or no tab exists
+
+Fixes
+
+- Notification toasts are much subtler (small translucent cards with a thin
+  accent bar instead of solid blocks)
+- The quick panel has a fixed width — sharing a session no longer makes it
+  jump wider
+
 ## v0.11.0
 
 New Features

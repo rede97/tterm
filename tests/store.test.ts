@@ -18,9 +18,8 @@ describe("ConfigStore — set/get", () => {
       fontSize: 14, fontFamily: "monospace", scrollback: 20000,
       themeName: "Default", renderer: "webgl", terminalBell: false,
       pasteWarning: true, pasteTrim: true, serialBaud: 115200,
-      serialInputMode: "normal", serialOutputNewline: "keep",
-      serialEnterNewline: "cr", defaultLocalProfile: null,
-      serialPortParams: {}, hiddenProfiles: [], hiddenSshHosts: [],
+      serialProfile: "Normal", defaultLocalProfile: null,
+      hiddenProfiles: [], hiddenSshHosts: [],
     });
     configStore.flush();
     invokeMock.mockClear();

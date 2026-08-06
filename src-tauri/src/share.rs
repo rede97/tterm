@@ -783,7 +783,7 @@ mod tests {
             crate::state::SerialSession {
                 cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)),
                 ctl: ctl_tx,
-                spec: None,
+                spec: None, auto_hold_restore: false
             },
         );
         assert!(session_exists(&state, "tab-2"));

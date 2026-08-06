@@ -1,11 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
 import { createElement, FolderOpen } from "lucide";
-import type { SshHost, SerialPort, SerialOutputNewline, SerialEnterNewline, WsConnectResult } from "../core/types";
+import type { SshHost, SerialPort, SerialInputMode, SerialOutputNewline, SerialEnterNewline, WsConnectResult } from "../core/types";
 import { hostProp } from "../core/common";
 import { configStore } from "../core/store";
 import { logCatch } from "../core/errorlog";
-import { serialParamsFor, serialKeyFor, rememberSerialParams } from "../config/serial-memory";
+import { findSerialProfile } from "../config/serial-profiles";
 import { showToast } from "../ui/toast";
 import { TerminalTab } from "./tab";
 import { updateQuickButton, closeQuickPanel } from "./quickpanel";
@@ -226,55 +226,80 @@ export class TabManager {
   }
 
   async createSerialTab(port: SerialPort): Promise<TerminalTab | null> {
-    const params = serialParamsFor(port);
+    // Session behavior comes from the selected profile; baud from the
+    // global default. No per-device parameter memory (removed by design).
+    const profile = findSerialProfile(configStore.get("serialProfile"));
+    const baud = configStore.get("serialBaud");
     let result: WsConnectResult;
     try {
       result = await invoke("serial_spawn", {
         portName: port.name,
-        baudRate: params.baud,
+        baudRate: baud,
         dataBits: 8,
         parity: "none",
         stopBits: 1,
-        flowControl: "none",
+        flowControl: profile.flowControl,
       });
     } catch (e) {
       showToast(String(e), "error");
       return null;
     }
-    const tab = new TerminalTab(result.id, "serial", `${port.name} · ${params.baud}`, this.terminalContainer);
+    const tab = new TerminalTab(result.id, "serial", `${port.name} · ${baud}`, this.terminalContainer);
     tab.serialPortName = port.name;
-    tab.serialKey = serialKeyFor(port);
-    tab.serialBaud = params.baud;
-    tab.outputNewline = params.outputNewline;
-    tab.enterNewline = params.enterNewline;
-    tab.inputMode = params.inputMode;
+    tab.serialBaud = baud;
+    tab.serialProfile = profile.name;
+    tab.outputNewline = profile.outputNewline;
+    tab.enterNewline = profile.enterNewline;
+    tab.inputMode = profile.inputMode;
+    tab.flowControl = profile.flowControl;
     return this._finalizeTab(tab, result);
   }
 
-  // Live Enter-key newline switch (frontend-side); persists memory.
+  // Apply a profile to a live serial session: input mode + Enter terminator
+  // (frontend input handler), output newline + flow control (backend).
+  // The choice becomes the global default for the next tab.
+  async setSerialProfile(tabId: string, name: string): Promise<void> {
+    const tab = this.tabs.get(tabId);
+    if (!tab || tab.type !== "serial") return;
+    const profile = findSerialProfile(name);
+    tab.setSerialInputMode(profile.inputMode);
+    tab.setSerialEnterNewline(profile.enterNewline);
+    await invoke("serial_set_output_newline", { id: tabId, mode: profile.outputNewline });
+    await invoke("serial_set_flow_control", { id: tabId, flow: profile.flowControl });
+    tab.outputNewline = profile.outputNewline;
+    tab.flowControl = profile.flowControl;
+    tab.serialProfile = profile.name;
+    configStore.set({ serialProfile: profile.name });
+  }
+
+  // Live Enter-key newline switch (frontend-side, this session only).
   async setSerialEnterNewline(tabId: string, mode: SerialEnterNewline): Promise<void> {
     const tab = this.tabs.get(tabId);
-    if (!tab || tab.type !== "serial" || !tab.serialKey) return;
+    if (!tab || tab.type !== "serial") return;
     tab.setSerialEnterNewline(mode);
-    await rememberSerialParams(tab.serialKey, { enterNewline: mode });
   }
 
-  // Live output-newline switch for an open serial session; persists memory.
+  // Live input-mode switch for an open serial session (this session only).
+  setSerialInputMode(tabId: string, mode: SerialInputMode): void {
+    const tab = this.tabs.get(tabId);
+    if (!tab || tab.type !== "serial") return;
+    tab.setSerialInputMode(mode);
+  }
+
+  // Live output-newline switch for an open serial session (this session only).
   async setSerialOutputNewline(tabId: string, mode: SerialOutputNewline): Promise<void> {
     const tab = this.tabs.get(tabId);
-    if (!tab || tab.type !== "serial" || !tab.serialKey) return;
+    if (!tab || tab.type !== "serial") return;
     await invoke("serial_set_output_newline", { id: tabId, mode });
     tab.outputNewline = mode;
-    await rememberSerialParams(tab.serialKey, { outputNewline: mode });
   }
 
-  // Live baud switch for an open serial session; persists per-port memory.
+  // Live baud switch for an open serial session (this session only).
   async setSerialBaud(tabId: string, baud: number): Promise<void> {
     const tab = this.tabs.get(tabId);
-    if (!tab || tab.type !== "serial" || !tab.serialPortName || !tab.serialKey) return;
+    if (!tab || tab.type !== "serial" || !tab.serialPortName) return;
     await invoke("serial_set_baud", { id: tabId, baudRate: baud });
     tab.serialBaud = baud;
-    await rememberSerialParams(tab.serialKey, { baud });
     // Baud display update, not a user rename — keep OSC title tracking live.
     tab.rename(`${tab.serialPortName} · ${baud}`, false);
   }
