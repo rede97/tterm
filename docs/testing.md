@@ -4,15 +4,29 @@
 
 | 层 | 工具 | 范围 | 命令 | 耗时 |
 |---|---|---|---|---|
-| L0 后端单元测试 | Rust `#[cfg(test)]` | 纯函数：命令解析、环境变量展开、管道帧编码、字体重名剥离、CLI 参数解析 | `bun run test:rust` | 秒级（编译后） |
+| L0 后端单元测试 | Rust `#[cfg(test)]` | 命令解析、环境变量展开、换行互转、字体后缀剥离、串口参数，外加 relay/deadmode 异步集成测试 | `bun run test:rust` | 秒级（编译后） |
 | L1 前端单元测试 | Vitest | 纯逻辑：hysteresis 适配算法、SSH 配置解析/生成、字体栈构建/解析 | `bun run test` | ~1.5s |
 | L2 DOM 集成测试 | Vitest + happy-dom | 菜单渲染（mock Tauri IPC）：串口枚举列、禁用态、详情回退 | `bun run test` | 同上 |
 | L3 端到端测试 | tauri-driver + WebdriverIO | 真实应用窗口：启动、标签栏、新建标签、终端视口 | `bun run test:e2e` | ~30s |
 
 ## L0 — Rust 后端单元测试
 
-测试与源码同文件（各 `src-tauri/src/*.rs` 模块尾部的 `#[cfg(test)] mod tests`）。
-为可测性提取的纯函数：`parse_working_dir`（pty.rs）、命令行解析（cmdparse.rs）、换行规范化（newline.rs）、`strip_font_suffix`（fonts.rs）等。
+测试以 colocated `#[cfg(test)] mod tests` 形式分布在各功能模块内（共 86 个用例 / 10 模块），与实现同文件、随实现演进：
+
+| 模块 | 用例数 | 覆盖 |
+|---|---|---|
+| `relay.rs` | 11 | WebSocket relay 全链路集成：路由提取、token 鉴权、echo/EOF 关闭、掉线重连、kick 释放半开槽位、dead mode 注入 + Enter 重生、自动重连定时重生 |
+| `share.rs` | 10 | AI 分享 HTTP API：prompt 文档、屏幕快照、输入转发、限流、吊销 |
+| `deadmode.rs` | 4 | in-band 断联协议：终端模式复位序列、提示文案、Enter 检测、重生预滚动 |
+| `cmdparse.rs` | 11 | 命令解析（引号 / 空格折叠）与环境变量展开 |
+| `newline.rs` | 11 | 换行模式互转（LF/CR/CRLF/strip），含跨分包与二进制字节保护 |
+| `serial.rs` | 13 | 串口参数与换行处理 |
+| `pty.rs` | 6 | PTY resize 转发、工作目录校验、Windows shell 探测 |
+| `fonts.rs` | 4 | 系统字体 TrueType/OpenType 后缀剥离 |
+| `demo.rs` | 15 | demo 会话脚本 |
+| `sshclient.rs` | 1 | 内嵌 SSH 端到端：密码认证、shell echo、window_change、动态 -L 端口映射 |
+
+`relay.rs` 的用例是对真实 `WsHub` 的 `tokio::test` 异步集成测试，无需手动起进程即覆盖休眠重连、半开槽位释放等关键路径。
 
 ```sh
 bun run test:rust        # = cargo test --manifest-path src-tauri/Cargo.toml
@@ -83,3 +97,4 @@ bun run test:e2e
 
 1. `parseSshConfig` 的 `Host *` 通配符在非末尾位置时泄漏为普通主机（已修复）
 2. `hysteresis` 在极小容器下可返回 0 列（退化网格），已加最终 min 钳制
+3. 会话死亡后终端遗留 alt screen / 滚动区 / DEC 图形字符集等模式，会覆盖或错位重连提示——`deadmode` 的复位序列（含光标先存后恢复）已回归保护

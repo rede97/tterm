@@ -47,7 +47,11 @@
   one-click sessions, live baud switching without reconnecting, newline
   modes (fix staircase LF or overwriting CR output), input modes (direct /
   local echo / line editing), and per-device memory keyed by VID:PID.
-- **Reconnect in a keystroke** — when a session drops, press Enter and it comes back.
+- **Sleep-proof sessions** — put the laptop to sleep, wake it, and the shell is
+  still there. A dropped transport is re-attached silently in the background —
+  no dialog, no lost scrollback. And when a session truly ends (shell exit,
+  unplugged serial), the reconnect prompt is printed *inside* the terminal:
+  press Enter to respawn — no focus hunt, no modal in the way.
 
 ### For everyone
 
