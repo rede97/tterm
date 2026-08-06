@@ -9,6 +9,7 @@ import { serialParamsFor, serialKeyFor, rememberSerialParams } from "../config/s
 import { showToast } from "../ui/toast";
 import { TerminalTab } from "./tab";
 import { updateQuickButton, closeQuickPanel } from "./quickpanel";
+import { reportWindowTitle } from "../core/windowtitle";
 import { listen } from "@tauri-apps/api/event";
 import Sortable from "sortablejs";
 
@@ -340,6 +341,8 @@ export class TabManager {
     // The quick panel tracks the active tab; switching closes it.
     closeQuickPanel();
     updateQuickButton();
+    // The tray menu lists this window by its active tab's label.
+    reportWindowTitle(next.label);
 
     if (next.needsResize) {
       const { cols, rows } = next.fit();

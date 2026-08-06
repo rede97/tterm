@@ -7,6 +7,7 @@ import { readText as clipboardReadText, writeText as clipboardWriteText } from "
 import { logCatch } from "../core/errorlog";
 import type { TabType } from "../core/types";
 import { hysteresis } from "../util/hysteresis";
+import { reportWindowTitle } from "../core/windowtitle";
 import { parseOsc9Progress, applyProgressToTabElement } from "../util/osc";
 import { SizeHint } from "../util/sizehint";
 import { shouldAutoReattach, reattachDelayForAttempt } from "../util/disconnect";
@@ -131,6 +132,8 @@ export class TerminalTab {
       const labelEl = this.tabElement.querySelector(".tab-label") as HTMLElement;
       if (labelEl) labelEl.textContent = title;
       this.tabElement.title = title;
+      // Active tab's title doubles as the window title (tray menu).
+      if (this.tabElement?.classList.contains("active")) reportWindowTitle(title);
     });
 
     this.xtermEl = this.element.querySelector(".xterm") as HTMLElement;
@@ -603,6 +606,8 @@ export class TerminalTab {
     const labelEl = this.tabElement.querySelector(".tab-label") as HTMLElement;
     if (labelEl) labelEl.textContent = this.label;
     this.tabElement.title = this.label;
+    // Active tab's title doubles as the window title (tray menu).
+    if (this.tabElement?.classList.contains("active")) reportWindowTitle(this.label);
   }
 
   // Undo a user rename (rename dialog committed empty): follow OSC title

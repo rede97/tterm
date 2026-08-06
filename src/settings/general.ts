@@ -29,6 +29,20 @@ export function createGeneralPanel(): HTMLElement {
       </div>
     </div>
     <div class="settings-section">
+      <div class="settings-section-title">Window</div>
+      <div class="settings-item settings-item-row">
+        <div class="settings-item-info">
+          <div class="settings-item-title">Close to system tray</div>
+          <div class="settings-item-desc">Closing the window parks TTerm in the system tray instead of quitting — sessions and AI agents keep running. Hidden windows are restored from the tray icon's menu.</div>
+        </div>
+        <div class="settings-item-control">
+          <label class="settings-toggle-row" style="padding:0;gap:0;">
+            <input type="checkbox" id="set-close-to-tray" ${configStore.get("closeToTray") ? "checked" : ""} />
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
       <div class="settings-section-title">Updates</div>
       <div class="settings-item settings-item-row">
         <div class="settings-item-info">
@@ -178,6 +192,8 @@ export function refreshGeneralPanel(root: HTMLElement): void {
 
   const autoUpdateEl = root.querySelector("#set-auto-update") as HTMLInputElement;
   if (autoUpdateEl) autoUpdateEl.checked = configStore.get("autoCheckUpdates");
+  const trayEl = root.querySelector("#set-close-to-tray") as HTMLInputElement;
+  if (trayEl) trayEl.checked = configStore.get("closeToTray");
 }
 
 export function collectGeneralSettings(root: HTMLElement): Partial<ConfigState> {
@@ -195,5 +211,7 @@ export function collectGeneralSettings(root: HTMLElement): Partial<ConfigState> 
   if (scrollbackEl) partial.scrollback = Math.max(100, Math.min(100000, parseInt(scrollbackEl.value, 10) || 1000));
   const autoUpdateEl = root.querySelector("#set-auto-update") as HTMLInputElement;
   if (autoUpdateEl) partial.autoCheckUpdates = autoUpdateEl.checked;
+  const trayEl = root.querySelector("#set-close-to-tray") as HTMLInputElement;
+  if (trayEl) partial.closeToTray = trayEl.checked;
   return partial;
 }

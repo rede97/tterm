@@ -1,5 +1,13 @@
 ## Unreleased
 
+New Features
+
+- **Close to system tray** — Settings → General → Window: closing the
+  window parks TTerm in the system tray instead of quitting, so sessions
+  and AI agents on long-running tasks keep working in the background.
+  Every hidden window shares one tray icon — right-click it and pick the
+  window to bring back; "Quit TTerm" exits everything parked there
+
 Fixes
 
 - Number fields in Settings (font size, scrollback) now have styled −/+

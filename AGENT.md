@@ -206,6 +206,16 @@ follows the active tab's type: AI share toggle for all, SSH adds
 auto-reconnect + inline port forwards (embedded client only), serial adds
 auto-reconnect + baud/newline selects + RTS toggle + live CTS status.
 
+## System tray (close-to-tray)
+
+Settings toggle `closeToTray` (General → Window). With it on, `CloseRequested` is intercepted (`tray::hide_to_tray`): `prevent_close` + `hide()` — sessions keep running for background agents. One tray icon is shared by ALL windows, but TTerm windows are separate PROCESSES (`open_new_window` spawns the exe), so coordination is file-based under the app config dir — no IPC server:
+
+- `tray-windows.json` — hidden-window registry `[{pid, title, since}]`; `tray-owner.lock` — owner pid by atomic create (dead owner replaced by the next hider); mutations under an advisory `tray.lock` spin-retry sidecar.
+- The owner keeps the tray icon and reconciles every 2 s: prune dead pids, prune windows visible again (5 s grace for fresh entries — Tauri's `hide()` is dispatched to the main thread and a just-hidden window can still read visible), rebuild the menu, tear the tray down when empty.
+- **Gotcha**: a TTerm process owns SEVERAL top-level windows (ConPTY `PseudoConsoleWindow`, `Tao Thread Event Target`, IME, `tray_icon_app`) that stay visible when the real one hides — `hwnd_of_pid` must filter by the `"Tauri Window"` class.
+- Cross-process restore needs no cooperation: `EnumWindows` by pid → `ShowWindow` + `SetForegroundWindow`. Tray Quit terminates every parked pid (shells die with it — same as closing the app).
+- The menu label is the window title = active tab's label, reported debounced (400 ms) via `tray_set_title` from `switchTo` / OSC title / rename (`src/core/windowtitle.ts`). Backend reads the toggle from config.json on demand — no config sync channel.
+
 ## Settings page
 
 Lazy-loaded via `import("./settings")` on first open. Sidebar layout, five panels (General / Appearance / Profile / SSH / Serial). Footer: feedback text + Revert + Apply (Apply grays out after save, re-enables on change). Settings tab uses `data-tab-id="#settings"`, excluded from badge counting. All settings reads/writes go through `configStore` (`src/core/store.ts`) — schema + defaults live there in one declarative table.

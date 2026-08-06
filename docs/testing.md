@@ -11,17 +11,18 @@
 
 ## L0 — Rust 后端单元测试
 
-测试以 colocated `#[cfg(test)] mod tests` 形式分布在各功能模块内（共 86 个用例 / 10 模块），与实现同文件、随实现演进：
+测试以 colocated `#[cfg(test)] mod tests` 形式分布在各功能模块内（共 91 个用例 / 11 模块），与实现同文件、随实现演进：
 
 | 模块 | 用例数 | 覆盖 |
 |---|---|---|
 | `relay.rs` | 11 | WebSocket relay 全链路集成：路由提取、token 鉴权、echo/EOF 关闭、掉线重连、kick 释放半开槽位、dead mode 注入 + Enter 重生、自动重连定时重生 |
-| `share.rs` | 10 | AI 分享 HTTP API：prompt 文档、屏幕快照、输入转发、限流、吊销 |
+| `share.rs` | 11 | AI 分享 HTTP API：prompt 文档、屏幕快照、输入转发、限流、吊销、三类会话表存在性校验 |
 | `deadmode.rs` | 4 | in-band 断联协议：终端模式复位序列、提示文案、Enter 检测、重生预滚动 |
 | `cmdparse.rs` | 11 | 命令解析（引号 / 空格折叠）与环境变量展开 |
 | `newline.rs` | 11 | 换行模式互转（LF/CR/CRLF/strip），含跨分包与二进制字节保护 |
 | `serial.rs` | 13 | 串口参数与换行处理 |
 | `pty.rs` | 6 | PTY resize 转发、工作目录校验、Windows shell 探测 |
+| `tray.rs` | 4 | 托盘注册表增删改、owner 选举与死主顶替、进程存活检测、配置解析 |
 | `fonts.rs` | 4 | 系统字体 TrueType/OpenType 后缀剥离 |
 | `demo.rs` | 15 | demo 会话脚本 |
 | `sshclient.rs` | 1 | 内嵌 SSH 端到端：密码认证、shell echo、window_change、动态 -L 端口映射 |
