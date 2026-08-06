@@ -5,8 +5,10 @@
 <h1 align="center">TTerm</h1>
 
 <p align="center">
-  A next-generation fast &amp; lightweight terminal for Windows — built for AI agents.<br/>
-  Cold start in under a second · CJK/IME input that works in agent TUIs · serial tuned for embedded engineers.
+  A next-generation fast &amp; lightweight terminal for Windows, purpose-built for AI agent workflows —<br/>
+  with Chinese IME input done right.<br/>
+  Cold start in under a second · hand any live session to your AI agent in one click ·
+  Chinese input that keeps working where other terminals lose it · serial tuned for embedded engineers.
 </p>
 
 <p align="center">
@@ -27,15 +29,17 @@
   TUI-aware — it even knows where the fake cursor is) and can type for you,
   while you watch every move in real time. One click revokes everything;
   nothing ever leaves 127.0.0.1. ([protocol](docs/ai-session-sharing.md))
-- **Fast** — cold start under 1 second, ~5 MB installer, under 30 MB idle
-  memory. No Electron bloat.
 - **CJK input that works in agent TUIs** — terminals that hide the hardware
   cursor (pi, Claude Code and friends) lose your IME composition: pinyin
   vanishes or lands in a far corner. TTerm floats the composition right at
   the input point, candidate window alongside, gone the instant you commit —
   typing Chinese in an agent feels as direct as in a plain shell.
+- **Fast** — cold start under 1 second, ~7 MB installer, under 30 MB idle
+  memory. No Electron bloat.
 - **SSH, one click to any host** — reads your `~/.ssh/config`; connect
-  instantly, no server setup needed.
+  instantly, no server setup needed. The built-in client asks for passwords
+  and host-key trust in proper dialogs (known_hosts stays shared with
+  OpenSSH), and local/remote port forwards can be added live mid-session.
 - **Start right in your working directory** — Shift+click the `+` to pick a
   folder, or right-click it for recent folders; the default shell opens
   there, ready for agent work in a project (pi, Claude Code…). Installed via
@@ -59,8 +63,9 @@
   at a glance (red dot = down, blue = AI-shared), one toggle for AI share,
   SSH auto-reconnect and port forwards, serial baud/RTS/CTS — all two
   clicks away.
-- **Theme gallery** — 12 built-in schemes plus automatic Windows Terminal
-  import, all previewed in your actual terminal font.
+- **Theme gallery** — 12 built-in schemes, automatic Windows Terminal
+  import, and a custom theme editor with live preview — all previewed in
+  your actual terminal font.
 
 | Main window | New-tab menu |
 | :---: | :---: |
@@ -76,7 +81,7 @@ Grab the installer (NSIS / MSI) from [Releases](https://github.com/rede97/tterm/
 
 | Metric | TTerm (Tauri) | Hyper (Electron) |
 |--------|---------------|-------------------|
-| Installer | ~5 MB | ~60 MB+ |
+| Installer | ~7 MB | ~60 MB+ |
 | Cold start | < 1s | ~3-5s |
 | Idle memory | < 30 MB | ~150 MB+ |
 
@@ -89,13 +94,6 @@ bun run tauri build
 
 Stack: Tauri v2 (Rust) + xterm.js, terminal I/O over a local WebSocket loopback.
 Dev and testing docs live in [docs/testing.md](docs/testing.md).
-
-## Roadmap
-
-- [x] ~~**AI session sharing**~~ — hand any live session (shell / SSH / serial) to a local AI agent over a scoped, revocable link: the agent opens the link, reads how it works, pulls character-level screen snapshots (no screenshots, no OCR, TUI-aware) and types keystrokes. You watch every move in real time and cut it off with one click. ([design + agent integration guide](docs/ai-session-sharing.md))
-- [ ] Split panes
-- [ ] Custom color scheme editor
-- [x] ~~Serial terminal~~ · ~~Session reconnect~~ · ~~Theme system~~ · ~~OSC 9;4 progress~~
 
 ## License
 

@@ -6,6 +6,7 @@ import { buildFontFamily, updateFontStack } from "../util/fontconfig";
 import { allThemes, findTheme, DEFAULT_THEME_NAME, type ThemeDef } from "../util/themes";
 import { dedupeThemeName } from "../config/custom-themes";
 import { showThemeEditor } from "./themeeditor";
+import { attachStepper } from "../ui/stepper";
 import { esc } from "../core/common";
 
 export function createAppearancePanel(): HTMLElement {
@@ -41,6 +42,9 @@ export function createAppearancePanel(): HTMLElement {
       <div id="set-theme-gallery" class="theme-gallery"></div>
     </div>
   `;
+
+  // Font size gets the shared stepper (native spinners are hidden globally).
+  attachStepper(panel.querySelector<HTMLInputElement>("#set-font-size")!);
 
   // Font config button — opens font picker
   panel.querySelector("#set-font-config")!.addEventListener("click", () => {

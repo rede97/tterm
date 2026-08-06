@@ -1481,6 +1481,49 @@ body {
   max-width: 120px;
 }
 
+/* Number inputs: native spinner buttons render with the platform look and
+   clash with the app chrome — hidden globally; settings number fields get
+   the shared stepper (src/ui/stepper.ts) instead. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  appearance: textfield;
+}
+
+.stepper {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.stepper .settings-input-narrow {
+  max-width: 64px;
+  text-align: center;
+}
+
+.stepper-btn {
+  width: 26px;
+  background: #3c3c3c;
+  border: 1px solid #555555;
+  border-radius: 4px;
+  color: #d4d4d4;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  outline: none;
+  padding: 0;
+}
+
+.stepper-btn:hover {
+  background: #094771;
+  border-color: #094771;
+  color: #ffffff;
+}
+
 .settings-select {
   flex: 1;
   background: #3c3c3c;

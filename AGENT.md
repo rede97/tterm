@@ -176,6 +176,10 @@ one-off prompt for a single feature. Four pieces cover every case:
   createModal + the sshauth dialog styles. Native OS dialogs are banned in
   the frontend (`@tauri-apps/plugin-dialog` is not a dependency); dismissal
   resolves `false` — a dismissed question never confirms.
+- **Number input** → `attachStepper` (`src/ui/stepper.ts`) wraps the input
+  with styled −/+ buttons; native spinner buttons are hidden globally in
+  CSS (they render with the platform look). Steppers dispatch bubbling
+  `input`+`change` so settings dirty-tracking keeps working.
 - **Per-session quick actions** → the quick-status panel
   (`src/terminal/quickpanel.ts`), opened from the button at the right end of
   the tab bar. Like contextmenu it never imports TabManager: actions go

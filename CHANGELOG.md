@@ -15,6 +15,8 @@ New Features
 
 Fixes
 
+- Number fields in Settings (font size, scrollback) now have styled −/+
+  stepper buttons instead of the unstyled native spinners
 - Sharing a session that runs on the built-in SSH client no longer fails
   with "no such session" — the share check now sees embedded SSH sessions
 - Starting an SSH session now shows a "Connecting to…" hint right away

@@ -6,6 +6,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { configStore, type ConfigState } from "../core/store";
 import { logCatch, logError } from "../core/errorlog";
+import { attachStepper } from "../ui/stepper";
 
 export function createGeneralPanel(): HTMLElement {
   const panel = document.createElement("div");
@@ -130,6 +131,9 @@ export function createGeneralPanel(): HTMLElement {
     const el = panel.querySelector("#set-version");
     if (el) el.textContent = "TTerm " + v;
   }).catch(() => {});
+
+  // Scrollback gets the shared stepper (native spinners are hidden globally).
+  attachStepper(panel.querySelector<HTMLInputElement>("#set-scrollback")!);
 
   // homepage link
   panel.querySelector("#set-homepage")!.addEventListener("click", (e) => {
