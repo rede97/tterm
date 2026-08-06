@@ -500,14 +500,14 @@ fn reconcile(app: &tauri::AppHandle) {
     let Some(base) = config_base(app) else { return };
     let me = std::process::id();
     let icon = TRAY_ICON.lock().clone();
-    let Some(mut icon) = icon else { return };
+    let Some(icon) = icon else { return };
 
     let i_am_owner = std::fs::read_to_string(owner_path(&base))
         .ok()
         .and_then(|raw| raw.trim().parse::<u32>().ok())
         == Some(me);
     if !i_am_owner {
-        set_tray_visible(&mut icon, false);
+        set_tray_visible(&icon, false);
         return;
     }
 
@@ -529,12 +529,12 @@ fn reconcile(app: &tauri::AppHandle) {
     });
 
     if entries.is_empty() {
-        set_tray_visible(&mut icon, false);
+        set_tray_visible(&icon, false);
         LAST_MENU.lock().clear();
         release_owner(&base, me);
         return;
     }
-    set_tray_visible(&mut icon, true);
+    set_tray_visible(&icon, true);
     let ordered = menu_order(&entries);
     if *LAST_MENU.lock() != ordered {
         // Rebuild only on real change: rebuilding an open popup menu
@@ -544,7 +544,7 @@ fn reconcile(app: &tauri::AppHandle) {
     }
 }
 
-fn set_tray_visible(icon: &mut tauri::tray::TrayIcon, visible: bool) {
+fn set_tray_visible(icon: &tauri::tray::TrayIcon, visible: bool) {
     let mut state = TRAY_VISIBLE.lock();
     if *state != visible {
         let _ = icon.set_visible(visible);
@@ -569,7 +569,7 @@ fn spawn_tray(app: &tauri::AppHandle) {
                 None => builder,
             };
             match builder.build(app) {
-                Ok(mut icon) => {
+                Ok(icon) => {
                     // No builder-level visible flag in this Tauri version —
                     // hide immediately; reconcile shows it when warranted.
                     let _ = icon.set_visible(false);
