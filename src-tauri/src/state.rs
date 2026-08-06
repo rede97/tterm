@@ -89,8 +89,9 @@ pub enum SerialCtl {
     // Sample modem lines; the pump answers on this channel.
     QueryLines(std::sync::mpsc::Sender<SerialLineState>),
     // Terminal size in cells — forwarded from pty_resize for sessions that
-    // render size-dependent content themselves (Anime TTY). Real serial
-    // ports ignore it.
+    // render size-dependent content themselves (Anime TTY, debug builds
+    // only — hence the release-only allow). Real serial ports ignore it.
+    #[cfg_attr(not(debug_assertions), allow(dead_code))]
     SetSize(u16, u16),
 }
 
