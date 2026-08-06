@@ -349,12 +349,22 @@ pub(crate) struct ReconnectHooks {
     // State signal for the tab UI: false when the stream dies, true after a
     // successful respawn.
     pub(crate) on_state: Box<dyn Fn(bool) + Send + Sync>,
+    // Shared flag (AppState::auto_reconnect): while set, the dead-mode pump
+    // also retries `respawn` on a timer without waiting for Enter. Failed
+    // attempts stay silent — for serial sessions the retry IS the unplug
+    // detection (open fails until the device returns), for SSH it is the
+    // timed reconnect. Enter keeps working in parallel.
+    pub(crate) auto_retry: Option<Arc<AtomicBool>>,
 }
 
 // The two ends of a session byte stream (reader from child, writer to child).
 pub(crate) type SessionIo = (Box<dyn Read + Send>, Box<dyn Write + Send>);
 
 type RespawnOutcome = Result<SessionIo, String>;
+
+// Dead-mode auto-reconnect cadence: how often the pump retries a silent
+// respawn while the session's auto-reconnect flag is set.
+const AUTO_RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_secs(3);
 
 // Upstream writer installed while a session is dead: swallows all input
 // except Enter, which runs the respawn (blocking) and hands the outcome to
@@ -496,10 +506,23 @@ fn read_pump(
             }
             // Park until the watcher delivers a respawn outcome. Polls cancel
             // so a tab kill while dead unwinds promptly; Disconnected means
-            // the watcher was dropped (entry removed = kill).
+            // the watcher was dropped (entry removed = kill). While the
+            // session's auto-reconnect flag is set, additionally fire a
+            // SILENT respawn attempt on a timer (failed retries print
+            // nothing — the serial device may just still be unplugged).
+            let mut next_auto = std::time::Instant::now() + AUTO_RETRY_INTERVAL;
             let outcome = loop {
                 if cancel.load(Ordering::Relaxed) {
                     return;
+                }
+                if let Some(flag) = &hooks.auto_retry {
+                    if flag.load(Ordering::Relaxed) && std::time::Instant::now() >= next_auto {
+                        next_auto = std::time::Instant::now() + AUTO_RETRY_INTERVAL;
+                        match (hooks.respawn)() {
+                            Ok(io) => break Ok(io),
+                            Err(_) => continue,
+                        }
+                    }
                 }
                 match result_rx.recv_timeout(std::time::Duration::from_millis(200)) {
                     Ok(o) => break o,
@@ -542,6 +565,37 @@ pub(crate) fn unregister_session(hub: &Arc<WsHub>, id: &str) {
             entry.cancel.store(true, Ordering::Relaxed);
         }
     }
+}
+
+// ── Auto-reconnect toggle (quick panel) ──────────────────────────────
+
+#[tauri::command]
+pub fn session_set_auto_reconnect(
+    state: tauri::State<crate::state::AppState>,
+    id: &str,
+    enabled: bool,
+) -> Result<(), String> {
+    let flag = state
+        .auto_reconnect
+        .lock()
+        .map_err(|e| e.to_string())?
+        .get(id)
+        .cloned()
+        .ok_or_else(|| format!("session {} does not support auto-reconnect", id))?;
+    flag.store(enabled, Ordering::Relaxed);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn session_get_auto_reconnect(state: tauri::State<crate::state::AppState>, id: &str) -> Result<bool, String> {
+    let flag = state
+        .auto_reconnect
+        .lock()
+        .map_err(|e| e.to_string())?
+        .get(id)
+        .cloned();
+    // Unknown id (demo session, or kill raced the panel): report off.
+    Ok(flag.is_some_and(|f| f.load(Ordering::Relaxed)))
 }
 
 #[cfg(test)]
@@ -844,6 +898,7 @@ mod tests {
                     Ok((Box::new(r) as Box<dyn Read + Send>, Box::new(s) as Box<dyn Write + Send>))
                 })
             },
+            auto_retry: None,
         };
 
         register_session(&hub, "tab-d", session_reader, session_side, Some(hooks)).unwrap();
@@ -908,6 +963,7 @@ mod tests {
             pre_resume: Box::new(Vec::new),
             on_state: Box::new(|_| {}),
             respawn: Box::new(|| Err("should not be called".into())),
+            auto_retry: None,
         };
         register_session(&hub, "tab-x", session_reader, session_side, Some(hooks)).unwrap();
 
@@ -938,5 +994,97 @@ mod tests {
             }
         }
         assert!(got_close, "client should receive a Close frame after kill");
+    }
+
+    // Auto-reconnect: with the flag set, a dead session respawns on the
+    // timer WITHOUT anyone pressing Enter; failed retries stay silent.
+    #[test]
+    fn hub_auto_retry_respawns_without_enter() {
+        use std::sync::atomic::AtomicUsize;
+        use std::time::Duration;
+        use tokio_tungstenite::tungstenite;
+
+        let hub = WsHub::start().expect("hub start");
+        std::thread::sleep(Duration::from_millis(150));
+
+        let mk_shell = || {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let session_side = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+            let (mut echo_side, _) = listener.accept().unwrap();
+            std::thread::spawn(move || {
+                let mut buf = [0u8; 1024];
+                loop {
+                    match echo_side.read(&mut buf) {
+                        Ok(0) | Err(_) => break,
+                        Ok(n) => {
+                            if echo_side.write_all(&buf[..n]).is_err() {
+                                break;
+                            }
+                        }
+                    }
+                }
+            });
+            session_side
+        };
+
+        // Session v1: a shell we can kill on demand by dropping our side.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let session_side = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (shell_side, _) = listener.accept().unwrap();
+        let session_reader = session_side.try_clone().unwrap();
+
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let flag = Arc::new(AtomicBool::new(true));
+        let hooks = ReconnectHooks {
+            notice: Box::new(|| b"dead\r\n".to_vec()),
+            pre_resume: Box::new(Vec::new),
+            on_state: Box::new(|_| {}),
+            respawn: {
+                let attempts = attempts.clone();
+                Box::new(move || {
+                    if attempts.fetch_add(1, Ordering::Relaxed) == 0 {
+                        return Err("still gone".into());
+                    }
+                    let s = mk_shell();
+                    let r = s.try_clone().unwrap();
+                    Ok((Box::new(r) as Box<dyn Read + Send>, Box::new(s) as Box<dyn Write + Send>))
+                })
+            },
+            auto_retry: Some(flag),
+        };
+        register_session(&hub, "tab-ar2", session_reader, session_side, Some(hooks)).unwrap();
+
+        let stream = std::net::TcpStream::connect(format!("127.0.0.1:{}", hub.port)).unwrap();
+        let (mut ws, _r) = tungstenite::client(
+            format!("ws://127.0.0.1:{}/pty/tab-ar2?token={}", hub.port, hub.token),
+            stream,
+        ).expect("handshake");
+        ws.get_mut().set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+
+        // Shell dies -> notice. No Enter pressed.
+        drop(shell_side);
+        let notice = ws.read().expect("notice");
+        assert_eq!(notice.into_data(), b"dead\r\n".to_vec());
+
+        // Within ~2 retry windows the pump must have retried silently
+        // (attempt 1 failed without printing) and then respawned.
+        ws.send(tungstenite::Message::Binary(b"ping".to_vec())).unwrap();
+        let mut echoed = false;
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        while std::time::Instant::now() < deadline {
+            // Send is retried because the write may land while dead (swallowed).
+            match ws.read() {
+                Ok(m) => {
+                    if m.into_data() == b"ping".to_vec() {
+                        echoed = true;
+                        break;
+                    }
+                    let _ = ws.send(tungstenite::Message::Binary(b"ping".to_vec()));
+                }
+                Err(_) => break,
+            }
+        }
+        assert!(echoed, "auto-reconnect should respawn the session without Enter");
+        assert!(attempts.load(Ordering::Relaxed) >= 2, "first attempt should have failed silently");
     }
 }

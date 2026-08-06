@@ -184,6 +184,9 @@ pub(crate) fn serial_io_loop(
     mut newline_filter: NewlineFilter,
 ) {
     let mut buf = [0u8; 16384];
+    // RTS is asserted at open (open_serial); tracked here because the line
+    // state cannot be read back from the device.
+    let mut rts = true;
     'outer: loop {
         if cancel.load(Ordering::Relaxed) {
             break;
@@ -196,6 +199,15 @@ pub(crate) fn serial_io_loop(
                 }
                 SerialCtl::SetOutputNewline(mode) => {
                     newline_filter.set_mode(mode);
+                }
+                SerialCtl::SetRts(on) => {
+                    if port.write_request_to_send(on).is_ok() {
+                        rts = on;
+                    }
+                }
+                SerialCtl::QueryLines(reply) => {
+                    let cts = port.read_clear_to_send().unwrap_or(false);
+                    let _ = reply.send(crate::state::SerialLineState { rts, cts });
                 }
                 SerialCtl::SetSize(..) => {} // meaningless for real serial ports
             }
@@ -287,9 +299,10 @@ fn start_pump(
 // Reconnect hooks for serial sessions: the relay calls `respawn` when the
 // user presses Enter at the in-band disconnect prompt (e.g. after unplug).
 // Runs on a blocking relay thread.
-fn serial_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec) -> ReconnectHooks {
+fn serial_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec, auto_retry: Arc<AtomicBool>) -> ReconnectHooks {
     let serial_sessions = app.state::<AppState>().serial_sessions.clone();
     ReconnectHooks {
+        auto_retry: Some(auto_retry),
         notice: Box::new(crate::deadmode::disconnect_notice),
         // Serial devices emit no startup frame — nothing to preserve against.
         pre_resume: Box::new(Vec::new),
@@ -345,7 +358,10 @@ pub(crate) fn start_serial_session(
         })
         .unwrap_or(NewlineMode::Keep);
     let (reader, writer, cancel, ctl_tx) = start_pump(port, nl_mode);
-    let hooks = spec.clone().map(|s| serial_hooks(app.clone(), id.clone(), s));
+    let hooks = spec.clone().map(|s| {
+        let auto = state.register_auto_reconnect(&id);
+        serial_hooks(app.clone(), id.clone(), s, auto)
+    });
     register_session(&state.hub, &id, reader, writer, hooks)?;
 
     state
@@ -404,14 +420,48 @@ pub fn serial_spawn(
 
 #[tauri::command]
 pub fn serial_set_baud(state: tauri::State<AppState>, id: &str, baud_rate: u32) -> Result<(), String> {
+    let mut sessions = state.serial_sessions.lock().map_err(|e| e.to_string())?;
+    let session = sessions
+        .get_mut(id)
+        .ok_or_else(|| format!("No serial session: {}", id))?;
+    // Keep the spec in sync so (auto-)reconnect reopens at the current baud.
+    if let Some(SpawnSpec::Serial { baud_rate: spec_baud, .. }) = &mut session.spec {
+        *spec_baud = baud_rate;
+    }
+    session
+        .ctl
+        .send(SerialCtl::SetBaud(baud_rate))
+        .map_err(|e| format!("Serial session closed: {}", e))
+}
+
+// Drive the RTS modem line (quick panel toggle).
+#[tauri::command]
+pub fn serial_set_rts(state: tauri::State<AppState>, id: &str, on: bool) -> Result<(), String> {
     let sessions = state.serial_sessions.lock().map_err(|e| e.to_string())?;
     let session = sessions
         .get(id)
         .ok_or_else(|| format!("No serial session: {}", id))?;
     session
         .ctl
-        .send(SerialCtl::SetBaud(baud_rate))
+        .send(SerialCtl::SetRts(on))
         .map_err(|e| format!("Serial session closed: {}", e))
+}
+
+// Sample the modem lines for the quick panel (RTS tracked, CTS read live).
+#[tauri::command]
+pub fn serial_line_status(state: tauri::State<AppState>, id: &str) -> Result<crate::state::SerialLineState, String> {
+    let sessions = state.serial_sessions.lock().map_err(|e| e.to_string())?;
+    let session = sessions
+        .get(id)
+        .ok_or_else(|| format!("No serial session: {}", id))?;
+    let (tx, rx) = std::sync::mpsc::channel();
+    session
+        .ctl
+        .send(SerialCtl::QueryLines(tx))
+        .map_err(|e| format!("Serial session closed: {}", e))?;
+    drop(sessions);
+    rx.recv_timeout(std::time::Duration::from_secs(2))
+        .map_err(|_| "Serial session did not answer line query".to_string())
 }
 
 #[tauri::command]

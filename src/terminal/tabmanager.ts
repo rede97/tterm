@@ -8,6 +8,7 @@ import { logCatch } from "../core/errorlog";
 import { serialParamsFor, serialKeyFor, rememberSerialParams } from "../config/serial-memory";
 import { showToast } from "../ui/toast";
 import { TerminalTab } from "./tab";
+import { updateQuickButton, closeQuickPanel } from "./quickpanel";
 import { listen } from "@tauri-apps/api/event";
 import Sortable from "sortablejs";
 
@@ -45,6 +46,7 @@ export class TabManager {
     if ("__TAURI_INTERNALS__" in window) {
       listen<{ id: string; alive: boolean }>("session-state", (e) => {
         this.tabs.get(e.payload.id)?.setDisconnected(!e.payload.alive);
+        updateQuickButton();
       });
     }
   }
@@ -170,8 +172,14 @@ export class TabManager {
 
   async createSshTab(host: SshHost): Promise<TerminalTab | null> {
     let result: WsConnectResult;
+    // The embedded connect can block for many seconds (TCP + handshake +
+    // auth dialog) with no tab on screen yet — keep a pending toast up for
+    // the whole attempt so the click doesn't feel lost.
+    let pending: { dismiss(): void } | null = null;
     try {
       if (configStore.get("sshEmbedded")) {
+        const target = `${hostProp(host, "user") || "root"}@${hostProp(host, "hostname") || host.name}`;
+        pending = showToast(`Connecting to ${target}…`, "info", 60000);
         // Built-in client: password/key prompts and host-key confirmation
         // come up as dialogs; port forwarding is available on the tab menu.
         result = await invoke("ssh_spawn_embedded", {
@@ -190,8 +198,14 @@ export class TabManager {
         });
       }
     } catch (e) {
-      showToast(`Failed to start SSH session: ${e}`, "error");
+      // A cancelled password/host-key prompt is a deliberate abort, not a
+      // failure — close the attempt quietly.
+      if (!String(e).toLowerCase().includes("cancelled")) {
+        showToast(`Failed to start SSH session: ${e}`, "error");
+      }
       return null;
+    } finally {
+      pending?.dismiss();
     }
     const tab = new TerminalTab(result.id, "ssh", host.name, this.terminalContainer);
     tab.sshHost = host;
@@ -323,6 +337,9 @@ export class TabManager {
     if (prev) prev.hide();
     next.show();
     this.activeTabId = id;
+    // The quick panel tracks the active tab; switching closes it.
+    closeQuickPanel();
+    updateQuickButton();
 
     if (next.needsResize) {
       const { cols, rows } = next.fit();
@@ -364,6 +381,7 @@ export class TabManager {
       }
     }
     this.refreshBadges();
+    updateQuickButton();
   }
 
   get(id: string): TerminalTab | undefined {
@@ -449,6 +467,7 @@ export class TabManager {
       tab.shareUrl = undefined;
       tab.tabElement.classList.remove("shared");
       showToast("AI sharing stopped", "info");
+      updateQuickButton();
       return;
     }
     try {
@@ -463,6 +482,7 @@ export class TabManager {
       tab.shareUrl = res.url;
       tab.tabElement.classList.add("shared");
       showToast("Share link copied — paste it to your AI agent", "info", 6000);
+      updateQuickButton();
     } catch (e) {
       showToast(`Failed to share session: ${e}`, "error");
     }

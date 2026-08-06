@@ -34,6 +34,19 @@ describe("showToast", () => {
     expect(el.classList.contains("visible")).toBe(false);
   });
 
+  it("dismiss() removes a long-lived toast before its duration", () => {
+    const el = showToast("Connecting…", "info", 60000);
+    el.dismiss();
+    expect(el.classList.contains("visible")).toBe(false);
+    vi.advanceTimersByTime(200); // removal transition
+    expect(document.querySelector(".toast")).toBeNull();
+    // The pending duration timer must not fire later and disturb new toasts.
+    const other = showToast("done", "info", 1000);
+    vi.advanceTimersByTime(60000);
+    expect(document.querySelector(".toast")).toBeNull();
+    expect(other.isConnected).toBe(false);
+  });
+
   it("stacks multiple toasts in one container", () => {
     showToast("a", "error");
     showToast("b", "info");

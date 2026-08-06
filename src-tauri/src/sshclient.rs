@@ -711,7 +711,7 @@ async fn spawn_local_forward(
 
 // ── Reconnect hooks (dead mode) ──────────────────────────────────────
 
-fn ssh_hooks(app: tauri::AppHandle, id: String) -> ReconnectHooks {
+fn ssh_hooks(app: tauri::AppHandle, id: String, auto_retry: Arc<AtomicBool>) -> ReconnectHooks {
     let state = app.state::<AppState>();
     let ssh_sessions = state.ssh_sessions.clone();
     let prompter: Arc<dyn Prompter> = Arc::new(FrontendPrompter::new(
@@ -719,6 +719,7 @@ fn ssh_hooks(app: tauri::AppHandle, id: String) -> ReconnectHooks {
         state.pending_prompts.clone(),
     ));
     ReconnectHooks {
+        auto_retry: Some(auto_retry),
         notice: Box::new(crate::deadmode::disconnect_notice),
         pre_resume: {
             let ssh_sessions = ssh_sessions.clone();
@@ -791,7 +792,8 @@ pub async fn ssh_spawn_embedded(
         .map_err(|e| e.to_string())?
         .insert(id.clone(), session);
 
-    register_session(&state.hub, &id, reader, writer, Some(ssh_hooks(app, id.clone())))?;
+    let auto = state.register_auto_reconnect(&id);
+    register_session(&state.hub, &id, reader, writer, Some(ssh_hooks(app, id.clone(), auto)))?;
     Ok(state.ws_result(id))
 }
 

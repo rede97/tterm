@@ -79,11 +79,12 @@ fn spawn_pty_child(
 // Reconnect hooks for PTY/SSH sessions: the relay calls `respawn` when the
 // user presses Enter at the in-band disconnect prompt. Runs on a blocking
 // relay thread.
-fn pty_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec) -> ReconnectHooks {
+fn pty_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec, auto_retry: Arc<std::sync::atomic::AtomicBool>) -> ReconnectHooks {
     let state = app.state::<AppState>();
     let sessions = state.sessions.clone();
     let initial_cwd = state.initial_cwd.clone();
     ReconnectHooks {
+        auto_retry: Some(auto_retry),
         notice: Box::new(crate::deadmode::disconnect_notice),
         pre_resume: {
             let sessions = sessions.clone();
@@ -136,7 +137,9 @@ fn pty_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec) -> ReconnectHoo
 }
 
 pub(crate) fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder, spec: SpawnSpec) -> Result<(), String> {
-    let sessions = app_handle.state::<AppState>().sessions.clone();
+    let state = app_handle.state::<AppState>();
+    let sessions = state.sessions.clone();
+    let auto = state.register_auto_reconnect(&id);
     let (reader, writer) = spawn_pty_child(
         &sessions,
         &id,
@@ -144,7 +147,7 @@ pub(crate) fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBu
         PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 },
     )?;
     let hub = app_handle.state::<AppState>().hub.clone();
-    register_session(&hub, &id, reader, writer, Some(pty_hooks(app_handle, id.clone(), spec)))?;
+    register_session(&hub, &id, reader, writer, Some(pty_hooks(app_handle, id.clone(), spec, auto)))?;
     Ok(())
 }
 
@@ -280,6 +283,9 @@ fn kill_session_resources(state: &AppState, id: &str) -> Result<(), String> {
     if let Some(session) = ssh.remove(id) {
         crate::sshclient::kill_ssh_session(&session);
     }
+    drop(ssh);
+    let mut auto = state.auto_reconnect.lock().map_err(|e| e.to_string())?;
+    auto.remove(id);
     Ok(())
 }
 
@@ -299,6 +305,7 @@ mod tests {
             sessions: Arc::new(Mutex::new(std::collections::HashMap::new())),
             serial_sessions: Arc::new(Mutex::new(std::collections::HashMap::new())),
             ssh_sessions: Arc::new(Mutex::new(std::collections::HashMap::new())),
+            auto_reconnect: Arc::new(Mutex::new(std::collections::HashMap::new())),
             pending_prompts: Arc::new(Mutex::new(std::collections::HashMap::new())),
             next_id: Mutex::new(1),
             initial_cwd: None,
@@ -311,7 +318,7 @@ mod tests {
         );
         resize_session(&state, "tab-9", 177, 52).unwrap();
         let msg = ctl_rx.recv_timeout(std::time::Duration::from_secs(2)).expect("SetSize not forwarded");
-        assert_eq!(msg, crate::state::SerialCtl::SetSize(177, 52));
+        assert!(matches!(msg, crate::state::SerialCtl::SetSize(177, 52)));
         // unknown id: no panic, no message
         resize_session(&state, "nope", 80, 24).unwrap();
         assert!(ctl_rx.try_recv().is_err());

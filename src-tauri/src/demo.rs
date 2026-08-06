@@ -175,6 +175,8 @@ fn spawn_animation_session(
             on_state: Box::new(move |alive| {
                 let _ = app2.emit("session-state", SessionState { id: id2.clone(), alive });
             }),
+            // Demo sessions restart on Enter only — no auto-reconnect.
+            auto_retry: None,
             respawn: {
                 let id3 = id.clone();
                 Box::new(move || {

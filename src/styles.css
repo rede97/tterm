@@ -241,6 +241,283 @@ body {
   margin-left: 1cm;
 }
 
+/* -- quick-status button + panel -- */
+
+/* Sits between the drag spacer and the window controls; the 1cm margin on
+   #window-controls keeps it visibly separated from minimize/maximize. */
+#quick-status {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #cccccc;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+#quick-status:hover {
+  background: #333333;
+  color: #ffffff;
+}
+
+#quick-status.disabled {
+  opacity: 0.4;
+}
+
+#quick-status .qs-dot {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: none;
+}
+
+#quick-status[data-state="down"] .qs-dot {
+  display: block;
+  background: #e81123;
+}
+
+#quick-status[data-state="shared"] .qs-dot {
+  display: block;
+  background: #3794ff;
+}
+
+.quick-panel {
+  position: fixed;
+  z-index: 110;
+  min-width: 280px;
+  max-width: 340px;
+  background: #252526;
+  border: 1px solid #3e3e42;
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+  padding: 6px 0;
+  display: none;
+  font-size: 13px;
+  color: #cccccc;
+}
+
+.quick-panel.open {
+  display: block;
+}
+
+.qp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px 8px;
+  border-bottom: 1px solid #3e3e42;
+}
+
+.qp-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qp-state {
+  font-size: 11px;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.qp-state-connected {
+  color: #4ec9b0;
+}
+
+.qp-state-disconnected {
+  color: #f14c4c;
+}
+
+.qp-section {
+  padding: 6px 0;
+  border-bottom: 1px solid #3e3e42;
+}
+
+.qp-section:last-child {
+  border-bottom: none;
+}
+
+.qp-section-title {
+  padding: 2px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #888888;
+  letter-spacing: 0.5px;
+}
+
+.qp-sub-title {
+  padding: 4px 12px 2px;
+  font-size: 12px;
+  color: #aaaaaa;
+}
+
+.qp-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  gap: 8px;
+}
+
+.qp-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qp-select {
+  background: #1e1e1e;
+  color: #cccccc;
+  border: 1px solid #3e3e42;
+  border-radius: 3px;
+  font-size: 12px;
+  padding: 2px 4px;
+  max-width: 150px;
+}
+
+.qp-input {
+  background: #1e1e1e;
+  color: #cccccc;
+  border: 1px solid #3e3e42;
+  border-radius: 3px;
+  font-size: 12px;
+  padding: 2px 6px;
+  min-width: 0;
+}
+
+.qp-mini-btn {
+  background: #2d2d30;
+  color: #cccccc;
+  border: 1px solid #3e3e42;
+  border-radius: 3px;
+  font-size: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.qp-mini-btn:hover {
+  background: #094771;
+  color: #ffffff;
+}
+
+/* Toggle switch (role="switch"). */
+.qp-switch {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  border: 1px solid #3e3e42;
+  background: #1e1e1e;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.qp-switch .qp-knob {
+  position: absolute;
+  top: 1px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #888888;
+  transition: left 0.12s, background 0.12s;
+}
+
+.qp-switch.on {
+  background: #094771;
+  border-color: #094771;
+}
+
+.qp-switch.on .qp-knob {
+  left: 14px;
+  background: #ffffff;
+}
+
+.qp-share-url-row {
+  gap: 6px;
+}
+
+.qp-share-url {
+  flex: 1;
+  font-size: 11px;
+  color: #888888;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qp-line-val {
+  font-size: 12px;
+  color: #888888;
+}
+
+.qp-line-val.on {
+  color: #4ec9b0;
+}
+
+.qp-fwd-list {
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.qp-fwd-empty {
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #888888;
+}
+
+.qp-fwd-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 12px;
+  font-size: 12px;
+}
+
+.qp-fwd-route {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qp-fwd-add {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px 4px;
+}
+
+.qp-fwd-add .qp-fwd-port {
+  width: 52px;
+}
+
+.qp-fwd-add .qp-fwd-host {
+  width: 84px;
+}
+
+.qp-fwd-kind {
+  flex-shrink: 0;
+}
+
+.qp-fwd-arrow {
+  color: #888888;
+  flex-shrink: 0;
+}
+
 .win-btn {
   position: relative;
   display: flex;

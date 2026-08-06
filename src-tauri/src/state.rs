@@ -59,11 +59,23 @@ pub enum SpawnSpec {
 
 use crate::newline::NewlineMode;
 
+// Live modem-line snapshot for the serial quick panel. `rts` is the state we
+// last drove (the line cannot be read back); `cts` is sampled from the device.
+#[derive(Clone, Copy, Debug, serde::Serialize)]
+pub struct SerialLineState {
+    pub rts: bool,
+    pub cts: bool,
+}
+
 // Control messages for the serial I/O pump thread.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum SerialCtl {
     SetBaud(u32),
     SetOutputNewline(NewlineMode),
+    // Drive the RTS modem line (default asserted at open).
+    SetRts(bool),
+    // Sample modem lines; the pump answers on this channel.
+    QueryLines(std::sync::mpsc::Sender<SerialLineState>),
     // Terminal size in cells — forwarded from pty_resize for sessions that
     // render size-dependent content themselves (Anime TTY). Real serial
     // ports ignore it.
@@ -74,6 +86,10 @@ pub struct AppState {
     pub(crate) sessions: Arc<Mutex<HashMap<String, PtySession>>>,
     pub(crate) serial_sessions: Arc<Mutex<HashMap<String, SerialSession>>>,
     pub(crate) ssh_sessions: Arc<Mutex<HashMap<String, crate::sshclient::SshSession>>>,
+    // Per-session auto-reconnect flags shared with the relay's dead-mode
+    // pump (ReconnectHooks::auto_retry). Sessions without reconnect hooks
+    // (demo TTYs) never appear here.
+    pub(crate) auto_reconnect: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
     // Frontend dialog roundtrips in flight (ssh auth / host-key confirm).
     pub(crate) pending_prompts: crate::sshclient::PendingPrompts,
     pub(crate) next_id: Mutex<u32>,
@@ -85,5 +101,15 @@ impl AppState {
     // Connect info handed back to the frontend after (re)spawning a session.
     pub(crate) fn ws_result(&self, id: String) -> WsConnectResult {
         WsConnectResult { id, port: self.hub.port, token: self.hub.token.clone() }
+    }
+
+    // Create the shared auto-reconnect flag for a session being registered.
+    // The flag outlives individual respawns: it is removed only on tab kill.
+    pub(crate) fn register_auto_reconnect(&self, id: &str) -> Arc<AtomicBool> {
+        let flag = Arc::new(AtomicBool::new(false));
+        if let Ok(mut map) = self.auto_reconnect.lock() {
+            map.insert(id.to_string(), flag.clone());
+        }
+        flag
     }
 }

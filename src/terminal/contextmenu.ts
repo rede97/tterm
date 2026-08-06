@@ -5,8 +5,7 @@
 import { openFind } from "./search";
 import { showPortForwardingDialog } from "./forwarding";
 import { createElement, Plus, ExternalLink, Palette, Pencil, Copy, Share2, Link, Unlink, X, ArrowRightToLine, CircleX, ArrowLeftRight } from "lucide";
-import { trimPasteContent, SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES } from "../core/common";
-import type { SerialEnterNewline, SerialOutputNewline } from "../core/types";
+import { trimPasteContent } from "../core/common";
 import { readText as clipboardReadText, writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
 import { showToast } from "../ui/toast";
 import { configStore } from "../core/store";
@@ -28,13 +27,6 @@ export interface ContextMenuHandlers {
   clearTab: (tabId: string) => void;
   switchTo: (tabId: string) => void;
   exportTab: (tabId: string) => void;
-  setSerialBaud: (tabId: string, baud: number) => void;
-  setSerialEnterNewline: (tabId: string, mode: SerialEnterNewline) => void;
-  setSerialOutputNewline: (tabId: string, mode: SerialOutputNewline) => void;
-  isSerialTab: (tabId: string) => boolean;
-  getSerialBaud: (tabId: string) => number | undefined;
-  getSerialOutputNewline: (tabId: string) => string | undefined;
-  getSerialEnterNewline: (tabId: string) => string | undefined;
   getActiveTabId: () => string | null;
   newWindow: () => void;
   shareTab: (tabId: string) => void;
@@ -180,84 +172,7 @@ const termMenuGroup = document.createElement("div");
 termMenuGroup.dataset.group = "term";
 termMenuGroup.style.display = "none";
 
-const SERIAL_BAUDS = SERIAL_BAUD_RATES;
-
-// Baud Rate submenu (serial tabs only)
-const baudItem = document.createElement("div");
-baudItem.className = "menu-item has-submenu";
-baudItem.style.display = "none";
-const baudLabel = document.createElement("span");
-baudLabel.textContent = "Baud Rate";
-baudItem.appendChild(baudLabel);
-const baudArrow = document.createElement("span");
-baudArrow.className = "menu-arrow";
-baudArrow.textContent = "\u203a";
-baudItem.appendChild(baudArrow);
-
-const baudSub = document.createElement("div");
-baudSub.className = "baud-submenu";
-for (const b of SERIAL_BAUDS) {
-  const el = document.createElement("div");
-  el.className = "menu-item baud-option";
-  el.dataset.baud = String(b);
-  baudSub.appendChild(el);
-}
-baudItem.appendChild(baudSub);
-baudItem.addEventListener("mouseenter", () => baudSub.classList.add("open"));
-baudItem.addEventListener("mouseleave", () => baudSub.classList.remove("open"));
-termMenuGroup.appendChild(baudItem);
-
-// Output newlines submenu (serial tabs only)
-const nlItem = document.createElement("div");
-nlItem.className = "menu-item has-submenu";
-nlItem.style.display = "none";
-const nlLabel = document.createElement("span");
-nlLabel.textContent = "Output Newlines";
-nlItem.appendChild(nlLabel);
-const nlArrow = document.createElement("span");
-nlArrow.className = "menu-arrow";
-nlArrow.textContent = "\u203a";
-nlItem.appendChild(nlArrow);
-
-const nlSub = document.createElement("div");
-nlSub.className = "baud-submenu";
-for (const [v, label] of SERIAL_OUTPUT_NEWLINES) {
-  const el = document.createElement("div");
-  el.className = "menu-item nl-option";
-  el.dataset.nl = v;
-  el.dataset.nlLabel = label;
-  nlSub.appendChild(el);
-}
-nlItem.appendChild(nlSub);
-nlItem.addEventListener("mouseenter", () => nlSub.classList.add("open"));
-nlItem.addEventListener("mouseleave", () => nlSub.classList.remove("open"));
-termMenuGroup.appendChild(nlItem);
-
-// Enter-sends submenu (serial tabs only)
-const enterItem = document.createElement("div");
-enterItem.className = "menu-item has-submenu";
-enterItem.style.display = "none";
-const enterLabel = document.createElement("span");
-enterLabel.textContent = "Enter Sends";
-enterItem.appendChild(enterLabel);
-const enterArrow = document.createElement("span");
-enterArrow.className = "menu-arrow";
-enterArrow.textContent = "\u203a";
-enterItem.appendChild(enterArrow);
-
-const enterSub = document.createElement("div");
-enterSub.className = "baud-submenu";
-for (const [v, label] of SERIAL_ENTER_NEWLINES) {
-  const el = document.createElement("div");
-  el.className = "menu-item enter-option";
-  el.dataset.enter = v;
-  el.dataset.enterLabel = label;
-  enterSub.appendChild(el);
-}
-enterItem.appendChild(enterSub);
-enterItem.addEventListener("mouseenter", () => enterSub.classList.add("open"));
-enterItem.addEventListener("mouseleave", () => enterSub.classList.remove("open"));
-termMenuGroup.appendChild(enterItem);
+// Serial baud/newline controls moved to the quick-status panel (quickpanel.ts).
 
 termMenuGroup.appendChild(mkItem("Copy", "copy"));
 termMenuGroup.appendChild(mkItem("Copy as HTML", "copy-html"));
@@ -279,27 +194,6 @@ contextMenu.addEventListener("click", (e) => {
   if (target.classList.contains("color-swatch") && target.dataset.color) {
     e.stopPropagation();
     _handlers?.setTabColor(currentTabId, target.dataset.color);
-    closeContextMenu();
-    return;
-  }
-
-  if (target.classList.contains("baud-option") && target.dataset.baud) {
-    e.stopPropagation();
-    _handlers?.setSerialBaud(currentTabId, parseInt(target.dataset.baud, 10));
-    closeContextMenu();
-    return;
-  }
-
-  if (target.classList.contains("enter-option") && target.dataset.enter) {
-    e.stopPropagation();
-    _handlers?.setSerialEnterNewline(currentTabId, target.dataset.enter as SerialEnterNewline);
-    closeContextMenu();
-    return;
-  }
-
-  if (target.classList.contains("nl-option") && target.dataset.nl) {
-    e.stopPropagation();
-    _handlers?.setSerialOutputNewline(currentTabId, target.dataset.nl as SerialOutputNewline);
     closeContextMenu();
     return;
   }
@@ -406,28 +300,6 @@ export function showTabContextMenu(tabId: string, x: number, y: number) {
 
 export function showTerminalContextMenu(tabId: string, x: number, y: number) {
   currentTabId = tabId;
-  const h = _handlers;
-  const isSerial = h?.isSerialTab(tabId) ?? false;
-  baudItem.style.display = isSerial ? "" : "none";
-  nlItem.style.display = isSerial ? "" : "none";
-  enterItem.style.display = isSerial ? "" : "none";
-  if (isSerial) {
-    const baud = h?.getSerialBaud(tabId);
-    baudSub.querySelectorAll<HTMLElement>(".baud-option").forEach(el => {
-      const b = parseInt(el.dataset.baud!, 10);
-      el.textContent = b === baud ? `${b} \u2713` : String(b);
-    });
-    const curNl = h?.getSerialOutputNewline(tabId) ?? "keep";
-    nlSub.querySelectorAll<HTMLElement>(".nl-option").forEach(el => {
-      const isCur = el.dataset.nl === curNl;
-      el.textContent = isCur ? `${el.dataset.nlLabel!} \u2713` : el.dataset.nlLabel!;
-    });
-    const curEnter = h?.getSerialEnterNewline(tabId) ?? "cr";
-    enterSub.querySelectorAll<HTMLElement>(".enter-option").forEach(el => {
-      const isCur = el.dataset.enter === curEnter;
-      el.textContent = isCur ? `${el.dataset.enterLabel!} \u2713` : el.dataset.enterLabel!;
-    });
-  }
   tabMenuGroup.style.display = "none";
   termMenuGroup.style.display = "";
   showAt(x, y);

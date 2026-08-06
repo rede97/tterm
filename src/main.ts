@@ -117,6 +117,17 @@ tabManager.initNewTabButton();
 initSearchBar();
 initProfileMenu();
 initSshAuthDialogs();
+import("./terminal/quickpanel").then(m => {
+  m.setQuickPanelHandlers({
+    getActiveTab: () => tabManager.activeTab,
+    getTab: (id) => tabManager.get(id),
+    shareTab: (id) => tabManager.shareTab(id),
+    setSerialBaud: (id, baud) => tabManager.setSerialBaud(id, baud),
+    setSerialOutputNewline: (id, mode) => tabManager.setSerialOutputNewline(id, mode),
+    setSerialEnterNewline: (id, mode) => tabManager.setSerialEnterNewline(id, mode),
+  });
+  m.initQuickPanel();
+});
 import("./terminal/contextmenu").then(m => {
   m.setContextMenuHandlers({
     createLocalTab: () => tabManager.createLocalTab(),
@@ -133,13 +144,6 @@ import("./terminal/contextmenu").then(m => {
     clearTab: (id) => tabManager.clearTab(id),
     switchTo: (id) => tabManager.switchTo(id),
     exportTab: (id) => tabManager.exportTab(id),
-    setSerialBaud: (id, baud) => tabManager.setSerialBaud(id, baud),
-    setSerialEnterNewline: (id, mode) => tabManager.setSerialEnterNewline(id, mode),
-    setSerialOutputNewline: (id, mode) => tabManager.setSerialOutputNewline(id, mode),
-    isSerialTab: (id) => tabManager.get(id)?.type === "serial",
-    getSerialBaud: (id) => tabManager.get(id)?.serialBaud,
-    getSerialOutputNewline: (id) => tabManager.get(id)?.outputNewline,
-    getSerialEnterNewline: (id) => tabManager.get(id)?.enterNewline,
     getActiveTabId: () => tabManager.activeTabId,
     shareTab: (id) => tabManager.shareTab(id),
     isTabShared: (id) => tabManager.get(id)?.shared ?? false,
