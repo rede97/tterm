@@ -206,15 +206,19 @@ follows the active tab's type: AI share toggle for all, SSH adds
 auto-reconnect + inline port forwards (embedded client only), serial adds
 auto-reconnect + baud/newline selects + RTS toggle + live CTS status.
 
-## System tray (close-to-tray)
+## System tray (park window)
 
-Settings toggle `closeToTray` (General → Window). With it on, `CloseRequested` is intercepted (`tray::hide_to_tray`): `prevent_close` + `hide()` — sessions keep running for background agents. One tray icon is shared by ALL windows, but TTerm windows are separate PROCESSES (`open_new_window` spawns the exe), so coordination is file-based under the app config dir — no IPC server:
+Parking is an explicit PER-WINDOW action — the park button (`#btn-park-tray`, PanelBottomClose icon, immediately left of minimize) hides the window into the tray while its sessions keep running (background agents on long tasks). It is deliberately NOT a close-button behavior: each window's content is the user's choice, and the X button still closes for real. `tray_park_window` → `tray::park_window`.
 
-- `tray-windows.json` — hidden-window registry `[{pid, title, since}]`; `tray-owner.lock` — owner pid by atomic create (dead owner replaced by the next hider); mutations under an advisory `tray.lock` spin-retry sidecar.
+One tray icon is shared by ALL windows, but TTerm windows are separate PROCESSES (`open_new_window` spawns the exe), so coordination is file-based under the app config dir — no IPC server:
+
+- `tray-windows.json` — parked-window registry `[{pid, tabs, since}]`; `tray-owner.lock` — owner pid by atomic create (dead owner replaced by the next parking process); mutations under an advisory `tray.lock` spin-retry sidecar.
 - The owner keeps the tray icon and reconciles every 2 s: prune dead pids, prune windows visible again (5 s grace for fresh entries — Tauri's `hide()` is dispatched to the main thread and a just-hidden window can still read visible), rebuild the menu, tear the tray down when empty.
+- Menu layout: one submenu per parked window — `TTerm#N` in park order (windows have no meaningful title) — listing that window's tab labels; clicking any tab restores the window. Plus `Quit TTerm` (terminates every parked process; shells die with it).
+- Tab labels come from the frontend, debounced 400 ms (`src/core/traytabs.ts`): TabManager registers a provider, TerminalTab notifies on rename/OSC title, TabManager on switch/close. `tray_set_tabs` also sets the native window title to the active tab's label.
 - **Gotcha**: a TTerm process owns SEVERAL top-level windows (ConPTY `PseudoConsoleWindow`, `Tao Thread Event Target`, IME, `tray_icon_app`) that stay visible when the real one hides — `hwnd_of_pid` must filter by the `"Tauri Window"` class.
-- Cross-process restore needs no cooperation: `EnumWindows` by pid → `ShowWindow` + `SetForegroundWindow`. Tray Quit terminates every parked pid (shells die with it — same as closing the app).
-- The menu label is the window title = active tab's label, reported debounced (400 ms) via `tray_set_title` from `switchTo` / OSC title / rename (`src/core/windowtitle.ts`). Backend reads the toggle from config.json on demand — no config sync channel.
+- Cross-process restore needs no cooperation: `EnumWindows` by pid → `ShowWindow` + `SetForegroundWindow`.
+- Dev-mode artifact: with the vite dev server, its reload broadcast can recreate a hidden window's WebView — production (embedded dist) never reloads, and the grace period + class filter absorb it anyway.
 
 ## Settings page
 

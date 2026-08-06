@@ -78,7 +78,7 @@ pub fn run() {
                 serial::serial_set_output_newline, serial::serial_set_rts, serial::serial_line_status,
                 relay::session_set_auto_reconnect, relay::session_get_auto_reconnect,
                 share::share_create, share::share_revoke, share::share_screen_response, share::share_screen_changed,
-                tray::tray_set_title,
+                tray::tray_set_tabs, tray::tray_park_window,
                 demo::demo_spawn, demo::anime_spawn,
                 fonts::list_system_fonts,
             ] }
@@ -98,19 +98,9 @@ pub fn run() {
                 serial::serial_set_output_newline, serial::serial_set_rts, serial::serial_line_status,
                 relay::session_set_auto_reconnect, relay::session_get_auto_reconnect,
                 share::share_create, share::share_revoke, share::share_screen_response, share::share_screen_changed,
-                tray::tray_set_title,
+                tray::tray_set_tabs, tray::tray_park_window,
                 fonts::list_system_fonts,
             ] }
-        })
-        // Close-to-tray: with the setting on, closing a window hides it to
-        // the shared system tray instead of quitting — background sessions
-        // (agents on long tasks) keep running.
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if tray::hide_to_tray(window) {
-                    api.prevent_close();
-                }
-            }
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

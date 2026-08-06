@@ -1,6 +1,6 @@
-﻿import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { createElement, Minus, Square, Copy, X } from "lucide";
+import { createElement, Minus, Square, Copy, X, PanelBottomClose } from "lucide";
 
 const appWindow = getCurrentWindow();
 
@@ -56,6 +56,11 @@ function initWindowButtons() {
     if (!btn) return;
 
     switch (btn.id) {
+      case "btn-park-tray":
+        // Park the window in the shared system tray: the window hides,
+        // sessions keep running, restore via the tray icon's menu.
+        invoke("tray_park_window");
+        break;
       case "btn-minimize":
         invoke("window_minimize");
         break;
@@ -80,7 +85,10 @@ function initWindowButtons() {
 function injectIcons() {
   const btnMinimize = document.getElementById("btn-minimize")!;
   const btnClose = document.getElementById("btn-close")!;
+  const btnPark = document.getElementById("btn-park-tray")!;
 
+  btnPark.title = "Park to tray — sessions keep running; restore from the tray icon";
+  btnPark.appendChild(createElement(PanelBottomClose, { stroke: "currentColor", width: 14, height: 14 }));
   btnMinimize.appendChild(createElement(Minus, { stroke: "currentColor", width: 14, height: 14 }));
   const icoMax = createElement(Square, { stroke: "currentColor", width: 14, height: 14 });
   icoMax.classList.add("ico-max");

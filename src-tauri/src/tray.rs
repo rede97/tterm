@@ -1,19 +1,23 @@
 //! System tray with a single shared icon for ALL TTerm windows.
 //!
-//! TTerm's "new window" spawns a new PROCESS, so one tray icon listing every
-//! window needs cross-process coordination. There is no IPC server: state
-//! lives in two files under the app config dir, and cross-process window
-//! restore uses plain Win32 (EnumWindows by pid → ShowWindow) — the target
-//! process does not need to cooperate.
+//! Parking is an explicit per-window action: the park button in the window
+//! controls (each window's content is the user's choice, so it is NOT a
+//! close-button behavior). The window hides; sessions keep running.
 //!
-//! - `tray-windows.json` — registry of HIDDEN windows: [{pid, title}].
-//!   A process appends its entry when its window retreats to the tray
-//!   (close-to-tray intercept); the owner removes entries on restore,
-//!   process death, or the window becoming visible again.
+//! TTerm's "new window" spawns a new PROCESS, so one tray icon listing every
+//! parked window needs cross-process coordination. There is no IPC server:
+//! state lives in two files under the app config dir, and cross-process
+//! window restore uses plain Win32 (EnumWindows by pid → ShowWindow) — the
+//! target process does not need to cooperate.
+//!
+//! - `tray-windows.json` — registry of PARKED windows: [{pid, tabs, since}].
+//!   A process appends its entry on park; the owner removes entries on
+//!   restore, process death, or the window becoming visible again. The tray
+//!   menu is one submenu per window ("TTerm#N" in park order) listing its
+//!   tab labels.
 //! - `tray-owner.lock` — owner election by atomic create; contents are the
 //!   owner pid. The owner keeps the tray icon and reconciles the registry
-//!   every 2 s. A dead owner pid is replaced by the next process that hides
-//!   its window.
+//!   every 2 s. A dead owner pid is replaced by the next parking process.
 //!
 //! All registry mutations go through an advisory `tray.lock` sidecar
 //! (create_new + retry) — human-scale events, so a spin retry is plenty.
@@ -25,7 +29,10 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TrayWindowEntry {
     pub pid: u32,
-    pub title: String,
+    // Tab labels of the parked window — the tray menu shows them as a
+    // submenu under "TTerm#N" so the user can tell windows apart.
+    #[serde(default)]
+    pub tabs: Vec<String>,
     // Unix seconds when the window hid. Reconcile gives fresh entries a
     // grace period before trusting Win32 visibility: Tauri's hide() is
     // dispatched to the main thread, so a just-hidden window can still read
@@ -41,9 +48,9 @@ fn now_secs() -> u64 {
         .unwrap_or(0)
 }
 
-// Last title reported by the frontend (active tab label) — the menu text
-// when this window hides.
-static LAST_TITLE: Mutex<Option<String>> = Mutex::new(None);
+// Last tab list reported by the frontend (debounced) — the submenu content
+// when this window parks.
+static LAST_TABS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 // The tray icon when this process is the owner. Dropping removes the icon.
 static TRAY_ICON: Mutex<Option<tauri::tray::TrayIcon>> = Mutex::new(None);
@@ -65,19 +72,8 @@ fn config_base(app: &tauri::AppHandle) -> Option<PathBuf> {
 
 // ---- config ----
 
-// The toggle lives in the frontend-owned config.json; the backend reads it
-// on demand (window close is rare, so no sync channel is needed).
-pub(crate) fn close_to_tray_enabled(app: &tauri::AppHandle) -> bool {
-    let Some(base) = config_base(app) else { return false };
-    parse_close_to_tray(&std::fs::read_to_string(base.join("config.json")).unwrap_or_default())
-}
-
-pub(crate) fn parse_close_to_tray(config_json: &str) -> bool {
-    serde_json::from_str::<serde_json::Value>(config_json)
-        .ok()
-        .and_then(|v| v.get("closeToTray").and_then(|b| b.as_bool()))
-        .unwrap_or(false)
-}
+// Parking is an explicit per-window action (the park button in the window
+// controls), not a close-button behavior — there is no setting to read.
 
 // ---- process liveness ----
 
@@ -137,13 +133,13 @@ fn write_hidden(base: &Path, entries: &[TrayWindowEntry]) {
     }
 }
 
-// Record (or refresh) this process's hidden window. Called on the
-// close-to-tray intercept.
-pub(crate) fn mark_hidden(base: &Path, pid: u32, title: String) {
+// Record (or refresh) this process's hidden window. Called when the window
+// parks in the tray.
+pub(crate) fn mark_hidden(base: &Path, pid: u32, tabs: Vec<String>) {
     with_registry_lock(base, |base| {
         let mut entries = list_hidden(base);
         entries.retain(|e| e.pid != pid);
-        entries.push(TrayWindowEntry { pid, title, since: now_secs() });
+        entries.push(TrayWindowEntry { pid, tabs, since: now_secs() });
         write_hidden(base, &entries);
     });
 }
@@ -275,15 +271,31 @@ fn window_visible(_pid: u32) -> bool {
 const ITEM_SHOW_PREFIX: &str = "show:";
 const ITEM_QUIT: &str = "tray:quit";
 
+// Menu layout: one submenu per parked window ("TTerm#1", "TTerm#2", … in
+// park order) listing its tabs — the tab labels are how the user tells
+// windows apart. Clicking any tab item restores that window.
 fn build_menu(app: &tauri::AppHandle, entries: &[TrayWindowEntry]) -> tauri::menu::Menu<tauri::Wry> {
     let mut builder = tauri::menu::MenuBuilder::new(app);
-    for e in entries {
-        let label = if e.title.is_empty() { format!("TTerm (pid {})", e.pid) } else { e.title.clone() };
-        let item = tauri::menu::MenuItemBuilder::new(label)
-            .id(format!("{}{}", ITEM_SHOW_PREFIX, e.pid))
-            .build(app)
-            .expect("tray menu item");
-        builder = builder.item(&item);
+    for (i, e) in entries.iter().enumerate() {
+        let mut sub = tauri::menu::SubmenuBuilder::new(app, format!("TTerm#{}", i + 1));
+        if e.tabs.is_empty() {
+            let item = tauri::menu::MenuItemBuilder::new("Restore window")
+                .id(format!("{}{}", ITEM_SHOW_PREFIX, e.pid))
+                .build(app)
+                .expect("tray menu item");
+            sub = sub.item(&item);
+        } else {
+            for (j, tab) in e.tabs.iter().enumerate() {
+                let label = if tab.is_empty() { format!("Tab {}", j + 1) } else { tab.clone() };
+                let item = tauri::menu::MenuItemBuilder::new(label)
+                    .id(format!("{}{}:{}", ITEM_SHOW_PREFIX, e.pid, j))
+                    .build(app)
+                    .expect("tray menu item");
+                sub = sub.item(&item);
+            }
+        }
+        let submenu = sub.build().expect("tray submenu");
+        builder = builder.item(&submenu);
     }
     if !entries.is_empty() {
         builder = builder.separator();
@@ -300,8 +312,9 @@ fn build_menu(app: &tauri::AppHandle, entries: &[TrayWindowEntry]) -> tauri::men
 
 fn on_menu_event(app: &tauri::AppHandle, id: &str) {
     let Some(base) = config_base(app) else { return };
-    if let Some(pid_raw) = id.strip_prefix(ITEM_SHOW_PREFIX) {
-        if let Ok(pid) = pid_raw.parse::<u32>() {
+    if let Some(rest) = id.strip_prefix(ITEM_SHOW_PREFIX) {
+        // "show:<pid>" or "show:<pid>:<tab>" — both restore the window.
+        if let Ok(pid) = rest.split(':').next().unwrap_or("").parse::<u32>() {
             restore_window(app, pid);
         }
     } else if id == ITEM_QUIT {
@@ -420,28 +433,24 @@ fn spawn_tray(app: &tauri::AppHandle) {
 
 // ---- entry points called from lib.rs / commands ----
 
-// Close-requested intercept: returns true when the close was converted into
-// a tray hide (caller must prevent_close).
-pub(crate) fn hide_to_tray(window: &tauri::Window) -> bool {
+// Park this window in the tray (the park button in the window controls).
+// The window hides; its sessions keep running in the background.
+pub(crate) fn park_window(window: &tauri::Window) {
     use tauri::Manager;
     let app = window.app_handle();
-    if !close_to_tray_enabled(app) {
-        return false;
-    }
-    let Some(base) = config_base(app) else { return false };
+    let Some(base) = config_base(app) else { return };
     let pid = std::process::id();
-    let title = LAST_TITLE.lock().clone().unwrap_or_else(|| "TTerm".into());
+    let tabs = LAST_TABS.lock().clone();
     let _ = window.hide();
-    mark_hidden(&base, pid, title);
+    mark_hidden(&base, pid, tabs);
     if ensure_owner(&base, pid) {
         spawn_tray(app);
         reconcile(app);
     }
-    true
 }
 
 // Process exit: drop our registry entry; if we owned the tray, release the
-// lock so the next hiding process re-elects.
+// lock so the next parking process re-elects.
 pub(crate) fn on_exit(app: &tauri::AppHandle) {
     let Some(base) = config_base(app) else { return };
     let pid = std::process::id();
@@ -450,11 +459,19 @@ pub(crate) fn on_exit(app: &tauri::AppHandle) {
     TRAY_ICON.lock().take();
 }
 
-// Frontend reports the window title (active tab label, debounced).
+// Park button in the window controls.
 #[tauri::command]
-pub fn tray_set_title(window: tauri::Window, title: String) {
-    let _ = window.set_title(&title);
-    *LAST_TITLE.lock() = Some(title);
+pub fn tray_park_window(window: tauri::Window) {
+    park_window(&window);
+}
+
+// Frontend reports the window's tab list (debounced): the native title gets
+// the active tab's label, the tray submenu gets the full list.
+#[tauri::command]
+pub fn tray_set_tabs(window: tauri::Window, tabs: Vec<String>, active: String) {
+    let title = if active.is_empty() { "TTerm" } else { &active };
+    let _ = window.set_title(title);
+    *LAST_TABS.lock() = tabs;
 }
 
 #[cfg(test)]
@@ -471,14 +488,14 @@ mod tests {
     #[test]
     fn registry_add_update_remove() {
         let base = temp_base("crud");
-        mark_hidden(&base, 100, "one".into());
-        mark_hidden(&base, 200, "two".into());
+        mark_hidden(&base, 100, vec!["one".into()]);
+        mark_hidden(&base, 200, vec!["a".into(), "b".into()]);
         assert_eq!(list_hidden(&base).len(), 2);
-        // Re-hiding the same pid refreshes the title instead of duplicating.
-        mark_hidden(&base, 100, "one-renamed".into());
+        // Re-parking the same pid refreshes the tabs instead of duplicating.
+        mark_hidden(&base, 100, vec!["renamed".into()]);
         let entries = list_hidden(&base);
         assert_eq!(entries.len(), 2);
-        assert_eq!(entries.iter().find(|e| e.pid == 100).unwrap().title, "one-renamed");
+        assert_eq!(entries.iter().find(|e| e.pid == 100).unwrap().tabs, vec!["renamed".to_string()]);
         unmark(&base, 100);
         let entries = list_hidden(&base);
         assert_eq!(entries.len(), 1);
@@ -505,13 +522,5 @@ mod tests {
     fn pid_alive_sanity() {
         assert!(pid_alive(std::process::id()));
         assert!(!pid_alive(u32::MAX));
-    }
-
-    #[test]
-    fn close_to_tray_config_parsing() {
-        assert!(!parse_close_to_tray("{}"));
-        assert!(!parse_close_to_tray("not json"));
-        assert!(!parse_close_to_tray(r#"{"closeToTray":false}"#));
-        assert!(parse_close_to_tray(r#"{"closeToTray":true}"#));
     }
 }

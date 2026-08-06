@@ -9,7 +9,7 @@ import { serialParamsFor, serialKeyFor, rememberSerialParams } from "../config/s
 import { showToast } from "../ui/toast";
 import { TerminalTab } from "./tab";
 import { updateQuickButton, closeQuickPanel } from "./quickpanel";
-import { reportWindowTitle } from "../core/windowtitle";
+import { notifyTrayTabs, setTrayTabsProvider } from "../core/traytabs";
 import { listen } from "@tauri-apps/api/event";
 import Sortable from "sortablejs";
 
@@ -341,8 +341,9 @@ export class TabManager {
     // The quick panel tracks the active tab; switching closes it.
     closeQuickPanel();
     updateQuickButton();
-    // The tray menu lists this window by its active tab's label.
-    reportWindowTitle(next.label);
+    // The tray submenu lists this window's tabs; the title follows the
+    // active tab's label.
+    notifyTrayTabs();
 
     if (next.needsResize) {
       const { cols, rows } = next.fit();
@@ -385,6 +386,7 @@ export class TabManager {
     }
     this.refreshBadges();
     updateQuickButton();
+    notifyTrayTabs();
   }
 
   get(id: string): TerminalTab | undefined {
@@ -701,6 +703,10 @@ export function initTabManager(
 ): TabManager {
   Object.assign(tabManager, { tabsContainer, terminalContainer, _welcomeEl: welcomeEl });
   tabManager.initSortable();
+  setTrayTabsProvider(() => ({
+    tabs: [...tabManager.tabs.values()].map((t) => t.label),
+    active: tabManager.activeTab?.label ?? "",
+  }));
   return tabManager;
 }
 

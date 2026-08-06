@@ -40,7 +40,6 @@ export interface ConfigState {
   serialEnterNewline: SerialEnterNewline;
   defaultLocalProfile: string | null;
   autoCheckUpdates: boolean;
-  closeToTray: boolean;
   // Built-in SSH client (russh) instead of spawning the system ssh binary.
   sshEmbedded: boolean;
   recentDirectories: string[];
@@ -89,7 +88,6 @@ const SCHEMA = {
   serialEnterNewline: { default: "cr" as SerialEnterNewline,  validate: isOneOf(SERIAL_ENTER_MODES) },
   defaultLocalProfile: { default: null as string | null,    validate: isOrNull(isString) },
   autoCheckUpdates:   { default: true,                     validate: isBoolean },
-  closeToTray:        { default: false,                    validate: isBoolean },
   sshEmbedded:        { default: true,                     validate: isBoolean },
   recentDirectories:  { default: [] as string[],           validate: isArray<string> },
   loaded:             { default: false,                    validate: isBoolean },

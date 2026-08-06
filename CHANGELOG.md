@@ -2,11 +2,12 @@
 
 New Features
 
-- **Close to system tray** — Settings → General → Window: closing the
-  window parks TTerm in the system tray instead of quitting, so sessions
-  and AI agents on long-running tasks keep working in the background.
-  Every hidden window shares one tray icon — right-click it and pick the
-  window to bring back; "Quit TTerm" exits everything parked there
+- **Park windows in the system tray** — a new button next to minimize
+  hides the window while its sessions keep running, so AI agents and
+  long-running tasks keep working in the background. All parked windows
+  share one tray icon: right-click it and every window appears as
+  "TTerm#N" with its tabs listed under it, so you can tell which is
+  which before restoring; "Quit TTerm" exits everything parked there
 
 Fixes
 
