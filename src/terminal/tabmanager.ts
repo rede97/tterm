@@ -434,6 +434,15 @@ export class TabManager {
         if (tab) tab.index = i;
       }
     });
+    this._syncTabsOverflow();
+  }
+
+  // Gate the +/dropdown pinning: only when the strip actually scrolls does
+  // #new-tab-group go sticky (otherwise sticky misaligns it). Width changes
+  // land here via refreshBadges (tab add/close) and _onResize.
+  private _syncTabsOverflow(): void {
+    const el = this.tabsContainer;
+    el.classList.toggle("overflowing", el.scrollWidth > el.clientWidth + 1);
   }
 
   // -- tab features --
@@ -568,6 +577,8 @@ export class TabManager {
     if (this.settingsEl || !this._createSettingsContent) return;
 
     this.settingsOpen = true;
+    closeQuickPanel();
+    updateQuickButton();
 
     for (const tab of this.tabs.values()) tab.hide();
 
@@ -615,6 +626,7 @@ export class TabManager {
     }
 
     this.settingsOpen = false;
+    updateQuickButton();
 
     if (restore && this.activeTabId) {
       const tab = this.tabs.get(this.activeTabId);
@@ -635,6 +647,7 @@ export class TabManager {
 
   private _onResize(): void {
     for (const t of this.tabs.values()) t.needsResize = true;
+    this._syncTabsOverflow();
 
     const active = this.activeTab;
     if (!active) return;

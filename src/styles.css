@@ -51,6 +51,9 @@ body {
 #drag-spacer {
   flex: 1;
   height: 100%;
+  /* Always leave ~a small tab's width of grabbable empty space for window
+     dragging, even when the tab strip overflows. */
+  min-width: 70px;
 }
 
 #new-tab-group {
@@ -59,10 +62,21 @@ body {
   flex-shrink: 0;
 }
 
+/* Overflowing tab strip only: pin +/dropdown to the scrollport's right edge
+   (sticky would misalign the group when there is no overflow, so the class
+   gates it). Opaque background — scrolled tabs slide beneath. */
+#tabs.overflowing #new-tab-group {
+  position: sticky;
+  right: 0;
+  background: #252526;
+  border-left: 1px solid #1e1e1e;
+}
+
 #new-tab {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Same width as the dropdown, quick-status and park-to-tray buttons. */
   width: 30px;
   min-width: 30px;
   height: 100%;
@@ -241,6 +255,27 @@ body {
   margin-left: 1cm;
 }
 
+/* Quick actions + park-to-tray as one same-width group, separated from the
+   minimize/maximize/close cluster by a vertical divider. The group is more
+   compact than the 46px window controls. */
+#quick-actions {
+  display: flex;
+  height: 100%;
+}
+
+#quick-actions .win-btn {
+  width: 30px;
+}
+
+.win-divider {
+  width: 1px;
+  height: 14px;
+  align-self: center;
+  background: #3e3e42;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
 /* -- quick-status button + panel -- */
 
 /* Sits between the drag spacer and the window controls; the 1cm margin on
@@ -250,7 +285,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
+  /* Same width as the park-to-tray button (#quick-actions .win-btn). */
+  width: 30px;
   height: 100%;
   border: none;
   outline: none;
@@ -267,6 +303,7 @@ body {
 
 #quick-status.disabled {
   opacity: 0.4;
+  cursor: default;
 }
 
 #quick-status .qs-dot {

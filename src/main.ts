@@ -119,7 +119,7 @@ initProfileMenu();
 initSshAuthDialogs();
 import("./terminal/quickpanel").then(m => {
   m.setQuickPanelHandlers({
-    getActiveTab: () => tabManager.activeTab,
+    getActiveTab: () => (tabManager.settingsOpen ? undefined : tabManager.activeTab),
     getTab: (id) => tabManager.get(id),
     shareTab: (id) => tabManager.shareTab(id),
     setSerialBaud: (id, baud) => tabManager.setSerialBaud(id, baud),

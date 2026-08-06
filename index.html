@@ -12,8 +12,9 @@
       <button id="settings-btn" aria-label="Settings"></button>
       <div id="tabs">
         <!-- + and dropdown live INSIDE #tabs as the last flex item so they
-             stay flush against the last tab (and scroll with it on
-             overflow). New tab elements are inserted before this group. -->
+             stay flush against the last tab. position:sticky pins them to
+             the right edge when the tab strip overflows and scrolls.
+             New tab elements are inserted before this group. -->
         <div id="new-tab-group">
           <button id="new-tab"><span class="plus">+</span></button>
           <button id="new-tab-menu-btn" aria-label="New tab options">
@@ -24,9 +25,12 @@
         </div>
       </div>
       <div id="drag-spacer" data-tauri-drag-region></div>
-      <button id="quick-status" aria-label="Session quick actions" title="Session quick actions"></button>
       <div id="window-controls">
-        <button id="btn-park-tray" class="win-btn" aria-label="Park to tray"></button>
+        <div id="quick-actions">
+          <button id="quick-status" aria-label="Session quick actions" title="Session quick actions"></button>
+          <button id="btn-park-tray" class="win-btn" aria-label="Park to tray"></button>
+        </div>
+        <span class="win-divider" aria-hidden="true"></span>
         <button id="btn-minimize" class="win-btn" aria-label="Minimize"></button>
         <button id="btn-maximize" class="win-btn" aria-label="Maximize"></button>
         <button id="btn-close" class="win-btn" aria-label="Close"></button>

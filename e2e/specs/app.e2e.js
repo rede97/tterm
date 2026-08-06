@@ -380,16 +380,36 @@ describe("TTerm application", () => {
   });
 
   it("keeps the new-tab buttons flush against the last tab", async () => {
-    // The + / dropdown group lives inside #tabs as the last flex item, so
-    // it must sit immediately right of the last tab regardless of count.
-    await browser.waitUntil(async () => (await $$("#tabs .tab")).length >= 2, { timeout: 15000 });
-    const gap = await browser.execute(() => {
-      const tabs = [...document.querySelectorAll("#tabs .tab")];
-      const last = tabs[tabs.length - 1].getBoundingClientRect();
-      const btn = document.getElementById("new-tab-group").getBoundingClientRect();
-      return Math.round(btn.left - last.right);
+    // The + / dropdown group sits immediately right of the last tab when
+    // the strip is NOT overflowing (overflow pinning is the next test).
+    // Earlier tests leave an unknown number of tabs — normalize to 2.
+    await browser.execute(async () => {
+      const mgr = window.__tterm.mgr;
+      const ids = [...mgr.tabs.keys()];
+      for (const id of ids.slice(2)) await mgr.closeTab(id);
     });
-    expect(Math.abs(gap)).toBeLessThanOrEqual(1);
+    await browser.waitUntil(async () => (await $$("#tabs .tab")).length <= 2, {
+      timeout: 15000,
+      timeoutMsg: "could not reduce to 2 tabs",
+    });
+    await browser.execute(() => {
+      document.getElementById("tabs").scrollLeft = 0;
+    });
+    await browser.pause(200);
+    const result = await browser.execute(() => {
+      const tabs = document.getElementById("tabs");
+      const tabEls = [...tabs.querySelectorAll(".tab")];
+      const last = tabEls[tabEls.length - 1].getBoundingClientRect();
+      const btn = document.getElementById("new-tab-group").getBoundingClientRect();
+      return {
+        gap: Math.round(btn.left - last.right),
+        overflowing: tabs.classList.contains("overflowing"),
+        scrollWidth: tabs.scrollWidth,
+        clientWidth: tabs.clientWidth,
+      };
+    });
+    expect(result.overflowing).toBe(false);
+    expect(Math.abs(result.gap)).toBeLessThanOrEqual(1);
   });
 
   it("shows the terminal viewport inside the active tab", async () => {
@@ -405,5 +425,61 @@ describe("TTerm application", () => {
         return r.width > 0 && r.height > 0;
       });
     }, { timeout: 15000 });
+  });
+
+  it("keeps + and dropdown pinned when tabs overflow into the scrollbar", async () => {
+    // Flood the strip with cheap demo tabs until #tabs scrolls.
+    await browser.execute(async () => {
+      const mgr = window.__tterm.mgr;
+      for (let i = 0; i < 24; i++) await mgr.createDemoTab();
+    });
+    await browser.waitUntil(
+      () => browser.execute(() => {
+        const tabs = document.getElementById("tabs");
+        return tabs.classList.contains("overflowing") &&
+          tabs.scrollWidth > tabs.clientWidth + 1;
+      }),
+      { timeout: 20000, timeoutMsg: "tab strip did not overflow with 24 extra tabs" }
+    );
+
+    // Even scrolled hard left, the group must stay at the scrollport's
+    // right edge (sticky), never scrolled out of view.
+    const pinned = await browser.execute(() => {
+      const tabs = document.getElementById("tabs");
+      tabs.scrollLeft = 0;
+      const group = document.getElementById("new-tab-group").getBoundingClientRect();
+      const port = tabs.getBoundingClientRect();
+      return {
+        visibleAtLeft: Math.abs(group.right - port.right) <= 1,
+        width: group.width,
+      };
+    });
+    expect(pinned.width).toBeGreaterThan(0);
+    expect(pinned.visibleAtLeft).toBe(true);
+
+    // Even under overflow the drag spacer keeps its minimum width so the
+    // window stays grabbable.
+    const spacerWidth = await browser.execute(() =>
+      document.getElementById("drag-spacer").getBoundingClientRect().width
+    );
+    expect(spacerWidth).toBeGreaterThanOrEqual(69);
+
+    // Cleanup: close the demo tabs so the strip fits again (and the class
+    // flips off — the flush layout is covered by the earlier test).
+    await browser.execute(() => {
+      const mgr = window.__tterm.mgr;
+      const demoIds = [...mgr.tabs.values()]
+        .filter((t) => t.label === "Demo TTY")
+        .map((t) => t.id);
+      // closeTab is async; fire them all, wait below.
+      return Promise.all(demoIds.map((id) => mgr.closeTab(id)));
+    });
+    await browser.waitUntil(
+      () => browser.execute(() => {
+        const tabs = document.getElementById("tabs");
+        return !tabs.classList.contains("overflowing");
+      }),
+      { timeout: 30000, timeoutMsg: "demo tabs did not close" }
+    );
   });
 });

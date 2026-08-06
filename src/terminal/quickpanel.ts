@@ -373,6 +373,9 @@ export function updateQuickButton(): void {
   const btn = qsButton();
   if (!btn) return;
   const tab = _handlers?.getActiveTab();
+  // Real disabled state (not just dimmed): no tab selected — or the
+  // settings page is showing — means no panel to open.
+  btn.disabled = !tab;
   btn.classList.toggle("disabled", !tab);
   btn.dataset.state = !tab ? "" : tab.disconnected ? "down" : tab.shared ? "shared" : "";
 }

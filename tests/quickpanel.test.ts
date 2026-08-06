@@ -74,8 +74,16 @@ describe("quick-status button", () => {
   it("is disabled with no active tab and does not open", () => {
     updateQuickButton();
     expect(button().classList.contains("disabled")).toBe(true);
+    expect(button().disabled).toBe(true);
     openPanel();
     expect(panel().classList.contains("open")).toBe(false);
+  });
+
+  it("is enabled with an active tab", () => {
+    activeTab = fakeTab({ id: "tab-1" });
+    updateQuickButton();
+    expect(button().disabled).toBe(false);
+    expect(button().classList.contains("disabled")).toBe(false);
   });
 
   it("shows a red dot while the active session is down", () => {

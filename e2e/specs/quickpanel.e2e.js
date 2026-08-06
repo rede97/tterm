@@ -3,23 +3,58 @@
 // the serial section (mock loopback port) with live RTS/CTS and
 // auto-reconnect IPC roundtrips.
 describe("Quick-status button and panel", () => {
-  it("renders in the tab bar between the drag spacer and window controls", async () => {
+  it("groups with the park-to-tray button ahead of the window controls, divided from minimize", async () => {
     await browser.waitUntil(async () => (await $$("#tabs .tab")).length >= 1, { timeout: 15000 });
     const layout = await browser.execute(() => {
       const qs = document.getElementById("quick-status");
-      const win = document.getElementById("window-controls");
+      const park = document.getElementById("btn-park-tray");
+      const min = document.getElementById("btn-minimize");
+      const group = document.getElementById("quick-actions");
+      const divider = document.querySelector(".win-divider");
       const qsRect = qs.getBoundingClientRect();
-      const winRect = win.getBoundingClientRect();
+      const parkRect = park.getBoundingClientRect();
+      const divRect = divider.getBoundingClientRect();
+      const minRect = min.getBoundingClientRect();
       return {
-        exists: !!qs,
-        // Button sits left of minimize, with a visible margin between them.
-        leftOf: qsRect.right <= winRect.left,
-        gap: winRect.left - qsRect.right,
+        // Both buttons live in the shared group, quick-status first.
+        grouped: group.contains(qs) && group.contains(park),
+        order: qsRect.right <= parkRect.left,
+        sameWidth: Math.abs(qsRect.width - parkRect.width) < 1,
+        // All four bar buttons share one width.
+        allFourWidth: (() => {
+          const nt = document.getElementById("new-tab").getBoundingClientRect().width;
+          const dd = document.getElementById("new-tab-menu-btn").getBoundingClientRect().width;
+          return Math.abs(nt - qsRect.width) < 1 && Math.abs(dd - qsRect.width) < 1;
+        })(),
+        // Vertical divider sits between the group and minimize.
+        divided: parkRect.right <= divRect.left && divRect.right <= minRect.left,
+        dividerVertical: divRect.height > divRect.width,
       };
     });
-    expect(layout.exists).toBe(true);
-    expect(layout.leftOf).toBe(true);
-    expect(layout.gap).toBeGreaterThan(4);
+    expect(layout.grouped).toBe(true);
+    expect(layout.order).toBe(true);
+    expect(layout.sameWidth).toBe(true);
+    expect(layout.allFourWidth).toBe(true);
+    expect(layout.divided).toBe(true);
+    expect(layout.dividerVertical).toBe(true);
+  });
+
+  it("is disabled while the settings page is showing, re-enabled on close", async () => {
+    const isDisabled = () =>
+      browser.execute(
+        () => document.getElementById("quick-status").disabled
+      );
+    expect(await isDisabled()).toBe(false);
+    await browser.execute(() => window.__tterm.mgr.toggleSettings());
+    await browser.waitUntil(async () => (await isDisabled()) === true, {
+      timeout: 5000,
+      timeoutMsg: "quick-status not disabled with settings open",
+    });
+    await browser.execute(() => window.__tterm.mgr.closeSettings(true));
+    await browser.waitUntil(async () => (await isDisabled()) === false, {
+      timeout: 5000,
+      timeoutMsg: "quick-status not re-enabled after closing settings",
+    });
   });
 
   it("opens the panel with an AI Share section for the active tab", async () => {
