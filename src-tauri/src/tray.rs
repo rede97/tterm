@@ -55,6 +55,10 @@ static LAST_TABS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 // The tray icon when this process is the owner. Dropping removes the icon.
 static TRAY_ICON: Mutex<Option<tauri::tray::TrayIcon>> = Mutex::new(None);
 
+// Entries the visible menu was last built from. Rebuilding an OPEN native
+// popup menu dismisses it, so reconcile must only set_menu on real changes.
+static LAST_MENU: Mutex<Vec<TrayWindowEntry>> = Mutex::new(Vec::new());
+
 // ---- paths ----
 
 fn registry_path(base: &Path) -> PathBuf {
@@ -388,9 +392,13 @@ fn reconcile(app: &tauri::AppHandle) {
     if let Some(icon) = icon {
         if entries.is_empty() {
             TRAY_ICON.lock().take(); // drop removes the icon
+            LAST_MENU.lock().clear();
             release_owner(&base, std::process::id());
-        } else {
+        } else if *LAST_MENU.lock() != entries {
+            // Rebuild only on real change: rebuilding an open popup menu
+            // closes it (the user is probably hovering it right now).
             let _ = icon.set_menu(Some(build_menu(app, &entries)));
+            *LAST_MENU.lock() = entries;
         }
     }
 }
@@ -413,7 +421,10 @@ fn spawn_tray(app: &tauri::AppHandle) {
             None => builder,
         };
         match builder.build(app) {
-            Ok(icon) => *slot = Some(icon),
+            Ok(icon) => {
+                *LAST_MENU.lock() = entries;
+                *slot = Some(icon);
+            }
             Err(_) => return,
         }
     }
