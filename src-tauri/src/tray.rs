@@ -275,12 +275,21 @@ fn window_visible(_pid: u32) -> bool {
 const ITEM_SHOW_PREFIX: &str = "show:";
 const ITEM_QUIT: &str = "tray:quit";
 
+// Menu order is park order, oldest first — explicit sort by park time so a
+// disturbed registry order (restore-and-repark, dev-mode window recreation)
+// can never flip the display.
+fn menu_order(entries: &[TrayWindowEntry]) -> Vec<TrayWindowEntry> {
+    let mut sorted = entries.to_vec();
+    sorted.sort_by_key(|e| e.since); // stable: same-second parks keep file order
+    sorted
+}
+
 // Menu layout: one submenu per parked window ("1#Tab 3" = window 1 in park
 // order, 3 tabs) listing its tab labels — the tabs are how the user tells
 // windows apart. Clicking any tab item restores that window.
 fn build_menu(app: &tauri::AppHandle, entries: &[TrayWindowEntry]) -> tauri::menu::Menu<tauri::Wry> {
     let mut builder = tauri::menu::MenuBuilder::new(app);
-    for (i, e) in entries.iter().enumerate() {
+    for (i, e) in menu_order(entries).iter().enumerate() {
         let mut sub = tauri::menu::SubmenuBuilder::new(app, format!("{}#Tab {}", i + 1, e.tabs.len()));
         if e.tabs.is_empty() {
             let item = tauri::menu::MenuItemBuilder::new("Restore window")
@@ -394,11 +403,14 @@ fn reconcile(app: &tauri::AppHandle) {
             TRAY_ICON.lock().take(); // drop removes the icon
             LAST_MENU.lock().clear();
             release_owner(&base, std::process::id());
-        } else if *LAST_MENU.lock() != entries {
-            // Rebuild only on real change: rebuilding an open popup menu
-            // closes it (the user is probably hovering it right now).
-            let _ = icon.set_menu(Some(build_menu(app, &entries)));
-            *LAST_MENU.lock() = entries;
+        } else {
+            let ordered = menu_order(&entries);
+            if *LAST_MENU.lock() != ordered {
+                // Rebuild only on real change: rebuilding an open popup menu
+                // closes it (the user is probably hovering it right now).
+                let _ = icon.set_menu(Some(build_menu(app, &entries)));
+                *LAST_MENU.lock() = ordered;
+            }
         }
     }
 }
@@ -422,7 +434,7 @@ fn spawn_tray(app: &tauri::AppHandle) {
         };
         match builder.build(app) {
             Ok(icon) => {
-                *LAST_MENU.lock() = entries;
+                *LAST_MENU.lock() = menu_order(&entries);
                 *slot = Some(icon);
             }
             Err(_) => return,
@@ -533,5 +545,16 @@ mod tests {
     fn pid_alive_sanity() {
         assert!(pid_alive(std::process::id()));
         assert!(!pid_alive(u32::MAX));
+    }
+
+    #[test]
+    fn menu_order_is_chronological_even_if_registry_is_not() {
+        let e = |pid: u32, since: u64| TrayWindowEntry { pid, tabs: vec![], since };
+        let shuffled = vec![e(3, 30), e(1, 10), e(2, 20)];
+        let ordered = menu_order(&shuffled);
+        assert_eq!(ordered.iter().map(|x| x.pid).collect::<Vec<_>>(), vec![1, 2, 3]);
+        // Same-second ties keep the incoming (file) order — stable sort.
+        let tied = vec![e(9, 10), e(8, 10)];
+        assert_eq!(menu_order(&tied).iter().map(|x| x.pid).collect::<Vec<_>>(), vec![9, 8]);
     }
 }
