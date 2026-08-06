@@ -6,7 +6,7 @@ New Features
   hides the window while its sessions keep running, so AI agents and
   long-running tasks keep working in the background. All parked windows
   share one tray icon: right-click it and every window appears as
-  "TTerm#N" with its tabs listed under it, so you can tell which is
+  "N#Tab M" (window number + tab count) with its tabs listed under it, so you can tell which is
   which before restoring; "Quit TTerm" exits everything parked there
 
 Fixes

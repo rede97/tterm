@@ -214,7 +214,7 @@ One tray icon is shared by ALL windows, but TTerm windows are separate PROCESSES
 
 - `tray-windows.json` — parked-window registry `[{pid, tabs, since}]`; `tray-owner.lock` — owner pid by atomic create (dead owner replaced by the next parking process); mutations under an advisory `tray.lock` spin-retry sidecar.
 - The owner keeps the tray icon and reconciles every 2 s: prune dead pids, prune windows visible again (5 s grace for fresh entries — Tauri's `hide()` is dispatched to the main thread and a just-hidden window can still read visible), rebuild the menu, tear the tray down when empty.
-- Menu layout: one submenu per parked window — `TTerm#N` in park order (windows have no meaningful title) — listing that window's tab labels; clicking any tab restores the window. Plus `Quit TTerm` (terminates every parked process; shells die with it).
+- Menu layout: one submenu per parked window — `N#Tab M` (window N in park order, M = tab count; windows have no meaningful title) — listing that window's tab labels; clicking any tab restores the window. Plus `Quit TTerm` (terminates every parked process; shells die with it).
 - Tab labels come from the frontend, debounced 400 ms (`src/core/traytabs.ts`): TabManager registers a provider, TerminalTab notifies on rename/OSC title, TabManager on switch/close. `tray_set_tabs` also sets the native window title to the active tab's label.
 - **Gotcha**: a TTerm process owns SEVERAL top-level windows (ConPTY `PseudoConsoleWindow`, `Tao Thread Event Target`, IME, `tray_icon_app`) that stay visible when the real one hides — `hwnd_of_pid` must filter by the `"Tauri Window"` class.
 - Cross-process restore needs no cooperation: `EnumWindows` by pid → `ShowWindow` + `SetForegroundWindow`.

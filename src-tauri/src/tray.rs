@@ -13,7 +13,7 @@
 //! - `tray-windows.json` — registry of PARKED windows: [{pid, tabs, since}].
 //!   A process appends its entry on park; the owner removes entries on
 //!   restore, process death, or the window becoming visible again. The tray
-//!   menu is one submenu per window ("TTerm#N" in park order) listing its
+//!   menu is one submenu per window ("N#Tab M" = window N in park order, M tabs) listing its
 //!   tab labels.
 //! - `tray-owner.lock` — owner election by atomic create; contents are the
 //!   owner pid. The owner keeps the tray icon and reconciles the registry
@@ -30,7 +30,7 @@ use std::path::{Path, PathBuf};
 pub struct TrayWindowEntry {
     pub pid: u32,
     // Tab labels of the parked window — the tray menu shows them as a
-    // submenu under "TTerm#N" so the user can tell windows apart.
+    // submenu under "N#Tab M" so the user can tell windows apart.
     #[serde(default)]
     pub tabs: Vec<String>,
     // Unix seconds when the window hid. Reconcile gives fresh entries a
@@ -275,13 +275,13 @@ fn window_visible(_pid: u32) -> bool {
 const ITEM_SHOW_PREFIX: &str = "show:";
 const ITEM_QUIT: &str = "tray:quit";
 
-// Menu layout: one submenu per parked window ("TTerm#1", "TTerm#2", … in
-// park order) listing its tabs — the tab labels are how the user tells
+// Menu layout: one submenu per parked window ("1#Tab 3" = window 1 in park
+// order, 3 tabs) listing its tab labels — the tabs are how the user tells
 // windows apart. Clicking any tab item restores that window.
 fn build_menu(app: &tauri::AppHandle, entries: &[TrayWindowEntry]) -> tauri::menu::Menu<tauri::Wry> {
     let mut builder = tauri::menu::MenuBuilder::new(app);
     for (i, e) in entries.iter().enumerate() {
-        let mut sub = tauri::menu::SubmenuBuilder::new(app, format!("TTerm#{}", i + 1));
+        let mut sub = tauri::menu::SubmenuBuilder::new(app, format!("{}#Tab {}", i + 1, e.tabs.len()));
         if e.tabs.is_empty() {
             let item = tauri::menu::MenuItemBuilder::new("Restore window")
                 .id(format!("{}{}", ITEM_SHOW_PREFIX, e.pid))
