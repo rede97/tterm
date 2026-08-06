@@ -29,6 +29,11 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TrayWindowEntry {
     pub pid: u32,
+    // Memorable window name (a programming-language word, e.g. "Rust"),
+    // assigned on first park and kept for the process lifetime. Replaces
+    // meaningless numbering in the tray menu.
+    #[serde(default)]
+    pub name: String,
     // Tab labels of the parked window — the tray menu shows them as a
     // submenu under "N#Tab M" so the user can tell windows apart.
     #[serde(default)]
@@ -39,6 +44,71 @@ pub struct TrayWindowEntry {
     // as visible for a few hundred ms.
     #[serde(default)]
     pub since: u64,
+}
+
+// Candidate window names: programming languages — short, pronounceable,
+// distinct. Meeting-room style: easy to remember and refer to.
+const LANGUAGE_NAMES: &[&str] = &[
+    "Rust", "Go", "Python", "Ruby", "Swift", "Kotlin", "Scala", "Haskell",
+    "Erlang", "Elixir", "Clojure", "Lua", "Perl", "Dart", "Julia", "Zig",
+    "Nim", "Crystal", "OCaml", "Fortran", "Cobol", "Pascal", "Ada", "Lisp",
+    "Prolog", "Racket", "Scheme", "Groovy", "Elm", "Raku", "Pony", "Pharo",
+    "Gleam", "Roc", "Mojo", "Carbon", "Odin", "Hare", "V", "Idris",
+    "Agda", "Coq", "Solidity", "Move", "Cairo", "Vyper", "Nix", "Dhall",
+    "Haxe", "Jule", "Vale", "Ballerina", "Fantom", "Ceylon", "Eiffel",
+    "Forth", "Logo", "Tcl", "Rexx", "Bash", "D", "Squirrel", "Wren",
+];
+
+// This window's assigned name; assigned once and reused on later parks so
+// the user can build a habit around it.
+static ASSIGNED_NAME: Mutex<Option<String>> = Mutex::new(None);
+
+// Pick this window's name: keep the current one unless another parked
+// window already holds it; otherwise draw a random unused language word.
+// Deterministic fallback suffix if the whole list is somehow taken.
+fn assign_name(taken: &std::collections::HashSet<String>) -> String {
+    {
+        let current = ASSIGNED_NAME.lock().clone();
+        if let Some(name) = current {
+            if !taken.contains(&name) {
+                return name;
+            }
+        }
+    }
+    let mut taken = taken.clone();
+    let name = {
+        use rand::seq::IndexedRandom;
+        let mut rng = rand::rng();
+        let mut picked = None;
+        for _ in 0..8 {
+            if let Some(word) = LANGUAGE_NAMES.choose(&mut rng) {
+                if !taken.contains(*word) {
+                    picked = Some(word.to_string());
+                    break;
+                }
+                taken.insert(word.to_string());
+            }
+        }
+        // All 8 draws collided (or list exhausted): first free word, then
+        // "Word N".
+        picked.unwrap_or_else(|| {
+            match LANGUAGE_NAMES.iter().find(|w| !taken.contains(**w)) {
+                Some(w) => w.to_string(),
+                None => {
+                    let mut n = 2;
+                    loop {
+                        let candidate = format!("{}{}", LANGUAGE_NAMES[0], n);
+                        if !taken.contains(&candidate) {
+                            break candidate;
+                        }
+                        n += 1;
+                    }
+                }
+            }
+        })
+    };
+    *ASSIGNED_NAME.lock() = Some(name.clone());
+    name
 }
 
 fn now_secs() -> u64 {
@@ -142,13 +212,16 @@ fn write_hidden(base: &Path, entries: &[TrayWindowEntry]) {
     }
 }
 
-// Record (or refresh) this process's hidden window. Called when the window
+// Record (or refresh) this process's parked window. Called when the window
 // parks in the tray.
 pub(crate) fn mark_hidden(base: &Path, pid: u32, tabs: Vec<String>) {
     with_registry_lock(base, |base| {
         let mut entries = list_hidden(base);
         entries.retain(|e| e.pid != pid);
-        entries.push(TrayWindowEntry { pid, tabs, since: now_secs() });
+        let taken: std::collections::HashSet<String> =
+            entries.iter().map(|e| e.name.clone()).collect();
+        let name = assign_name(&taken);
+        entries.push(TrayWindowEntry { pid, name, tabs, since: now_secs() });
         write_hidden(base, &entries);
     });
 }
@@ -289,13 +362,18 @@ fn menu_order(entries: &[TrayWindowEntry]) -> Vec<TrayWindowEntry> {
     sorted
 }
 
-// Menu layout: one submenu per parked window ("1#Tab 3" = window 1 in park
-// order, 3 tabs) listing its tab labels — the tabs are how the user tells
+// Menu layout: one submenu per parked window ("Rust#Tab 3" = window "Rust"
+// with 3 tabs) listing its tab labels — the tabs are how the user tells
 // windows apart. Clicking any tab item restores that window.
 fn build_menu(app: &tauri::AppHandle, entries: &[TrayWindowEntry]) -> tauri::menu::Menu<tauri::Wry> {
     let mut builder = tauri::menu::MenuBuilder::new(app);
-    for (i, e) in menu_order(entries).iter().enumerate() {
-        let mut sub = tauri::menu::SubmenuBuilder::new(app, format!("{}#Tab {}", i + 1, e.tabs.len()));
+    for e in menu_order(entries).iter() {
+        let title = if e.name.is_empty() {
+            format!("TTerm (pid {})", e.pid)
+        } else {
+            format!("{}#Tab {}", e.name, e.tabs.len())
+        };
+        let mut sub = tauri::menu::SubmenuBuilder::new(app, title);
         if e.tabs.is_empty() {
             let item = tauri::menu::MenuItemBuilder::new("Restore window")
                 .id(format!("{}{}", ITEM_SHOW_PREFIX, e.pid))
@@ -635,13 +713,39 @@ mod tests {
 
     #[test]
     fn menu_order_is_chronological_even_if_registry_is_not() {
-        let e = |pid: u32, since: u64| TrayWindowEntry { pid, tabs: vec![], since };
+        let e = |pid: u32, since: u64| TrayWindowEntry { pid, name: String::new(), tabs: vec![], since };
         let shuffled = vec![e(3, 30), e(1, 10), e(2, 20)];
         let ordered = menu_order(&shuffled);
         assert_eq!(ordered.iter().map(|x| x.pid).collect::<Vec<_>>(), vec![1, 2, 3]);
         // Same-second ties keep the incoming (file) order — stable sort.
         let tied = vec![e(9, 10), e(8, 10)];
         assert_eq!(menu_order(&tied).iter().map(|x| x.pid).collect::<Vec<_>>(), vec![9, 8]);
+    }
+
+    #[test]
+    fn assigned_name_is_unique_and_sticky() {
+        use std::collections::HashSet;
+        // Free pool: assigns a language word and remembers it.
+        let first = assign_name(&HashSet::new());
+        assert!(LANGUAGE_NAMES.contains(&first.as_str()));
+        // Sticky: same name while it is free…
+        assert_eq!(assign_name(&HashSet::new()), first);
+        // …but re-assigned when another window holds it.
+        let taken: HashSet<String> = [first.clone()].into_iter().collect();
+        let second = assign_name(&taken);
+        assert_ne!(second, first);
+        assert!(LANGUAGE_NAMES.contains(&second.as_str()));
+        // All names taken except one: the one free word is picked.
+        let nearly_full: HashSet<String> = LANGUAGE_NAMES
+            .iter()
+            .filter(|w| **w != "Zig")
+            .map(|w| w.to_string())
+            .collect();
+        *ASSIGNED_NAME.lock() = Some("Zig".into()); // held by "us", but taken below
+        let pool: HashSet<String> = nearly_full.into_iter().chain(["Zig".to_string()]).collect();
+        // Everything taken: fallback kicks in and stays unique.
+        let fallback = assign_name(&pool);
+        assert!(!pool.contains(&fallback));
     }
 
     #[test]
