@@ -59,6 +59,11 @@ static TRAY_ICON: Mutex<Option<tauri::tray::TrayIcon>> = Mutex::new(None);
 // popup menu dismisses it, so reconcile must only set_menu on real changes.
 static LAST_MENU: Mutex<Vec<TrayWindowEntry>> = Mutex::new(Vec::new());
 
+// Whether our tray icon is currently shown. The icon is created ONCE per
+// process and only visibility/menu change afterwards — repeated
+// drop-and-recreate cycles left duplicate icons in the notification area.
+static TRAY_VISIBLE: Mutex<bool> = Mutex::new(false);
+
 // ---- paths ----
 
 fn registry_path(base: &Path) -> PathBuf {
@@ -326,9 +331,12 @@ fn build_menu(app: &tauri::AppHandle, entries: &[TrayWindowEntry]) -> tauri::men
 fn on_menu_event(app: &tauri::AppHandle, id: &str) {
     let Some(base) = config_base(app) else { return };
     if let Some(rest) = id.strip_prefix(ITEM_SHOW_PREFIX) {
-        // "show:<pid>" or "show:<pid>:<tab>" — both restore the window.
-        if let Ok(pid) = rest.split(':').next().unwrap_or("").parse::<u32>() {
-            restore_window(app, pid);
+        // "show:<pid>" or "show:<pid>:<tab>" — restore the window, and when
+        // a tab was picked, activate it after the window is back.
+        let mut parts = rest.split(':');
+        if let Ok(pid) = parts.next().unwrap_or("").parse::<u32>() {
+            let tab = parts.next().and_then(|t| t.parse::<usize>().ok());
+            restore_window(app, pid, tab);
         }
     } else if id == ITEM_QUIT {
         // Quit = terminate every process currently parked in the tray
@@ -340,6 +348,30 @@ fn on_menu_event(app: &tauri::AppHandle, id: &str) {
         }
         app.exit(0);
     }
+}
+
+// ---- cross-process "activate this tab after restore" handoff ----
+// The owner restores any process's window via Win32, but only the target
+// process can switch its own tab. The request is parked in a file; the
+// target picks it up when its window regains focus (frontend listens to
+// onFocusChanged). Own-window restores skip the file and use a direct
+// Tauri event.
+
+fn pending_tab_path(base: &Path, pid: u32) -> PathBuf {
+    base.join(format!("tray-activate-{}.json", pid))
+}
+
+fn write_pending_tab(base: &Path, pid: u32, tab: usize) {
+    let _ = std::fs::write(pending_tab_path(base, pid), tab.to_string());
+}
+
+fn take_pending_tab(base: &Path, pid: u32) -> Option<usize> {
+    let path = pending_tab_path(base, pid);
+    let tab = std::fs::read_to_string(&path).ok()?.trim().parse::<usize>().ok();
+    if tab.is_some() {
+        let _ = std::fs::remove_file(&path);
+    }
+    tab
 }
 
 #[cfg(windows)]
@@ -357,9 +389,12 @@ fn terminate_pid(pid: u32) {
 #[cfg(not(windows))]
 fn terminate_pid(_pid: u32) {}
 
-// Restore one hidden window (any process) and drop its registry entry.
-fn restore_window(app: &tauri::AppHandle, pid: u32) {
-    use tauri::Manager;
+// Restore one parked window (any process) and drop its registry entry.
+// `tab` carries the picked submenu index: same-process restore emits a
+// Tauri event, cross-process parks the request in a file the target picks
+// up on focus.
+fn restore_window(app: &tauri::AppHandle, pid: u32, tab: Option<usize>) {
+    use tauri::{Emitter, Manager};
     let Some(base) = config_base(app) else { return };
     if pid == std::process::id() {
         for w in app.webview_windows().values() {
@@ -367,20 +402,40 @@ fn restore_window(app: &tauri::AppHandle, pid: u32) {
             let _ = w.unminimize();
             let _ = w.set_focus();
         }
+        if let Some(idx) = tab {
+            let _ = app.emit("tray-activate-tab", idx);
+        }
     } else {
+        if let Some(idx) = tab {
+            write_pending_tab(&base, pid, idx);
+        }
         show_window_by_pid(pid);
     }
     unmark(&base, pid);
     reconcile(app);
 }
 
-// Owner reconciliation: drop dead pids and windows that became visible
-// again, refresh the menu, and tear the tray down when nothing is parked.
+// Owner reconciliation: prune dead pids and windows visible again, refresh
+// the menu, show/hide the icon. Only the lock-file owner may show an icon —
+// that invariant guarantees a single shared tray slot.
 fn reconcile(app: &tauri::AppHandle) {
     let Some(base) = config_base(app) else { return };
+    let me = std::process::id();
+    let icon = TRAY_ICON.lock().clone();
+    let Some(mut icon) = icon else { return };
+
+    let i_am_owner = std::fs::read_to_string(owner_path(&base))
+        .ok()
+        .and_then(|raw| raw.trim().parse::<u32>().ok())
+        == Some(me);
+    if !i_am_owner {
+        set_tray_visible(&mut icon, false);
+        return;
+    }
+
     let now = now_secs();
     let entries = with_registry_lock(&base, |base| {
-        let kept: Vec<_> = list_hidden(&base)
+        let kept: Vec<_> = list_hidden(base)
             .into_iter()
             .filter(|e| {
                 if !pid_alive(e.pid) {
@@ -394,54 +449,62 @@ fn reconcile(app: &tauri::AppHandle) {
         write_hidden(base, &kept);
         kept
     });
-    let icon = {
-        let slot = TRAY_ICON.lock();
-        slot.as_ref().cloned()
-    };
-    if let Some(icon) = icon {
-        if entries.is_empty() {
-            TRAY_ICON.lock().take(); // drop removes the icon
-            LAST_MENU.lock().clear();
-            release_owner(&base, std::process::id());
-        } else {
-            let ordered = menu_order(&entries);
-            if *LAST_MENU.lock() != ordered {
-                // Rebuild only on real change: rebuilding an open popup menu
-                // closes it (the user is probably hovering it right now).
-                let _ = icon.set_menu(Some(build_menu(app, &entries)));
-                *LAST_MENU.lock() = ordered;
-            }
-        }
+
+    if entries.is_empty() {
+        set_tray_visible(&mut icon, false);
+        LAST_MENU.lock().clear();
+        release_owner(&base, me);
+        return;
+    }
+    set_tray_visible(&mut icon, true);
+    let ordered = menu_order(&entries);
+    if *LAST_MENU.lock() != ordered {
+        // Rebuild only on real change: rebuilding an open popup menu
+        // closes it (the user is probably hovering it right now).
+        let _ = icon.set_menu(Some(build_menu(app, &entries)));
+        *LAST_MENU.lock() = ordered;
     }
 }
 
-// Create the tray icon + reconciliation poll. Called once ownership is taken.
+fn set_tray_visible(icon: &mut tauri::tray::TrayIcon, visible: bool) {
+    let mut state = TRAY_VISIBLE.lock();
+    if *state != visible {
+        let _ = icon.set_visible(visible);
+        *state = visible;
+    }
+}
+
+// Create the tray icon (once per process, initially hidden) and start the
+// reconciliation poll. Visibility is driven by reconcile.
 fn spawn_tray(app: &tauri::AppHandle) {
     {
         let mut slot = TRAY_ICON.lock();
-        if slot.is_some() {
-            return;
-        }
-        let Some(base) = config_base(app) else { return };
-        let entries = list_hidden(&base);
-        let builder = tauri::tray::TrayIconBuilder::new()
-            .tooltip("TTerm")
-            .menu(&build_menu(app, &entries))
-            .on_menu_event(|app, e| on_menu_event(app, e.id().as_ref()));
-        let builder = match app.default_window_icon() {
-            Some(icon) => builder.icon(icon.clone()),
-            None => builder,
-        };
-        match builder.build(app) {
-            Ok(icon) => {
-                *LAST_MENU.lock() = menu_order(&entries);
-                *slot = Some(icon);
+        if slot.is_none() {
+            let Some(base) = config_base(app) else { return };
+            let entries = list_hidden(&base);
+            let builder = tauri::tray::TrayIconBuilder::new()
+                .tooltip("TTerm")
+                .menu(&build_menu(app, &entries))
+                .on_menu_event(|app, e| on_menu_event(app, e.id().as_ref()));
+            let builder = match app.default_window_icon() {
+                Some(icon) => builder.icon(icon.clone()),
+                None => builder,
+            };
+            match builder.build(app) {
+                Ok(mut icon) => {
+                    // No builder-level visible flag in this Tauri version —
+                    // hide immediately; reconcile shows it when warranted.
+                    let _ = icon.set_visible(false);
+                    *LAST_MENU.lock() = menu_order(&entries);
+                    *slot = Some(icon);
+                }
+                Err(_) => return,
             }
-            Err(_) => return,
         }
     }
-    // Slow poll: catches dead pids and windows shown by other means
-    // (taskbar, Alt-Tab). Exits when the tray is torn down.
+    // Slow poll: catches dead pids, windows shown by other means (taskbar,
+    // Alt-Tab), and parks registered with another owner. Runs for the
+    // process lifetime; reconcile no-ops for non-owners.
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
         loop {
@@ -489,12 +552,35 @@ pub fn tray_park_window(window: tauri::Window) {
 }
 
 // Frontend reports the window's tab list (debounced): the native title gets
-// the active tab's label, the tray submenu gets the full list.
+// the active tab's label, the tray submenu gets the full list. When this
+// window is currently parked, its registry entry is refreshed too so the
+// submenu labels (and their indices) stay in sync.
 #[tauri::command]
 pub fn tray_set_tabs(window: tauri::Window, tabs: Vec<String>, active: String) {
+    use tauri::Manager;
     let title = if active.is_empty() { "TTerm" } else { &active };
     let _ = window.set_title(title);
-    *LAST_TABS.lock() = tabs;
+    *LAST_TABS.lock() = tabs.clone();
+    let Some(base) = config_base(&window.app_handle()) else { return };
+    let pid = std::process::id();
+    with_registry_lock(&base, |base| {
+        let mut entries = list_hidden(base);
+        if let Some(e) = entries.iter_mut().find(|e| e.pid == pid) {
+            if e.tabs != tabs {
+                e.tabs = tabs;
+                write_hidden(base, &entries);
+            }
+        }
+    });
+}
+
+// The frontend calls this when its window regains focus: a cross-process
+// tray restore may have parked a tab-activation request for us.
+#[tauri::command]
+pub fn tray_take_pending_tab(window: tauri::Window) -> Option<usize> {
+    use tauri::Manager;
+    let Some(base) = config_base(&window.app_handle()) else { return None };
+    take_pending_tab(&base, std::process::id())
 }
 
 #[cfg(test)]
@@ -556,5 +642,21 @@ mod tests {
         // Same-second ties keep the incoming (file) order — stable sort.
         let tied = vec![e(9, 10), e(8, 10)];
         assert_eq!(menu_order(&tied).iter().map(|x| x.pid).collect::<Vec<_>>(), vec![9, 8]);
+    }
+
+    #[test]
+    fn pending_tab_handoff_roundtrip() {
+        let base = temp_base("tab");
+        assert_eq!(take_pending_tab(&base, 42), None);
+        write_pending_tab(&base, 42, 3);
+        // First take consumes the request…
+        assert_eq!(take_pending_tab(&base, 42), Some(3));
+        // …and the file is gone afterwards.
+        assert_eq!(take_pending_tab(&base, 42), None);
+        // Requests are per-process.
+        write_pending_tab(&base, 42, 1);
+        assert_eq!(take_pending_tab(&base, 43), None);
+        assert_eq!(take_pending_tab(&base, 42), Some(1));
+        let _ = std::fs::remove_dir_all(&base);
     }
 }

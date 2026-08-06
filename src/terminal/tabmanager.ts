@@ -11,6 +11,7 @@ import { TerminalTab } from "./tab";
 import { updateQuickButton, closeQuickPanel } from "./quickpanel";
 import { notifyTrayTabs, setTrayTabsProvider } from "../core/traytabs";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import Sortable from "sortablejs";
 
 export class TabManager {
@@ -48,6 +49,16 @@ export class TabManager {
       listen<{ id: string; alive: boolean }>("session-state", (e) => {
         this.tabs.get(e.payload.id)?.setDisconnected(!e.payload.alive);
         updateQuickButton();
+      });
+      // Tray restore with a picked tab: same-process restores emit this
+      // event directly; cross-process restores park a request file that we
+      // pick up on focus (below).
+      listen<number>("tray-activate-tab", (e) => this.activateTabAt(e.payload));
+      getCurrentWindow().onFocusChanged((f) => {
+        if (!f.payload) return;
+        invoke<number | null>("tray_take_pending_tab")
+          .then((idx) => { if (typeof idx === "number") this.activateTabAt(idx); })
+          .catch(() => { });
       });
     }
   }
@@ -391,6 +402,13 @@ export class TabManager {
 
   get(id: string): TerminalTab | undefined {
     return this.tabs.get(id);
+  }
+
+  // Tray restore: activate a tab by its position (matches the submenu order).
+  activateTabAt(index: number): void {
+    const ids = [...this.tabs.keys()];
+    const id = ids[index];
+    if (id !== undefined) this.switchTo(id);
   }
 
   get activeTab(): TerminalTab | undefined {

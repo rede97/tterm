@@ -6,10 +6,15 @@ New Features
   hides the window while its sessions keep running, so AI agents and
   long-running tasks keep working in the background. All parked windows
   share one tray icon: right-click it and every window appears as
-  "N#Tab M" (window number + tab count) with its tabs listed under it, so you can tell which is
-  which before restoring; "Quit TTerm" exits everything parked there
+  "N#Tab M" (window number + tab count) with its tabs listed under it —
+  picking a tab restores the window and jumps straight to that tab;
+  "Quit TTerm" exits everything parked there
 
 Fixes
+
+- Restoring a parked window and parking it again no longer leaves a
+  duplicate tray icon — the icon is created once per process and only
+  its visibility toggles
 
 - Number fields in Settings (font size, scrollback) now have styled −/+
   stepper buttons instead of the unstyled native spinners

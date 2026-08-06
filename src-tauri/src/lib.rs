@@ -78,7 +78,7 @@ pub fn run() {
                 serial::serial_set_output_newline, serial::serial_set_rts, serial::serial_line_status,
                 relay::session_set_auto_reconnect, relay::session_get_auto_reconnect,
                 share::share_create, share::share_revoke, share::share_screen_response, share::share_screen_changed,
-                tray::tray_set_tabs, tray::tray_park_window,
+                tray::tray_set_tabs, tray::tray_park_window, tray::tray_take_pending_tab,
                 demo::demo_spawn, demo::anime_spawn,
                 fonts::list_system_fonts,
             ] }
@@ -98,7 +98,7 @@ pub fn run() {
                 serial::serial_set_output_newline, serial::serial_set_rts, serial::serial_line_status,
                 relay::session_set_auto_reconnect, relay::session_get_auto_reconnect,
                 share::share_create, share::share_revoke, share::share_screen_response, share::share_screen_changed,
-                tray::tray_set_tabs, tray::tray_park_window,
+                tray::tray_set_tabs, tray::tray_park_window, tray::tray_take_pending_tab,
                 fonts::list_system_fonts,
             ] }
         })
