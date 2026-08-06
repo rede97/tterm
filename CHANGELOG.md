@@ -15,6 +15,8 @@ New Features
 
 Fixes
 
+- Sharing a session that runs on the built-in SSH client no longer fails
+  with "no such session" — the share check now sees embedded SSH sessions
 - Starting an SSH session now shows a "Connecting to…" hint right away
   instead of going silent until success or timeout
 - Cancelling the SSH password prompt closes the attempt quietly instead of

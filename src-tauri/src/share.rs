@@ -70,11 +70,19 @@ pub struct ShareCreated {
     pub token: String,
 }
 
+// A session is shareable while it exists in ANY session table. All three
+// maps must be checked: PTY sessions, serial/demo sessions, and embedded
+// SSH sessions (missing from the original check — sharing an embedded SSH
+// tab failed with "no such session").
+pub(crate) fn session_exists(state: &AppState, id: &str) -> bool {
+    state.sessions.lock().map(|t| t.contains_key(id)).unwrap_or(false)
+        || state.serial_sessions.lock().map(|t| t.contains_key(id)).unwrap_or(false)
+        || state.ssh_sessions.lock().map(|t| t.contains_key(id)).unwrap_or(false)
+}
+
 #[tauri::command]
 pub fn share_create(state: tauri::State<AppState>, id: String, label: String, kind: String, allow_write: bool) -> Result<ShareCreated, String> {
-    let exists = state.sessions.lock().map_err(|e| e.to_string())?.contains_key(&id)
-        || state.serial_sessions.lock().map_err(|e| e.to_string())?.contains_key(&id);
-    if !exists {
+    if !session_exists(&state, &id) {
         return Err("no such session".into());
     }
     let token = generate_share_token();
@@ -738,6 +746,69 @@ mod tests {
                 last_shot_poll: Mutex::new(None),
             }),
         );
+    }
+
+    // Regression: share_create used to check only the PTY and serial tables,
+    // so sharing an embedded SSH tab failed with "no such session".
+    #[test]
+    fn session_exists_covers_all_session_tables() {
+        let hub = WsHub::start().expect("hub start");
+        let state = crate::state::AppState {
+            sessions: Arc::new(Mutex::new(std::collections::HashMap::new())),
+            serial_sessions: Arc::new(Mutex::new(std::collections::HashMap::new())),
+            ssh_sessions: Arc::new(Mutex::new(std::collections::HashMap::new())),
+            auto_reconnect: Arc::new(Mutex::new(std::collections::HashMap::new())),
+            pending_prompts: Arc::new(Mutex::new(std::collections::HashMap::new())),
+            next_id: Mutex::new(1),
+            initial_cwd: None,
+            hub,
+        };
+        assert!(!session_exists(&state, "tab-1"));
+
+        // PTY table.
+        state.sessions.lock().unwrap().insert(
+            "tab-1".to_string(),
+            crate::state::PtySession {
+                master: None,
+                nonce: 0,
+                size: portable_pty::PtySize::default(),
+            },
+        );
+        assert!(session_exists(&state, "tab-1"));
+
+        // Serial/demo table.
+        let (ctl_tx, _ctl_rx) = std::sync::mpsc::channel::<crate::state::SerialCtl>();
+        state.serial_sessions.lock().unwrap().insert(
+            "tab-2".to_string(),
+            crate::state::SerialSession {
+                cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                ctl: ctl_tx,
+                spec: None,
+            },
+        );
+        assert!(session_exists(&state, "tab-2"));
+
+        // Embedded SSH table — the case that was missed.
+        state.ssh_sessions.lock().unwrap().insert(
+            "tab-3".to_string(),
+            crate::sshclient::SshSession {
+                cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                close_notify: Arc::new(tokio::sync::Notify::new()),
+                live: Arc::new(tokio::sync::Mutex::new(None)),
+                size: Arc::new(Mutex::new((80, 24))),
+                spec: crate::sshclient::EmbeddedSshSpec {
+                    hostname: "127.0.0.1".into(),
+                    port: 22,
+                    user: "u".into(),
+                    identity_file: None,
+                },
+                cached_password: Arc::new(Mutex::new(None)),
+                forwards: Arc::new(Mutex::new(std::collections::HashMap::new())),
+                next_forward: Arc::new(AtomicU64::new(1)),
+            },
+        );
+        assert!(session_exists(&state, "tab-3"));
+        assert!(!session_exists(&state, "tab-4"));
     }
 
     fn http(hub: &WsHub, request: &str) -> String {

@@ -113,6 +113,8 @@ Right-click a tab → Share with AI copies a self-describing HTTP URL (`/share/<
 
 **Gotcha**: do NOT store `tauri::AppHandle` in `WsHub` — a `Mutex<Option<AppHandle>>` field there makes the test binary fail to load with 0xc0000139. The hub uses a type-erased `emit_fn` closure set in `setup()` instead.
 
+**Gotcha**: `share_create` validates the session via `session_exists`, which must check ALL THREE session tables (`sessions` / `serial_sessions` / `ssh_sessions`) — the embedded SSH client landed later and its table was missing, so sharing an embedded SSH tab failed with "no such session". Any new session kind needs its table added there.
+
 ## Disconnect & reconnect
 
 Backend-managed and in-band (`deadmode.rs` + relay dead mode): on byte-stream end the relay keeps the socket alive, resets terminal modes (wrapped in save/restore cursor because `ESC[?1049l`/`ESC[?6l`/`ESC[r` home the cursor), prints a timed "Press Enter to reconnect" notice into the scrollback, and a `DeadWatcher` respawns on Enter. PTY respawn injects `resume_scroll` bytes first because a fresh ConPTY always opens with `ESC[2J`. A `session-state` event drives the tab-label strikethrough — the only frontend involvement. Transport-level drops (1006) trigger silent re-attach with backoff (`util/disconnect.ts`).
