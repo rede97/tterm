@@ -1,3 +1,34 @@
+## Unreleased
+
+New Features
+
+- **Quick-status button** — a new button at the right end of the tab bar
+  shows the active session's state at a glance (red dot while disconnected,
+  blue while shared with an AI agent) and opens a quick panel:
+  - every tab: AI share on/off switch with a copyable link
+  - SSH: auto-reconnect switch (retries quietly in the background while the
+    session is down), current port forwards with inline add/remove
+  - serial: auto-reconnect switch (reconnects by itself when an unplugged
+    device comes back), baud rate / newline switches, RTS line toggle and
+    live CTS status. The baud/newline submenus moved here from the
+    terminal's right-click menu
+
+Fixes
+
+- Starting an SSH session now shows a "Connecting to…" hint right away
+  instead of going silent until success or timeout
+- Cancelling the SSH password prompt closes the attempt quietly instead of
+  raising an error
+- The update-available prompt now uses the app's own dialog style instead of
+  a native system window
+
+Internal
+
+- UI feedback unified: all yes/no questions go through one shared confirm
+  dialog, and port-forward operations (list/add/remove, validation, error
+  wording) live in a single module shared by the forwarding dialog and the
+  quick panel
+
 ## v0.9.1
 
 Fixes

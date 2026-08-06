@@ -117,6 +117,8 @@ Right-click a tab → Share with AI copies a self-describing HTTP URL (`/share/<
 
 Backend-managed and in-band (`deadmode.rs` + relay dead mode): on byte-stream end the relay keeps the socket alive, resets terminal modes (wrapped in save/restore cursor because `ESC[?1049l`/`ESC[?6l`/`ESC[r` home the cursor), prints a timed "Press Enter to reconnect" notice into the scrollback, and a `DeadWatcher` respawns on Enter. PTY respawn injects `resume_scroll` bytes first because a fresh ConPTY always opens with `ESC[2J`. A `session-state` event drives the tab-label strikethrough — the only frontend involvement. Transport-level drops (1006) trigger silent re-attach with backoff (`util/disconnect.ts`).
 
+**Auto-reconnect** (quick panel toggle): `AppState.auto_reconnect` holds a per-session `Arc<AtomicBool>` shared with `ReconnectHooks.auto_retry`; while set, the dead-mode pump also retries `respawn` every 3 s WITHOUT Enter, and failed attempts print nothing (for serial sessions the failed open IS the unplug detection). The flag survives respawns and is removed only on tab kill. Serial `serial_set_baud` keeps the respawn spec in sync so a reconnect uses the current baud.
+
 ## Tab system
 
 - `TerminalTab.show()` — `display:""`, add `active`, `terminal.focus()`. `hide()` — `display:"none"`, sets `needsResize = true` (show does NOT fit).
@@ -146,13 +148,57 @@ Backend-managed and in-band (`deadmode.rs` + relay dead mode): on byte-stream en
 
 | Trigger | Action |
 |---|---|
-| Right-click on **tab** | Tab operations menu |
+| Right-click on **tab** | Tab operations menu (incl. Share with AI + Port Forwarding…) |
 | **Shift+right-click** on terminal | Content operations menu |
 | Right-click on terminal (no shift) | Copy if selection, else paste |
 | **Shift+click** the `+` button | Folder picker → shell starts in that directory |
 | Right-click the `+` button | Recent-folders menu (+ Browse…) |
 
-Terminal right-click uses capture phase; copy uses `execCommand("copy")` + hidden textarea (not `navigator.clipboard`) to avoid the permission prompt; a global `contextmenu` preventDefault blocks native menus.
+Terminal right-click uses capture phase; copy uses `execCommand("copy")` + hidden textarea (not `navigator.clipboard`) to avoid the permission prompt; a global `contextmenu` preventDefault blocks native menus. Serial baud/newline controls are NOT in the content menu — they live in the quick panel (below).
+
+## UI feedback components (mandatory shared pieces)
+
+Operation feedback must go through the shared components — never hand-roll a
+one-off prompt for a single feature. Four pieces cover every case:
+
+- **Transient notice** → `showToast` (`src/ui/toast.ts`), the ONLY toast.
+  Long-running operations (SSH connect, update download) keep a toast up and
+  clear it with the returned `ToastHandle.dismiss()`. A user *aborting* their
+  own action (e.g. cancelling the SSH password prompt — backend marks it
+  "cancelled") is NOT an error: no error toast.
+- **Modal dialog** → `createModal` (`src/ui/modal.ts`): overlay + Escape +
+  backdrop dismissal + singleton-per-class. Every dismissal path must run
+  the same cancel logic (`onClose`) — an unanswered backend prompt wedges
+  the caller (see sshauth).
+- **Yes/no question** → `confirmDialog` (`src/ui/confirm.ts`), built on
+  createModal + the sshauth dialog styles. Native OS dialogs are banned in
+  the frontend (`@tauri-apps/plugin-dialog` is not a dependency); dismissal
+  resolves `false` — a dismissed question never confirms.
+- **Per-session quick actions** → the quick-status panel
+  (`src/terminal/quickpanel.ts`), opened from the button at the right end of
+  the tab bar. Like contextmenu it never imports TabManager: actions go
+  through injected handlers (`setQuickPanelHandlers` in main.ts).
+
+When two surfaces drive the same backend operation, the operation + its
+error wording live in ONE module — e.g. `forwarding.ts`
+(`listForwards`/`addForward`/`removeForward`/`validForwardPorts`) serves both
+the forwarding modal and the quick panel. Add a third surface by importing,
+never by copying.
+
+Dropdown menus (profile menu, directory menu, tab context menu, quick panel)
+share the same visual tokens (`#252526` surface, `#3e3e42` border) — reuse
+the existing classes/tokens for new popups.
+
+## Quick-status button & panel
+
+`#quick-status` sits between `#drag-spacer` and `#window-controls` (the 1 cm
+margin on `#window-controls` keeps it off the minimize button). Its dot
+reflects the active tab: red = session down, blue = AI-shared
+(`updateQuickButton()` is called from TabManager switch/close/share and the
+`session-state` listener; switching tabs closes the panel). Panel content
+follows the active tab's type: AI share toggle for all, SSH adds
+auto-reconnect + inline port forwards (embedded client only), serial adds
+auto-reconnect + baud/newline selects + RTS toggle + live CTS status.
 
 ## Settings page
 
@@ -166,7 +212,7 @@ Lazy-loaded via `import("./settings")` on first open. Sidebar layout, five panel
 
 ## Custom window decorations
 
-No native title bar (`decorations: false`). The tab bar is the title bar: tabs left, `#drag-spacer[data-tauri-drag-region]` center, window controls right. Drag starts only after actual mouse movement (so `dblclick` can still toggle maximize). Maximize icon toggles via `.restore` CSS class. Vite dev server binds `127.0.0.1` explicitly (IPv6 loopback is broken on Windows) — same for `devUrl`, never `localhost`.
+No native title bar (`decorations: false`). The tab bar is the title bar: tabs left, `#drag-spacer[data-tauri-drag-region]` center, then the quick-status button, then window controls right. Drag starts only after actual mouse movement (so `dblclick` can still toggle maximize). Maximize icon toggles via `.restore` CSS class. Vite dev server binds `127.0.0.1` explicitly (IPv6 loopback is broken on Windows) — same for `devUrl`, never `localhost`.
 
 ## E2E testing
 

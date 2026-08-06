@@ -55,6 +55,10 @@
 
 ### For everyone
 
+- **Quick-status button** — at the right end of the tab bar: session state
+  at a glance (red dot = down, blue = AI-shared), one toggle for AI share,
+  SSH auto-reconnect and port forwards, serial baud/RTS/CTS — all two
+  clicks away.
 - **Theme gallery** — 12 built-in schemes plus automatic Windows Terminal
   import, all previewed in your actual terminal font.
 

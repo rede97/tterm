@@ -37,7 +37,7 @@ bun run test:rust        # = cargo test --manifest-path src-tauri/Cargo.toml
 ## L1/L2 — Vitest（前端）
 
 - 配置：`vitest.config.ts`（happy-dom 环境）
-- 用例：`tests/*.test.ts`（hysteresis 适配、SSH 配置解析/生成、字体栈构建、profile/context 菜单渲染、OSC 解析等）
+- 用例：`tests/*.test.ts`（hysteresis 适配、SSH 配置解析/生成、字体栈构建、profile/context 菜单渲染、quick panel、confirm 对话框、OSC 解析等）
 - L2 通过 `vi.mock("@tauri-apps/api/core")` 替换 IPC 层，在 happy-dom 中渲染真实菜单 DOM
 
 ```sh
