@@ -20,6 +20,14 @@ import { SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES } from
 import type { SerialEnterNewline, SerialOutputNewline } from "../core/types";
 import { showToast } from "../ui/toast";
 import { logCatch } from "../core/errorlog";
+import {
+  listForwards,
+  addForward,
+  removeForward,
+  parsePort,
+  validForwardPorts,
+  type ForwardInfo,
+} from "./forwarding";
 import type { TerminalTab } from "./tab";
 
 // ---- Injected handlers ----
@@ -37,15 +45,6 @@ let _handlers: QuickPanelHandlers | null = null;
 
 export function setQuickPanelHandlers(h: QuickPanelHandlers): void {
   _handlers = h;
-}
-
-interface ForwardInfo {
-  forwardId: number;
-  kind: string;
-  listenHost: string;
-  listenPort: number;
-  targetHost: string;
-  targetPort: number;
 }
 
 interface SerialLineState {
@@ -208,9 +207,7 @@ function forwardsBlock(tab: TerminalTab): HTMLElement {
       rm.textContent = "✕";
       rm.title = "Remove forward";
       rm.addEventListener("click", () => {
-        invoke("ssh_forward_remove", { id: tab.id, forwardId: f.forwardId })
-          .then(refresh)
-          .catch((e) => showToast(`Failed to remove port forward: ${e}`, "error"));
+        removeForward(tab.id, f.forwardId).then((ok) => { if (ok) refresh(); });
       });
       row.appendChild(rm);
       list.appendChild(row);
@@ -218,12 +215,9 @@ function forwardsBlock(tab: TerminalTab): HTMLElement {
   };
 
   const refresh = (): Promise<void> =>
-    invoke<ForwardInfo[]>("ssh_forward_list", { id: tab.id })
-      .then(renderList)
-      .catch((e) => {
-        list.innerHTML = "";
-        list.appendChild(el("div", "qp-fwd-empty", String(e)));
-      });
+    listForwards(tab.id).then((forwards) => {
+      if (forwards) renderList(forwards);
+    });
 
   // Compact add form: kind + ports; hosts default to loopback.
   const form = el("div", "qp-fwd-add");
@@ -259,26 +253,21 @@ function forwardsBlock(tab: TerminalTab): HTMLElement {
   add.className = "qp-mini-btn qp-fwd-add-btn";
   add.textContent = "Add";
   add.addEventListener("click", () => {
-    const lp = parseInt(listenPort.value, 10);
-    const tp = parseInt(targetPort.value, 10);
-    if (!Number.isFinite(lp) || lp < 1 || lp > 65535 || !Number.isFinite(tp) || tp < 1 || tp > 65535) {
-      showToast("Ports must be numbers between 1 and 65535", "error");
-      return;
-    }
-    invoke("ssh_forward_add", {
-      id: tab.id,
+    const lp = parsePort(listenPort.value);
+    const tp = parsePort(targetPort.value);
+    if (!validForwardPorts(lp, tp)) return;
+    addForward(tab.id, {
       kind: kind.value,
       listenHost: "127.0.0.1",
-      listenPort: lp,
+      listenPort: lp!,
       targetHost: targetHost.value.trim() || "127.0.0.1",
-      targetPort: tp,
-    })
-      .then(() => {
-        listenPort.value = "";
-        targetPort.value = "";
-        return refresh();
-      })
-      .catch((e) => showToast(`Failed to add port forward: ${e}`, "error"));
+      targetPort: tp!,
+    }).then((ok) => {
+      if (!ok) return;
+      listenPort.value = "";
+      targetPort.value = "";
+      refresh();
+    });
   });
   form.appendChild(kind);
   form.appendChild(listenPort);

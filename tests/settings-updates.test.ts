@@ -11,7 +11,6 @@ const { invokeMock, checkMock } = vi.hoisted(() => ({
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 vi.mock("@tauri-apps/api/app", () => ({ getVersion: () => Promise.resolve("0.7.3") }));
 vi.mock("@tauri-apps/plugin-updater", () => ({ check: checkMock }));
-vi.mock("@tauri-apps/plugin-dialog", () => ({ ask: vi.fn(() => Promise.resolve(false)) }));
 vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: vi.fn() }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
 

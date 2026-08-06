@@ -1,12 +1,25 @@
-// Port forwarding dialog — manage local (-L) / remote (-R) forwards for
-// tabs running on the embedded SSH client (src-tauri/src/sshclient.rs).
+// Port forwarding — manage local (-L) / remote (-R) forwards for tabs
+// running on the embedded SSH client (src-tauri/src/sshclient.rs).
+//
+// The invoke calls AND their error toasts live here exactly once
+// (listForwards / addForward / removeForward / validForwardPorts): the
+// modal below and the quick panel (quickpanel.ts) are two views of the
+// same operations and must give identical feedback.
 
 import { invoke } from "@tauri-apps/api/core";
 import { showToast } from "../ui/toast";
 import { createModal } from "../ui/modal";
 
-interface ForwardInfo {
+export interface ForwardInfo {
   forwardId: number;
+  kind: string;
+  listenHost: string;
+  listenPort: number;
+  targetHost: string;
+  targetPort: number;
+}
+
+export interface NewForward {
   kind: string;
   listenHost: string;
   listenPort: number;
@@ -18,10 +31,48 @@ function errText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-function parsePort(raw: string): number | null {
+export function parsePort(raw: string): number | null {
   const n = parseInt(raw, 10);
   if (!Number.isFinite(n) || n < 1 || n > 65535) return null;
   return n;
+}
+
+// null = both ports valid; otherwise the shared rejection message (already
+// toasted) and the caller must abort.
+export function validForwardPorts(listenPort: number | null, targetPort: number | null): boolean {
+  if (listenPort !== null && targetPort !== null) return true;
+  showToast("Ports must be numbers between 1 and 65535", "error");
+  return false;
+}
+
+// null on failure (toast already shown).
+export async function listForwards(tabId: string): Promise<ForwardInfo[] | null> {
+  try {
+    return await invoke<ForwardInfo[]>("ssh_forward_list", { id: tabId });
+  } catch (err) {
+    showToast(`Failed to list port forwards: ${errText(err)}`, "error");
+    return null;
+  }
+}
+
+export async function addForward(tabId: string, forward: NewForward): Promise<boolean> {
+  try {
+    await invoke("ssh_forward_add", { id: tabId, ...forward });
+    return true;
+  } catch (err) {
+    showToast(`Failed to add port forward: ${errText(err)}`, "error");
+    return false;
+  }
+}
+
+export async function removeForward(tabId: string, forwardId: number): Promise<boolean> {
+  try {
+    await invoke("ssh_forward_remove", { id: tabId, forwardId });
+    return true;
+  } catch (err) {
+    showToast(`Failed to remove port forward: ${errText(err)}`, "error");
+    return false;
+  }
 }
 
 export function showPortForwardingDialog(tabId: string): void {
@@ -104,9 +155,7 @@ function openDialog(tabId: string, initial: ForwardInfo[]): void {
       removeBtn.type = "button";
       removeBtn.textContent = "Remove";
       removeBtn.addEventListener("click", () => {
-        invoke("ssh_forward_remove", { id: tabId, forwardId: f.forwardId })
-          .then(refresh)
-          .catch((err) => showToast(`Failed to remove port forward: ${errText(err)}`, "error"));
+        removeForward(tabId, f.forwardId).then((ok) => { if (ok) refresh(); });
       });
 
       row.appendChild(badge);
@@ -117,9 +166,9 @@ function openDialog(tabId: string, initial: ForwardInfo[]): void {
   }
 
   function refresh(): Promise<void> {
-    return invoke<ForwardInfo[]>("ssh_forward_list", { id: tabId })
-      .then((forwards) => { renderList(forwards); })
-      .catch((err) => { showToast(`Failed to list port forwards: ${errText(err)}`, "error"); });
+    return listForwards(tabId).then((forwards) => {
+      if (forwards) renderList(forwards);
+    });
   }
 
   overlay.querySelector<HTMLButtonElement>(".fwd-add-btn")!.addEventListener("click", () => {
@@ -128,17 +177,14 @@ function openDialog(tabId: string, initial: ForwardInfo[]): void {
     const targetHost = targetHostInput.value.trim() || "127.0.0.1";
     const listenPort = parsePort(listenPortInput.value);
     const targetPort = parsePort(targetPortInput.value);
-    if (listenPort === null || targetPort === null) {
-      showToast("Ports must be numbers between 1 and 65535", "error");
-      return;
-    }
-    invoke("ssh_forward_add", { id: tabId, kind, listenHost, listenPort, targetHost, targetPort })
-      .then(() => {
+    if (!validForwardPorts(listenPort, targetPort)) return;
+    addForward(tabId, { kind, listenHost, listenPort: listenPort!, targetHost, targetPort: targetPort! })
+      .then((ok) => {
+        if (!ok) return;
         listenPortInput.value = "";
         targetPortInput.value = "";
-        return refresh();
-      })
-      .catch((err) => showToast(`Failed to add port forward: ${errText(err)}`, "error"));
+        refresh();
+      });
   });
 
   overlay.querySelector(".fwd-close")!.addEventListener("click", modal.close);

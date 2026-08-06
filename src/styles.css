@@ -2334,6 +2334,11 @@ body {
   z-index: 1100;
 }
 
+/* Shared confirm dialog (src/ui/confirm.ts): multi-line messages. */
+.confirm-text {
+  white-space: pre-line;
+}
+
 .sshauth-dialog {
   width: 420px;
   max-width: 90vw;

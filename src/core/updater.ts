@@ -3,9 +3,9 @@
 // and failures of an update the user already accepted.
 
 import { check } from "@tauri-apps/plugin-updater";
-import { ask } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { showToast } from "../ui/toast";
+import { confirmDialog } from "../ui/confirm";
 import { logCatch } from "./errorlog";
 import { configStore } from "./store";
 
@@ -27,10 +27,12 @@ export async function checkForUpdates(manual = false): Promise<void> {
       if (manual) showToast("You're up to date.", "info");
       return;
     }
-    const yes = await ask(
-      `A new version of TTerm is available: v${update.version} (current: v${update.currentVersion}).\n\nDownload and install now? The app will restart to finish updating.`,
-      { title: "Update Available", kind: "info", okLabel: "Update", cancelLabel: "Later" }
-    );
+    const yes = await confirmDialog({
+      title: "Update Available",
+      message: `A new version of TTerm is available: v${update.version} (current: v${update.currentVersion}).\n\nDownload and install now? The app will restart to finish updating.`,
+      okLabel: "Update",
+      cancelLabel: "Later",
+    });
     if (!yes) return;
 
     const toast = showToast("Downloading update…", "info", 600000);
@@ -45,7 +47,7 @@ export async function checkForUpdates(manual = false): Promise<void> {
         toast.textContent = "Installing update…";
       }
     });
-    toast.remove();
+    toast.dismiss();
     await relaunch();
   } catch (err) {
     if (manual) showToast(`Update check failed: ${err}`, "error");
