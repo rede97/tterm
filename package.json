@@ -15,7 +15,8 @@
     "tauri": "tauri",
     "test:e2e:ime": "wdio run e2e/wdio.conf.js --spec e2e/specs/ime.e2e.js",
     "test:e2e:anime": "wdio run e2e/wdio.conf.js --spec e2e/specs/anime.e2e.js",
-    "test:e2e:share": "wdio run e2e/wdio.conf.js --spec e2e/specs/share.e2e.js"
+    "test:e2e:share": "wdio run e2e/wdio.conf.js --spec e2e/specs/share.e2e.js",
+    "test:e2e:release": "wdio run e2e/wdio.release.conf.js"
   },
   "dependencies": {
     "@fontsource/cascadia-mono": "^5.2.3",

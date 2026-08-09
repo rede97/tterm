@@ -970,6 +970,9 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
         direct_tcpip_target: (String, u16),
         // Only the shell channel echoes; direct-tcpip channels are bridged.
         shell_channel: Option<russh::ChannelId>,
+        // When set, shell_request streams this payload (and no echo happens
+        // on the shell channel) — the issue #1 flood repro.
+        flood: Option<Arc<Vec<u8>>>,
     }
 
     /// Minimal in-process SSH server: password auth (u/pw), echo shell on
@@ -1044,9 +1047,18 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             channel: russh::ChannelId,
             session: &mut server::Session,
         ) -> Result<(), Self::Error> {
+            let flood = self.state.lock().unwrap().flood.clone();
             self.state.lock().unwrap().shell_channel = Some(channel);
             session.channel_success(channel)?;
             session.data(channel, b"shell-ready\r\n".to_vec())?;
+            if let Some(flood) = flood {
+                // Stream the burst the way a pty flood arrives: a few large
+                // writes, then a trailing "remote finished" marker.
+                for chunk in flood.chunks(32 * 1024) {
+                    session.data(channel, chunk.to_vec())?;
+                }
+                session.data(channel, b"=== SERVER DONE ===\r\n".to_vec())?;
+            }
             Ok(())
         }
 
@@ -1056,9 +1068,14 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             data: &[u8],
             session: &mut server::Session,
         ) -> Result<(), Self::Error> {
-            if self.state.lock().unwrap().shell_channel != Some(channel) {
+            let st = self.state.lock().unwrap();
+            if st.shell_channel != Some(channel) {
                 return Ok(()); // forwarding channel — the bridge handles it
             }
+            if st.flood.is_some() {
+                return Ok(()); // flood channel swallows upstream "replies"
+            }
+            drop(st);
             let mut reply = b"echo:".to_vec();
             reply.extend_from_slice(data);
             session.data(channel, reply)?;
@@ -1127,6 +1144,7 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
                 sizes: Vec::new(),
                 direct_tcpip_target: ("127.0.0.1".into(), echo_port),
                 shell_channel: None,
+                flood: None,
             }));
 
             // Bind the SSH server.
@@ -1233,6 +1251,126 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             .expect("tunnel reply in time")
             .expect("tunnel reply");
             assert_eq!(&got, b"tunnel", "bytes round-tripped through the SSH tunnel");
+
+            kill_ssh_session(&session);
+        });
+    }
+
+    /// Issue rede97/tterm#1 regression: the captured omp startup burst
+    /// (93,723 bytes) must flow through the ENTIRE backend chain — russh
+    /// channel → SshReader → relay hub → WebSocket client — completely and
+    /// without wedging, even while the client concurrently pushes "query
+    /// reply" bytes upstream (xterm answers the DA/DECRQM queries contained
+    /// in the burst; those replies ride the same session in the real setup).
+    ///
+    /// The byte stream is byte-agnostic to the backend, so what this pins is
+    /// the transport contract: a fast multi-chunk flood + interleaved upstream
+    /// writes never deadlocks the pumps. A wedge shows up here as the read
+    /// deadline expiring before the SERVER DONE marker arrives.
+    #[test]
+    fn ssh_flood_delivers_entire_omp_stream() {
+        use tokio_tungstenite::tungstenite;
+
+        // The exact byte stream attached to the issue (raw — the same fixture
+        // the frontend regression test parses).
+        static FLOOD: &[u8] = include_bytes!("../../tests/fixtures/omp-startup-stream.bin");
+        const DONE: &[u8] = b"=== SERVER DONE ===\r\n";
+        const BANNER: &[u8] = b"shell-ready\r\n";
+
+        tauri::async_runtime::block_on(async {
+            // In-process SSH server that floods the captured stream on shell open.
+            let server_state = Arc::new(Mutex::new(ServerState {
+                sizes: Vec::new(),
+                direct_tcpip_target: ("127.0.0.1".into(), 1),
+                shell_channel: None,
+                flood: Some(Arc::new(FLOOD.to_vec())),
+            }));
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let ssh_port = listener.local_addr().unwrap().port();
+            {
+                let state = server_state.clone();
+                tauri::async_runtime::spawn(async move {
+                    loop {
+                        let Ok((stream, _)) = listener.accept().await else { break };
+                        let key = russh::keys::PrivateKey::from_openssh(TEST_HOST_KEY).unwrap();
+                        let config = Arc::new(server::Config {
+                            keys: vec![key],
+                            auth_rejection_time: Duration::ZERO,
+                            ..Default::default()
+                        });
+                        let handler = TestServer { state: state.clone() };
+                        tauri::async_runtime::spawn(async move {
+                            let _ = server::run_stream(config, stream, handler).await;
+                        });
+                    }
+                });
+            }
+
+            // Client session through the real connect path…
+            let kh = temp_known_hosts("flood");
+            let _ = std::fs::remove_file(&kh);
+            let session = test_session(ssh_port);
+            let (reader, writer) = connect_session_with(&session, Arc::new(TestPrompter), Some(kh))
+                .await
+                .expect("connect + auth + shell");
+
+            // …then the real relay path to a real WebSocket client (the
+            // frontend stand-in, as in relay.rs's hub tests).
+            let hub = WsHub::start().expect("hub start");
+            std::thread::sleep(Duration::from_millis(150));
+            register_session(&hub, "tab-flood", reader, writer, None).unwrap();
+
+            let stream = std::net::TcpStream::connect(format!("127.0.0.1:{}", hub.port)).unwrap();
+            let (mut ws, _resp) = tungstenite::client(
+                format!("ws://127.0.0.1:{}/pty/tab-flood?token={}", hub.port, hub.token),
+                stream,
+            )
+            .expect("handshake");
+            ws.get_mut()
+                .set_read_timeout(Some(Duration::from_secs(15)))
+                .unwrap();
+
+            // Once the flood starts arriving, interleave upstream "query
+            // replies" exactly like the frontend would emit them mid-parse.
+            let expected_len = BANNER.len() + FLOOD.len() + DONE.len();
+            let mut collected: Vec<u8> = Vec::with_capacity(expected_len);
+            let mut replies_sent = false;
+            let deadline = std::time::Instant::now() + Duration::from_secs(30);
+            while !collected.ends_with(DONE) {
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "delivery wedged: {} of {} bytes arrived",
+                    collected.len(),
+                    expected_len
+                );
+                let msg = ws.read().expect("ws read before DONE marker");
+                let data = msg.into_data();
+                collected.extend_from_slice(&data);
+                if !replies_sent && collected.len() > 1024 {
+                    replies_sent = true;
+                    // DA + DECRP answers, ~130 bytes total, as xterm emits them.
+                    for _ in 0..7 {
+                        ws.send(tungstenite::Message::Binary(b"\x1b[?1;2c".to_vec())).unwrap();
+                    }
+                    for mode in [2026u32, 2031, 2048, 1010, 1011] {
+                        ws.send(tungstenite::Message::Binary(
+                            format!("\x1b[?{};0$y", mode).into_bytes(),
+                        ))
+                        .unwrap();
+                    }
+                }
+            }
+
+            // Byte-exact delivery: banner, the full captured stream, marker.
+            let mut expected = Vec::with_capacity(expected_len);
+            expected.extend_from_slice(BANNER);
+            expected.extend_from_slice(FLOOD);
+            expected.extend_from_slice(DONE);
+            assert_eq!(collected.len(), expected_len, "byte count mismatch");
+            assert_eq!(collected, expected, "stream corrupted in transit");
+
+            // Upstream replies really reached the server (consumed by data()).
+            assert!(replies_sent);
 
             kill_ssh_session(&session);
         });

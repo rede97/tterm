@@ -1,3 +1,20 @@
+## Unreleased
+
+Fixes
+
+- **Frozen tabs with TUIs that query private modes (e.g. omp)** — the
+  production bundle mis-minified xterm.js's DECRQM handler (`CSI ? Pm $ p`):
+  esbuild 0.25's logical-assignment lowering dropped a variable declaration
+  (esbuild #4508), so the first private-mode query threw an uncaught
+  ReferenceError that permanently killed the terminal's write/parse loop.
+  The tab froze with a stale frame while input, SSH and the remote process
+  kept working; only dev builds were unaffected. Build target is now ES2022
+  (no such lowering; WebView2/WKWebView have supported it for years).
+  Regression covered at three levels: vitest parser replay of the captured
+  byte stream, a Rust SSH-flood transport test, and an e2e spec that
+  replays the stream through the live WebSocket path (debug and release
+  variants)
+
 ## v0.12.0
 
 New Features

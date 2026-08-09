@@ -29,6 +29,16 @@ export default defineConfig(async () => ({
   },
 
   build: {
+    // ES2022 minimum: with the default "modules" target (es2020), esbuild's
+    // minifier mis-lowers logical assignment (`x ||= {}`): it drops the
+    // variable's declaration while keeping the write (esbuild #4508, fixed in
+    // esbuild 0.28.2; vite 6.4 pins 0.25.x). In the production bundle this
+    // broke xterm.js's DECRQM handler (`CSI ? Pm $ p`) with an uncaught
+    // ReferenceError that permanently killed the write/parse loop — SSH tabs
+    // froze the moment an app queried a private mode (issue #1: omp's TUI
+    // startup query wedged the whole tab). ES2022 needs no such lowering, and
+    // WebView2/WKWebView have supported it for years.
+    target: "es2022",
     rollupOptions: {
       output: {
         manualChunks(id: string) {
