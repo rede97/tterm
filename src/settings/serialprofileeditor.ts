@@ -8,7 +8,7 @@ import type {
   SerialInputMode,
   SerialFlowControl,
 } from "../core/types";
-import { SERIAL_ENTER_NEWLINES, SERIAL_OUTPUT_NEWLINES, esc } from "../core/common";
+import { SERIAL_ENTER_NEWLINES, SERIAL_OUTPUT_NEWLINES, SERIAL_OUTPUT_NEWLINE_DESCS, esc } from "../core/common";
 import {
   allSerialProfiles,
   saveSerialProfile,
@@ -56,9 +56,16 @@ export function showSerialProfileEditor(opts: SerialProfileEditorOptions): void 
     flowControl: opts.base.flowControl,
   };
 
-  const optionsHtml = <T extends string>(pairs: readonly [T, string][], current: T): string =>
+  const optionsHtml = <T extends string>(
+    pairs: readonly [T, string][],
+    current: T,
+    descs?: Record<T, string>,
+  ): string =>
     pairs
-      .map(([v, label]) => `<option value="${v}" ${v === current ? "selected" : ""}>${label}</option>`)
+      .map(([v, label]) => {
+        const title = descs ? ` title="${esc(descs[v])}"` : "";
+        return `<option value="${v}"${title} ${v === current ? "selected" : ""}>${label}</option>`;
+      })
       .join("");
 
   const rowHtml = (label: string, field: string, options: string): string => `
@@ -78,7 +85,8 @@ export function showSerialProfileEditor(opts: SerialProfileEditorOptions): void 
       </div>
       ${rowHtml("Input mode", "inputMode", optionsHtml(INPUT_MODE_LABELS, working.inputMode))}
       ${rowHtml("Enter sends", "enterNewline", optionsHtml(SERIAL_ENTER_NEWLINES, working.enterNewline))}
-      ${rowHtml("Output newlines", "outputNewline", optionsHtml(SERIAL_OUTPUT_NEWLINES, working.outputNewline))}
+      ${rowHtml("Output newlines", "outputNewline", optionsHtml(SERIAL_OUTPUT_NEWLINES, working.outputNewline, SERIAL_OUTPUT_NEWLINE_DESCS))}
+      <div class="sp-hint">${esc(SERIAL_OUTPUT_NEWLINE_DESCS[working.outputNewline])}</div>
       ${rowHtml("Flow control", "flowControl", optionsHtml(FLOW_CONTROL_LABELS, working.flowControl))}
       <div class="sp-footer">
         ${opts.editName ? `<button class="sp-btn sp-delete">Delete</button>` : ""}
@@ -91,11 +99,16 @@ export function showSerialProfileEditor(opts: SerialProfileEditorOptions): void 
 
   const nameInput = overlay.querySelector<HTMLInputElement>(".sp-name")!;
 
+  const hintEl = overlay.querySelector<HTMLElement>(".sp-hint")!;
+
   overlay.querySelectorAll<HTMLSelectElement>(".sp-select").forEach((el) => {
     const field = el.dataset.field as keyof Omit<SerialProfile, "name">;
     el.value = working[field];
     el.addEventListener("change", () => {
       (working[field] as string) = el.value;
+      if (field === "outputNewline") {
+        hintEl.textContent = SERIAL_OUTPUT_NEWLINE_DESCS[el.value as SerialProfile["outputNewline"]];
+      }
     });
   });
 

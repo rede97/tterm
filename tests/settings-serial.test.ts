@@ -112,6 +112,29 @@ describe("settings — Serial profile gallery", () => {
     expect(overlay!.querySelector(".sp-preview")).toBeNull();
   });
 
+  it("Output newlines select shows a live help line and per-option tooltips", () => {
+    const panel = openPanel();
+    card(panel, "AT").querySelector<HTMLButtonElement>(".theme-card-action")!.click();
+    const overlay = document.body.querySelector(".sp-overlay")!;
+
+    const sel = overlay.querySelector<HTMLSelectElement>('.sp-select[data-field="outputNewline"]')!;
+    const hint = overlay.querySelector<HTMLElement>(".sp-hint")!;
+    // AT profile is out=keep: hint explains the current selection.
+    expect(sel.value).toBe("keep");
+    expect(hint.textContent).toContain("Pass through unchanged");
+    // Every option carries its description as a hover tooltip.
+    for (const opt of sel.querySelectorAll("option")) {
+      expect(opt.title.length).toBeGreaterThan(0);
+    }
+    // Switching the select updates the hint to the new mode's description.
+    sel.value = "cr-in-lf";
+    sel.dispatchEvent(new Event("change"));
+    expect(hint.textContent).toContain("staircase");
+    sel.value = "strip";
+    sel.dispatchEvent(new Event("change"));
+    expect(hint.textContent).toContain("Remove all CR/LF");
+  });
+
   it("saving a custom profile adds it to the Custom section with an Edit button", async () => {
     const panel = openPanel();
     card(panel, "AT").querySelector<HTMLButtonElement>(".theme-card-action")!.click();

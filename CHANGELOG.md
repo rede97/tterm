@@ -1,3 +1,15 @@
+## v0.12.2
+
+Improvements
+
+- **Output newlines help text** — the serial profile editor (Settings →
+  Serial) and the serial quick panel now explain each output-newline mode:
+  every option carries a hover tooltip, and a live help line under the
+  select describes the current choice and follows changes
+- **Clearer title-bar icons** — the quick-actions button is now a solid
+  blue bolt, and park-to-tray uses a mask icon to suggest the window
+  hiding into the tray
+
 ## v0.12.1
 
 Fixes

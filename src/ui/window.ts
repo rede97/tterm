@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { createElement, Minus, Square, Copy, X, PanelBottomClose } from "lucide";
+import { createElement, Minus, Square, Copy, X, Drama } from "lucide";
 
 const appWindow = getCurrentWindow();
 
@@ -88,7 +88,8 @@ function injectIcons() {
   const btnPark = document.getElementById("btn-park-tray")!;
 
   btnPark.title = "Park to tray — sessions keep running; restore from the tray icon";
-  btnPark.appendChild(createElement(PanelBottomClose, { stroke: "currentColor", width: 14, height: 14 }));
+  // Mask icon: the window "disappears" into the tray while sessions run on.
+  btnPark.appendChild(createElement(Drama, { stroke: "currentColor", width: 14, height: 14 }));
   btnMinimize.appendChild(createElement(Minus, { stroke: "currentColor", width: 14, height: 14 }));
   const icoMax = createElement(Square, { stroke: "currentColor", width: 14, height: 14 });
   icoMax.classList.add("ico-max");

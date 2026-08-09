@@ -291,14 +291,15 @@ body {
   border: none;
   outline: none;
   background: transparent;
-  color: #cccccc;
+  /* Blue bolt: raise the visual weight of the quick-config affordance. */
+  color: #3794ff;
   cursor: pointer;
   flex-shrink: 0;
 }
 
 #quick-status:hover {
   background: #333333;
-  color: #ffffff;
+  color: #6bb8ff;
 }
 
 #quick-status.disabled {
@@ -511,6 +512,12 @@ body {
   font-size: 11px;
   color: #888888;
   padding: 2px 8px 4px;
+}
+
+/* Live help line under a select row (e.g. Output newlines). */
+.qp-select-hint {
+  line-height: 1.4;
+  padding-top: 0;
 }
 
 .qp-row.qp-disabled {
@@ -2865,6 +2872,14 @@ input[type="number"] {
   color: #ccc;
   padding: 4px 6px;
   font-size: 12px;
+}
+
+/* Live help line under the Output newlines select. */
+.sp-hint {
+  margin: -2px 0 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #888;
 }
 
 .sp-footer {

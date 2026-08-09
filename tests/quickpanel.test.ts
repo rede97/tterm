@@ -202,6 +202,23 @@ describe("quick panel — serial tab", () => {
     expect(handlers.setSerialOutputNewline).toHaveBeenCalledWith("tab-7", "cr-in-lf");
   });
 
+  it("Output newlines select shows a live help line and per-option tooltips", () => {
+    const p = openPanel();
+    const sec = p.querySelector('[data-section="serial"]')!;
+    const outSel = rowOf(sec, "Output newlines")!.querySelector("select")!;
+    const hint = sec.querySelector<HTMLElement>(".qp-select-hint")!;
+    // Default keep: hint explains the current selection.
+    expect(hint.textContent).toContain("Pass through unchanged");
+    for (const opt of outSel.querySelectorAll("option")) {
+      expect(opt.title.length).toBeGreaterThan(0);
+    }
+    // Switching updates the hint; the handler still fires.
+    outSel.value = "force-crlf";
+    outSel.dispatchEvent(new Event("change"));
+    expect(hint.textContent).toContain("Normalize every ending");
+    expect(handlers.setSerialOutputNewline).toHaveBeenCalledWith("tab-7", "force-crlf");
+  });
+
   it("queries modem lines on open; auto-reconnect toggle works; no signal rows while flow is none", async () => {
     const p = openPanel();
     expect(invokeMock).toHaveBeenCalledWith("serial_line_status", { id: "tab-7" });

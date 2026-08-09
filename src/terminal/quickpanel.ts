@@ -15,9 +15,9 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { createElement, SlidersHorizontal } from "lucide";
+import { createElement, Zap } from "lucide";
 import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
-import { SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES } from "../core/common";
+import { SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES, SERIAL_OUTPUT_NEWLINE_DESCS } from "../core/common";
 import type { SerialEnterNewline, SerialFlowControl, SerialInputMode, SerialOutputNewline } from "../core/types";
 import { allSerialProfiles, DEFAULT_SERIAL_PROFILE } from "../config/serial-profiles";
 import { showToast } from "../ui/toast";
@@ -117,6 +117,7 @@ function mkSelectRow(
   options: readonly (readonly [string, string])[],
   current: string,
   onChange: (value: string) => void,
+  descs?: Record<string, string>,
 ): HTMLElement {
   const row = el("div", "qp-row");
   row.appendChild(el("span", "qp-label", label));
@@ -127,12 +128,26 @@ function mkSelectRow(
     const opt = document.createElement("option");
     opt.value = value;
     opt.textContent = text;
+    if (descs?.[value]) opt.title = descs[value];
     sel.appendChild(opt);
   }
   sel.value = current;
-  sel.addEventListener("change", () => onChange(sel.value));
   row.appendChild(sel);
-  return row;
+  if (!descs) {
+    sel.addEventListener("change", () => onChange(sel.value));
+    return row;
+  }
+  // With per-option descriptions: option hover tooltips + a live help line
+  // under the row that follows the selection.
+  const hint = el("div", "qp-hint qp-select-hint", descs[sel.value] ?? "");
+  sel.addEventListener("change", () => {
+    hint.textContent = descs[sel.value] ?? "";
+    onChange(sel.value);
+  });
+  const wrap = el("div", "qp-select-wrap");
+  wrap.appendChild(row);
+  wrap.appendChild(hint);
+  return wrap;
 }
 
 // -- sections --
@@ -482,6 +497,7 @@ function serialSection(tab: TerminalTab): HTMLElement {
     SERIAL_OUTPUT_NEWLINES,
     tab.outputNewline ?? "keep",
     (v) => _handlers?.setSerialOutputNewline(tab.id, v as SerialOutputNewline).catch(logCatch("serial.setOutputNewline")),
+    SERIAL_OUTPUT_NEWLINE_DESCS,
   ));
   sec.appendChild(serialFlowBlock(tab));
   return sec;
@@ -542,7 +558,8 @@ export function initQuickPanel(): void {
   const btn = qsButton();
   if (!btn) return;
 
-  btn.appendChild(createElement(SlidersHorizontal, { stroke: "currentColor", width: 15, height: 15 }));
+  // Solid-filled bolt (fill + stroke) — reads as one bold mark at 15px.
+  btn.appendChild(createElement(Zap, { stroke: "currentColor", fill: "currentColor", width: 15, height: 15 }));
   btn.appendChild(el("span", "qs-dot"));
 
   panel = document.createElement("div");
