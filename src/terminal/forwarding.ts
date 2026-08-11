@@ -47,13 +47,14 @@ export async function listForwards(tabId: string): Promise<ForwardInfo[] | null>
   }
 }
 
-export async function addForward(tabId: string, forward: NewForward): Promise<boolean> {
+// Returns the backend forward id (needed later by removeForward); null on
+// failure (toast already shown).
+export async function addForward(tabId: string, forward: NewForward): Promise<number | null> {
   try {
-    await invoke("ssh_forward_add", { id: tabId, ...forward });
-    return true;
+    return await invoke<number>("ssh_forward_add", { id: tabId, ...forward });
   } catch (err) {
     showToast(`Failed to add port forward: ${errText(err)}`, "error");
-    return false;
+    return null;
   }
 }
 
@@ -153,8 +154,8 @@ function openDialog(tabId: string, initial: ForwardInfo[]): void {
     const spec = editor.read();
     if (!spec) { toastInvalidPorts(); return; }
     addForward(tabId, spec)
-      .then((ok) => {
-        if (!ok) return;
+      .then((id) => {
+        if (id === null) return;
         editor.reset();
         refresh();
       });

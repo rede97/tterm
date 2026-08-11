@@ -291,6 +291,7 @@ describe("quick panel — ssh tab", () => {
   it("embedded client shows the grouped forward table and adds one inline", async () => {
     invokeMock.mockImplementation((cmd: unknown) => {
       if (cmd === "ssh_forward_list") return Promise.resolve([]);
+      if (cmd === "ssh_forward_add") return Promise.resolve(7);
       return Promise.resolve(null);
     });
     activeTab = fakeTab({ id: "tab-3", type: "ssh", sshEmbedded: true });
@@ -319,6 +320,18 @@ describe("quick panel — ssh tab", () => {
     });
     // Runtime forwards are not inline-editable (delete + re-add instead).
     expect(sec.querySelector(".ft-edit")).toBeNull();
+
+    // Regression: a runtime-added row must carry its backend forwardId —
+    // deleting it addresses ssh_forward_remove with that id, not undefined.
+    const row = await vi.waitFor(() => {
+      const r = sec.querySelector<HTMLElement>(".ft-group .ft-row:not(.ft-add-row)");
+      expect(r?.textContent).toContain("db.internal:5432");
+      return r!;
+    });
+    row.querySelector<HTMLButtonElement>(".ft-del")!.click();
+    await vi.waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("ssh_forward_remove", { id: "tab-3", forwardId: 7 });
+    });
   });
 
   it("external ssh hides the forwards block", async () => {

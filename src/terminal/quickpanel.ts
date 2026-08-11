@@ -231,7 +231,14 @@ function forwardsBlock(tab: TerminalTab): HTMLElement {
     const table = createForwardTable(rows, {
       compact: true,
       editable: false, // runtime forwards: delete + re-add instead
-      onAdd: (r) => addForward(tab.id, r),
+      onAdd: async (r) => {
+        // The row pushed into the table must carry its backend forwardId —
+        // onRemove needs it to address ssh_forward_remove.
+        const forwardId = await addForward(tab.id, r);
+        if (forwardId === null) return false;
+        (r as RuntimeRow).forwardId = forwardId;
+        return true;
+      },
       onRemove: (r) => removeForward(tab.id, (r as RuntimeRow).forwardId),
     });
     slot.replaceChildren(table.el);

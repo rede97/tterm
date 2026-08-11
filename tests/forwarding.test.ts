@@ -26,6 +26,7 @@ beforeEach(() => {
   mockInvoke.mockReset();
   mockInvoke.mockImplementation((cmd: unknown) => {
     if (cmd === "ssh_forward_list") return Promise.resolve([]);
+    if (cmd === "ssh_forward_add") return Promise.resolve(1);
     return Promise.resolve(null);
   });
   document.body.innerHTML = "";
