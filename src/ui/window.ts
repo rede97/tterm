@@ -75,7 +75,9 @@ function initWindowButtons() {
 
   document.getElementById("tab-bar")!.addEventListener("dblclick", (e) => {
     const target = e.target instanceof Element ? e.target : (e.target as Node).parentElement;
-    if (target?.closest("button")) return;
+    // Buttons have their own actions; a dblclick on a tab is rename/click
+    // territory, not a window-maximize gesture (matches the drag guard).
+    if (target?.closest("button") || target?.closest(".tab")) return;
     invoke("window_toggle_maximize");
   });
 }

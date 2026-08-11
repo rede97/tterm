@@ -141,22 +141,32 @@ export function applyTerminalBackground(theme: ITheme): void {
   }
 }
 
+// WT schemes come from settings.json AND third-party fragment files, and
+// the theme preview builds HTML markup with these colors — only hex
+// colors may pass, anything else is dropped (an unvalidated string could
+// break out of a style attribute).
+const WT_COLOR_RE = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+const wtColor = (v: unknown): string | undefined =>
+  typeof v === "string" && WT_COLOR_RE.test(v) ? v : undefined;
+
 // Parse the "schemes" array from WT settings.json raw content.
 // WT fields map 1:1 to ITheme except cursorColor -> cursor.
 export function parseWtSchemes(raw: string): ThemeDef[] {
-  let root: any;
+  let root: unknown;
   try {
     root = JSON.parse(raw);
   } catch {
     return [];
   }
-  const schemes: any[] = root?.schemes;
+  const schemes: unknown = (root as { schemes?: unknown } | null)?.schemes;
   if (!Array.isArray(schemes)) return [];
 
   const result: ThemeDef[] = [];
-  for (const s of schemes) {
+  for (const s of schemes as Record<string, unknown>[]) {
     if (!s || typeof s.name !== "string" || !s.name) continue;
-    if (typeof s.background !== "string" || typeof s.foreground !== "string") continue;
+    const background = wtColor(s.background);
+    const foreground = wtColor(s.foreground);
+    if (!background || !foreground) continue;
     // Skip schemes that duplicate a built-in name (built-in wins)
     if (BUILTIN_THEMES.some(b => b.name === s.name)) continue;
     result.push({
@@ -164,16 +174,18 @@ export function parseWtSchemes(raw: string): ThemeDef[] {
       label: s.name,
       source: "wt",
       theme: {
-        background: s.background,
-        foreground: s.foreground,
-        cursor: s.cursorColor,
-        selectionBackground: s.selectionBackground,
-        black: s.black, red: s.red, green: s.green, yellow: s.yellow,
-        blue: s.blue, magenta: s.purple ?? s.magenta, cyan: s.cyan, white: s.white,
-        brightBlack: s.brightBlack, brightRed: s.brightRed, brightGreen: s.brightGreen,
-        brightYellow: s.brightYellow, brightBlue: s.brightBlue,
-        brightMagenta: s.brightPurple ?? s.brightMagenta, brightCyan: s.brightCyan,
-        brightWhite: s.brightWhite,
+        background,
+        foreground,
+        cursor: wtColor(s.cursorColor),
+        selectionBackground: wtColor(s.selectionBackground),
+        black: wtColor(s.black), red: wtColor(s.red), green: wtColor(s.green),
+        yellow: wtColor(s.yellow), blue: wtColor(s.blue),
+        magenta: wtColor(s.purple ?? s.magenta), cyan: wtColor(s.cyan), white: wtColor(s.white),
+        brightBlack: wtColor(s.brightBlack), brightRed: wtColor(s.brightRed),
+        brightGreen: wtColor(s.brightGreen), brightYellow: wtColor(s.brightYellow),
+        brightBlue: wtColor(s.brightBlue),
+        brightMagenta: wtColor(s.brightPurple ?? s.brightMagenta),
+        brightCyan: wtColor(s.brightCyan), brightWhite: wtColor(s.brightWhite),
       },
     });
   }

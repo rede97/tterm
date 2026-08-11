@@ -99,3 +99,30 @@ describe("serial input modes", () => {
     expect(echoed.join("")).toBe("AT\r\n");
   });
 });
+
+describe("pasted newlines (regression)", () => {
+  it("line mode: bare \\n in pasted text submits the line", () => {
+    const { sent, echoed, handler } = make("line");
+    handler("first\nsecond\r");
+    expect(sent.join("")).toBe("first\rsecond\r");
+    expect(echoed.join("")).toBe("first\r\nsecond\r\n");
+  });
+
+  it("line mode: a \\r\\n pair submits once, not twice", () => {
+    const { sent, handler } = make("line");
+    handler("cmd\r\nnext\r\n");
+    expect(sent.join("")).toBe("cmd\rnext\r");
+  });
+
+  it("normal + crlf: bare \\n is normalized to CRLF", () => {
+    const { sent, handler } = make("normal", "crlf");
+    handler("a\nb");
+    expect(sent.join("")).toBe("a\r\nb");
+  });
+
+  it("normal + crlf: \\r\\n does not double the newline", () => {
+    const { sent, handler } = make("normal", "crlf");
+    handler("a\r\nb");
+    expect(sent.join("")).toBe("a\r\nb");
+  });
+});

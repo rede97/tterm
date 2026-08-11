@@ -43,14 +43,21 @@ export function parseSshConfig(raw: string): SshHost[] {
       const names = value.split(/\s+/);
       current = { name: names[0], __names: names } as any;
     } else if (current) {
+      // ssh keywords are case-insensitive: find an existing property by
+      // lowercase name (never the host's own name/__names fields), so
+      // "LocalForward" then "localforward" doesn't split into two props
+      // and "HostName" then "hostname" keeps last-wins instead of
+      // emitting both on save.
+      const existing = Object.keys(current).find(
+        k => k !== "name" && !k.startsWith("__") && k.toLowerCase() === key);
       // Forward directives may repeat (one per rule); merge into a
       // newline-separated value so nothing is lost. Other keywords keep
       // last-wins behavior.
-      if ((key === "localforward" || key === "remoteforward" || key === "dynamicforward") &&
-          Object.prototype.hasOwnProperty.call(current, rawKey)) {
-        current[rawKey] += "\n" + value;
+      if (key === "localforward" || key === "remoteforward" || key === "dynamicforward") {
+        if (existing) current[existing] += "\n" + value;
+        else current[rawKey] = value;
       } else {
-        current[rawKey] = value;
+        current[existing ?? rawKey] = value;
       }
     } else {
       preProps[rawKey] = value;

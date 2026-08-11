@@ -110,11 +110,6 @@ class ConfigStore {
     return this._state[key];
   }
 
-  /** Shallow copy snapshot of the entire state. Mutations do not affect internal state. */
-  snapshot(): ConfigState {
-    return { ...this._state };
-  }
-
   /** Batch-write config values. Memory updates immediately; disk write is debounced 300ms. */
   set(partial: Partial<ConfigState>): void {
     const changed: string[] = [];

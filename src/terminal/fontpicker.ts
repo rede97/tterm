@@ -4,6 +4,7 @@ import Sortable from "sortablejs";
 import { createModal } from "../ui/modal";
 import { BUILTIN_FONTS, NERDFONT_BUILTIN, FontDef, buildFontFamily, parseFontFamily, systemFontDefs } from "../util/fontconfig";
 import { configStore } from "../core/store";
+import { esc } from "../core/common";
 
 const NERDFONT_URL = "https://www.nerdfonts.com/";
 
@@ -105,7 +106,7 @@ export function showFontPickerDialog(
     else if (f.source === "builtin") badge = `<span class="fp-badge builtin">in</span>`;
 
     row.innerHTML = `
-      <span class="fp-font-name">${f.label}</span>${badge}
+      <span class="fp-font-name">${esc(f.label)}</span>${badge}
       <button class="fp-font-add${inUse ? " in-use" : ""}" title="Add to font list">+</button>
     `;
 
@@ -146,8 +147,8 @@ export function showFontPickerDialog(
 
     row.innerHTML = `
       <span class="fp-drag-grip" title="Drag to reorder">⠿</span>
-      <span class="fp-selected-name">${def?.label ?? family}</span>
-      <span class="fp-remove-btn" data-family="${family}">×</span>
+      <span class="fp-selected-name">${esc(def?.label ?? family)}</span>
+      <span class="fp-remove-btn" data-family="${esc(family)}">×</span>
     `;
 
     row.querySelector(".fp-remove-btn")!.addEventListener("click", (e) => {

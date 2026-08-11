@@ -20,8 +20,10 @@ export function createSerialInputHandler(
   echo: (data: string) => void,
 ): (data: string) => void {
   const terminator = TERMINATORS[enterNewline];
-  // ICRNL-style mapping: every \r becomes the configured terminator
-  const map = (data: string) => enterNewline === "cr" ? data : data.replace(/\r/g, terminator);
+  // ICRNL-style mapping: any pasted newline (\r\n, \r, or \n) becomes the
+  // configured terminator — previously a bare \n bypassed the mapping and
+  // went to the device as raw LF even in cr/crlf mode.
+  const map = (data: string) => data.replace(/\r\n|\r|\n/g, terminator);
 
   if (mode === "normal") {
     return (data) => send(map(data));
@@ -34,9 +36,17 @@ export function createSerialInputHandler(
   }
   // line-by-line with local editing
   let buf = "";
+  let skipLf = false; // the \n half of a \r\n pair must not submit twice
   return (data) => {
     for (const ch of data) {
-      if (ch === "\r") {
+      if (ch === "\n" && skipLf) {
+        skipLf = false;
+        continue;
+      }
+      skipLf = ch === "\r";
+      if (ch === "\r" || ch === "\n") {
+        // \n submits too: pasted multi-line text goes line by line instead
+        // of being silently concatenated into one buffered line.
         const line = buf;
         buf = "";
         send(line + terminator);

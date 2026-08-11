@@ -59,3 +59,12 @@ describe("built-in font definitions", () => {
     expect(new Set(all).size).toBe(all.length);
   });
 });
+
+describe("parseFontFamily edge cases", () => {
+  it("keeps quoted families containing commas intact", () => {
+    expect(parseFontFamily("'Foo, Bar', Consolas")).toEqual(["Foo, Bar", "Consolas"]);
+    // and round-trips through buildFontFamily
+    const stack = parseFontFamily(buildFontFamily(["Foo, Bar", "Consolas"]));
+    expect(stack).toEqual(["Foo, Bar", "Consolas"]);
+  });
+});

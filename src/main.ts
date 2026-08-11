@@ -23,7 +23,8 @@ import { loadAllWtData } from "./config/wt-profiles";
 import { setWtThemes, findTheme, applyTerminalBackground } from "./util/themes";
 import { loadCustomThemes } from "./config/custom-themes";
 import { loadSerialProfiles } from "./config/serial-profiles";
-import { logCatch } from "./core/errorlog";
+import { logCatch, logError } from "./core/errorlog";
+import { showToast } from "./ui/toast";
 import { scheduleAutoUpdateCheck } from "./core/updater";
 
 // -- DOM refs ---
@@ -212,7 +213,11 @@ configStore.load().then(async () => {
   const p = tabManager.defaultLocalProfile();
   if (p) await tabManager.createLocalTab(p.command, p.name);
   else await tabManager.createLocalTab();
-}).catch(() => {
+}).catch((e) => {
+  // load() never rejects — this is a downstream failure (WT data, themes,
+  // first tab). Surface it instead of a bare welcome screen.
+  logError("app.init", e);
+  showToast(`Startup failed: ${e}`, "error");
   welcomeEl.style.display = "flex";
 });
 

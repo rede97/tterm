@@ -19,6 +19,11 @@ export interface ModalOptions {
 }
 
 const openModals = new Map<string, ModalHandle>();
+// Open order. Escape must close only the TOP modal: every modal installs
+// a capture-phase keydown listener, so without this check one Escape
+// closes every open modal at once (e.g. stacked ssh auth prompts, each
+// answering "cancelled" to the backend).
+const modalStack: ModalHandle[] = [];
 
 export function createModal(options: ModalOptions): ModalHandle {
   const { className, onClose } = options;
@@ -29,7 +34,7 @@ export function createModal(options: ModalOptions): ModalHandle {
   let closed = false;
 
   const onKeydown = (e: KeyboardEvent) => {
-    if (e.key === "Escape") handle.close();
+    if (e.key === "Escape" && modalStack[modalStack.length - 1] === handle) handle.close();
   };
 
   const handle: ModalHandle = {
@@ -38,6 +43,8 @@ export function createModal(options: ModalOptions): ModalHandle {
       if (closed) return;
       closed = true;
       if (openModals.get(className) === handle) openModals.delete(className);
+      const i = modalStack.indexOf(handle);
+      if (i !== -1) modalStack.splice(i, 1);
       onClose?.();
       document.removeEventListener("keydown", onKeydown, true);
       overlay.remove();
@@ -45,6 +52,7 @@ export function createModal(options: ModalOptions): ModalHandle {
   };
 
   if (options.singleton !== false) openModals.set(className, handle);
+  modalStack.push(handle);
   document.addEventListener("keydown", onKeydown, true);
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) handle.close();

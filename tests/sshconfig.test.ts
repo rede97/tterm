@@ -146,3 +146,29 @@ describe("generateSshConfig", () => {
     );
   });
 });
+
+describe("case-insensitive keywords (regression)", () => {
+  it("merges forward directives regardless of casing", () => {
+    const hosts = parseSshConfig([
+      "Host box",
+      "  HostName 10.0.0.1",
+      "  LocalForward 8080 localhost:80",
+      "  localforward 9090 localhost:90",
+    ].join("\n"));
+    // One property, both rules preserved (was: second overwrote/split off)
+    const keys = Object.keys(hosts[0]).filter(k => k.toLowerCase() === "localforward");
+    expect(keys).toHaveLength(1);
+    expect(hosts[0][keys[0]]).toBe("8080 localhost:80\n9090 localhost:90");
+  });
+
+  it("non-forward keywords keep last-wins regardless of casing", () => {
+    const hosts = parseSshConfig([
+      "Host box",
+      "  HostName 10.0.0.1",
+      "  hostname 10.0.0.2",
+    ].join("\n"));
+    const keys = Object.keys(hosts[0]).filter(k => k.toLowerCase() === "hostname");
+    expect(keys).toHaveLength(1);
+    expect(hosts[0][keys[0]]).toBe("10.0.0.2");
+  });
+});

@@ -100,3 +100,28 @@ describe("parseWtSchemes (Windows Terminal import)", () => {
     setWtThemes([]);
   });
 });
+
+describe("parseWtSchemes color validation", () => {
+  it("drops non-hex colors instead of passing them to markup", () => {
+    const schemes = parseWtSchemes(JSON.stringify({
+      schemes: [{
+        name: "Evil",
+        background: "#101010",
+        foreground: "#e0e0e0",
+        blue: 'red"><img src=x onerror=alert(1)>',
+        cursorColor: "not-a-color",
+      }],
+    }));
+    expect(schemes).toHaveLength(1);
+    expect(schemes[0].theme.blue).toBeUndefined();
+    expect(schemes[0].theme.cursor).toBeUndefined();
+    expect(schemes[0].theme.background).toBe("#101010");
+  });
+
+  it("skips schemes whose background/foreground are not hex colors", () => {
+    const schemes = parseWtSchemes(JSON.stringify({
+      schemes: [{ name: "Bad", background: "url(x)", foreground: "#fff" }],
+    }));
+    expect(schemes).toHaveLength(0);
+  });
+});

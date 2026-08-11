@@ -38,8 +38,27 @@ export function buildFontFamily(fonts: string[]): string {
 }
 
 export function parseFontFamily(css: string): string[] {
-  return css.split(",").map(s => s.trim().replace(/^['"]|['"]$/g, ""))
-    .filter(f => f.toLowerCase() !== "monospace");
+  // Split on commas OUTSIDE quotes — a quoted family may itself contain a
+  // comma ("'Foo, Bar', monospace"). Quotes are consumed by the split.
+  const parts: string[] = [];
+  let cur = "";
+  let quote: string | null = null;
+  for (const ch of css) {
+    if (quote) {
+      if (ch === quote) quote = null;
+      else cur += ch;
+    } else if (ch === "'" || ch === '"') {
+      quote = ch;
+    } else if (ch === ",") {
+      parts.push(cur);
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  parts.push(cur);
+  return parts.map(s => s.trim())
+    .filter(f => f && f.toLowerCase() !== "monospace");
 }
 
 export function updateFontStack(stack: string[]) {
