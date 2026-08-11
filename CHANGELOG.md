@@ -1,3 +1,42 @@
+## v1.0.2
+
+New Features
+
+- **Drag to reorder SSH hosts** — host cards in Settings → SSH can be
+  dragged into place; the new order is kept with Save SSH Config. An
+  expanded host now shows each config option on its own line
+- **Unsaved SSH config hint** — after adding, editing, deleting, or
+  reordering hosts, the settings footer shows "SSH Config edited —
+  unsaved" until you save
+- **Scroll-edge shadows on the tab bar** — while more tabs are scrolled
+  out of view on a side, a shadow appears at that edge (on the right it
+  hugs the always-visible + button), so it's clear more tabs exist
+
+Improvements
+
+- **Font picker sees per-user font installs** — fonts installed for the
+  current user only (Windows' default without admin), such as a
+  user-installed Nerd Font set, now appear in the font list
+
+Fixes
+
+- **Revert wiped the settings page**, leaving only the SSH host list
+  with no sidebar or buttons
+- **Apply could silently reset the default profile** to the first entry
+  when saving an unrelated change; Revert could leave the profile list
+  stale after Windows Terminal profiles changed on disk
+- **The Built-in SSH Client toggle could be silently discarded** when
+  the SSH panel re-rendered (host edit, reload, key generation)
+- **Quick panel and find bar stayed open over a closed tab**, and the
+  tray menu could activate the wrong tab after drag-reordering
+- **Escape closed every open dialog at once** — stacked SSH auth prompts
+  were all cancelled together; double-clicking a tab toggled maximize
+- **Pasting multi-line text in serial line mode merged it into one
+  line**, and pasted newlines ignored the configured line ending
+- **Saving ~/.ssh/config could lose or duplicate forwarding rules** when
+  a keyword's casing differed between entries (LocalForward vs
+  localforward)
+
 ## v1.0.1
 
 Fixes
