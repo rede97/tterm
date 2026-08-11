@@ -34,9 +34,9 @@ describe("forward table — groups", () => {
     expect(groups[1].querySelector(".ft-group-title")!.textContent).toBe("Remote (-R)");
     expect(groups[2].querySelector(".ft-group-title")!.textContent).toBe("Dynamic (-D)");
     expect(t.el.querySelectorAll(".ft-add-row")).toHaveLength(3);
-    // Target host placeholder locates the side: remote for -L, local for -R.
-    expect(addRowIn(groups[0]).targetHost!.placeholder).toBe("Host (Remote)");
-    expect(addRowIn(groups[1]).targetHost!.placeholder).toBe("Host (Local)");
+    // Target host placeholder locates the side and shows the empty-default.
+    expect(addRowIn(groups[0]).targetHost!.placeholder).toBe("127.0.0.1 (Remote)");
+    expect(addRowIn(groups[1]).targetHost!.placeholder).toBe("127.0.0.1 (Local)");
     // Dynamic group has no target inputs in its add-row.
     const dyn = addRowIn(groups[2]);
     expect(dyn.targetHost).toBeNull();
@@ -81,10 +81,23 @@ describe("forward table — groups", () => {
     expect(a.listenPort.classList.contains("ft-invalid")).toBe(true);
 
     a.listenPort.value = "9090";
-    a.targetHost!.value = "";
+    a.targetHost!.value = "has space";
     a.add.click();
     expect(t.rows()).toHaveLength(0);
     expect(a.targetHost!.classList.contains("ft-invalid")).toBe(true);
+  });
+
+  it("blank target host commits as 127.0.0.1", () => {
+    const t = createForwardTable();
+    document.body.appendChild(t.el);
+    const a = addRowIn(group(t.el, "remote"));
+    a.listenPort.value = "9090";
+    a.targetHost!.value = "";
+    a.targetPort!.value = "80";
+    a.add.click();
+    expect(t.rows()).toEqual([
+      { kind: "remote", listenHost: "127.0.0.1", listenPort: 9090, targetHost: "127.0.0.1", targetPort: 80 },
+    ]);
   });
 
   it("edit swaps a row to inputs and ✓ applies the change", () => {
@@ -117,6 +130,24 @@ describe("forward table — groups", () => {
 
     displayRowsIn(group(t.el, "remote"))[0].querySelector<HTMLButtonElement>(".ft-del")!.click();
     expect(t.rows()).toHaveLength(0);
+  });
+
+  it("compact mode drops the pinned loopback and uses a bare + button", () => {
+    const t = createForwardTable([
+      { kind: "local", listenHost: "127.0.0.1", listenPort: 8080, targetHost: "db.internal", targetPort: 5432 },
+    ], { compact: true });
+    document.body.appendChild(t.el);
+
+    // Add-row: no "127.0.0.1 :" pin, icon-only add button.
+    const a = addRowIn(group(t.el, "local"));
+    expect(a.listenPort.closest(".ft-listen")!.querySelector(".ft-pin")).toBeNull();
+    expect(a.add.querySelector("svg")).not.toBeNull();
+    expect(a.add.title).toBe("Add local forward");
+
+    // Display row: listen cell is the bare port; full address on the title.
+    const listen = displayRowsIn(group(t.el, "local"))[0].querySelector<HTMLElement>(".ft-listen")!;
+    expect(listen.textContent).toBe("8080");
+    expect(listen.title).toBe("127.0.0.1:8080");
   });
 });
 

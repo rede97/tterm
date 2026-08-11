@@ -95,6 +95,10 @@ export function createForwardEditor(opts?: { stacked?: boolean }): ForwardEditor
     remote.host.disabled = !lockLocal;
     local.host.value = lockLocal ? LOOPBACK : localHost;
     remote.host.value = lockLocal ? remoteHost : LOOPBACK;
+    // The editable target side advertises its empty-default; the locked
+    // side shows the pinned value, so no placeholder is needed there.
+    local.host.placeholder = lockLocal ? "" : `${LOOPBACK} (default)`;
+    remote.host.placeholder = lockLocal ? `${LOOPBACK} (default)` : "";
     local.host.classList.toggle("xfe-locked", lockLocal);
     remote.host.classList.toggle("xfe-locked", !lockLocal);
     arrow.textContent = dir === "local" ? "→" : "←";

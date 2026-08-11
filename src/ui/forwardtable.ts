@@ -44,11 +44,12 @@ const portRule: Rule = {
   },
 };
 
+// Target host is optional: empty defaults to 127.0.0.1 on commit (the
+// listen side's own loopback — the most common target). Spaces are the
+// only hard error.
 const hostRule: Rule = {
   check(raw) {
-    const v = raw.trim();
-    if (!v) return "Host is required";
-    if (/\s/.test(v)) return "Host must not contain spaces";
+    if (/\s/.test(raw.trim())) return "Host must not contain spaces";
     return null;
   },
 };
@@ -65,8 +66,8 @@ interface GroupDef {
 }
 
 const GROUPS: GroupDef[] = [
-  { kind: "local", title: "Local (-L)", desc: "Listen here, reach a target through the server", hasTarget: true, accent: "ft-g-local", targetHostPh: "Host (Remote)" },
-  { kind: "remote", title: "Remote (-R)", desc: "Listen on the server, reach a target from here", hasTarget: true, accent: "ft-g-remote", targetHostPh: "Host (Local)" },
+  { kind: "local", title: "Local (-L)", desc: "Listen here, reach a target through the server", hasTarget: true, accent: "ft-g-local", targetHostPh: "127.0.0.1 (Remote)" },
+  { kind: "remote", title: "Remote (-R)", desc: "Listen on the server, reach a target from here", hasTarget: true, accent: "ft-g-remote", targetHostPh: "127.0.0.1 (Local)" },
   { kind: "dynamic", title: "Dynamic (-D)", desc: "SOCKS5 proxy listening here, any destination", hasTarget: false, accent: "ft-g-dynamic", targetHostPh: "" },
 ];
 
@@ -80,12 +81,15 @@ interface Draft {
 }
 
 function toRow(d: Draft): ForwardEditorValue {
+  // Target fields exist only for local/remote groups; a blank target host
+  // there means "the listen side's own loopback".
+  const hasTarget = d.targetPort.trim() !== "";
   return {
     kind: d.kind,
     listenHost: "127.0.0.1",
     listenPort: parseInt(d.listenPort, 10),
-    targetHost: d.targetHost.trim(),
-    targetPort: d.targetHost ? parseInt(d.targetPort, 10) : 0,
+    targetHost: hasTarget ? d.targetHost.trim() || "127.0.0.1" : "",
+    targetPort: hasTarget ? parseInt(d.targetPort, 10) : 0,
   };
 }
 
@@ -133,11 +137,16 @@ function el(tag: string, className: string, text = ""): HTMLElement {
   return d;
 }
 
+// Lucide-style inline icons (same stroke style as the GitHub icon in
+// settings/general.ts) — crisper than text glyphs at small sizes.
+const ICON_X = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
+const ICON_PLUS = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`;
+
 function mkBtn(className: string, text: string, title: string): HTMLButtonElement {
   const b = document.createElement("button");
   b.type = "button";
   b.className = className;
-  b.textContent = text;
+  b.innerHTML = text;
   b.title = title;
   return b;
 }
@@ -177,7 +186,9 @@ export function createForwardTable(
     const row = el("div", "ft-row ft-editing");
 
     const listen = el("span", "ft-cell ft-listen");
-    listen.appendChild(el("span", "ft-pin", "127.0.0.1 :"));
+    // Compact rows are one line ([Port] [Host]:[Port] +); the pinned
+    // loopback prefix is noise there — the listen port stands alone.
+    if (!opts.compact) listen.appendChild(el("span", "ft-pin", "127.0.0.1 :"));
     const listenPort = mkInput("Listen port", "Port", true, draft.listenPort, portRule);
     listen.appendChild(listenPort);
     row.appendChild(listen);
@@ -203,7 +214,10 @@ export function createForwardTable(
     }
 
     const actions = el("span", "ft-cell ft-actions");
-    const ok = mkBtn(`ft-btn ft-ok${commitLabel === "Add" ? " ft-add" : ""}`, commitLabel,
+    // Compact rows save button area with a bare plus icon; the title keeps
+    // the full action name discoverable.
+    const label = opts.compact && commitLabel === "Add" ? ICON_PLUS : commitLabel;
+    const ok = mkBtn(`ft-btn ft-ok${commitLabel === "Add" ? " ft-add" : ""}`, label,
       commitLabel === "Add" ? `Add ${group.kind} forward` : "Apply");
     ok.addEventListener("click", () => {
       for (const f of inputs) {
@@ -220,7 +234,7 @@ export function createForwardTable(
     });
     actions.appendChild(ok);
     if (cancel) {
-      const no = mkBtn("ft-btn ft-cancel", "✕", "Cancel");
+      const no = mkBtn("ft-btn ft-cancel", ICON_X, "Cancel");
       no.addEventListener("click", cancel);
       actions.appendChild(no);
     }
@@ -231,7 +245,10 @@ export function createForwardTable(
   /** A committed row in display mode. */
   function displayRow(r: ForwardEditorValue, render: () => void): HTMLElement {
     const row = el("div", "ft-row");
-    row.appendChild(el("span", "ft-cell ft-listen", `${r.listenHost}:${r.listenPort}`));
+    const listenCell = el("span", "ft-cell ft-listen",
+      opts.compact ? String(r.listenPort) : `${r.listenHost}:${r.listenPort}`);
+    listenCell.title = `${r.listenHost}:${r.listenPort}`;
+    row.appendChild(listenCell);
     row.appendChild(el("span", `ft-cell ft-target${r.kind === "dynamic" ? " ft-socks" : ""}`,
       r.kind === "dynamic" ? "any destination (SOCKS5)" : `${r.targetHost}:${r.targetPort}`));
     const actions = el("span", "ft-cell ft-actions");
@@ -248,7 +265,7 @@ export function createForwardTable(
       });
       actions.appendChild(edit);
     }
-    const del = mkBtn("ft-btn ft-del", "✕", "Delete forward");
+    const del = mkBtn("ft-btn ft-del", ICON_X, "Delete forward");
     del.addEventListener("click", () => {
       if (opts.onRemove) {
         del.disabled = true;

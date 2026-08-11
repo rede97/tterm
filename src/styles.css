@@ -540,28 +540,36 @@ body {
   padding: 4px 8px 8px;
 }
 
+/* Compact rows are a single line: [Port] | [Host]:[Port] [+]. The listen
+   column is fixed to the port input's width so committed rows line up
+   with the input row below; a vertical divider separates listen from
+   target across all rows. */
 .ft-compact .ft-row {
-  grid-template-columns: 1fr auto;
-  row-gap: 2px;
-}
-
-.ft-compact .ft-listen {
-  grid-column: 1;
-  grid-row: 1;
-}
-
-.ft-compact .ft-actions {
-  grid-column: 2;
-  grid-row: 1;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
 }
 
 .ft-compact .ft-target {
-  grid-column: 1 / -1;
-  grid-row: 2;
+  border-left: 1px solid #3e3e42;
+  padding-left: 8px;
+}
+
+/* Committed rows: nudge text to where the input's text sits below
+   (input border 1px + padding 6px). */
+.ft-compact .ft-row:not(.ft-add-row):not(.ft-editing) .ft-listen {
+  padding-left: 7px;
+}
+
+.ft-compact .ft-row:not(.ft-add-row):not(.ft-editing) .ft-target {
+  padding-left: 15px;
 }
 
 .ft-compact .ft-port {
   width: 56px;
+  box-sizing: border-box;
+}
+
+.ft-compact .ft-add {
+  padding: 4px 8px;
 }
 
 .win-btn {
