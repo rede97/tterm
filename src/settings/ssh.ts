@@ -21,7 +21,11 @@ export function createSshPanel(): HTMLElement {
 }
 
 export function refreshSshPanel(root: HTMLElement): void {
-  renderSshPanel(root);
+  // Re-render ONLY the SSH panel inside the settings page. Rendering into
+  // `root` itself would wipe the sidebar, sibling panels, and the footer
+  // (Revert did exactly that — the page "kept" only the SSH host list).
+  const panel = root.querySelector<HTMLElement>('.settings-panel-content[data-panel="ssh"]');
+  if (panel) renderSshPanel(panel);
 }
 
 function renderSshPanel(container: HTMLElement) {

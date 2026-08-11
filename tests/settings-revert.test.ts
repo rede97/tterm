@@ -1,0 +1,83 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const { invokeMock } = vi.hoisted(() => ({
+  invokeMock: vi.fn((cmd: string) => {
+    if (cmd === "read_config") return Promise.resolve("{}");
+    if (cmd === "serial_list_ports") return Promise.resolve([]);
+    if (cmd === "ssh_list_keys") return Promise.resolve([]);
+    return Promise.resolve(null);
+  }),
+}));
+vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
+vi.mock("@tauri-apps/api/app", () => ({ getVersion: () => Promise.resolve("1.0.1") }));
+vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
+
+import { createSettingsContent } from "../src/settings/index";
+import { configStore } from "../src/core/store";
+
+beforeEach(() => {
+  document.body.innerHTML = "";
+  invokeMock.mockClear();
+  configStore.set({
+    sshHosts: [{ name: "LocalMyPC", hostname: "192.168.1.7", user: "rede" }],
+    hiddenSshHosts: [],
+  });
+});
+
+function revertButton(root: HTMLElement): HTMLButtonElement {
+  const btn = root.querySelector<HTMLButtonElement>(".settings-btn-revert");
+  expect(btn, "revert button").toBeTruthy();
+  return btn!;
+}
+
+describe("settings — Revert", () => {
+  it("keeps the settings page intact and re-renders only the SSH panel", async () => {
+    const root = createSettingsContent();
+    document.body.appendChild(root);
+
+    revertButton(root).click();
+    await vi.waitFor(() => {
+      expect(root.querySelector(".settings-feedback")!.textContent).toBe("Reverted to saved config");
+    });
+
+    // Page chrome survives: sidebar with all five panels, footer buttons.
+    expect(root.querySelectorAll(".settings-nav-item")).toHaveLength(5);
+    expect(revertButton(root).textContent).toBe("Revert");
+    const footerApply = root.querySelector<HTMLButtonElement>(
+      ".settings-footer .settings-btn:not(.settings-btn-revert)",
+    );
+    expect(footerApply!.textContent).toBe("Apply");
+
+    // Every panel still exists exactly once…
+    for (const name of ["general", "appearance", "profile", "ssh", "serial"]) {
+      expect(
+        root.querySelectorAll(`.settings-panel-content[data-panel="${name}"]`),
+        `${name} panel`,
+      ).toHaveLength(1);
+    }
+
+    // …and the SSH panel re-rendered inside its own container (host list
+    // reflects the reloaded store, not duplicated or orphaned markup).
+    const sshPanel = root.querySelector<HTMLElement>('.settings-panel-content[data-panel="ssh"]')!;
+    expect(sshPanel.textContent).toContain("Imported Hosts (1)");
+    expect(sshPanel.querySelectorAll(".ssh-host-card")).toHaveLength(1);
+    expect(sshPanel.textContent).toContain("LocalMyPC");
+  });
+
+  it("revert is repeatable — the page survives a second click", async () => {
+    const root = createSettingsContent();
+    document.body.appendChild(root);
+
+    for (let i = 0; i < 2; i++) {
+      revertButton(root).click();
+      await vi.waitFor(() => {
+        expect(root.querySelector(".settings-feedback")!.textContent).toBe("Reverted to saved config");
+      });
+      // feedback clears after 2s; don't wait, just proceed
+    }
+
+    expect(root.querySelectorAll(".settings-nav-item")).toHaveLength(5);
+    expect(root.querySelectorAll('.settings-panel-content[data-panel="ssh"]')).toHaveLength(1);
+    expect(root.querySelectorAll(".ssh-host-card")).toHaveLength(1);
+  });
+});
