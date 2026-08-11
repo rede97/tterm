@@ -677,6 +677,42 @@ body {
   background: #333333;
 }
 
+/* Scroll-edge shadows on the tab strip: the left shadow appears only
+   while tabs are occluded on the left (scrolled past). The right shadow
+   hugs the + button's LEFT edge — the pinned, never-hidden + group is
+   what actually occludes tabs there, so the shadow rides with it.
+   Instant on/off, no transition. can-scroll-* classes are maintained by
+   syncTabStripState (tabmanager). */
+#tabs::before {
+  content: "";
+  position: sticky;
+  left: 0;
+  flex: none;
+  width: 16px;
+  margin-right: -16px;
+  z-index: 20;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.55), transparent);
+}
+
+#new-tab-group::before {
+  content: "";
+  position: absolute;
+  right: 100%;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.55), transparent);
+}
+
+#tabs.can-scroll-left::before,
+#tabs.can-scroll-right #new-tab-group::before {
+  opacity: 1;
+}
+
 /* floating IME composition mirror (Plan C) */
 .ime-box {
   position: absolute;
