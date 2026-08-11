@@ -1,4 +1,4 @@
-// Floating IME composition mirror (Plan C — see docs/plan-c-floating-composition.md).
+// Floating IME composition mirror — see docs/ime-composition.md.
 // Shows the in-progress IME composition near the (possibly fake) cursor,
 // anchored ONCE at compositionstart and frozen until compositionend — so the
 // box never drifts while the terminal content scrolls or the cursor moves

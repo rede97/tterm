@@ -1,3 +1,32 @@
+## Unreleased
+
+New Features
+
+- **SSH key management** — Settings → SSH gains a Keys section: generate
+  Ed25519 or RSA-4096 key pairs (optional passphrase), list and copy local
+  public keys, and upload a public key to any configured host straight
+  from its detail view (ssh-copy-id equivalent — the private key never
+  leaves the machine). Works against Linux, macOS and Windows targets:
+  the remote shell is auto-detected by probing sh → cmd → PowerShell, or
+  you can pin the target system in the upload dialog. Note: on Windows,
+  administrator accounts may require administrators_authorized_keys
+
+Improvements
+
+- **Easier port-forward entry** — the target host is now optional and
+  defaults to 127.0.0.1 (the most common target); input placeholders show
+  the default so it's discoverable. The quick panel's forward list is a
+  compact single line per forward — listen port and target aligned with
+  the input row below, a divider between them, and icon buttons
+
+Fixes
+
+- **Deleting a forward added mid-session failed with an error** — freshly
+  added rows were missing their server-side id, so removal was rejected
+- **SSH key upload could fail with "could not detect the remote shell"** —
+  a race in remote command replies (EOF arriving before the exit status)
+  made shell detection flaky
+
 ## v0.13.0
 
 New Features

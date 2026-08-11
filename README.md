@@ -39,7 +39,9 @@
 - **SSH, one click to any host** — reads your `~/.ssh/config`; connect
   instantly, no server setup needed. The built-in client asks for passwords
   and host-key trust in proper dialogs (known_hosts stays shared with
-  OpenSSH), and local/remote port forwards can be added live mid-session.
+  OpenSSH), local/remote/SOCKS5 port forwards can be added live mid-session,
+  and Settings can generate key pairs and install a public key on any host
+  (ssh-copy-id built in, Linux/macOS/Windows targets).
 - **Start right in your working directory** — Shift+click the `+` to pick a
   folder, or right-click it for recent folders; the default shell opens
   there, ready for agent work in a project (pi, Claude Code…). Installed via

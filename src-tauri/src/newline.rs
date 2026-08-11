@@ -1,5 +1,5 @@
 // Output newline processing (device -> terminal) for serial sessions.
-// See docs/serial-newlines.md for the option semantics.
+// See docs/serial-design.md for the option semantics.
 //
 // The filter is a 1-byte state machine: a CR at the end of a chunk is held
 // (`pending_cr`) until the next byte decides whether it formed a CRLF pair.

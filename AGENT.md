@@ -48,6 +48,7 @@ src/
   settings/
     index.ts            settings shell (sidebar nav, footer Apply/Revert, panel routing)
     general|appearance|profile|ssh|serial.ts   the five panels
+    sshhosteditor.ts    host Add/Edit modal; sshkeys.ts  key generate/install modals
   ui/
     window.ts           window controls, drag handling, maximize icon toggle
     toast.ts            showToast — all user-facing errors
@@ -67,8 +68,8 @@ src-tauri/src/
   relay.rs              unified WS relay hub shared by PTY/serial/demo
   pty.rs                PTY spawn/resize/kill
   sshclient.rs          embedded SSH client (russh): auth via frontend dialogs,
-                        known_hosts TOFU, dynamic port forwarding (see
-                        docs/embedded-ssh-plan.md)
+                        known_hosts TOFU, dynamic port forwarding, key
+                        generation + ssh-copy-id install (see docs/ssh-client.md)
   deadmode.rs           in-band "session ended, Enter to reconnect" protocol
   serial.rs             serial sessions (+ live baud via SerialCtl)
   share.rs              AI session sharing: HTTP API on the hub (prompt doc, screen
@@ -85,7 +86,7 @@ src-tauri/src/
 
 ## IME composition mirror (headline feature — read the docs first)
 
-Docs: `docs/plan-c-floating-composition.md` (design + milestones) and `docs/bugfix-ime-hidden-cursor.md` (postmortem: Plans A/B rejected, M2 root causes). Read both before touching `imebox.ts`, the freeze proxy, or composition handling.
+Docs: `docs/ime-composition.md` (final design, rejected Plans A/B, and the 1px-textarea root cause). Read it before touching `imebox.ts`, the freeze proxy, or composition handling.
 
 Key facts:
 
@@ -114,6 +115,33 @@ Right-click a tab → Share with AI copies a self-describing HTTP URL (`/share/<
 **Gotcha**: do NOT store `tauri::AppHandle` in `WsHub` — a `Mutex<Option<AppHandle>>` field there makes the test binary fail to load with 0xc0000139. The hub uses a type-erased `emit_fn` closure set in `setup()` instead.
 
 **Gotcha**: `share_create` validates the session via `session_exists`, which must check ALL THREE session tables (`sessions` / `serial_sessions` / `ssh_sessions`) — the embedded SSH client landed later and its table was missing, so sharing an embedded SSH tab failed with "no such session". Any new session kind needs its table added there.
+
+## Embedded SSH client: forwards & key management
+
+Full design: `docs/ssh-client.md` (architecture, auth chain, host-key TOFU,
+forward kinds, key management, frontend surfaces, test strategy). Operational
+gotchas that bite during changes:
+
+- **Runtime forwards** live in `SshSession.forwards` keyed by backend
+  `forward_id`. `ssh_forward_add` RETURNS that id — every surface that keeps
+  a local row must store it back onto the row, or `ssh_forward_remove` is
+  later called with `undefined` and serde rejects it (this exact bug shipped
+  and was caught by the quick-panel add→delete regression test).
+- **Config-defined forwards** are applied on embedded connect
+  (`TabManager._applyConfigForwards`) and appear in the quick panel like
+  runtime ones; panel deletion doesn't touch the config — they return on
+  reconnect.
+- **External ssh (system OpenSSH) cannot be managed** — `pty_spawn_ssh` is a
+  bare `ssh user@host` child with no ControlMaster, so the UI hides the
+  feature on those tabs: the context-menu item and quick-panel block are
+  suppressed, and the forwarding dialog probes `ssh_forward_list` first and
+  toasts instead of opening. This is by design (not a key scenario); config
+  forwards still work there because OpenSSH reads `~/.ssh/config` itself.
+- **Gotcha — exec EOF race**: sshd delivers a fast command's stdout EOF
+  BEFORE it reaps the process and sends exit-status. `exec_capture` must
+  keep reading until channel Close; breaking on Eof loses the exit status
+  randomly and made remote-shell detection fail flakily. The in-process
+  test server reproduces the sshd ordering (eof → exit-status → close).
 
 ## Disconnect & reconnect
 
@@ -203,7 +231,8 @@ reflects the active tab: red = session down, blue = AI-shared
 (`updateQuickButton()` is called from TabManager switch/close/share and the
 `session-state` listener; switching tabs closes the panel). Panel content
 follows the active tab's type: AI share toggle for all, SSH adds
-auto-reconnect + inline port forwards (embedded client only), serial adds
+auto-reconnect + inline port forwards (embedded client only, compact
+single-line table), serial adds
 auto-reconnect + baud/newline selects + RTS toggle + live CTS status.
 
 ## System tray (park window)
