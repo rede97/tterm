@@ -11,13 +11,14 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 import { invoke } from "@tauri-apps/api/core";
 import { configStore } from "../src/core/store";
-import { createSshPanel } from "../src/settings/ssh";
+import { createSshPanel, syncSshHostOrder, resetSshConfigDirty, isSshConfigDirty } from "../src/settings/ssh";
 
 const invokeMock = vi.mocked(invoke);
 
 beforeEach(() => {
   document.body.innerHTML = "";
   configStore.set({ sshHosts: [], hiddenSshHosts: [], sshEmbedded: true });
+  resetSshConfigDirty();
 });
 
 function openPanel(): HTMLElement {
@@ -235,5 +236,100 @@ describe("settings — SSH key management", () => {
       expect(document.querySelector<HTMLElement>(".she-overlay .she-header")!.textContent)
         .toBe("Generate SSH Key");
     });
+  });
+});
+
+describe("settings — SSH host list order & detail", () => {
+  it("drag order syncs the working copy (pending until save)", () => {
+    configStore.set({
+      sshHosts: [
+        { name: "a", HostName: "10.0.0.1" },
+        { name: "b", HostName: "10.0.0.2" },
+        { name: "c", HostName: "10.0.0.3" },
+      ],
+    });
+    const panel = openPanel();
+    const list = panel.querySelector<HTMLElement>(".ssh-host-list")!;
+    const cards = list.querySelectorAll<HTMLElement>(".ssh-host-card");
+    expect(cards).toHaveLength(3);
+    list.insertBefore(cards[2], cards[0]); // Sortable's DOM move: c, a, b
+    syncSshHostOrder(list);
+    expect(configStore.get("sshHosts").map(h => h.name)).toEqual(["c", "a", "b"]);
+  });
+
+  it("sync refuses to drop hosts when DOM and store disagree", () => {
+    configStore.set({
+      sshHosts: [
+        { name: "a", HostName: "10.0.0.1" },
+        { name: "b", HostName: "10.0.0.2" },
+      ],
+    });
+    const panel = openPanel();
+    const list = panel.querySelector<HTMLElement>(".ssh-host-list")!;
+    list.querySelector<HTMLElement>('.ssh-host-card[data-name="b"]')!.remove();
+    syncSshHostOrder(list);
+    expect(configStore.get("sshHosts").map(h => h.name)).toEqual(["a", "b"]);
+  });
+
+  it("expanding marks the card non-draggable and lists one property per line", () => {
+    configStore.set({
+      sshHosts: [{ name: "a", HostName: "10.0.0.1", IdentityFile: "~/.ssh/id_ed25519", ForwardAgent: "yes" }],
+    });
+    const panel = openPanel();
+    const card = panel.querySelector<HTMLElement>(".ssh-host-card")!;
+    expect(card.classList.contains("expanded")).toBe(false);
+    card.querySelector<HTMLElement>(".ssh-host-row")!.click();
+    expect(card.classList.contains("expanded")).toBe(true);
+    const lines = card.querySelectorAll(".ssh-host-extra > div");
+    expect(lines.length).toBe(2); // one per line, not joined with separators
+    expect(card.querySelector(".ssh-host-extra")!.textContent).not.toContain("·");
+  });
+});
+
+describe("settings — SSH config dirty state", () => {
+  it("clean initially, dirty after Delete, clean again after Save", async () => {
+    vi.stubGlobal("confirm", () => true);
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "ssh_save_config") return Promise.resolve("Saved to ~/.ssh/config");
+      if (cmd === "ssh_read_config_raw") return Promise.resolve("");
+      if (cmd === "read_config") return Promise.resolve("{}");
+      return Promise.resolve(null);
+    });
+    configStore.set({ sshHosts: [{ name: "a", HostName: "10.0.0.1" }] });
+    const panel = openPanel();
+    expect(isSshConfigDirty()).toBe(false);
+
+    panel.querySelector<HTMLButtonElement>(".ssh-btn-delete")!.click();
+    expect(isSshConfigDirty()).toBe(true);
+
+    panel.querySelector<HTMLButtonElement>("#set-save-ssh-config")!.click();
+    await vi.waitFor(() => expect(isSshConfigDirty()).toBe(false));
+  });
+
+  it("drag reorder marks dirty and fires tterm-ssh-dirty (bubbles)", () => {
+    configStore.set({
+      sshHosts: [
+        { name: "a", HostName: "10.0.0.1" },
+        { name: "b", HostName: "10.0.0.2" },
+      ],
+    });
+    const panel = openPanel();
+    const events: boolean[] = [];
+    panel.addEventListener("tterm-ssh-dirty", (e) => events.push((e as CustomEvent).detail));
+    const list = panel.querySelector<HTMLElement>(".ssh-host-list")!;
+    const cards = list.querySelectorAll<HTMLElement>(".ssh-host-card");
+    list.insertBefore(cards[1], cards[0]);
+    syncSshHostOrder(list);
+    expect(isSshConfigDirty()).toBe(true);
+    expect(events).toEqual([true]);
+  });
+
+  it("Reload clears the dirty state", async () => {
+    configStore.set({ sshHosts: [{ name: "a", HostName: "10.0.0.1" }] });
+    const panel = openPanel();
+    panel.querySelector<HTMLButtonElement>(".ssh-btn-delete")!.click();
+    expect(isSshConfigDirty()).toBe(true);
+    panel.querySelector<HTMLButtonElement>("#set-reload-ssh")!.click();
+    await vi.waitFor(() => expect(isSshConfigDirty()).toBe(false));
   });
 });
