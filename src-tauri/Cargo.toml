@@ -49,4 +49,7 @@ windows = { version = "0.61", features = [
 ] }
 base64 = "0.23.1"
 russh = { version = "0.62", default-features = false, features = ["ring", "rsa", "flate2"] }
+# OS RNG for keygen, adapted to ssh-key's rand_core 0.10 traits below.
+getrandom = "0.4"
+rand_core = "0.10"
 

@@ -1,4 +1,4 @@
-//! Embedded SSH client (russh) — see docs/embedded-ssh-plan.md.
+//! Embedded SSH client (russh) — see docs/ssh-client.md.
 //!
 //! An embedded SSH session is just another byte-pipe producer for the relay
 //! hub: the shell channel's halves are adapted into the blocking
@@ -1047,6 +1047,365 @@ pub fn ssh_forward_list(state: tauri::State<AppState>, id: String) -> Result<Vec
     Ok(forwards)
 }
 
+// ── Key management (generate / list / install) ───────────────────────
+
+/// One local keypair entry (from ~/.ssh/*.pub).
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshKeyInfo {
+    pub name: String,       // file stem, e.g. "id_ed25519"
+    pub path: String,       // private key path
+    pub public_key: String, // OpenSSH one-liner (with comment)
+    pub fingerprint: String, // "SHA256:…"
+}
+
+/// Outcome of ssh_install_pubkey.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallResult {
+    pub outcome: String, // "installed" | "already"
+    // Which remote shell answered the probes — shown in the result toast.
+    pub shell: String, // "posix" | "windows-cmd" | "windows-powershell"
+}
+
+fn ssh_dir() -> Option<PathBuf> {
+    crate::ssh::ssh_config_path().and_then(|p| p.parent().map(|d| d.to_path_buf()))
+}
+
+/// Infallible CSPRNG over the OS RNG. ssh-key wants `CryptoRng` (i.e.
+/// `TryRng<Error = Infallible>`); a getrandom failure mid-keygen is
+/// unrecoverable, so panicking is the honest behavior.
+struct OsRng;
+
+impl rand_core::TryRng for OsRng {
+    type Error = std::convert::Infallible;
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+        let mut b = [0u8; 4];
+        getrandom::fill(&mut b).expect("OS RNG failure");
+        Ok(u32::from_le_bytes(b))
+    }
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+        let mut b = [0u8; 8];
+        getrandom::fill(&mut b).expect("OS RNG failure");
+        Ok(u64::from_le_bytes(b))
+    }
+    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Self::Error> {
+        getrandom::fill(dst).expect("OS RNG failure");
+        Ok(())
+    }
+}
+
+impl rand_core::TryCryptoRng for OsRng {}
+
+/// Normalize a public key to "algo base64" (comment dropped): the comment
+/// is free-form text and would break shell quoting on the remote side.
+fn normalize_public_key(public_key: &str) -> Result<String, String> {
+    let key = ssh_key::PublicKey::from_openssh(public_key)
+        .map_err(|e| format!("invalid public key: {e}"))?;
+    let line = key.to_openssh().map_err(|e| e.to_string())?;
+    let mut parts = line.split_whitespace();
+    match (parts.next(), parts.next()) {
+        (Some(algo), Some(data)) => Ok(format!("{algo} {data}")),
+        _ => Err("invalid public key".into()),
+    }
+}
+
+fn key_info_from_pub(pub_path: &std::path::Path) -> Option<SshKeyInfo> {
+    let content = std::fs::read_to_string(pub_path).ok()?;
+    let line = content.lines().find(|l| !l.trim().is_empty())?;
+    let key = ssh_key::PublicKey::from_openssh(line).ok()?;
+    let stem = pub_path.file_stem()?.to_string_lossy().to_string();
+    let priv_path = pub_path.parent()?.join(&stem);
+    if !priv_path.exists() {
+        return None; // orphan .pub — nothing to authenticate with later
+    }
+    Some(SshKeyInfo {
+        name: stem,
+        path: priv_path.to_string_lossy().to_string(),
+        public_key: line.trim().to_string(),
+        fingerprint: key.fingerprint(ssh_key::HashAlg::Sha256).to_string(),
+    })
+}
+
+fn list_keys_in(dir: &std::path::Path) -> Vec<SshKeyInfo> {
+    let mut out: Vec<SshKeyInfo> = std::fs::read_dir(dir)
+        .map(|entries| {
+            entries
+                .flatten()
+                .map(|e| e.path())
+                .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("pub"))
+                .filter_map(|p| key_info_from_pub(&p))
+                .collect()
+        })
+        .unwrap_or_default();
+    out.sort_by(|a, b| a.name.cmp(&b.name));
+    out
+}
+
+#[tauri::command]
+pub fn ssh_list_keys() -> Result<Vec<SshKeyInfo>, String> {
+    Ok(ssh_dir().map(|d| list_keys_in(&d)).unwrap_or_default())
+}
+
+fn keygen_in(
+    dir: &std::path::Path,
+    algorithm: &str,
+    name: &str,
+    passphrase: Option<String>,
+) -> Result<SshKeyInfo, String> {
+    let name = name.trim();
+    if name.is_empty()
+        || !name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+    {
+        return Err("Key name may only contain letters, digits, '.', '_' and '-'".into());
+    }
+    let algorithm = match algorithm {
+        "ed25519" => ssh_key::Algorithm::Ed25519,
+        // 4096-bit (ssh-key crate default); the hash alg is negotiated
+        // per handshake at auth time.
+        "rsa" => ssh_key::Algorithm::Rsa { hash: None },
+        other => return Err(format!("unsupported algorithm: {other}")),
+    };
+    let priv_path = dir.join(name);
+    let pub_path = dir.join(format!("{name}.pub"));
+    if priv_path.exists() || pub_path.exists() {
+        return Err(format!("{name} already exists — pick another name"));
+    }
+
+    let mut rng = OsRng;
+    let mut key = ssh_key::PrivateKey::random(&mut rng, algorithm).map_err(|e| e.to_string())?;
+    key.set_comment("tterm");
+    if let Some(pp) = passphrase.filter(|p| !p.is_empty()) {
+        key = key.encrypt(&mut rng, pp.as_bytes()).map_err(|e| e.to_string())?;
+    }
+    let priv_pem = key.to_openssh(ssh_key::LineEnding::LF).map_err(|e| e.to_string())?;
+    std::fs::write(&priv_path, priv_pem.as_bytes()).map_err(|e| e.to_string())?;
+    // 0600 on unix — OpenSSH clients refuse world-readable private keys.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&priv_path, std::fs::Permissions::from_mode(0o600));
+    }
+    let pub_line = key.public_key().to_openssh().map_err(|e| e.to_string())?;
+    std::fs::write(&pub_path, format!("{pub_line}\n")).map_err(|e| e.to_string())?;
+
+    key_info_from_pub(&pub_path).ok_or_else(|| "generated key failed to re-parse".into())
+}
+
+/// Generate a keypair in ~/.ssh. Refuses to overwrite an existing name.
+#[tauri::command]
+pub fn ssh_keygen(
+    algorithm: String,
+    name: String,
+    passphrase: Option<String>,
+) -> Result<SshKeyInfo, String> {
+    let dir = ssh_dir().ok_or("cannot locate the ~/.ssh directory")?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    keygen_in(&dir, &algorithm, &name, passphrase)
+}
+
+// ── Public-key installation (ssh-copy-id equivalent) ─────────────────
+
+/// The remote shell family, decided by probing. Windows targets answer
+/// either cmd or powershell depending on the sshd default-shell setting;
+/// Linux and macOS both answer sh.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum TargetShell {
+    Posix,
+    WindowsCmd,
+    WindowsPowerShell,
+}
+
+impl TargetShell {
+    fn label(self) -> &'static str {
+        match self {
+            TargetShell::Posix => "posix",
+            TargetShell::WindowsCmd => "windows-cmd",
+            TargetShell::WindowsPowerShell => "windows-powershell",
+        }
+    }
+}
+
+/// Probe commands in order; the first that exits 0 identifies the shell.
+/// `target_os` ("windows" | "linux" | "macos") narrows the candidate list.
+fn probe_plan(target_os: Option<&str>) -> Vec<(TargetShell, &'static str)> {
+    const POSIX: (TargetShell, &str) = (TargetShell::Posix, "sh -c \"uname -s\"");
+    const CMD: (TargetShell, &str) = (TargetShell::WindowsCmd, "ver");
+    const PS: (TargetShell, &str) =
+        (TargetShell::WindowsPowerShell, "$PSVersionTable.PSVersion | Out-Null");
+    match target_os {
+        Some("windows") => vec![CMD, PS],
+        Some("linux") | Some("macos") => vec![POSIX],
+        _ => vec![POSIX, CMD, PS],
+    }
+}
+
+/// The three install steps for a shell family: prepare the .ssh directory,
+/// test whether the key is already authorized, append it. `key` is the
+/// normalized "algo base64" form — no quotes, so single-quote wrapping is
+/// safe on every shell.
+struct InstallSteps {
+    prepare: String,
+    contains: String,
+    append: String,
+}
+
+fn install_steps(shell: TargetShell, key: &str) -> InstallSteps {
+    match shell {
+        TargetShell::Posix => InstallSteps {
+            prepare: "mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys".into(),
+            contains: format!("grep -qxF '{key}' ~/.ssh/authorized_keys"),
+            append: format!("echo '{key}' >> ~/.ssh/authorized_keys"),
+        },
+        TargetShell::WindowsCmd => InstallSteps {
+            prepare: "if not exist \"%USERPROFILE%\\.ssh\" mkdir \"%USERPROFILE%\\.ssh\"".into(),
+            contains: format!(
+                "findstr /x /l /c:\"{key}\" \"%USERPROFILE%\\.ssh\\authorized_keys\""
+            ),
+            append: format!("echo {key}>> \"%USERPROFILE%\\.ssh\\authorized_keys\""),
+        },
+        TargetShell::WindowsPowerShell => InstallSteps {
+            prepare: "New-Item -ItemType Directory -Force \"$env:USERPROFILE\\.ssh\" | Out-Null"
+                .into(),
+            contains: format!(
+                "if ((Test-Path \"$env:USERPROFILE\\.ssh\\authorized_keys\") -and ((Get-Content \"$env:USERPROFILE\\.ssh\\authorized_keys\") -contains '{key}')) {{ exit 0 }} else {{ exit 1 }}"
+            ),
+            append: format!(
+                "Add-Content \"$env:USERPROFILE\\.ssh\\authorized_keys\" '{key}'"
+            ),
+        },
+    }
+}
+
+/// Run one command, collect stdout, return (exit status, stdout).
+async fn exec_capture(handle: &Handle<SshHandler>, command: &str) -> Result<(u32, String), String> {
+    let run = async {
+        let channel = handle
+            .channel_open_session()
+            .await
+            .map_err(|e| format!("channel open failed: {e}"))?;
+        channel
+            .exec(true, command)
+            .await
+            .map_err(|e| format!("exec failed: {e}"))?;
+        let (mut rd, _wr) = channel.split();
+        let mut status: Option<u32> = None;
+        let mut out = String::new();
+        loop {
+            match rd.wait().await {
+                Some(russh::ChannelMsg::Data { data }) => {
+                    out.push_str(&String::from_utf8_lossy(&data));
+                }
+                Some(russh::ChannelMsg::ExitStatus { exit_status }) => {
+                    status = Some(exit_status);
+                }
+                // NB: do NOT break on Eof — for fast commands sshd delivers
+                // stdout's EOF before it reaps the process and sends
+                // exit-status. Only Close ends the conversation.
+                Some(russh::ChannelMsg::Close) | None => break,
+                _ => {}
+            }
+        }
+        Ok::<(u32, String), String>((status.unwrap_or(1), out))
+    };
+    tokio::time::timeout(Duration::from_secs(15), run)
+        .await
+        .map_err(|_| format!("remote command timed out: {command}"))?
+}
+
+/// Connect, authenticate (agent → identity files → password dialog), probe
+/// the remote shell, then append the public key to authorized_keys.
+async fn install_pubkey_with(
+    spec: &EmbeddedSshSpec,
+    public_key: &str,
+    target_os: Option<String>,
+    prompter: Arc<dyn Prompter>,
+    known_hosts: Option<PathBuf>,
+) -> Result<InstallResult, String> {
+    let key = normalize_public_key(public_key)?;
+
+    let mut config = client::Config::default();
+    config.inactivity_timeout = None;
+    config.nodelay = true;
+    let handler = SshHandler {
+        host: spec.hostname.clone(),
+        port: spec.port,
+        prompter: prompter.clone(),
+        known_hosts,
+        forwards: Arc::new(Mutex::new(HashMap::new())),
+    };
+    let mut handle = tokio::time::timeout(
+        Duration::from_secs(15),
+        client::connect(
+            Arc::new(config),
+            (spec.hostname.as_str(), spec.port),
+            handler,
+        ),
+    )
+    .await
+    .map_err(|_| format!("Connection to {} timed out", spec.hostname))?
+    .map_err(|e| format!("SSH handshake with {} failed: {e}", spec.hostname))?;
+    authenticate(&mut handle, spec, &prompter, &Arc::new(Mutex::new(None))).await?;
+
+    // Probe the remote shell: first candidate exiting 0 wins.
+    let mut shell = None;
+    for (candidate, probe) in probe_plan(target_os.as_deref()) {
+        if let Ok((0, _)) = exec_capture(&handle, probe).await {
+            shell = Some(candidate);
+            break;
+        }
+    }
+    let shell = shell.ok_or_else(|| {
+        "could not detect the remote shell (tried sh / cmd / powershell)".to_string()
+    })?;
+
+    let steps = install_steps(shell, &key);
+    let (status, out) = exec_capture(&handle, &steps.prepare).await?;
+    if status != 0 {
+        return Err(format!("failed to prepare ~/.ssh on the target: {out}"));
+    }
+    if let Ok((0, _)) = exec_capture(&handle, &steps.contains).await {
+        return Ok(InstallResult {
+            outcome: "already".into(),
+            shell: shell.label().into(),
+        });
+    }
+    let (status, out) = exec_capture(&handle, &steps.append).await?;
+    if status != 0 {
+        return Err(format!("failed to append the key on the target: {out}"));
+    }
+    Ok(InstallResult {
+        outcome: "installed".into(),
+        shell: shell.label().into(),
+    })
+}
+
+/// Install a local public key on a remote host (ssh-copy-id equivalent).
+/// `target_os`: "auto" (probe sh → cmd → powershell) or a restriction to
+/// "windows" / "linux" / "macos".
+#[tauri::command]
+pub async fn ssh_install_pubkey(
+    state: tauri::State<'_, AppState>,
+    spec: EmbeddedSshSpec,
+    public_key: String,
+    target_os: Option<String>,
+) -> Result<InstallResult, String> {
+    let prompter: Arc<dyn Prompter> = Arc::new(FrontendPrompter::new(
+        state.hub.clone(),
+        state.pending_prompts.clone(),
+    ));
+    install_pubkey_with(
+        &spec,
+        &public_key,
+        target_os,
+        prompter,
+        known_hosts_path(),
+    )
+    .await
+}
+
 // ── Tests ────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -1075,6 +1434,14 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
         }
     }
 
+    /// Which remote shell the exec simulation answers to.
+    #[derive(Clone, Copy, PartialEq)]
+    enum ExecSim {
+        Posix,
+        WindowsCmd,
+        WindowsPs,
+    }
+
     struct ServerState {
         sizes: Vec<(u32, u32)>,
         direct_tcpip_target: (String, u16),
@@ -1083,13 +1450,18 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
         // When set, shell_request streams this payload (and no echo happens
         // on the shell channel) — the issue #1 flood repro.
         flood: Option<Arc<Vec<u8>>>,
+        // Exec simulation for install_pubkey tests.
+        exec_sim: ExecSim,
+        exec_log: Vec<String>,
+        // When true, the "is the key already authorized" probe succeeds.
+        key_present: bool,
     }
 
     /// Minimal in-process SSH server: password auth (u/pw), echo shell on
     /// session channels, and direct-tcpip bridged to a fixed target.
     #[derive(Clone)]
     struct TestServer {
-        state: Arc<Mutex<ServerState>>,
+        state: Arc<parking_lot::Mutex<ServerState>>,
     }
 
     impl server::Handler for TestServer {
@@ -1128,7 +1500,7 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             _session: &mut server::Session,
         ) -> Result<(), Self::Error> {
             reply.accept().await;
-            let (host, _) = self.state.lock().unwrap().direct_tcpip_target.clone();
+            let (host, _) = self.state.lock().direct_tcpip_target.clone();
             tauri::async_runtime::spawn(async move {
                 if let Ok(stream) = tokio::net::TcpStream::connect((host.as_str(), port as u16)).await {
                     bridge_tcp_channel(stream, channel).await;
@@ -1157,8 +1529,8 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             channel: russh::ChannelId,
             session: &mut server::Session,
         ) -> Result<(), Self::Error> {
-            let flood = self.state.lock().unwrap().flood.clone();
-            self.state.lock().unwrap().shell_channel = Some(channel);
+            let flood = self.state.lock().flood.clone();
+            self.state.lock().shell_channel = Some(channel);
             session.channel_success(channel)?;
             session.data(channel, b"shell-ready\r\n".to_vec())?;
             if let Some(flood) = flood {
@@ -1178,7 +1550,7 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             data: &[u8],
             session: &mut server::Session,
         ) -> Result<(), Self::Error> {
-            let st = self.state.lock().unwrap();
+            let st = self.state.lock();
             if st.shell_channel != Some(channel) {
                 return Ok(()); // forwarding channel — the bridge handles it
             }
@@ -1192,6 +1564,46 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             Ok(())
         }
 
+        /// Emulates a target OS for install_pubkey: probe commands exit 0
+        /// only for the simulated shell; everything else is logged and
+        /// succeeds, except the "key already present" probes which honor
+        /// state.key_present.
+        async fn exec_request(
+            &mut self,
+            channel: russh::ChannelId,
+            data: &[u8],
+            session: &mut server::Session,
+        ) -> Result<(), Self::Error> {
+            let cmd = String::from_utf8_lossy(data).to_string();
+            let (sim, key_present) = {
+                let mut st = self.state.lock();
+                st.exec_log.push(cmd.clone());
+                (st.exec_sim, st.key_present)
+            };
+            let status = if cmd.contains("uname -s") {
+                (sim != ExecSim::Posix) as u32
+            } else if cmd.trim() == "ver" {
+                (sim != ExecSim::WindowsCmd) as u32
+            } else if cmd.contains("$PSVersionTable") {
+                (sim != ExecSim::WindowsPs) as u32
+            } else if cmd.contains("grep -qxF")
+                || cmd.contains("findstr")
+                || cmd.contains("Get-Content")
+            {
+                (!key_present) as u32
+            } else {
+                0 // prepare / append
+            };
+            session.channel_success(channel)?;
+            // Real sshd order: stdout EOF arrives as soon as the child's
+            // pipes close, BEFORE the process is reaped and exit-status is
+            // sent. This ordering caught the exec_capture Eof race.
+            session.eof(channel)?;
+            session.exit_status_request(channel, status)?;
+            session.close(channel)?;
+            Ok(())
+        }
+
         async fn window_change_request(
             &mut self,
             _channel: russh::ChannelId,
@@ -1201,7 +1613,7 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             _ph: u32,
             _session: &mut server::Session,
         ) -> Result<(), Self::Error> {
-            self.state.lock().unwrap().sizes.push((cols, rows));
+            self.state.lock().sizes.push((cols, rows));
             Ok(())
         }
     }
@@ -1250,11 +1662,14 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
     fn embedded_ssh_end_to_end() {
         tauri::async_runtime::block_on(async {
             let echo_port = spawn_tcp_echo().await;
-            let server_state = Arc::new(Mutex::new(ServerState {
+            let server_state = Arc::new(parking_lot::Mutex::new(ServerState {
                 sizes: Vec::new(),
                 direct_tcpip_target: ("127.0.0.1".into(), echo_port),
                 shell_channel: None,
                 flood: None,
+                exec_sim: ExecSim::Posix,
+                exec_log: Vec::new(),
+                key_present: false,
             }));
 
             // Bind the SSH server.
@@ -1314,13 +1729,13 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             // Resize propagates as window_change to the server.
             resize_ssh_session(&session, 132, 43);
             for _ in 0..50 {
-                if server_state.lock().unwrap().sizes.contains(&(132, 43)) {
+                if server_state.lock().sizes.contains(&(132, 43)) {
                     break;
                 }
                 tokio::time::sleep(Duration::from_millis(100)).await;
             }
             assert!(
-                server_state.lock().unwrap().sizes.contains(&(132, 43)),
+                server_state.lock().sizes.contains(&(132, 43)),
                 "server saw window_change"
             );
 
@@ -1372,11 +1787,14 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
     fn dynamic_forward_socks5_round_trip() {
         tauri::async_runtime::block_on(async {
             let echo_port = spawn_tcp_echo().await;
-            let server_state = Arc::new(Mutex::new(ServerState {
+            let server_state = Arc::new(parking_lot::Mutex::new(ServerState {
                 sizes: Vec::new(),
                 direct_tcpip_target: ("127.0.0.1".into(), echo_port),
                 shell_channel: None,
                 flood: None,
+                exec_sim: ExecSim::Posix,
+                exec_log: Vec::new(),
+                key_present: false,
             }));
 
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1469,11 +1887,14 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
 
         tauri::async_runtime::block_on(async {
             // In-process SSH server that floods the captured stream on shell open.
-            let server_state = Arc::new(Mutex::new(ServerState {
+            let server_state = Arc::new(parking_lot::Mutex::new(ServerState {
                 sizes: Vec::new(),
                 direct_tcpip_target: ("127.0.0.1".into(), 1),
                 shell_channel: None,
                 flood: Some(Arc::new(FLOOD.to_vec())),
+                exec_sim: ExecSim::Posix,
+                exec_log: Vec::new(),
+                key_present: false,
             }));
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let ssh_port = listener.local_addr().unwrap().port();
@@ -1563,6 +1984,138 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             assert!(replies_sent);
 
             kill_ssh_session(&session);
+        });
+    }
+
+    /// SSH server with the exec simulation configured, for install tests.
+    async fn spawn_exec_server(
+        sim: ExecSim,
+        key_present: bool,
+    ) -> (u16, Arc<parking_lot::Mutex<ServerState>>) {
+        let server_state = Arc::new(parking_lot::Mutex::new(ServerState {
+            sizes: Vec::new(),
+            direct_tcpip_target: ("127.0.0.1".into(), 1),
+            shell_channel: None,
+            flood: None,
+            exec_sim: sim,
+            exec_log: Vec::new(),
+            key_present,
+        }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let state = server_state.clone();
+        tauri::async_runtime::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else { break };
+                let key = russh::keys::PrivateKey::from_openssh(TEST_HOST_KEY).unwrap();
+                let config = Arc::new(server::Config {
+                    keys: vec![key],
+                    auth_rejection_time: Duration::ZERO,
+                    ..Default::default()
+                });
+                let handler = TestServer { state: state.clone() };
+                tauri::async_runtime::spawn(async move {
+                    let _ = server::run_stream(config, stream, handler).await;
+                });
+            }
+        });
+        (port, server_state)
+    }
+
+    #[test]
+    fn keygen_generates_loadable_keypairs() {
+        let dir = std::env::temp_dir().join(format!("tterm-test-keygen-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // ed25519: private half loads, public half matches the listing.
+        let info = keygen_in(&dir, "ed25519", "id_test", None).expect("keygen ed25519");
+        assert_eq!(info.name, "id_test");
+        assert!(info.fingerprint.starts_with("SHA256:"), "{}", info.fingerprint);
+        let key = russh::keys::load_secret_key(&info.path, None).expect("load private key");
+        assert_eq!(key.public_key().to_openssh().unwrap(), info.public_key);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&info.path).unwrap().permissions().mode();
+            assert_eq!(mode & 0o777, 0o600, "private key must be 0600");
+        }
+
+        // Listing finds real keypairs, skips orphan .pub files.
+        std::fs::write(dir.join("orphan.pub"), format!("{}\n", info.public_key)).unwrap();
+        let listed = list_keys_in(&dir);
+        assert_eq!(listed.len(), 1, "orphan .pub must be skipped: {listed:?}");
+
+        // Name validation, duplicate refusal, passphrase round-trip.
+        assert!(keygen_in(&dir, "ed25519", "bad/name", None).is_err());
+        assert!(keygen_in(&dir, "ed25519", "id_test", None).is_err());
+        let enc = keygen_in(&dir, "ed25519", "id_enc", Some("pw".into())).expect("keygen encrypted");
+        assert!(russh::keys::load_secret_key(&enc.path, None).is_err());
+        assert!(russh::keys::load_secret_key(&enc.path, Some("pw")).is_ok());
+
+        // RSA option produces an RSA key (slow: 4096-bit generation).
+        let rsa = keygen_in(&dir, "rsa", "id_rsa_test", None).expect("keygen rsa");
+        assert!(rsa.public_key.starts_with("ssh-rsa "), "{}", rsa.public_key);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn install_pubkey_probes_shell_and_appends() {
+        tauri::async_runtime::block_on(async {
+            let pub_key = russh::keys::PrivateKey::from_openssh(TEST_HOST_KEY)
+                .unwrap()
+                .public_key()
+                .to_openssh()
+                .unwrap();
+            let install = |port: u16, target_os: Option<String>, tag: &str| {
+                let pub_key = pub_key.clone();
+                let kh = temp_known_hosts(tag);
+                let _ = std::fs::remove_file(&kh);
+                async move {
+                    let spec = test_session(port).spec;
+                    install_pubkey_with(&spec, &pub_key, target_os, Arc::new(TestPrompter), Some(kh)).await
+                }
+            };
+
+            // POSIX target: the sh probe answers, sh syntax is used.
+            let (port, state) = spawn_exec_server(ExecSim::Posix, false).await;
+            let res = install(port, None, "inst-posix").await.expect("install posix");
+            assert_eq!(res.outcome, "installed");
+            assert_eq!(res.shell, "posix");
+            let log = state.lock().exec_log.join("\n");
+            assert!(log.contains("uname -s"), "probe ran: {log}");
+            assert!(log.contains("mkdir -p ~/.ssh"), "prepare ran: {log}");
+            assert!(log.contains(">> ~/.ssh/authorized_keys"), "append ran: {log}");
+
+            // Already-authorized key: reported, append skipped.
+            let (port, state) = spawn_exec_server(ExecSim::Posix, true).await;
+            let res = install(port, None, "inst-already").await.expect("install already");
+            assert_eq!(res.outcome, "already");
+            let log = state.lock().exec_log.join("\n");
+            assert!(log.contains("grep -qxF"), "contains probe ran: {log}");
+            assert!(!log.contains(">> ~/.ssh/authorized_keys"), "append skipped: {log}");
+
+            // Windows targets: cmd answers `ver`, powershell $PSVersionTable.
+            let (port, state) = spawn_exec_server(ExecSim::WindowsCmd, false).await;
+            let res = install(port, None, "inst-cmd").await.expect("install cmd");
+            assert_eq!(res.shell, "windows-cmd");
+            let log = state.lock().exec_log.join("\n");
+            assert!(log.contains("%USERPROFILE%\\.ssh\\authorized_keys"), "cmd append: {log}");
+
+            let (port, state) = spawn_exec_server(ExecSim::WindowsPs, false).await;
+            let res = install(port, None, "inst-ps").await.expect("install ps");
+            assert_eq!(res.shell, "windows-powershell");
+            let log = state.lock().exec_log.join("\n");
+            assert!(log.contains("Add-Content"), "ps append: {log}");
+
+            // OS restriction narrows the probes: "windows" on a posix target
+            // must fail detection instead of falling back to sh syntax.
+            let (port, _state) = spawn_exec_server(ExecSim::Posix, false).await;
+            let err = install(port, Some("windows".into()), "inst-restrict")
+                .await
+                .expect_err("restricted detection must fail");
+            assert!(err.contains("could not detect"), "{err}");
         });
     }
 }

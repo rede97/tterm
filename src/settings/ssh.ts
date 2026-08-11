@@ -7,6 +7,8 @@ import { hostProp, esc} from "../core/common";
 import { loadSshHosts, generateSshConfig } from "../config/ssh-config";
 import { logError } from "../core/errorlog";
 import { showSshHostEditor } from "./sshhosteditor";
+import { listKeys, showInstallKeyModal, showKeygenModal } from "./sshkeys";
+import { showToast } from "../ui/toast";
 import type { SshHost } from "../core/types";
 
 export function createSshPanel(): HTMLElement {
@@ -62,7 +64,7 @@ function renderSshPanel(container: HTMLElement) {
           ${extra.length > 0 ? `<div class="ssh-host-extra" style="font-size:12px;color:#888;margin-bottom:6px;word-break:break-all;padding-left:28px;">${extra.map(e => esc(e)).join(" <span style='color:#555'>\u00b7</span> ")}</div>` : ""}
           <div style="display:flex;gap:6px;padding-left:28px;">
             <button class="ssh-btn-clear settings-link-btn" data-hostname="${esc(hostname)}" style="background:#4a4a4a;">Clear KnownHosts</button>
-            <button class="ssh-btn-copy-id settings-link-btn" data-hostname="${esc(hostname)}" data-port="${port}" data-user="${esc(user)}" style="background:#4a4a4a;opacity:0.6;cursor:default;" disabled>Upload SSH Key</button>
+            <button class="ssh-btn-copy-id settings-link-btn" data-hostname="${esc(hostname)}" data-port="${port}" data-user="${esc(user)}" style="background:#4a4a4a;">Upload SSH Key</button>
           </div>
         </div>
       </div>`;
@@ -101,6 +103,14 @@ function renderSshPanel(container: HTMLElement) {
       </div>
       ${hostRows}
     </div>
+    <div class="settings-section">
+      <div class="settings-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>SSH Keys</span>
+        <button id="set-gen-ssh-key" class="settings-link-btn">+ Generate Key</button>
+      </div>
+      <div class="settings-item-desc" style="margin-bottom:6px;">Key pairs in ~/.ssh. Upload a public key from a host's detail view above — the private key never leaves this machine.</div>
+      <div class="ssh-key-list"></div>
+    </div>
     <div class="settings-section" style="display:flex;align-items:center;justify-content:space-between;">
       <div class="settings-item-desc" style="margin:0;">Saving will overwrite ~/.ssh/config. A backup is saved to config.tt.bak.</div>
       <button id="set-save-ssh-config" class="settings-btn">Save SSH Config</button>
@@ -108,6 +118,29 @@ function renderSshPanel(container: HTMLElement) {
   `;
 
   wireSshEvents(container);
+
+  // Key list loads async — the panel re-renders often, so refill every time.
+  const keyList = container.querySelector<HTMLElement>(".ssh-key-list")!;
+  listKeys().then((keys) => {
+    if (!keyList.isConnected) return; // panel re-rendered meanwhile
+    keyList.innerHTML = keys.length === 0
+      ? `<div class="settings-item"><div class="settings-item-desc">No key pairs found. Generate one to enable passwordless logins.</div></div>`
+      : keys.map(k => `<div class="settings-item settings-item-row">
+          <div class="settings-item-info">
+            <div class="settings-item-title">${esc(k.name)}</div>
+            <div class="settings-item-desc">${esc(k.fingerprint)}</div>
+          </div>
+          <div class="settings-item-control">
+            <button class="settings-link-btn ssh-key-copy" data-key="${esc(k.publicKey)}">Copy Public Key</button>
+          </div>
+        </div>`).join("");
+    keyList.querySelectorAll<HTMLButtonElement>(".ssh-key-copy").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(btn.dataset.key!);
+        showToast("Public key copied to clipboard", "info");
+      });
+    });
+  });
 }
 
 function wireSshEvents(container: HTMLElement) {
@@ -191,6 +224,25 @@ function wireSshEvents(container: HTMLElement) {
       }
     });
   });
+
+  // Upload SSH Key: pick a local public key and install it on this host.
+  container.querySelectorAll<HTMLButtonElement>(".ssh-btn-copy-id").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showInstallKeyModal({
+        hostname: btn.dataset.hostname!,
+        port: parseInt(btn.dataset.port!, 10) || 22,
+        user: btn.dataset.user!,
+      });
+    });
+  });
+
+  // Generate Key: new pair lands in ~/.ssh; the list refreshes on the next
+  // panel render, so trigger one after generation.
+  container.querySelector<HTMLButtonElement>("#set-gen-ssh-key")!
+    .addEventListener("click", () => {
+      showKeygenModal({ onSaved: () => renderSshPanel(container) });
+    });
 
   // Delete: remove from working copy (not saved until Save SSH Config)
   container.querySelectorAll(".ssh-btn-delete").forEach(btn => {
