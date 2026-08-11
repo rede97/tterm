@@ -6,6 +6,8 @@ import { configStore, type ConfigState } from "../core/store";
 import { hostProp, esc} from "../core/common";
 import { loadSshHosts, generateSshConfig } from "../config/ssh-config";
 import { logError } from "../core/errorlog";
+import { showSshHostEditor } from "./sshhosteditor";
+import type { SshHost } from "../core/types";
 
 export function createSshPanel(): HTMLElement {
   const panel = document.createElement("div");
@@ -36,7 +38,10 @@ function renderSshPanel(container: HTMLElement) {
       const user = hostProp(h, "user") || "root";
       const port = hostProp(h, "port") || "22";
       const skipKeys = new Set(["name", "hostname", "user", "port"]);
-      const extra = Object.entries(h).filter(([k]) => !skipKeys.has(k.toLowerCase())).map(([k, v]) => `${k}: ${v}`);
+      const extra = Object.entries(h)
+        .filter(([k]) => !skipKeys.has(k.toLowerCase()))
+        // Multi-line values (merged forward directives) read as a list.
+        .flatMap(([k, v]) => v.split("\n").map(line => `${k}: ${line}`));
       return `<div class="ssh-host-card" style="margin-bottom:4px;background:#2a2a2a;border-radius:4px;overflow:hidden;">
         <div class="ssh-host-row" style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;cursor:pointer;">
           <div style="flex-shrink:0;padding-top:2px;" onclick="event.stopPropagation()">
@@ -49,7 +54,7 @@ function renderSshPanel(container: HTMLElement) {
             <div class="settings-item-desc" style="margin-bottom:0;">${esc(user)}@${esc(hostname)}:${port}</div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
-            <button class="ssh-btn-edit settings-link-btn" data-hostname="${esc(h.name)}" style="opacity:0.5;cursor:default;" onclick="event.stopPropagation()" disabled>Edit</button>
+            <button class="ssh-btn-edit settings-link-btn" data-hostname="${esc(h.name)}" onclick="event.stopPropagation()">Edit</button>
             <button class="ssh-btn-delete settings-link-btn" data-hostname="${esc(h.name)}" style="color:#f44747;border-color:#f44747;" onclick="event.stopPropagation()">Delete</button>
           </div>
         </div>
@@ -90,7 +95,10 @@ function renderSshPanel(container: HTMLElement) {
       </div>
     </div>
     <div class="settings-section">
-      <div class="settings-section-title">Imported Hosts (${allHosts.length})</div>
+      <div class="settings-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Imported Hosts (${allHosts.length})</span>
+        <button id="set-add-ssh-host" class="settings-link-btn">+ Add Host</button>
+      </div>
       ${hostRows}
     </div>
     <div class="settings-section" style="display:flex;align-items:center;justify-content:space-between;">
@@ -194,7 +202,37 @@ function wireSshEvents(container: HTMLElement) {
       renderSshPanel(container);
     });
   });
+
+  // Add Host / Edit: both open the shared host editor modal. The result
+  // lands in the working copy (pending until Save SSH Config).
+  const saveHost = (container2: HTMLElement) =>
+    (host: SshHost, originalName?: string) => {
+      const hosts = configStore.get("sshHosts");
+      const next = originalName
+        ? hosts.map(h => (h.name === originalName ? host : h))
+        : [...hosts, host];
+      configStore.set({ sshHosts: next });
+      renderSshPanel(container2);
+    };
+
+  container.querySelector<HTMLButtonElement>("#set-add-ssh-host")!
+    .addEventListener("click", () => {
+      showSshHostEditor({ onSaved: saveHost(container) });
+    });
+
+  container.querySelectorAll<HTMLButtonElement>(".ssh-btn-edit").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const name = btn.dataset.hostname!;
+      const base = configStore.get("sshHosts").find(h => h.name === name);
+      if (base) showSshHostEditor({ base, onSaved: saveHost(container) });
+    });
+  });
 }
+
+// The host editor modal (sshhosteditor.ts) serves both Add and Edit; the
+// result lands in the working copy (pending until Save SSH Config),
+// exactly like Delete.
 
 export function collectSshSettings(root: HTMLElement): Partial<ConfigState> {
   const partial: Partial<ConfigState> = {};

@@ -666,6 +666,15 @@ async fn reapply_forwards(handle: &Arc<Handle<SshHandler>>, session: &SshSession
                     .tcpip_forward(info.listen_host.clone(), info.listen_port as u32)
                     .await;
             }
+            "dynamic" => {
+                if let Some(task) = spawn_dynamic_forward(handle, session, &info).await {
+                    if let Ok(mut t) = session.forwards.lock() {
+                        if let Some(entry) = t.get_mut(&info.forward_id) {
+                            entry.abort = Some(task);
+                        }
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -707,6 +716,98 @@ async fn spawn_local_forward(
             }
         }
     }))
+}
+
+/// Bind the local listener for a -D dynamic forward (SOCKS5, no-auth
+/// CONNECT only) and spawn its accept loop. Each accepted connection
+/// negotiates SOCKS5, then opens a direct-tcpip channel to the requested
+/// destination.
+async fn spawn_dynamic_forward(
+    handle: &Arc<Handle<SshHandler>>,
+    session: &SshSession,
+    info: &ForwardInfo,
+) -> Option<tauri::async_runtime::JoinHandle<()>> {
+    let listener = tokio::net::TcpListener::bind((info.listen_host.as_str(), info.listen_port)).await.ok()?;
+    let handle = handle.clone();
+    let notify = session.close_notify.clone();
+    Some(tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::select! {
+                _ = notify.notified() => break,
+                accepted = listener.accept() => {
+                    match accepted {
+                        Ok((stream, _peer)) => {
+                            let handle = handle.clone();
+                            tauri::async_runtime::spawn(async move {
+                                if let Some((ch, stream)) = socks5_connect(stream, &handle).await {
+                                    bridge_tcp_channel(stream, ch).await
+                                }
+                            });
+                        }
+                        Err(_) => break,
+                    }
+                }
+            }
+        }
+    }))
+}
+
+/// Minimal SOCKS5 server handshake (no authentication, CONNECT only).
+/// On success returns the opened SSH channel plus the client stream,
+/// ready to bridge; the success reply is already sent.
+async fn socks5_connect(
+    mut stream: tokio::net::TcpStream,
+    handle: &Arc<Handle<SshHandler>>,
+) -> Option<(russh::Channel<client::Msg>, tokio::net::TcpStream)> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    // Greeting: VER=5 NMETHODS METHODS... — require the no-auth method.
+    if stream.read_u8().await.ok()? != 5 {
+        return None;
+    }
+    let nmethods = stream.read_u8().await.ok()?;
+    let mut methods = vec![0u8; nmethods as usize];
+    stream.read_exact(&mut methods).await.ok()?;
+    if !methods.contains(&0) {
+        stream.write_all(&[5, 0xFF]).await.ok()?;
+        return None;
+    }
+    stream.write_all(&[5, 0]).await.ok()?;
+    // Request: VER=5 CMD=1(connect) RSV ATYP DST.ADDR DST.PORT
+    if stream.read_u8().await.ok()? != 5 {
+        return None;
+    }
+    if stream.read_u8().await.ok()? != 1 {
+        return None; // CONNECT only
+    }
+    let _rsv = stream.read_u8().await.ok()?;
+    let atyp = stream.read_u8().await.ok()?;
+    let host = match atyp {
+        1 => {
+            let mut b = [0u8; 4];
+            stream.read_exact(&mut b).await.ok()?;
+            std::net::Ipv4Addr::from(b).to_string()
+        }
+        3 => {
+            let len = stream.read_u8().await.ok()?;
+            let mut b = vec![0u8; len as usize];
+            stream.read_exact(&mut b).await.ok()?;
+            String::from_utf8(b).ok()?
+        }
+        4 => {
+            let mut b = [0u8; 16];
+            stream.read_exact(&mut b).await.ok()?;
+            std::net::Ipv6Addr::from(b).to_string()
+        }
+        _ => return None,
+    };
+    let port = stream.read_u16().await.ok()?;
+    let ch = handle
+        .channel_open_direct_tcpip(host, port as u32, "127.0.0.1", 0)
+        .await
+        .ok()?;
+    // Success reply: VER=5 REP=0 RSV ATYP=IPv4 BND.ADDR=0.0.0.0 BND.PORT=0
+    stream.write_all(&[5, 0, 0, 1, 0, 0, 0, 0, 0, 0]).await.ok()?;
+    Some((ch, stream))
 }
 
 // ── Reconnect hooks (dead mode) ──────────────────────────────────────
@@ -868,7 +969,16 @@ async fn add_forward(
                 .map_err(|e| format!("Remote forward request failed: {e}"))?;
             None
         }
-        _ => return Err("kind must be \"local\" or \"remote\"".into()),
+        "dynamic" => {
+            let guard = session.live.lock().await;
+            let live = guard.as_ref().ok_or("session not connected")?;
+            Some(
+                spawn_dynamic_forward(&live.handle, session, &info)
+                    .await
+                    .ok_or_else(|| format!("Failed to listen on {}:{}", info.listen_host, info.listen_port))?,
+            )
+        }
+        _ => return Err("kind must be \"local\", \"remote\" or \"dynamic\"".into()),
     };
 
     session
@@ -1251,6 +1361,86 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             .expect("tunnel reply in time")
             .expect("tunnel reply");
             assert_eq!(&got, b"tunnel", "bytes round-tripped through the SSH tunnel");
+
+            kill_ssh_session(&session);
+        });
+    }
+
+    /// Dynamic (-D) forward: a SOCKS5 client handshake through the local
+    /// listener must land on a direct-tcpip channel and bridge bytes.
+    #[test]
+    fn dynamic_forward_socks5_round_trip() {
+        tauri::async_runtime::block_on(async {
+            let echo_port = spawn_tcp_echo().await;
+            let server_state = Arc::new(Mutex::new(ServerState {
+                sizes: Vec::new(),
+                direct_tcpip_target: ("127.0.0.1".into(), echo_port),
+                shell_channel: None,
+                flood: None,
+            }));
+
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let ssh_port = listener.local_addr().unwrap().port();
+            {
+                let state = server_state.clone();
+                tauri::async_runtime::spawn(async move {
+                    loop {
+                        let Ok((stream, _)) = listener.accept().await else { break };
+                        let key = russh::keys::PrivateKey::from_openssh(TEST_HOST_KEY).unwrap();
+                        let config = Arc::new(server::Config {
+                            keys: vec![key],
+                            auth_rejection_time: Duration::ZERO,
+                            ..Default::default()
+                        });
+                        let handler = TestServer { state: state.clone() };
+                        tauri::async_runtime::spawn(async move {
+                            let _ = server::run_stream(config, stream, handler).await;
+                        });
+                    }
+                });
+            }
+
+            let kh = temp_known_hosts("dyn");
+            let _ = std::fs::remove_file(&kh);
+            let session = test_session(ssh_port);
+            let _ = connect_session_with(&session, Arc::new(TestPrompter), Some(kh))
+                .await
+                .expect("connect + auth + shell");
+
+            // Add a dynamic forward on a fixed free port.
+            let probe = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let socks_port = probe.local_addr().unwrap().port();
+            drop(probe);
+            add_forward(&session, "dynamic", "127.0.0.1".into(), socks_port, String::new(), 0)
+                .await
+                .expect("add dynamic forward");
+            tokio::time::sleep(Duration::from_millis(200)).await;
+
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let mut socks = tokio::net::TcpStream::connect(("127.0.0.1", socks_port)).await.unwrap();
+            // Greeting: one method, no-auth.
+            socks.write_all(&[5, 1, 0]).await.unwrap();
+            let mut reply = [0u8; 2];
+            socks.read_exact(&mut reply).await.unwrap();
+            assert_eq!(reply, [5, 0], "no-auth method accepted");
+            // CONNECT to 127.0.0.1:echo_port (domain form, like a browser).
+            let mut req = vec![5, 1, 0, 3, 9];
+            req.extend_from_slice(b"127.0.0.1");
+            req.extend_from_slice(&echo_port.to_be_bytes());
+            socks.write_all(&req).await.unwrap();
+            let mut head = [0u8; 4];
+            socks.read_exact(&mut head).await.unwrap();
+            assert_eq!(head, [5, 0, 0, 1], "connect granted");
+            let mut bnd = [0u8; 6]; // BND.ADDR + BND.PORT
+            socks.read_exact(&mut bnd).await.unwrap();
+
+            socks.write_all(b"tunnel").await.unwrap();
+            let mut got = vec![0u8; 6];
+            tokio::time::timeout(Duration::from_secs(5), socks.read_exact(&mut got))
+                .await
+                .expect("reply in time")
+                .expect("reply");
+            assert_eq!(&got, b"tunnel", "bytes round-tripped via SOCKS5 + direct-tcpip");
 
             kill_ssh_session(&session);
         });

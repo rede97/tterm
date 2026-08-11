@@ -53,17 +53,23 @@ describe("port forwarding dialog", () => {
     showPortForwardingDialog("tab-1");
     await flush();
 
-    (document.querySelector<HTMLInputElement>(".fwd-listen-host"))!.value = "0.0.0.0";
-    (document.querySelector<HTMLInputElement>(".fwd-listen-port"))!.value = "8080";
-    (document.querySelector<HTMLInputElement>(".fwd-target-host"))!.value = "127.0.0.1";
-    (document.querySelector<HTMLInputElement>(".fwd-target-port"))!.value = "3000";
+    // Direction → (default): Local port = listen (host pinned to
+    // 127.0.0.1), Remote host:port = target.
+    const ports = document.querySelectorAll<HTMLInputElement>(".xfe-port");
+    const hosts = document.querySelectorAll<HTMLInputElement>(".xfe-host");
+    expect(hosts[0].disabled).toBe(true);
+    expect(hosts[0].value).toBe("127.0.0.1");
+    ports[0].value = "8080";
+    hosts[1].value = "127.0.0.1";
+    hosts[1].dispatchEvent(new Event("input"));
+    ports[1].value = "3000";
     document.querySelector<HTMLButtonElement>(".fwd-add-btn")!.click();
     await flush();
 
     expect(mockInvoke).toHaveBeenCalledWith("ssh_forward_add", {
       id: "tab-1",
       kind: "local",
-      listenHost: "0.0.0.0",
+      listenHost: "127.0.0.1",
       listenPort: 8080,
       targetHost: "127.0.0.1",
       targetPort: 3000,
@@ -76,8 +82,9 @@ describe("port forwarding dialog", () => {
     showPortForwardingDialog("tab-1");
     await flush();
 
-    (document.querySelector<HTMLInputElement>(".fwd-listen-port"))!.value = bad;
-    (document.querySelector<HTMLInputElement>(".fwd-target-port"))!.value = "3000";
+    const ports = document.querySelectorAll<HTMLInputElement>(".xfe-port");
+    ports[0].value = bad;
+    ports[1].value = "3000";
     document.querySelector<HTMLButtonElement>(".fwd-add-btn")!.click();
     await flush();
 

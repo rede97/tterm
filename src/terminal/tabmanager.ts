@@ -6,6 +6,7 @@ import { hostProp } from "../core/common";
 import { configStore } from "../core/store";
 import { logCatch } from "../core/errorlog";
 import { findSerialProfile } from "../config/serial-profiles";
+import { addForward, type NewForward } from "./forwarding";
 import { showToast } from "../ui/toast";
 import { TerminalTab } from "./tab";
 import { updateQuickButton, closeQuickPanel } from "./quickpanel";
@@ -222,7 +223,53 @@ export class TabManager {
     const tab = new TerminalTab(result.id, "ssh", host.name, this.terminalContainer);
     tab.sshHost = host;
     tab.sshEmbedded = configStore.get("sshEmbedded");
-    return this._finalizeTab(tab, result);
+    const finalized = await this._finalizeTab(tab, result);
+    // Persisted host forwards (LocalForward / RemoteForward in ssh config)
+    // are applied on connect for the embedded client; the system-ssh path
+    // gets them from OpenSSH itself.
+    if (finalized && tab.sshEmbedded) this._applyConfigForwards(result.id, host);
+    return finalized;
+  }
+
+  // Fire-and-forget: each failure toasts individually (addForward), the
+  // session itself is already up and unaffected.
+  private _applyConfigForwards(tabId: string, host: SshHost): void {
+    const specs: NewForward[] = [];
+    const collect = (raw: string | undefined, kind: string): void => {
+      if (!raw) return;
+      for (const line of raw.split("\n")) {
+        // "[listen_host:]port target_host:port" — bare port binds loopback.
+        const m = line.trim().match(/^(?:(\S+):)?(\d+)\s+(\S+):(\d+)$/);
+        if (!m) continue;
+        specs.push({
+          kind,
+          listenHost: m[1] ?? "127.0.0.1",
+          listenPort: parseInt(m[2], 10),
+          targetHost: m[3],
+          targetPort: parseInt(m[4], 10),
+        });
+      }
+    };
+    collect(hostProp(host, "localforward"), "local");
+    collect(hostProp(host, "remoteforward"), "remote");
+    // DynamicForward carries a single endpoint: [listen_host:]port.
+    const dyn = hostProp(host, "dynamicforward");
+    if (dyn) {
+      for (const line of dyn.split("\n")) {
+        const m = line.trim().match(/^(?:(\S+):)?(\d+)$/);
+        if (!m) continue;
+        specs.push({
+          kind: "dynamic",
+          listenHost: m[1] ?? "127.0.0.1",
+          listenPort: parseInt(m[2], 10),
+          targetHost: "",
+          targetPort: 0,
+        });
+      }
+    }
+    // Sequential: listener binds stay ordered and errors don't interleave.
+    (async () => { for (const s of specs) await addForward(tabId, s); })()
+      .catch(logCatch("ssh.configForwards"));
   }
 
   async createSerialTab(port: SerialPort): Promise<TerminalTab | null> {

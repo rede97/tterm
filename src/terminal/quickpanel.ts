@@ -26,10 +26,9 @@ import {
   listForwards,
   addForward,
   removeForward,
-  parsePort,
-  validForwardPorts,
-  type ForwardInfo,
 } from "./forwarding";
+import { createForwardTable } from "../ui/forwardtable";
+import type { ForwardEditorValue, ForwardKind } from "../ui/forwardeditor";
 import type { TerminalTab } from "./tab";
 
 // ---- Injected handlers ----
@@ -211,96 +210,32 @@ function sshSection(tab: TerminalTab): HTMLElement {
 function forwardsBlock(tab: TerminalTab): HTMLElement {
   const wrap = el("div", "qp-fwd");
   wrap.appendChild(el("div", "qp-sub-title", "Port Forwards"));
-  const list = el("div", "qp-fwd-list");
-  wrap.appendChild(list);
+  const slot = el("div", "qp-fwd-slot");
+  wrap.appendChild(slot);
 
-  const renderList = (forwards: ForwardInfo[]) => {
-    list.innerHTML = "";
-    if (forwards.length === 0) {
-      list.appendChild(el("div", "qp-fwd-empty", "No active port forwards."));
-      return;
-    }
-    for (const f of forwards) {
-      const row = el("div", "qp-fwd-row");
-      row.appendChild(el("span", `fwd-badge fwd-badge-${f.kind === "remote" ? "remote" : "local"}`, f.kind === "remote" ? "R" : "L"));
-      row.appendChild(el("span", "qp-fwd-route", `${f.listenHost}:${f.listenPort} → ${f.targetHost}:${f.targetPort}`));
-      const rm = document.createElement("button");
-      rm.type = "button";
-      rm.className = "qp-mini-btn qp-fwd-remove";
-      rm.textContent = "✕";
-      rm.title = "Remove forward";
-      rm.addEventListener("click", () => {
-        removeForward(tab.id, f.forwardId).then((ok) => { if (ok) refresh(); });
-      });
-      row.appendChild(rm);
-      list.appendChild(row);
-    }
-  };
+  // Runtime rows carry their backend forwardId so Remove can address them;
+  // the table hands the same object back to onRemove.
+  interface RuntimeRow extends ForwardEditorValue { forwardId: number }
 
-  const refresh = (): Promise<void> =>
-    listForwards(tab.id).then((forwards) => {
-      if (forwards) renderList(forwards);
+  listForwards(tab.id).then((forwards) => {
+    if (!forwards) return; // toast already shown by listForwards
+    const rows = forwards.map((f) => ({
+      // backend kinds are exactly these three
+      kind: f.kind as ForwardKind,
+      listenHost: f.listenHost,
+      listenPort: f.listenPort,
+      targetHost: f.targetHost,
+      targetPort: f.targetPort,
+      forwardId: f.forwardId,
+    }));
+    const table = createForwardTable(rows, {
+      compact: true,
+      editable: false, // runtime forwards: delete + re-add instead
+      onAdd: (r) => addForward(tab.id, r),
+      onRemove: (r) => removeForward(tab.id, (r as RuntimeRow).forwardId),
     });
-
-  // Compact add form: kind + ports; hosts default to loopback.
-  const form = el("div", "qp-fwd-add");
-  const kind = document.createElement("select");
-  kind.className = "qp-select qp-fwd-kind";
-  kind.setAttribute("aria-label", "Forward kind");
-  for (const [v, text] of [["local", "Local (-L)"], ["remote", "Remote (-R)"]] as const) {
-    const opt = document.createElement("option");
-    opt.value = v;
-    opt.textContent = text;
-    kind.appendChild(opt);
-  }
-  const mkPort = (placeholder: string, label: string): HTMLInputElement => {
-    const input = document.createElement("input");
-    input.className = "qp-input qp-fwd-port";
-    input.type = "number";
-    input.min = "1";
-    input.max = "65535";
-    input.placeholder = placeholder;
-    input.setAttribute("aria-label", label);
-    return input;
-  };
-  const listenPort = mkPort("Listen", "Listen port");
-  const targetHost = document.createElement("input");
-  targetHost.className = "qp-input qp-fwd-host";
-  targetHost.type = "text";
-  targetHost.value = "127.0.0.1";
-  targetHost.spellcheck = false;
-  targetHost.setAttribute("aria-label", "Target host");
-  const targetPort = mkPort("Target", "Target port");
-  const add = document.createElement("button");
-  add.type = "button";
-  add.className = "qp-mini-btn qp-fwd-add-btn";
-  add.textContent = "Add";
-  add.addEventListener("click", () => {
-    const lp = parsePort(listenPort.value);
-    const tp = parsePort(targetPort.value);
-    if (!validForwardPorts(lp, tp)) return;
-    addForward(tab.id, {
-      kind: kind.value,
-      listenHost: "127.0.0.1",
-      listenPort: lp!,
-      targetHost: targetHost.value.trim() || "127.0.0.1",
-      targetPort: tp!,
-    }).then((ok) => {
-      if (!ok) return;
-      listenPort.value = "";
-      targetPort.value = "";
-      refresh();
-    });
+    slot.replaceChildren(table.el);
   });
-  form.appendChild(kind);
-  form.appendChild(listenPort);
-  form.appendChild(el("span", "qp-fwd-arrow", "→"));
-  form.appendChild(targetHost);
-  form.appendChild(targetPort);
-  form.appendChild(add);
-  wrap.appendChild(form);
-
-  refresh();
   return wrap;
 }
 

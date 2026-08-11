@@ -288,26 +288,37 @@ describe("quick panel — serial tab", () => {
 });
 
 describe("quick panel — ssh tab", () => {
-  it("embedded client shows port forwards and adds one inline", async () => {
+  it("embedded client shows the grouped forward table and adds one inline", async () => {
+    invokeMock.mockImplementation((cmd: unknown) => {
+      if (cmd === "ssh_forward_list") return Promise.resolve([]);
+      return Promise.resolve(null);
+    });
     activeTab = fakeTab({ id: "tab-3", type: "ssh", sshEmbedded: true });
     const p = openPanel();
     const sec = p.querySelector('[data-section="ssh"]')!;
     expect(sec.textContent).toContain("Auto-reconnect");
+    // Grouped table: Local/Remote/Dynamic sections with add-rows.
     await vi.waitFor(() => {
-      expect(sec.querySelector(".qp-fwd-empty")).not.toBeNull();
+      expect(sec.querySelectorAll(".ft-group")).toHaveLength(3);
     });
-    const ports = sec.querySelectorAll<HTMLInputElement>(".qp-fwd-port");
-    ports[0].value = "8080";
-    ports[1].value = "80";
-    sec.querySelector<HTMLButtonElement>(".qp-fwd-add-btn")!.click();
-    expect(invokeMock).toHaveBeenCalledWith("ssh_forward_add", {
-      id: "tab-3",
-      kind: "local",
-      listenHost: "127.0.0.1",
-      listenPort: 8080,
-      targetHost: "127.0.0.1",
-      targetPort: 80,
+    const localAdd = sec.querySelectorAll<HTMLElement>(".ft-group")[0]
+      .querySelector<HTMLElement>(".ft-add-row")!;
+    localAdd.querySelector<HTMLInputElement>('input[aria-label="Listen port"]')!.value = "8080";
+    localAdd.querySelector<HTMLInputElement>('input[aria-label="Target host"]')!.value = "db.internal";
+    localAdd.querySelector<HTMLInputElement>('input[aria-label="Target port"]')!.value = "5432";
+    localAdd.querySelector<HTMLButtonElement>(".ft-add")!.click();
+    await vi.waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("ssh_forward_add", {
+        id: "tab-3",
+        kind: "local",
+        listenHost: "127.0.0.1",
+        listenPort: 8080,
+        targetHost: "db.internal",
+        targetPort: 5432,
+      });
     });
+    // Runtime forwards are not inline-editable (delete + re-add instead).
+    expect(sec.querySelector(".ft-edit")).toBeNull();
   });
 
   it("external ssh hides the forwards block", async () => {

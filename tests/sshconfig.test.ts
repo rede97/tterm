@@ -72,6 +72,28 @@ Host db
   it("returns empty array for empty input", () => {
     expect(parseSshConfig("")).toEqual([]);
   });
+
+  it("merges repeated LocalForward/RemoteForward directives instead of dropping them", () => {
+    const hosts = parseSshConfig(`Host db
+    HostName db.internal
+    LocalForward 127.0.0.1:8080 127.0.0.1:80
+    LocalForward 127.0.0.1:5432 db.internal:5432
+    RemoteForward 127.0.0.1:9090 127.0.0.1:3000
+`);
+    expect(hosts).toHaveLength(1);
+    expect(hosts[0].LocalForward).toBe(
+      "127.0.0.1:8080 127.0.0.1:80\n127.0.0.1:5432 db.internal:5432",
+    );
+    expect(hosts[0].RemoteForward).toBe("127.0.0.1:9090 127.0.0.1:3000");
+  });
+
+  it("non-forward repeated keywords keep last-wins behavior", () => {
+    const hosts = parseSshConfig(`Host h
+    HostName a.example.com
+    HostName b.example.com
+`);
+    expect(hosts[0].HostName).toBe("b.example.com");
+  });
 });
 
 describe("generateSshConfig", () => {
@@ -105,5 +127,22 @@ describe("generateSshConfig", () => {
     expect(regenerated).toHaveLength(2);
     expect(regenerated[0]).toMatchObject(original[0]);
     expect(regenerated[1]).toMatchObject(original[1]);
+  });
+
+  it("expands multi-line forward values back to one directive per line", () => {
+    const out = generateSshConfig([
+      {
+        name: "db",
+        HostName: "db.internal",
+        LocalForward: "127.0.0.1:8080 127.0.0.1:80\n127.0.0.1:5432 db.internal:5432",
+      },
+    ]);
+    expect(out).toContain("    LocalForward 127.0.0.1:8080 127.0.0.1:80\n");
+    expect(out).toContain("    LocalForward 127.0.0.1:5432 db.internal:5432\n");
+    // And the expanded form parses back to the same merged value.
+    const reparsed = parseSshConfig(out);
+    expect(reparsed[0].LocalForward).toBe(
+      "127.0.0.1:8080 127.0.0.1:80\n127.0.0.1:5432 db.internal:5432",
+    );
   });
 });

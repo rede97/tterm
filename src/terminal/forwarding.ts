@@ -2,13 +2,14 @@
 // running on the embedded SSH client (src-tauri/src/sshclient.rs).
 //
 // The invoke calls AND their error toasts live here exactly once
-// (listForwards / addForward / removeForward / validForwardPorts): the
+// (listForwards / addForward / removeForward / toastInvalidPorts): the
 // modal below and the quick panel (quickpanel.ts) are two views of the
 // same operations and must give identical feedback.
 
 import { invoke } from "@tauri-apps/api/core";
 import { showToast } from "../ui/toast";
 import { createModal } from "../ui/modal";
+import { createForwardEditor } from "../ui/forwardeditor";
 
 export interface ForwardInfo {
   forwardId: number;
@@ -31,18 +32,9 @@ function errText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-export function parsePort(raw: string): number | null {
-  const n = parseInt(raw, 10);
-  if (!Number.isFinite(n) || n < 1 || n > 65535) return null;
-  return n;
-}
-
-// null = both ports valid; otherwise the shared rejection message (already
-// toasted) and the caller must abort.
-export function validForwardPorts(listenPort: number | null, targetPort: number | null): boolean {
-  if (listenPort !== null && targetPort !== null) return true;
+// The shared rejection toast for an incomplete/invalid editor read.
+export function toastInvalidPorts(): void {
   showToast("Ports must be numbers between 1 and 65535", "error");
-  return false;
 }
 
 // null on failure (toast already shown).
@@ -102,19 +94,7 @@ function openDialog(tabId: string, initial: ForwardInfo[]): void {
         <div class="fwd-add">
           <div class="fwd-add-title">Add Forward</div>
           <div class="fwd-form">
-            <select class="fwd-kind" aria-label="Forward kind">
-              <option value="local">Local (-L): listen here, reach remote target</option>
-              <option value="remote">Remote (-R): listen on server, reach target from here</option>
-            </select>
-            <div class="fwd-form-row">
-              <input class="fwd-host fwd-listen-host" type="text" value="127.0.0.1" spellcheck="false" aria-label="Listen host" />
-              <input class="fwd-port fwd-listen-port" type="number" min="1" max="65535" placeholder="Port" aria-label="Listen port" />
-            </div>
-            <div class="fwd-arrow">&#8595; forwards to &#8595;</div>
-            <div class="fwd-form-row">
-              <input class="fwd-host fwd-target-host" type="text" value="127.0.0.1" spellcheck="false" aria-label="Target host" />
-              <input class="fwd-port fwd-target-port" type="number" min="1" max="65535" placeholder="Port" aria-label="Target port" />
-            </div>
+            <div class="fwd-editor-slot"></div>
             <button class="fwd-add-btn" type="button">Add</button>
           </div>
         </div>
@@ -123,11 +103,8 @@ function openDialog(tabId: string, initial: ForwardInfo[]): void {
   document.body.appendChild(overlay);
 
   const listEl = overlay.querySelector<HTMLElement>(".fwd-list")!;
-  const kindSelect = overlay.querySelector<HTMLSelectElement>(".fwd-kind")!;
-  const listenHostInput = overlay.querySelector<HTMLInputElement>(".fwd-listen-host")!;
-  const listenPortInput = overlay.querySelector<HTMLInputElement>(".fwd-listen-port")!;
-  const targetHostInput = overlay.querySelector<HTMLInputElement>(".fwd-target-host")!;
-  const targetPortInput = overlay.querySelector<HTMLInputElement>(".fwd-target-port")!;
+  const editor = createForwardEditor();
+  overlay.querySelector(".fwd-editor-slot")!.replaceWith(editor.el);
 
   function renderList(forwards: ForwardInfo[]) {
     listEl.innerHTML = "";
@@ -149,6 +126,7 @@ function openDialog(tabId: string, initial: ForwardInfo[]): void {
       const route = document.createElement("span");
       route.className = "fwd-route";
       route.textContent = `${f.listenHost}:${f.listenPort} → ${f.targetHost}:${f.targetPort}`;
+      route.title = route.textContent;
 
       const removeBtn = document.createElement("button");
       removeBtn.className = "fwd-remove";
@@ -172,17 +150,12 @@ function openDialog(tabId: string, initial: ForwardInfo[]): void {
   }
 
   overlay.querySelector<HTMLButtonElement>(".fwd-add-btn")!.addEventListener("click", () => {
-    const kind = kindSelect.value;
-    const listenHost = listenHostInput.value.trim() || "127.0.0.1";
-    const targetHost = targetHostInput.value.trim() || "127.0.0.1";
-    const listenPort = parsePort(listenPortInput.value);
-    const targetPort = parsePort(targetPortInput.value);
-    if (!validForwardPorts(listenPort, targetPort)) return;
-    addForward(tabId, { kind, listenHost, listenPort: listenPort!, targetHost, targetPort: targetPort! })
+    const spec = editor.read();
+    if (!spec) { toastInvalidPorts(); return; }
+    addForward(tabId, spec)
       .then((ok) => {
         if (!ok) return;
-        listenPortInput.value = "";
-        targetPortInput.value = "";
+        editor.reset();
         refresh();
       });
   });

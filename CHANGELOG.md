@@ -1,3 +1,26 @@
+## v0.13.0
+
+New Features
+
+- **SSH host editor** — Settings → SSH now has a real editor window (Add
+  Host / per-card Edit) instead of hand-editing `~/.ssh/config`: alias,
+  hostname, user, port, ForwardAgent/ForwardX11 checkboxes, and port
+  forwards. Changes land in the working copy and persist via Save SSH
+  Config as before; Edit preserves directives the editor doesn't manage
+  (IdentityFile etc.)
+- **Port forwards as a grouped, editable table** — forwards are grouped by
+  direction: Local (-L) / Remote (-R) / Dynamic (-D), each group with a
+  one-line explanation and its own add row (listen side pinned to
+  127.0.0.1; target placeholders locate the side: "Host (Remote)" /
+  "Host (Local)"). Rows can be edited inline or deleted. The same table
+  drives the quick panel's runtime forwards (compact layout) — configured
+  forwards on a host are applied automatically when the embedded client
+  connects (LocalForward / RemoteForward / DynamicForward in ssh config;
+  the system-ssh path keeps using OpenSSH's own handling)
+- **Dynamic (-D) forwards in the embedded SSH client** — a minimal SOCKS5
+  listener (no-auth, CONNECT) bridging each connection to a direct-tcpip
+  channel, with reconnect re-apply like the other kinds
+
 ## v0.12.2
 
 Improvements

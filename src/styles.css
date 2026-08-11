@@ -531,54 +531,37 @@ body {
   padding-top: 2px;
 }
 
-.qp-fwd-list {
-  max-height: 120px;
+/* Quick-panel forwards: the grouped table (ui/forwardtable.ts) in compact
+   mode — rows stack listen / target on two lines so addresses never clip
+   in the narrow panel. */
+.qp-fwd-slot {
+  max-height: 320px;
   overflow-y: auto;
+  padding: 4px 8px 8px;
 }
 
-.qp-fwd-empty {
-  padding: 4px 12px;
-  font-size: 12px;
-  color: #888888;
+.ft-compact .ft-row {
+  grid-template-columns: 1fr auto;
+  row-gap: 2px;
 }
 
-.qp-fwd-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 12px;
-  font-size: 12px;
+.ft-compact .ft-listen {
+  grid-column: 1;
+  grid-row: 1;
 }
 
-.qp-fwd-route {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.ft-compact .ft-actions {
+  grid-column: 2;
+  grid-row: 1;
 }
 
-.qp-fwd-add {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 12px 4px;
+.ft-compact .ft-target {
+  grid-column: 1 / -1;
+  grid-row: 2;
 }
 
-.qp-fwd-add .qp-fwd-port {
-  width: 52px;
-}
-
-.qp-fwd-add .qp-fwd-host {
-  width: 84px;
-}
-
-.qp-fwd-kind {
-  flex-shrink: 0;
-}
-
-.qp-fwd-arrow {
-  color: #888888;
-  flex-shrink: 0;
+.ft-compact .ft-port {
+  width: 56px;
 }
 
 .win-btn {
@@ -2727,52 +2710,102 @@ input[type="number"] {
   gap: 8px;
 }
 
-.fwd-kind {
-  width: 100%;
-  padding: 6px 8px;
-  background: #3a3a3a;
-  border: 1px solid #4a4a4a;
-  border-radius: 4px;
-  color: #d4d4d4;
-  font-size: 12px;
-  outline: none;
-}
-
-.fwd-form-row {
+/* Directional forward editor (ui/forwardeditor.ts) — shared by the
+   forwarding dialog, the quick panel and the SSH add-host form.
+   Horizontal by default; .xfe-stacked flips to one row per endpoint for
+   narrow containers. */
+.xfe {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
 }
 
-.fwd-form-row input {
-  padding: 6px 8px;
-  background: #3a3a3a;
-  border: 1px solid #4a4a4a;
-  border-radius: 4px;
-  color: #d4d4d4;
-  font-size: 12px;
-  outline: none;
+.xfe-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
 }
 
-.fwd-form-row input:focus {
-  border-color: #6bb8ff;
-}
-
-.fwd-host {
+.xfe-col {
   flex: 1;
   min-width: 0;
 }
 
-.fwd-port {
-  width: 90px;
-  flex-shrink: 0;
+.xfe-col-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  margin-bottom: 4px;
+  user-select: none;
 }
 
-.fwd-arrow {
-  color: #888;
-  font-size: 11px;
-  text-align: center;
+/* Host+port read as ONE address group: shared border, radius only on the
+   outer corners. */
+.xfe-fields {
+  display: flex;
+}
+
+.xfe-host,
+.xfe-port {
+  padding: 6px 8px;
+  background: #3a3a3a;
+  border: 1px solid #4a4a4a;
+  color: #d4d4d4;
+  font-size: 12px;
+  outline: none;
+}
+
+.xfe-host {
+  flex: 1;
+  min-width: 0;
+  border-radius: 4px 0 0 4px;
+}
+
+.xfe-host.xfe-locked {
+  opacity: 0.55;
+}
+
+.xfe-port {
+  width: 76px;
+  flex-shrink: 0;
+  border-radius: 0 4px 4px 0;
+  margin-left: -1px; /* collapse the shared edge */
+}
+
+.xfe-stacked .xfe-port {
+  width: 88px;
+}
+
+.xfe-host:focus,
+.xfe-port:focus {
+  border-color: #6bb8ff;
+  position: relative; /* focused border wins over the joined edge */
+  z-index: 1;
+}
+
+.xfe-arrow {
+  background: transparent;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  color: #4da6ff;
+  font-size: 14px;
+  line-height: 1;
+  padding: 6px 10px;
+  margin-bottom: 1px;
+  cursor: pointer;
+  flex-shrink: 0;
   user-select: none;
+}
+
+.xfe-stacked .xfe-arrow {
+  align-self: center;
+  margin-bottom: 0;
+}
+
+.xfe-arrow:hover {
+  background: #3a3a3a;
+  border-color: #6bb8ff;
 }
 
 .fwd-add-btn {
@@ -2788,6 +2821,229 @@ input[type="number"] {
 
 .fwd-add-btn:hover {
   background: #1177bb;
+}
+
+/* SSH host editor modal (settings/sshhosteditor.ts). */
+.she-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+}
+
+.she-dialog {
+  background: #252526;
+  border: 1px solid #3e3e42;
+  border-radius: 8px;
+  padding: 16px 20px;
+  width: 560px;
+  max-width: 92vw;
+  max-height: 86vh;
+  overflow-y: auto;
+}
+
+.she-header {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 14px;
+}
+
+.she-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+}
+
+.she-field span {
+  display: block;
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.she-field .settings-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.she-opts {
+  display: flex;
+  gap: 20px;
+  margin-top: 12px;
+}
+
+.she-opt {
+  font-size: 12px;
+}
+
+.she-fwd-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ccc;
+  margin: 14px 0 6px;
+}
+
+.she-fwd-hint {
+  font-weight: 400;
+  font-size: 11px;
+  color: #888;
+  margin-left: 6px;
+}
+
+.she-footer {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.she-spacer {
+  flex: 1;
+}
+
+/* Forward table (ui/forwardtable.ts) — three direction groups, each with
+   its own rows and add-row. Rows share one column track per group. */
+.ft {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.ft-group {
+  border: 1px solid #3e3e42;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.ft-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 10px;
+  background: #2a2a2d;
+  user-select: none;
+}
+
+.ft-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ft-g-local { color: #4da6ff; }
+.ft-g-remote { color: #b586d8; }
+.ft-g-dynamic { color: #4ec9b0; }
+
+.ft-group-desc {
+  font-size: 11px;
+  color: #888;
+}
+
+.ft-row {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-top: 1px solid #2e2e32;
+}
+
+.ft-listen,
+.ft-target {
+  font-family: Consolas, "JetBrains Mono", monospace;
+  color: #aaa;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ft-socks {
+  color: #777;
+  font-style: italic;
+}
+
+.ft-pin {
+  color: #777;
+  font-family: Consolas, "JetBrains Mono", monospace;
+  user-select: none;
+}
+
+.ft-cell input {
+  background: #1e1e1e;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  color: #d4d4d4;
+  font-size: 12px;
+  padding: 4px 6px;
+  outline: none;
+  min-width: 0;
+}
+
+.ft-cell input:focus {
+  border-color: #6bb8ff;
+}
+
+.ft-cell input.ft-invalid {
+  border-color: #c5392f;
+}
+
+.ft-host {
+  width: 100%;
+  box-sizing: border-box;
+  flex: 1;
+}
+
+.ft-port {
+  width: 64px;
+  flex-shrink: 0;
+}
+
+.ft-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.ft-btn {
+  background: #3a3a3a;
+  border: none;
+  border-radius: 3px;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+.ft-btn:hover {
+  background: #4a4a4a;
+  color: #fff;
+}
+
+.ft-ok:hover { background: #0e639c; }
+.ft-del:hover { background: #a1260d; }
+
+.ft-add {
+  background: #0e639c;
+  color: #fff;
+  padding: 4px 14px;
+}
+
+.ft-add:hover {
+  background: #1177bb;
+}
+
+.ft-add-row {
+  background: #1d1d1f;
 }
 
 /* Serial profile cards (gallery reuses .theme-card/.theme-grid) */
