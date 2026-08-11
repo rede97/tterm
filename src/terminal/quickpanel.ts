@@ -467,6 +467,12 @@ export function closeQuickPanel(): void {
   panel?.classList.remove("open");
 }
 
+/// Hide the panel if it is bound to the given (closing) tab — a panel
+/// must not outlive the tab whose session it drives.
+export function closeQuickPanelForTab(tabId: string): void {
+  if (panelTabId === tabId) closeQuickPanel();
+}
+
 function togglePanel(): void {
   if (panelTabId !== null) {
     closeQuickPanel();

@@ -9,11 +9,25 @@ import { findSerialProfile } from "../config/serial-profiles";
 import { addForward, type NewForward } from "./forwarding";
 import { showToast } from "../ui/toast";
 import { TerminalTab } from "./tab";
-import { updateQuickButton, closeQuickPanel } from "./quickpanel";
+import { updateQuickButton, closeQuickPanel, closeQuickPanelForTab } from "./quickpanel";
+import { closeFindForTab } from "./search";
 import { notifyTrayTabs, setTrayTabsProvider } from "../core/traytabs";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import Sortable from "sortablejs";
+
+/// Toggle the strip's layout-state classes from live metrics:
+/// `overflowing` (strip scrolls → +/dropdown pin), `can-scroll-left`
+/// (tabs occluded on the left → left edge shadow) and `can-scroll-right`
+/// (more tabs off-screen right → right edge shadow).
+export function syncTabStripState(el: HTMLElement): void {
+  el.classList.toggle("overflowing", el.scrollWidth > el.clientWidth + 1);
+  el.classList.toggle("can-scroll-left", el.scrollLeft > 1);
+  el.classList.toggle(
+    "can-scroll-right",
+    el.scrollWidth - el.clientWidth - el.scrollLeft > 1,
+  );
+}
 
 export class TabManager {
   tabs = new Map<string, TerminalTab>();
@@ -69,6 +83,9 @@ export class TabManager {
   // Must be called after the real containers are injected (the module-level
   // singleton is constructed with nulls).
   initSortable(): void {
+    // Edge shadows track scrolling itself, not just structural changes
+    // (add/close/resize already funnel through _syncTabsOverflow).
+    this.tabsContainer.addEventListener("scroll", () => this._syncTabsOverflow(), { passive: true });
     new Sortable(this.tabsContainer, {
       animation: 150,
       direction: "horizontal",
@@ -80,6 +97,9 @@ export class TabManager {
       onEnd: () => {
         this._syncTabOrderFromDom();
         this.refreshBadges();
+        // The tray submenu carries positional indices — keep it in sync
+        // with the new order or it activates the wrong tab.
+        notifyTrayTabs();
       },
     });
   }
@@ -435,12 +455,23 @@ export class TabManager {
     }
   }
 
+  private _closing = new Set<string>();
+
   async closeTab(id: string): Promise<void> {
     const tab = this.tabs.get(id);
-    if (!tab) return;
+    // Re-entry guard: a second closeTab(id) while the first awaits
+    // pty_kill would run the whole teardown twice (double pty_kill,
+    // double terminal.dispose).
+    if (!tab || this._closing.has(id)) return;
+    this._closing.add(id);
+    try {
+      if (tab.shared) invoke("share_revoke", { id }).catch(() => { });
+      // UI close must not depend on the backend ack.
+      await invoke("pty_kill", { id }).catch(() => { });
 
-    if (tab.shared) invoke("share_revoke", { id }).catch(() => { });
-    await invoke("pty_kill", { id });
+      // Panels bound to the dying tab must not outlive it.
+      closeQuickPanelForTab(id);
+      closeFindForTab(id);
 
     // Find the next live tab to the right. Non-tab elements share the #tabs
     // container (the new-tab group is the last flex item), and the settings
@@ -470,6 +501,9 @@ export class TabManager {
     this.refreshBadges();
     updateQuickButton();
     notifyTrayTabs();
+    } finally {
+      this._closing.delete(id);
+    }
   }
 
   get(id: string): TerminalTab | undefined {
@@ -513,8 +547,7 @@ export class TabManager {
   // #new-tab-group go sticky (otherwise sticky misaligns it). Width changes
   // land here via refreshBadges (tab add/close) and _onResize.
   private _syncTabsOverflow(): void {
-    const el = this.tabsContainer;
-    el.classList.toggle("overflowing", el.scrollWidth > el.clientWidth + 1);
+    syncTabStripState(this.tabsContainer);
   }
 
   // -- tab features --
@@ -672,12 +705,19 @@ export class TabManager {
       this.settingsTabEl.appendChild(closeBtn);
       this.settingsTabEl.addEventListener("click", () => this.toggleSettings());
       this.tabsContainer.insertBefore(this.settingsTabEl, this.tabsContainer.firstChild);
+      this._syncTabsOverflow();
     }
     this.settingsTabEl.classList.add("active");
     const sCloseBtn = this.settingsTabEl.querySelector(".tab-close") as HTMLElement;
     if (sCloseBtn) sCloseBtn.style.opacity = "1";
 
-    this.settingsEl = await this._createSettingsContent();
+    const settingsEl = await this._createSettingsContent();
+    // The factory is a dynamic import — genuinely async. If the user
+    // closed settings (or switched to a tab) while it was in flight,
+    // discard the page: appending it now would stick it on screen with
+    // no live settings tab to dismiss it.
+    if (!this.settingsOpen) return;
+    this.settingsEl = settingsEl;
     this.terminalContainer.appendChild(this.settingsEl);
   }
 
@@ -690,6 +730,7 @@ export class TabManager {
       if (restore) {
         this.settingsTabEl.remove();
         this.settingsTabEl = null;
+        this._syncTabsOverflow();
       } else {
         this.settingsTabEl.classList.remove("active");
         const sCloseBtn = this.settingsTabEl.querySelector(".tab-close") as HTMLElement;

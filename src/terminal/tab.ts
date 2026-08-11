@@ -578,6 +578,9 @@ export class TerminalTab {
   fitDeferred(): void {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
+        // The tab may have been closed within these two frames — fit()
+        // on a disposed terminal throws (render service is gone).
+        if (this._destroyed) return;
         if (this.element.style.display === "none") return;
         const { cols, rows } = this.fit();
         this.needsResize = false;
@@ -641,7 +644,12 @@ export class TerminalTab {
     return buildShareScreenshot(this, scale);
   }
 
+  // Set by destroy(); pending async work (fitDeferred's double-rAF)
+  // checks it before touching the disposed terminal.
+  private _destroyed = false;
+
   destroy(): void {
+    this._destroyed = true;
     // Stop pending re-attach retries and stale socket callbacks.
     this.socketGen++;
     this._clearReattachTimer();

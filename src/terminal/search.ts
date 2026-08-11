@@ -1,4 +1,4 @@
-﻿import { tabManager } from "./tabmanager";
+import { tabManager } from "./tabmanager";
 import { createElement, ChevronUp, ChevronDown, X } from "lucide";
 
 // -- DOM --
@@ -43,6 +43,15 @@ export function closeFind() {
 
   searchBar.style.display = "none";
   if (tab) tab.terminal.focus();
+}
+
+/// Called when a tab closes: hide the find bar if it was bound to that
+/// tab — otherwise it floats over the next tab with dead find actions.
+export function closeFindForTab(tabId: string): void {
+  if (searchInput.dataset.tabId === tabId) {
+    searchInput.dataset.tabId = "";
+    searchBar.style.display = "none";
+  }
 }
 
 function doFindNext() {

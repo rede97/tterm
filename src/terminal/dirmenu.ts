@@ -128,8 +128,11 @@ export function showDirectoryMenu(anchor: HTMLElement): void {
     if (e.key === "Escape") closeDirectoryMenu();
   };
   // Delay the outside-click hookup so the opening right-click doesn't
-  // immediately dismiss the menu.
+  // immediately dismiss the menu. Bail if the menu was closed within
+  // this tick — registering now would leak permanent document listeners
+  // bound to a detached menu.
   setTimeout(() => {
+    if (menuEl !== menu) return;
     document.addEventListener("mousedown", onDocClick);
     document.addEventListener("keydown", onKey);
   }, 0);
