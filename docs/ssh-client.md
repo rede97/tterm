@@ -118,14 +118,19 @@ host is optional everywhere and defaults to 127.0.0.1.
 - `ssh_list_keys` — key pairs in ~/.ssh (orphan .pub files skipped), with
   SHA256 fingerprints.
 - `ssh_install_pubkey` — connect (same host-key + auth chain as sessions),
-  then probe the remote shell in order: `sh -c "uname -s"` → `ver` (cmd)
-  → `$PSVersionTable` (powershell); first exit-0 wins. `target_os`
-  ("windows"/"linux"/"macos") narrows the probe list. Per shell family:
-  prepare `~/.ssh` + `authorized_keys`, dedup-check, append. Key comments
-  are stripped to "algo base64" before upload (free-form comments break
-  shell quoting). Windows targets: administrator accounts may require
-  `administrators_authorized_keys` — the UI warns; we don't write
-  ProgramData.
+  then probe the remote shell in order: `$PSVersionTable` (powershell) →
+  `ver` (cmd) → `sh -c "uname -s"`; first exit-0 wins. sh is probed LAST
+  on purpose: the powershell/cmd probes can only be answered by the
+  default shell itself, but on Windows hosts with Git for Windows the
+  default shell spawns sh.exe from PATH and answers the sh probe too
+  (MINGW64_NT) — sh-first misclassified those as Posix, and the
+  `&&`-chained POSIX prepare is a syntax error on PowerShell 5.1.
+  `target_os` ("windows"/"linux"/"macos") narrows the probe list. Per
+  shell family: prepare `~/.ssh` + `authorized_keys`, dedup-check, append.
+  Key comments are stripped to "algo base64" before upload (free-form
+  comments break shell quoting). Windows targets: administrator accounts
+  may require `administrators_authorized_keys` — the UI warns; we don't
+  write ProgramData.
 - **Gotcha — exec EOF race**: sshd delivers a fast command's stdout EOF
   BEFORE it reaps the process and sends exit-status. `exec_capture` must
   read until channel Close; breaking on Eof loses the exit status randomly

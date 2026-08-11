@@ -116,7 +116,7 @@ export function showInstallKeyModal(target: InstallTarget): void {
       </select>
       <div style="margin-bottom:4px;">Target system:</div>
       <select class="settings-input ski-os" style="width:100%;">
-        <option value="auto" selected>Auto-detect (tries sh → cmd → powershell)</option>
+        <option value="auto" selected>Auto-detect (tries powershell → cmd → sh)</option>
         <option value="windows">Windows</option>
         <option value="linux">Linux</option>
         <option value="macos">macOS</option>

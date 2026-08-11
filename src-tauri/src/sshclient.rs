@@ -1230,15 +1230,28 @@ impl TargetShell {
 
 /// Probe commands in order; the first that exits 0 identifies the shell.
 /// `target_os` ("windows" | "linux" | "macos") narrows the candidate list.
+///
+/// Order matters. The PowerShell and cmd probes can only be answered by
+/// the default shell itself (`$PSVersionTable` is a syntax error or
+/// unknown command everywhere else; `ver` exists only in cmd). The sh
+/// probe is NOT decisive: on Windows hosts with Git for Windows, sh.exe
+/// sits on PATH and PowerShell/cmd will spawn it, so such a target
+/// answers `sh -c "uname -s"` with MINGW64_NT and exit 0. Probing sh
+/// first misclassified those hosts as Posix, and the
+/// `mkdir … && chmod …` prepare then died outright — PowerShell 5.1 has
+/// no `&&`. So sh goes LAST: it only ever matches hosts whose default
+/// shell genuinely is a POSIX shell (including Windows sshd configured
+/// with Git Bash as the default shell, where the POSIX steps do work —
+/// bash executes them and ~ maps to %USERPROFILE%).
 fn probe_plan(target_os: Option<&str>) -> Vec<(TargetShell, &'static str)> {
     const POSIX: (TargetShell, &str) = (TargetShell::Posix, "sh -c \"uname -s\"");
     const CMD: (TargetShell, &str) = (TargetShell::WindowsCmd, "ver");
     const PS: (TargetShell, &str) =
         (TargetShell::WindowsPowerShell, "$PSVersionTable.PSVersion | Out-Null");
     match target_os {
-        Some("windows") => vec![CMD, PS],
+        Some("windows") => vec![PS, CMD],
         Some("linux") | Some("macos") => vec![POSIX],
-        _ => vec![POSIX, CMD, PS],
+        _ => vec![PS, CMD, POSIX],
     }
 }
 
@@ -1358,7 +1371,7 @@ async fn install_pubkey_with(
         }
     }
     let shell = shell.ok_or_else(|| {
-        "could not detect the remote shell (tried sh / cmd / powershell)".to_string()
+        "could not detect the remote shell (tried powershell / cmd / sh)".to_string()
     })?;
 
     let steps = install_steps(shell, &key);
@@ -1383,7 +1396,7 @@ async fn install_pubkey_with(
 }
 
 /// Install a local public key on a remote host (ssh-copy-id equivalent).
-/// `target_os`: "auto" (probe sh → cmd → powershell) or a restriction to
+/// `target_os`: "auto" (probe powershell → cmd → sh) or a restriction to
 /// "windows" / "linux" / "macos".
 #[tauri::command]
 pub async fn ssh_install_pubkey(
@@ -1440,6 +1453,26 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
         Posix,
         WindowsCmd,
         WindowsPs,
+        // Windows hosts with Git for Windows on PATH: the default shell
+        // (cmd / PowerShell) spawns sh.exe for the `sh -c "uname -s"`
+        // probe, so that probe exits 0 even though the host is Windows.
+        WindowsCmdWithSh,
+        WindowsPsWithSh,
+    }
+
+    impl ExecSim {
+        fn answers_sh(self) -> bool {
+            matches!(
+                self,
+                ExecSim::Posix | ExecSim::WindowsCmdWithSh | ExecSim::WindowsPsWithSh
+            )
+        }
+        fn answers_cmd(self) -> bool {
+            matches!(self, ExecSim::WindowsCmd | ExecSim::WindowsCmdWithSh)
+        }
+        fn answers_ps(self) -> bool {
+            matches!(self, ExecSim::WindowsPs | ExecSim::WindowsPsWithSh)
+        }
     }
 
     struct ServerState {
@@ -1581,11 +1614,11 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
                 (st.exec_sim, st.key_present)
             };
             let status = if cmd.contains("uname -s") {
-                (sim != ExecSim::Posix) as u32
+                !sim.answers_sh() as u32
             } else if cmd.trim() == "ver" {
-                (sim != ExecSim::WindowsCmd) as u32
+                !sim.answers_cmd() as u32
             } else if cmd.contains("$PSVersionTable") {
-                (sim != ExecSim::WindowsPs) as u32
+                !sim.answers_ps() as u32
             } else if cmd.contains("grep -qxF")
                 || cmd.contains("findstr")
                 || cmd.contains("Get-Content")
@@ -2109,6 +2142,23 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             let log = state.lock().exec_log.join("\n");
             assert!(log.contains("Add-Content"), "ps append: {log}");
 
+            // Regression: Windows hosts with Git for Windows on PATH answer
+            // the `sh -c "uname -s"` probe (the default shell spawns sh.exe).
+            // Detection must still pick the real default shell — the POSIX
+            // `&&` prepare chain is a syntax error on PowerShell 5.1.
+            let (port, state) = spawn_exec_server(ExecSim::WindowsPsWithSh, false).await;
+            let res = install(port, None, "inst-ps-git").await.expect("install ps+git");
+            assert_eq!(res.shell, "windows-powershell");
+            let log = state.lock().exec_log.join("\n");
+            assert!(log.contains("Add-Content"), "ps append: {log}");
+            assert!(!log.contains("chmod"), "posix steps must not run: {log}");
+
+            let (port, state) = spawn_exec_server(ExecSim::WindowsCmdWithSh, false).await;
+            let res = install(port, None, "inst-cmd-git").await.expect("install cmd+git");
+            assert_eq!(res.shell, "windows-cmd");
+            let log = state.lock().exec_log.join("\n");
+            assert!(log.contains("%USERPROFILE%\\.ssh\\authorized_keys"), "cmd append: {log}");
+
             // OS restriction narrows the probes: "windows" on a posix target
             // must fail detection instead of falling back to sh syntax.
             let (port, _state) = spawn_exec_server(ExecSim::Posix, false).await;
@@ -2116,6 +2166,60 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
                 .await
                 .expect_err("restricted detection must fail");
             assert!(err.contains("could not detect"), "{err}");
+        });
+    }
+
+    /// Live smoke test against a real SSH host — ignored by default.
+    ///
+    ///     TTERM_LIVE=user:password@host[:port] cargo test live_install_pubkey -- --ignored --nocapture
+    ///
+    /// Generates a throwaway key pair, installs the public half through the
+    /// real auto-detect path, and prints the detected shell + outcome. The
+    /// installed authorized_keys line is left on the server.
+    #[test]
+    #[ignore = "needs a real SSH host via TTERM_LIVE=user:password@host[:port]"]
+    fn live_install_pubkey() {
+        tauri::async_runtime::block_on(async {
+            let live = std::env::var("TTERM_LIVE").expect("set TTERM_LIVE=user:password@host[:port]");
+            let (creds, hostport) = live.rsplit_once('@').expect("TTERM_LIVE needs user:pass@host");
+            let (user, password) = creds.split_once(':').expect("TTERM_LIVE needs user:password@host");
+            let (hostname, port) = match hostport.rsplit_once(':') {
+                Some((h, p)) => (h.to_string(), p.parse().expect("bad port")),
+                None => (hostport.to_string(), 22),
+            };
+
+            struct LivePrompter(String);
+            impl Prompter for LivePrompter {
+                fn ask_secret(&self, _kind: &str, _prompt: String) -> BoxFuture<Option<String>> {
+                    let pw = self.0.clone();
+                    Box::pin(async move { Some(pw) })
+                }
+                fn confirm_host_key(&self, info: HostKeyPrompt) -> BoxFuture<bool> {
+                    Box::pin(async move {
+                        eprintln!("accepting host key {} {}", info.key_type, info.fingerprint);
+                        true
+                    })
+                }
+            }
+
+            let dir = std::env::temp_dir().join(format!("tterm-live-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let key = keygen_in(&dir, "ed25519", "id_live", None).expect("keygen");
+
+            let spec = EmbeddedSshSpec {
+                hostname: hostname.clone(),
+                port,
+                user: user.to_string(),
+                identity_file: None, // mirror the app: probe default ~/.ssh keys first
+            };
+            let kh = temp_known_hosts("live");
+            let _ = std::fs::remove_file(&kh);
+            let res = install_pubkey_with(&spec, &key.public_key, None, Arc::new(LivePrompter(password.to_string())), Some(kh))
+                .await
+                .expect("live install failed");
+            eprintln!("live install on {user}@{hostname}:{port}: shell={} outcome={}", res.shell, res.outcome);
+
+            let _ = std::fs::remove_dir_all(&dir);
         });
     }
 }
