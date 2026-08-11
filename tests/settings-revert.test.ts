@@ -13,11 +13,13 @@ vi.mock("@tauri-apps/api/app", () => ({ getVersion: () => Promise.resolve("1.0.1
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
 
 import { createSettingsContent } from "../src/settings/index";
+import { resetSshConfigDirty } from "../src/settings/ssh";
 import { configStore } from "../src/core/store";
 
 beforeEach(() => {
   document.body.innerHTML = "";
   invokeMock.mockClear();
+  resetSshConfigDirty();
   configStore.set({
     sshHosts: [{ name: "LocalMyPC", hostname: "192.168.1.7", user: "rede" }],
     hiddenSshHosts: [],
@@ -79,5 +81,34 @@ describe("settings — Revert", () => {
     expect(root.querySelectorAll(".settings-nav-item")).toHaveLength(5);
     expect(root.querySelectorAll('.settings-panel-content[data-panel="ssh"]')).toHaveLength(1);
     expect(root.querySelectorAll(".ssh-host-card")).toHaveLength(1);
+  });
+});
+
+describe("settings — footer SSH dirty hint", () => {
+  it("hidden when clean, appears in real time on a working-copy edit", () => {
+    const root = createSettingsContent();
+    document.body.appendChild(root);
+    const hint = root.querySelector<HTMLElement>("#ssh-dirty-hint")!;
+    expect(hint.textContent).toContain("SSH Config");
+    expect(hint.style.display).toBe("none");
+
+    // Delete a host via the embedded ssh panel → footer hint appears,
+    // without any panel switch or save.
+    root.querySelector<HTMLButtonElement>(".ssh-btn-delete")!.click();
+    expect(hint.style.display).toBe("");
+  });
+
+  it("reflects a dirty state left over from a previous settings visit", () => {
+    // Simulate: user edited, closed settings without saving. The flag
+    // survives (module state), so the next settings page opens with the
+    // hint already showing.
+    const first = createSettingsContent();
+    document.body.appendChild(first);
+    first.querySelector<HTMLButtonElement>(".ssh-btn-delete")!.click();
+    first.remove();
+
+    const reopened = createSettingsContent();
+    document.body.appendChild(reopened);
+    expect(reopened.querySelector<HTMLElement>("#ssh-dirty-hint")!.style.display).toBe("");
   });
 });

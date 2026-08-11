@@ -147,8 +147,9 @@ export function renderThemeGallery(root: HTMLElement): void {
     card.addEventListener("click", () => {
       root.dataset.themeName = t.name;
       renderThemeGallerySelection(root);
-      const evt = new CustomEvent("tterm-settings-changed");
-      root.dispatchEvent(evt);
+      // The settings shell listens on the appearance PANEL; dispatching on
+      // root would never reach it (events bubble up, not down).
+      card.dispatchEvent(new CustomEvent("tterm-settings-changed", { bubbles: true }));
     });
     grid.appendChild(card);
   };

@@ -13,13 +13,21 @@ export function createProfilePanel(): HTMLElement {
   return panel;
 }
 
+// Panel-scoped re-render (same contract as refreshSshPanel): rebuilds the
+// option/checkbox lists from the store, so Revert also picks up WT
+// profiles that changed on disk — an in-place value refresh can't.
 export function refreshProfilePanel(root: HTMLElement): void {
-  renderProfilePanel(root);
+  const panel = root.querySelector<HTMLElement>('.settings-panel-content[data-panel="profile"]');
+  if (panel) renderProfilePanel(panel);
 }
 
 function renderProfilePanel(container: HTMLElement) {
   const localProfiles = configStore.get("localProfiles");
   const hiddenProfiles = configStore.get("hiddenProfiles");
+  // The select must OPEN on the configured default — an unmarked select
+  // falls back to the first option and the next Apply silently rewrites
+  // defaultLocalProfile to it.
+  const defaultProfile = configStore.get("defaultLocalProfile") ?? localProfiles[0]?.name ?? "";
 
   container.innerHTML = `
     <div class="settings-section">
@@ -30,7 +38,7 @@ function renderProfilePanel(container: HTMLElement) {
         </div>
         <div class="settings-item-control">
           <select id="set-default-profile" class="settings-select">
-            ${localProfiles.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("")}
+            ${localProfiles.map(p => `<option value="${esc(p.name)}" ${p.name === defaultProfile ? "selected" : ""}>${esc(p.name)}</option>`).join("")}
           </select>
         </div>
       </div>
@@ -54,6 +62,12 @@ function renderProfilePanel(container: HTMLElement) {
       }).join("")}
     </div>
   `;
+
+  // Set the value imperatively too: the `selected` attribute alone covers
+  // browsers, but select value-from-attribute on innerHTML re-parse is a
+  // known jsdom gap (and costs nothing in real engines).
+  const sel = container.querySelector<HTMLSelectElement>("#set-default-profile");
+  if (sel && sel.options.length > 0) sel.value = defaultProfile;
 }
 
 export function collectProfileSettings(root: HTMLElement): Partial<ConfigState> {
@@ -67,17 +81,5 @@ export function collectProfileSettings(root: HTMLElement): Partial<ConfigState> 
   checks.forEach(c => { if (!c.checked) hidden.push(c.value); });
   partial.hiddenProfiles = hidden;
   return partial;
-}
-
-export function refreshProfilePanelForm(root: HTMLElement): void {
-  const profileEl = root.querySelector("#set-default-profile") as HTMLSelectElement;
-  const checks = root.querySelectorAll<HTMLInputElement>(".wt-profile-check");
-  if (profileEl && profileEl.options.length > 0) {
-    profileEl.value = configStore.get("defaultLocalProfile") ?? configStore.get("localProfiles")[0]?.name ?? "";
-  }
-  const hiddenProfiles = configStore.get("hiddenProfiles");
-  checks.forEach(c => {
-    c.checked = !hiddenProfiles.includes(c.value);
-  });
 }
 

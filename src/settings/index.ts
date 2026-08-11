@@ -1,12 +1,12 @@
-﻿// Settings shell — sidebar navigation, footer (Apply/Revert), panel routing.
+// Settings shell — sidebar navigation, footer (Apply/Revert), panel routing.
 // Delegates panel content to settings-*.ts modules.
 
 import { configStore } from "../core/store";
 import { parseFontFamily, updateFontStack } from "../util/fontconfig";
 import { createGeneralPanel, refreshGeneralPanel, collectGeneralSettings } from "./general";
 import { createAppearancePanel, refreshAppearancePanel, collectAppearanceSettings, renderThemeGallery } from "./appearance";
-import { createProfilePanel, collectProfileSettings, refreshProfilePanelForm } from "./profile";
-import { createSshPanel, refreshSshPanel, collectSshSettings } from "./ssh";
+import { createProfilePanel, collectProfileSettings, refreshProfilePanel } from "./profile";
+import { createSshPanel, refreshSshPanel, collectSshSettings, isSshConfigDirty } from "./ssh";
 import { createSerialPanel, collectSerialSettings, refreshSerialPanel } from "./serial";
 import { loadAllWtData } from "../config/wt-profiles";
 import { setWtThemes } from "../util/themes";
@@ -65,6 +65,15 @@ export function createSettingsContent(): HTMLElement {
   feedback.className = "settings-feedback";
   footer.appendChild(feedback);
 
+  // Persistent SSH-config dirty hint in the footer bar, next to the
+  // transient feedback — visible in real time no matter which panel is
+  // active. Driven by the ssh panel's tterm-ssh-dirty events.
+  const sshDirty = document.createElement("span");
+  sshDirty.id = "ssh-dirty-hint";
+  sshDirty.style.cssText = `color:#e8a33d;margin-right:10px;${isSshConfigDirty() ? "" : "display:none;"}`;
+  sshDirty.textContent = "● SSH Config edited — unsaved";
+  footer.appendChild(sshDirty);
+
   const spacer = document.createElement("div");
   spacer.style.flex = "1";
   footer.appendChild(spacer);
@@ -103,11 +112,17 @@ export function createSettingsContent(): HTMLElement {
   body.appendChild(footer);
   root.appendChild(body);
 
-  // Enable Apply on any input change
-  root.querySelectorAll("input, select").forEach(el => {
-    el.addEventListener("input", () => applyBtn.classList.remove("applied"));
-    el.addEventListener("change", () => applyBtn.classList.remove("applied"));
-  });
+  // Enable Apply on any input change. Delegated on root, not per-element:
+  // panels re-render their controls (SSH panel on host save/delete/reload,
+  // profile panel on refresh) and listeners bound to the old nodes would
+  // be lost with them.
+  for (const ev of ["input", "change"] as const) {
+    root.addEventListener(ev, (e) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) {
+        applyBtn.classList.remove("applied");
+      }
+    });
+  }
 
   // Sidebar navigation
   const navItems = root.querySelectorAll(".settings-nav-item");
@@ -138,13 +153,19 @@ export function createSettingsContent(): HTMLElement {
     applyBtn.classList.remove("applied");
   });
 
+  // SSH config dirty state — pushed by the ssh panel (Add/Edit/Delete/
+  // drag/Save/Reload), shown persistently in the footer.
+  root.addEventListener("tterm-ssh-dirty", (e) => {
+    sshDirty.style.display = (e as CustomEvent).detail ? "" : "none";
+  });
+
   return root;
 }
 
 function refreshAll(root: HTMLElement) {
   refreshGeneralPanel(root);
   refreshAppearancePanel(root);
-  refreshProfilePanelForm(root);
+  refreshProfilePanel(root);
   refreshSshPanel(root);
   refreshSerialPanel(root);
   renderThemeGallery(root);
