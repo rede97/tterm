@@ -1,3 +1,12 @@
+## v1.0.1
+
+Fixes
+
+- **SSH key upload failed on Windows targets running PowerShell with Git
+  installed** — shell auto-detection mistook the host for Linux (Git's
+  sh.exe answered the detection probe) and then ran Linux shell commands
+  the target can't parse. Detection now tries PowerShell → cmd → sh
+
 ## v1.0.0
 
 New Features
