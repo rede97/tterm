@@ -31,6 +31,8 @@ src/
   main.ts               app entry: init TabManager, WS bridge, settings button, welcome backdrop
   terminal/
     tab.ts              TerminalTab class (one per tab: terminal, xterm, DOM, IME wiring)
+    fit.ts              computeGrid — pure grid-fit calc (hysteresis + cell metrics)
+    xtermfactory.ts     createXterm — Terminal construction + addon assembly
     tabmanager.ts       TabManager singleton (tab Map, active tab, settings tab, sortable)
     batchattach.ts      BatchAttachAddon — coalesces WS frames before terminal.write (see below)
     contextmenu.ts      tab-bar menu + shift-right-click terminal menu
@@ -59,6 +61,7 @@ src/
   util/
     imebox.ts           floating IME composition mirror + enable modes + debug flags
     imefilter.ts        CursorPositionFilter (stable-run cursor estimate for IME anchoring)
+    imeanchor.ts        imeAnchorCell / cursorPixelPos (fake-cursor inverse-cell scan)
     hysteresis.ts       fit hysteresis (see below)
     disconnect.ts       re-attach backoff helpers
     fontconfig.ts       font stack model, system font enumeration glue

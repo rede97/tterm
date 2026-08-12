@@ -3,10 +3,9 @@ import {
   readText as clipboardReadText,
   writeText as clipboardWriteText,
 } from "@tauri-apps/plugin-clipboard-manager";
-import { FitAddon } from "@xterm/addon-fit";
-import { SearchAddon } from "@xterm/addon-search";
-import { WebglAddon } from "@xterm/addon-webgl";
-import { type IBufferCell, type IDisposable, Terminal } from "@xterm/xterm";
+import type { FitAddon } from "@xterm/addon-fit";
+import type { SearchAddon } from "@xterm/addon-search";
+import type { IDisposable, Terminal } from "@xterm/xterm";
 import { logCatch, swallow } from "../core/errorlog";
 import { configStore } from "../core/store";
 import { notifyTrayTabs } from "../core/traytabs";
@@ -18,18 +17,18 @@ import type {
   TabType,
 } from "../core/types";
 import { reattachDelayForAttempt, shouldAutoReattach } from "../util/disconnect";
-import { hysteresis } from "../util/hysteresis";
+import { cursorPixelPos, imeAnchorCell } from "../util/imeanchor";
 import { getImeDebugFlags, ImeBox, imeMirrorActiveFor } from "../util/imebox";
 import { CursorPositionFilter } from "../util/imefilter";
 import { applyProgressToTabElement, parseOsc9Progress } from "../util/osc";
 import { createSerialInputHandler } from "../util/serialinput";
 import { SizeHint } from "../util/sizehint";
-import { findTheme } from "../util/themes";
 import { cellDimensions, cursorIsHidden, terminalTextarea } from "../util/xterm-internals";
 import { BatchAttachAddon } from "./batchattach";
-import { setupTerminalLinks } from "./links";
+import { computeGrid } from "./fit";
 import { pasteIntoTerminal } from "./paste";
 import { buildShareScreenshot, buildShareSnapshot } from "./sharescreen";
+import { createXterm } from "./xtermfactory";
 
 export class TerminalTab {
   id: string;
@@ -104,21 +103,16 @@ export class TerminalTab {
     this.sizeHint = new SizeHint(this.element, 1200, configStore.get("fontFamily"));
     this.imeBox = new ImeBox(this.element, configStore.get("fontFamily"));
 
-    this.terminal = new Terminal({
-      allowProposedApi: true,
-      cursorBlink: true,
+    const instance = createXterm(this.element, {
       fontSize: configStore.get("fontSize"),
       fontFamily: configStore.get("fontFamily"),
       scrollback: configStore.get("scrollback"),
-      theme: findTheme(configStore.get("themeName")).theme,
+      themeName: configStore.get("themeName"),
+      renderer: configStore.get("renderer"),
     });
-
-    this.fitAddon = new FitAddon();
-    this.terminal.loadAddon(this.fitAddon);
-    this.searchAddon = new SearchAddon();
-    this.terminal.loadAddon(this.searchAddon);
-    // Clickable links: plain-click OSC 8 hyperlinks, Ctrl+click URLs.
-    setupTerminalLinks(this.terminal);
+    this.terminal = instance.terminal;
+    this.fitAddon = instance.fitAddon;
+    this.searchAddon = instance.searchAddon;
 
     // OSC 9;4 progress reporting (build tasks etc.)
     this.terminal.parser.registerOscHandler(9, (data: string) => {
@@ -127,8 +121,6 @@ export class TerminalTab {
       this.setProgress(p.state, p.progress);
       return true;
     });
-    if (configStore.get("renderer") === "webgl") this.terminal.loadAddon(new WebglAddon());
-    this.terminal.open(this.element);
 
     // Single source of truth for backend size tracking: ANY grid change
     // (fit, font-metric re-measure refits, window resize) fires onResize.
@@ -223,7 +215,7 @@ export class TerminalTab {
     if (textarea) {
       this.imeBox.attach(
         textarea,
-        () => this._cursorPixelPos(),
+        () => cursorPixelPos(this.terminal, this.cursorFilter),
         () => imeMirrorActiveFor(this._isCursorHidden()),
       );
     }
@@ -249,53 +241,6 @@ export class TerminalTab {
     this.element.classList.toggle("cursor-hidden", hidden);
     const active = imeMirrorActiveFor(hidden) && getImeDebugFlags().suppress;
     this.element.classList.toggle("ime-mirror-on", active);
-  }
-
-  // Filtered cursor position in pixels, relative to the terminal element.
-  private _cursorPixelPos(): { x: number; y: number; cellH: number } {
-    try {
-      const dims = cellDimensions(this.terminal);
-      if (!dims) throw new Error("no cell metrics");
-      const cell = this._imeAnchorCell();
-      return {
-        x: cell.x * dims.width,
-        y: cell.y * dims.height,
-        cellH: dims.height,
-      };
-    } catch {
-      return { x: 8, y: 8, cellH: 16 };
-    }
-  }
-
-  // Anchor cell for the IME candidate window, viewport-relative.
-  // Some TUIs (e.g. pi) hide the hardware cursor (\x1b[?25l) and draw their
-  // own as an inverse-video cell. In that case buffer.cursorX/Y is wherever
-  // the app parked the cursor (often line end), so scan the viewport for the
-  // rendered cursor instead. Falls back to the stable-run filter position.
-  private _imeAnchorCell(): { x: number; y: number } {
-    const buf = this.terminal.buffer.active;
-    const fallback = this.cursorFilter.position() ?? { x: buf.cursorX, y: buf.cursorY };
-    try {
-      if (!cursorIsHidden(this.terminal)) return fallback;
-      let best: { x: number; y: number; d: number } | null = null;
-      const ref = buf.cursorY * 10000 + buf.cursorX; // prefer cell nearest the parked cursor
-      for (let y = 0; y < this.terminal.rows; y++) {
-        const line = buf.getLine(buf.viewportY + y);
-        if (!line) continue;
-        let cell: IBufferCell | undefined;
-        for (let x = 0; x < line.length; x++) {
-          cell = line.getCell(x, cell);
-          if (!cell) break;
-          if (cell.isInverse()) {
-            const d = Math.abs(y * 10000 + x - ref);
-            if (!best || d < best.d) best = { x, y, d };
-          }
-        }
-      }
-      return best ? { x: best.x, y: best.y } : fallback;
-    } catch {
-      return fallback;
-    }
   }
 
   // Attach (or re-attach) the session WebSocket. Disposes any previous addon.
@@ -455,7 +400,7 @@ export class TerminalTab {
     const pxPos = (): { x: number; y: number } | null => {
       const cellDims = cellDimensions(this.terminal);
       if (!cellDims) return null;
-      const cell = this._imeAnchorCell();
+      const cell = imeAnchorCell(this.terminal, this.cursorFilter);
       const maxX = Math.max(0, this.element.clientWidth - cellDims.width - SAFE_RIGHT);
       const maxY = Math.max(0, this.element.clientHeight - cellDims.height);
       return {
@@ -580,32 +525,9 @@ export class TerminalTab {
    * No dead zone, no oscillation just available space / char size.
    */
   fit(): { cols: number; rows: number } {
-    const dims = cellDimensions(this.terminal);
-    if (!dims) return { cols: this.terminal.cols, rows: this.terminal.rows };
-    const charWidth = dims.width;
-    const charHeight = dims.height;
-
-    const parent = this.element.parentElement;
-    if (!parent) return { cols: this.terminal.cols, rows: this.terminal.rows };
-    const ps = getComputedStyle(parent);
-    const parentH = parseFloat(ps.height);
-    const parentW = parseFloat(ps.width);
-
-    const termEl = this.terminal.element;
-    if (!termEl) return { cols: this.terminal.cols, rows: this.terminal.rows };
-    const xs = getComputedStyle(termEl);
-    let padH = parseFloat(xs.paddingLeft) + parseFloat(xs.paddingRight);
-    // xterm-screen padding-right = scrollbar safe area
-    const scr = this.terminal.element?.querySelector(".xterm-screen");
-    if (scr) padH += parseFloat(getComputedStyle(scr).paddingRight) || 0;
-    const padV = parseFloat(xs.paddingTop) + parseFloat(xs.paddingBottom);
-
-    const floatCols = (parentW - padH) / charWidth;
-    const floatRows = (parentH - padV) / charHeight;
-
-    const cols = hysteresis(floatCols, this.terminal.cols, 0.8, 0.9);
-    const rows = hysteresis(floatRows, this.terminal.rows, 0.98, 1.0);
-
+    const grid = computeGrid(this.terminal, this.element);
+    if (!grid) return { cols: this.terminal.cols, rows: this.terminal.rows };
+    const { cols, rows } = grid;
     if (this.terminal.cols !== cols || this.terminal.rows !== rows) {
       this.terminal.resize(cols, rows);
       // Reset any horizontal scroll drift that may have accumulated
@@ -615,7 +537,6 @@ export class TerminalTab {
       if (vp && vp.scrollLeft !== 0) vp.scrollLeft = 0;
       this.sizeHint.show(cols, rows);
     }
-
     return { cols, rows };
   }
 
@@ -674,7 +595,7 @@ export class TerminalTab {
   }
 
   fakeCursorCell(): { x: number; y: number } {
-    return this._imeAnchorCell();
+    return imeAnchorCell(this.terminal, this.cursorFilter);
   }
 
   // Character-level screen snapshot for AI session sharing (the xterm
