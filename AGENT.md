@@ -31,6 +31,7 @@ src/
   main.ts               app entry: init TabManager, WS bridge, settings button, welcome backdrop
   terminal/
     tab.ts              TerminalTab class (one per tab: terminal, xterm, DOM, IME wiring)
+    title.ts            TitleModel — tab title state machine (label / lock / OSC title)
     fit.ts              computeGrid — pure grid-fit calc (hysteresis + cell metrics)
     xtermfactory.ts     createXterm — Terminal construction + addon assembly
     tabmanager.ts       TabManager singleton (tab Map, active tab, settings tab, sortable)

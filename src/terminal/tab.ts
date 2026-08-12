@@ -28,6 +28,7 @@ import { BatchAttachAddon } from "./batchattach";
 import { computeGrid } from "./fit";
 import { pasteIntoTerminal } from "./paste";
 import { buildShareScreenshot, buildShareSnapshot } from "./sharescreen";
+import { TitleModel } from "./title";
 import { createXterm } from "./xtermfactory";
 
 export class TerminalTab {
@@ -54,14 +55,16 @@ export class TerminalTab {
   outputNewline?: string;
   inputMode: SerialInputMode = "normal";
   enterNewline: SerialEnterNewline = "cr";
-  label: string;
+  // Title state lives in TitleModel; label/titleLocked are accessors so the
+  // public read surface (tab.label, tab.titleLocked) is unchanged.
+  private _title: TitleModel;
+  get label(): string {
+    return this._title.label;
+  }
+  get titleLocked(): boolean {
+    return this._title.locked;
+  }
   color?: string;
-  // User-renamed tabs stop following OSC title changes (rename() locks,
-  // internal display updates pass lockTitle=false).
-  titleLocked = false;
-  // Last title the terminal reported — tracked even while locked so
-  // resetTitle() can restore it instantly.
-  private oscTitle?: string;
   needsResize = false;
   index = 0;
   searchQuery = "";
@@ -94,7 +97,7 @@ export class TerminalTab {
   constructor(id: string, type: TabType, label: string, container: HTMLElement) {
     this.id = id;
     this.type = type;
-    this.label = label;
+    this._title = new TitleModel(label);
 
     this.element = document.createElement("div");
     this.element.className = "terminal-instance";
@@ -131,14 +134,7 @@ export class TerminalTab {
     });
 
     this.terminal.onTitleChange((title: string) => {
-      if (!title) return;
-      this.oscTitle = title;
-      if (this.titleLocked) return;
-      this.label = title;
-      const labelEl = this.tabElement.querySelector(".tab-label") as HTMLElement;
-      if (labelEl) labelEl.textContent = title;
-      this.tabElement.title = title;
-      notifyTrayTabs();
+      if (this._title.onOscTitle(title)) this._syncTitleDom();
     });
 
     this.xtermEl = this.element.querySelector(".xterm") as HTMLElement;
@@ -570,23 +566,25 @@ export class TerminalTab {
   }
 
   rename(newName: string, lockTitle = true): void {
-    this.label = newName.trim();
+    this._title.rename(newName, lockTitle);
     this.command = undefined;
-    if (lockTitle) this.titleLocked = true;
-    const labelEl = this.tabElement.querySelector(".tab-label") as HTMLElement;
-    if (labelEl) labelEl.textContent = this.label;
-    this.tabElement.title = this.label;
-    notifyTrayTabs();
+    this._syncTitleDom();
   }
 
   // Undo a user rename (rename dialog committed empty): follow OSC title
   // changes again, restoring the last title the terminal reported.
   resetTitle(): void {
-    this.titleLocked = false;
-    if (this.oscTitle) this.label = this.oscTitle;
+    this._title.reset();
+    this._syncTitleDom(false);
+  }
+
+  // Reflect the current label into the tab element + tray. resetTitle passes
+  // notifyTray=false to preserve the original (rename-only) tray notification.
+  private _syncTitleDom(notifyTray = true): void {
     const labelEl = this.tabElement.querySelector(".tab-label") as HTMLElement;
     if (labelEl) labelEl.textContent = this.label;
     this.tabElement.title = this.label;
+    if (notifyTray) notifyTrayTabs();
   }
 
   // ShareScreenSource adapters (sharescreen.ts never sees TerminalTab).
