@@ -664,7 +664,13 @@ export function initQuickPanel(): void {
       updateQuickButton();
       if (panelTabId === e.payload.id) {
         const tab = _handlers?.getTab(e.payload.id);
-        if (tab) renderPanel(tab);
+        if (tab) {
+          // The connect/disconnect round-trip is complete once the session
+          // state actually flipped — clear the busy guard so the button is
+          // genuinely clickable (the 600ms timer below is only a fallback).
+          if (panelState && panelState.tabId === tab.id) panelState.connectBusy = false;
+          renderPanel(tab);
+        }
       }
     }).catch(swallow);
   }
