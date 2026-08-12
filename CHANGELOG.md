@@ -1,3 +1,24 @@
+## Unreleased
+
+Fixes
+
+- **Saving SSH config no longer deletes your global settings** — the
+  `Host *` block and options before the first `Host` line (ProxyJump,
+  ServerAliveInterval, …) were silently dropped on Save; they are now
+  preserved
+- **Reset All / Revert now apply immediately** — cleared or reverted
+  settings (including keybindings) previously kept their old values
+  until the app restarted
+- **Multi-line paste warning works** — the setting existed but was never
+  enforced; pasting multiple lines now asks first (single commands still
+  paste straight through)
+- **Rebinding a key to its default or unbinding a default could be
+  silently ignored** in Settings → Keyboard
+- **Ctrl+= / Ctrl++ and numpad keys can now be bound** — the `+` key
+  itself and numpad variants were rejected by the combo parser
+- **Quick open / tab switcher no longer stalls** when a tab closes while
+  the overlay is open
+
 ## v1.0.3
 
 New Features

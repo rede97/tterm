@@ -128,6 +128,64 @@ describe("ConfigStore — load", () => {
     expect(configStore.get("fontSize")).toBe(14);
     expect(configStore.get("scrollback")).toBe(20000);
   });
+
+  it("load notifies ALL schema keys, not just the ones in the file", async () => {
+    const fn = vi.fn();
+    const unsub = configStore.subscribe(fn);
+    try {
+      invokeMock.mockImplementation((cmd: string) => {
+        if (cmd === "read_config") return Promise.resolve(JSON.stringify({ fontSize: 20 }));
+        return Promise.resolve(null);
+      });
+      await configStore.load();
+      const notified: string[] = fn.mock.calls.at(-1)?.[0] ?? [];
+      // Subscribers (keymap lookup, terminal options) must re-apply
+      // defaults too — Reset All / Revert must not silently keep old
+      // values until restart.
+      expect(notified).toEqual(expect.arrayContaining(["fontSize", "keybindings", "scrollback", "themeName"]));
+    } finally {
+      unsub();
+    }
+  });
+
+  it("load resets persisted keys absent from the file to defaults (runtime keys untouched)", async () => {
+    configStore.set({ fontSize: 22, keybindings: { "workbench.action.closeTab": "ctrl+q" } });
+    configStore.set({ sshHosts: [{ name: "KeepMe" }] });
+    configStore.flush();
+    invokeMock.mockClear();
+    // File from an older version: no fontSize, no keybindings.
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "read_config") return Promise.resolve(JSON.stringify({ themeName: "Nord" }));
+      return Promise.resolve(null);
+    });
+    await configStore.load();
+    expect(configStore.get("fontSize")).toBe(14);
+    expect(configStore.get("keybindings")).toEqual({});
+    expect(configStore.get("themeName")).toBe("Nord");
+    // Runtime data is not part of the persisted round-trip.
+    expect(configStore.get("sshHosts")).toEqual([{ name: "KeepMe" }]);
+  });
+
+  it("load cancels a pending debounced write (Revert race)", async () => {
+    vi.useFakeTimers();
+    try {
+      configStore.set({ fontSize: 22 }); // pending, deliberately not flushed
+      invokeMock.mockClear();
+      invokeMock.mockImplementation((cmd: string) => {
+        if (cmd === "read_config") return Promise.resolve(JSON.stringify({ fontSize: 16 }));
+        return Promise.resolve(null);
+      });
+      await configStore.load();
+      configStore.flush();
+      // Advance well past the 300ms debounce: the stale pending write (22)
+      // must never reach disk after the load.
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(invokeMock.mock.calls.filter(c => c[0] === "write_config")).toHaveLength(0);
+      expect(configStore.get("fontSize")).toBe(16);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("ConfigStore — flush & debounce", () => {

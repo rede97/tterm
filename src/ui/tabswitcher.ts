@@ -174,8 +174,12 @@ function close(): void {
 
 function commit(id: string): void {
   const h = _handlers;
+  const m = mode;
   close();
-  h?.switchTo(id);
+  // The item list is a snapshot: a tab can die (clean exit auto-close,
+  // Ctrl+W elsewhere) while the overlay is open. Re-check against the
+  // live list or the switch silently no-ops.
+  if (h && m && h.listTabs(m).some(t => t.id === id)) h.switchTo(id);
 }
 
 // -- quick open --

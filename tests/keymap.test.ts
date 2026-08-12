@@ -13,7 +13,6 @@ import {
   KEY_COMMANDS,
 } from "../src/core/keymap";
 import { configStore } from "../src/core/store";
-import { filterSwitcherItems, stepIndex, type SwitcherItem } from "../src/ui/tabswitcher";
 
 function keyEvent(init: Partial<KeyboardEventInit> & { key: string }): KeyboardEvent {
   return new KeyboardEvent("keydown", {
@@ -52,6 +51,20 @@ describe("parseCombo / comboMatches", () => {
     expect(parseCombo("ctrl")).toBeNull();
     expect(parseCombo("ctrl+")).toBeNull();
     expect(parseCombo("bogus+p")).toBeNull();
+  });
+
+  it("the plus key itself round-trips (ctrl++)", () => {
+    expect(parseCombo("ctrl++")).toEqual({ ctrl: true, alt: false, shift: false, meta: false, key: "+" });
+    expect(parseCombo("+")).toEqual({ ctrl: false, alt: false, shift: false, meta: false, key: "+" });
+    expect(comboFromEvent(keyEvent({ key: "+", ctrlKey: true }))).toBe("ctrl++");
+    expect(comboMatches(keyEvent({ key: "+", ctrlKey: true }), "ctrl++")).toBe(true);
+    expect(formatCombo("ctrl++")).toBe("Ctrl++");
+  });
+
+  it("numpad keys stay distinct from main-row twins", () => {
+    expect(comboFromEvent(keyEvent({ key: "1", ctrlKey: true, code: "Numpad1" }))).toBe("ctrl+num1");
+    expect(comboFromEvent(keyEvent({ key: "1", ctrlKey: true, code: "Digit1" }))).toBe("ctrl+1");
+    expect(parseCombo("ctrl+num1")).toEqual({ ctrl: true, alt: false, shift: false, meta: false, key: "num1" });
   });
 
   it("matches only exact modifier state", () => {
@@ -167,52 +180,6 @@ describe("keymap dispatcher", () => {
     }
     dispatch({ key: "w", ctrlKey: true });
     expect(fired).toEqual(["workbench.action.closeTab"]);
-  });
-});
-
-describe("filterSwitcherItems (Ctrl+P quick open)", () => {
-  const items: SwitcherItem[] = [
-    { id: "tab-1", label: "Terminal", index: 1, active: true, disconnected: false },
-    { id: "tab-2", label: "prod-server", index: 2, active: false, disconnected: false },
-    { id: "tab-3", label: "COM3 · 115200", index: 3, active: false, disconnected: true },
-  ];
-
-  it("empty query returns everything", () => {
-    expect(filterSwitcherItems(items, "")).toHaveLength(3);
-    expect(filterSwitcherItems(items, "   ")).toHaveLength(3);
-  });
-
-  it("numeric query matches the tab number", () => {
-    expect(filterSwitcherItems(items, "2").map(i => i.id)).toEqual(["tab-2"]);
-  });
-
-  it("text query matches the label case-insensitively", () => {
-    expect(filterSwitcherItems(items, "PROD").map(i => i.id)).toEqual(["tab-2"]);
-    expect(filterSwitcherItems(items, "com3").map(i => i.id)).toEqual(["tab-3"]);
-  });
-
-  it("no match yields an empty list", () => {
-    expect(filterSwitcherItems(items, "zzz")).toEqual([]);
-  });
-});
-
-describe("stepIndex (MRU highlight)", () => {
-  it("wraps forward and backward", () => {
-    expect(stepIndex(0, 1, 4)).toBe(1);
-    expect(stepIndex(3, 1, 4)).toBe(0);
-    expect(stepIndex(0, -1, 4)).toBe(3);
-    expect(stepIndex(1, -1, 4)).toBe(0);
-  });
-
-  it("first-press start: next tab vs wrap to least-recent", () => {
-    // Ctrl+Tab opens on the next MRU entry; Ctrl+Shift+Tab on the last one.
-    expect(stepIndex(0, 1, 3)).toBe(1);
-    expect(stepIndex(0, -1, 3)).toBe(2);
-  });
-
-  it("degenerates safely", () => {
-    expect(stepIndex(0, 1, 0)).toBe(0);
-    expect(stepIndex(5, 1, 1)).toBe(0);
   });
 });
 

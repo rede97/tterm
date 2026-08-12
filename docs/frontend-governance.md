@@ -16,6 +16,8 @@
 
 # 第一部分：缺陷修复清单（审计确认，按 ROI 排序）
 
+> **进度（2026-08）**：A1–A4、C1–C6 已全部修复并回归测试覆盖（store.load 全键通知 + pending 写取消、SSH config 全局段往返、pasteWarning 多行粘贴守卫落地、README 失实描述移除、window.ts unlisten/空 catch、ctrl++/numpad 解析、settings dirty 事件泛化、switcher 死 id 守卫、测试拆分与面板单测）。修复中发现并顺带修复一个未在清单内的 bug：`setPending` 未与默认绑定比较导致解绑默认值被静默跳过。剩余：B1–B4、C7、D 级。
+
 ## A. 立即修 — 数据安全 / 功能失效
 
 ### A1. `store.load()` 通知语义缺陷（一处改动解三个问题）⭐ 最高 ROI

@@ -19,6 +19,7 @@ import { initSshAuthDialogs } from "./terminal/sshauth";
 import { initWindowControls, toggleZenMode, toggleFullscreenMode } from "./ui/window";
 import { initKeymap } from "./core/keymap";
 import { setTabSwitcherHandlers, openQuickOpen, stepMruSwitcher } from "./ui/tabswitcher";
+import { pasteIntoTerminal } from "./terminal/paste";
 import type { TerminalTab } from "./terminal/tab";
 import { configStore } from "./core/store";
 import { loadSshHosts } from "./config/ssh-config";
@@ -202,7 +203,7 @@ import("./terminal/contextmenu").then(m => {
     closeTabsRight: (id) => tabManager.closeTabsRight(id),
     closeOtherTabs: (id) => tabManager.closeOtherTabs(id),
     getSelection: (id) => tabManager.get(id)?.terminal.getSelection() ?? "",
-    pasteToTab: (id, text) => tabManager.get(id)?.terminal.paste(text),
+    pasteToTab: (id, text) => { const t = tabManager.get(id); if (t) pasteIntoTerminal(t.terminal, text); },
     clearTab: (id) => tabManager.clearTab(id),
     switchTo: (id) => tabManager.switchTo(id),
     exportTab: (id) => tabManager.exportTab(id),

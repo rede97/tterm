@@ -14,7 +14,7 @@ import { shouldAutoReattach, reattachDelayForAttempt } from "../util/disconnect"
 import { ImeBox, imeMirrorActiveFor, getImeDebugFlags } from "../util/imebox";
 import { CursorPositionFilter } from "../util/imefilter";
 import type { SshHost, SerialInputMode, SerialEnterNewline } from "../core/types";
-import { trimPasteContent } from "../core/common";
+import { pasteIntoTerminal } from "./paste";
 import { configStore } from "../core/store";
 import { createSerialInputHandler } from "../util/serialinput";
 import { findTheme } from "../util/themes";
@@ -169,7 +169,7 @@ export class TerminalTab {
         this.terminal.clearSelection();
       } else {
         clipboardReadText().then(t => {
-          if (t) this.terminal.paste(trimPasteContent(t, configStore.get("pasteTrim")));
+          if (t) pasteIntoTerminal(this.terminal, t);
         }).catch(logCatch("clipboard.read"));
       }
     }, true);

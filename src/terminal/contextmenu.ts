@@ -5,10 +5,8 @@
 import { openFind } from "./search";
 import { showPortForwardingDialog } from "./forwarding";
 import { createElement, Plus, ExternalLink, Palette, Pencil, Copy, Share2, Link, Unlink, X, ArrowRightToLine, CircleX, ArrowLeftRight } from "lucide";
-import { trimPasteContent } from "../core/common";
 import { readText as clipboardReadText, writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
 import { showToast } from "../ui/toast";
-import { configStore } from "../core/store";
 import { logCatch } from "../core/errorlog";
 
 // ---- Injected handlers ----
@@ -266,7 +264,7 @@ function dispatch(action: string) {
     }
     case "paste":
       clipboardReadText().then(text => {
-        if (text) h.pasteToTab(tabId, trimPasteContent(text, configStore.get("pasteTrim")));
+        if (text) h.pasteToTab(tabId, text);
       }).catch(logCatch("clipboard.read"));
       break;
     case "clear":

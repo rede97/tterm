@@ -147,6 +147,60 @@ describe("generateSshConfig", () => {
   });
 });
 
+describe("global sections round-trip (H1 regression)", () => {
+  it("preserves pre-Host globals and Host * blocks on generate", () => {
+    parseSshConfig([
+      "ForwardAgent yes",
+      "AddKeysToAgent yes",
+      "",
+      "Host web",
+      "    HostName web.example.com",
+      "    User deploy",
+      "",
+      "Host *",
+      "    ServerAliveInterval 60",
+      "    ProxyJump bastion",
+      "",
+    ].join("\n"));
+
+    const out = generateSshConfig([
+      { name: "web", HostName: "web.example.com", User: "deploy" },
+    ]);
+    // Pre-Host globals stay at the top…
+    expect(out).toContain("ForwardAgent yes\nAddKeysToAgent yes");
+    expect(out.indexOf("ForwardAgent yes")).toBeLessThan(out.indexOf("Host web"));
+    // …and the wildcard block survives — at the END, so OpenSSH
+    // first-match semantics can't let it shadow host settings.
+    expect(out).toContain("Host *\n    ServerAliveInterval 60\n    ProxyJump bastion");
+    expect(out.indexOf("Host *")).toBeGreaterThan(out.indexOf("Host web"));
+  });
+
+  it("multiple Host * blocks all survive", () => {
+    parseSshConfig([
+      "Host one",
+      "    HostName 1.example.com",
+      "Host *",
+      "    ServerAliveInterval 60",
+      "Host two",
+      "    HostName 2.example.com",
+      "Host *",
+      "    ServerAliveCountMax 3",
+    ].join("\n"));
+    const out = generateSshConfig([
+      { name: "one", HostName: "1.example.com" },
+      { name: "two", HostName: "2.example.com" },
+    ]);
+    expect(out).toContain("ServerAliveInterval 60");
+    expect(out).toContain("ServerAliveCountMax 3");
+  });
+
+  it("no global sections: output unchanged from before", () => {
+    parseSshConfig("Host web\n    HostName web.example.com\n");
+    const out = generateSshConfig([{ name: "web", HostName: "web.example.com" }]);
+    expect(out).not.toContain("Host *");
+  });
+});
+
 describe("case-insensitive keywords (regression)", () => {
   it("merges forward directives regardless of casing", () => {
     const hosts = parseSshConfig([

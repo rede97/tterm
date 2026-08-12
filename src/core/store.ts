@@ -146,17 +146,37 @@ class ConfigStore {
   /** Load config from disk via Tauri IPC. */
   async load(): Promise<void> {
     try {
+      // A pending debounced write holds STALE in-memory values; if it fires
+      // after we re-read the disk (e.g. Revert), it writes the reverted
+      // values straight back. Disk is truth now — cancel it.
+      if (this._saveTimer) {
+        clearTimeout(this._saveTimer);
+        this._saveTimer = null;
+      }
+      this._pendingMerge = null;
+
       const raw = await invoke<string>("read_config");
       const cfg = JSON.parse(raw);
       const isEmpty = Object.keys(cfg).length === 0;
-      this._applyConfig(cfg);
+      // Keys ABSENT from the file (old config from before a key existed,
+      // or a deleted config) must fall back to defaults, not to whatever
+      // stale value memory currently holds. Runtime keys are untouched.
+      const base: Record<string, unknown> = {};
+      for (const [key, entry] of Object.entries(SCHEMA) as [SchemaKey, SchemaEntry<unknown>][]) {
+        if (!RUNTIME_KEYS.has(key)) base[key] = entry.default;
+      }
+      this._applyConfig({ ...base, ...cfg });
       if (isEmpty) {
         const defaults = this._persistableSnapshot();
         this._applyConfig(defaults);
         await this._writeDisk(defaults);
       }
       this._state.loaded = true;
-      this._notify(Object.keys(cfg));
+      // Notify ALL schema keys, not just the ones the file mentioned:
+      // subscribers (keymap lookup, terminal options) must re-apply
+      // defaults too, or Reset All / Revert silently keep old values
+      // until restart.
+      this._notify(Object.keys(SCHEMA));
     } catch (e) {
       logError("config.load", e);
       this._state.loaded = true;

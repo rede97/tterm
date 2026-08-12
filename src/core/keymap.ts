@@ -98,8 +98,12 @@ export function comboFromEvent(e: {
   altKey: boolean;
   shiftKey: boolean;
   metaKey: boolean;
+  code?: string;
 }): string | null {
-  const key = normKey(e.key);
+  let key = normKey(e.key);
+  // Numpad keys share e.key with their main-row twins ("1", "+") — use
+  // e.code so they stay separately bindable ("ctrl+num1" ≠ "ctrl+1").
+  if (e.code?.startsWith("Numpad")) key = "num" + e.code.slice(6).toLowerCase();
   if (key in MODIFIER_KEYS || key === "dead") return null;
   const parts: string[] = [];
   if (e.ctrlKey) parts.push("ctrl");
@@ -113,10 +117,21 @@ export function comboFromEvent(e: {
 /** Parse a canonical combo string; null when malformed. */
 export function parseCombo(combo: string): ParsedCombo | null {
   if (!combo) return null;
-  const parts = combo.split("+");
-  const key = parts[parts.length - 1];
+  // A trailing "+" is the KEY itself ("ctrl++" = Ctrl + plus key): strip
+  // it before splitting, or split("+") yields an empty final segment.
+  // Only the canonical doubled form counts — "ctrl+" stays malformed.
+  const plusKey = combo === "+" || combo.endsWith("++");
+  const parts = (plusKey ? combo.slice(0, -1) : combo).split("+").filter(p => p !== "");
+  let key: string;
+  let mods: Set<string>;
+  if (plusKey && parts.every(p => p in COMBO_MODS)) {
+    key = "+";
+    mods = new Set(parts);
+  } else {
+    key = parts[parts.length - 1] ?? "";
+    mods = new Set(parts.slice(0, -1));
+  }
   if (!key || key in MODIFIER_KEYS || key in COMBO_MODS) return null;
-  const mods = new Set(parts.slice(0, -1));
   for (const m of mods) {
     if (!(m in COMBO_MODS)) return null;
   }

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createElement, Minus, Square, Copy, X, Drama } from "lucide";
-import { logCatch } from "../core/errorlog";
+import { logCatch, swallow } from "../core/errorlog";
 
 const appWindow = getCurrentWindow();
 
@@ -16,7 +16,9 @@ async function updateMaximizeIcon() {
     } else {
       btnMaximize.classList.remove("restore");
     }
-  } catch (_) {}
+  } catch {
+    swallow(); // icon state is cosmetic; IPC failure leaves it stale, harmless
+  }
 }
 
 // -- drag ----
@@ -170,12 +172,17 @@ export async function toggleFullscreenMode(): Promise<void> {
 
 // -- init ----
 
+// onResized's unlisten is retained so re-initialization (dev HMR) doesn't
+// stack duplicate listeners.
+let unlistenResized: (() => void) | null = null;
+
 export function initWindowControls() {
   initDrag();
   initWindowButtons();
   injectIcons();
   updateMaximizeIcon();
 
+  unlistenResized?.();
   appWindow.onResized(() => {
     updateMaximizeIcon();
     // Drag-restore or the maximize button while in zen: drop the zen chrome
@@ -191,7 +198,7 @@ export function initWindowControls() {
         }
       });
     }
-  });
+  }).then((fn) => { unlistenResized = fn; });
 }
 
 

@@ -86,6 +86,19 @@ src-tauri/src/
 - All user-facing errors go through `showToast(message, "error")` (`src/ui/toast.ts`). Settings panels keep their inline feedback elements.
 - Window state save/restore is handled entirely by `tauri-plugin-window-state`. Do NOT write custom save/restore code.
 
+### Frontend discipline (TypeScript & DOM)
+
+Style rules every agent must follow without being told twice (lint rollout
+to machine-enforce them: `docs/frontend-governance.md` P1).
+
+- **Errors**: no silent swallows. Promise tails end in `.catch(logCatch("area.action"))`, catch blocks use `logError`, and `swallow()` (`core/errorlog.ts`) only when the error is truly irrelevant (say why in a comment). Bare `.catch(() => {})` is banned. When the caught value is unused, write bare `catch { }` — no `catch (_)`.
+- **Types**: `strict` is on. No `as any` — narrow with `in`/`typeof` guards at boundaries; type-only imports go top-level as `import type` (never inline `import("x").T` in annotations); no casting an object inline just to read one property.
+- **Style**: no one-line wrapper functions — inline the expression unless the name is a stable domain concept used 3+ times. Static lookup tables are `Record<string, …>`; runtime collections (insert/delete/iterate) are `Set`/`Map`.
+- **Async**: `Promise.withResolvers()` over the `new Promise((resolve) => …)` executor form.
+- **DOM**: never hand-roll one-off UI — use the shared components (toast / createModal / confirmDialog / attachStepper). No native `alert`/`confirm`/`prompt`. Don't add another `el()` helper copy (5 exist; consolidation is planned — reuse the one in the module you're editing).
+- **Settings panels**: follow the create / refresh / collect contract; every panel except General starts hidden (`panel.style.display = "none"`) — forgetting this stacks the new panel over the General page (shipped once as a bug). Enable the footer Apply via the settings shell's dirty mechanism, not synthetic DOM events.
+- **Tests**: one module per test file; assert observable contracts, not element counts. Time is driven by `vi.useFakeTimers()` — never real `setTimeout`/`sleep` waits in tests.
+
 ## IME composition mirror (headline feature — read the docs first)
 
 Docs: `docs/ime-composition.md` (final design, rejected Plans A/B, and the 1px-textarea root cause). Read it before touching `imebox.ts`, the freeze proxy, or composition handling.

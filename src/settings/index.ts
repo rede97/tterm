@@ -153,8 +153,9 @@ export function createSettingsContent(): HTMLElement {
     setTimeout(() => { feedback.textContent = ""; }, 2000);
   });
 
-  // Handle appearance changes (font picker)
-  panelAppearance.addEventListener("tterm-settings-changed", () => {
+  // Panels with non-native edits (font picker, keybinding capture) signal
+  // dirty state with this bubbling event — any panel, one listener.
+  root.addEventListener("tterm-settings-changed", () => {
     applyBtn.classList.remove("applied");
   });
 

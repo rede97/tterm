@@ -33,15 +33,17 @@ function el(tag: string, className: string, text?: string): HTMLElement {
 }
 
 function markDirty(panel: HTMLElement): void {
-  // The settings shell enables Apply on bubbled input/change events whose
-  // target is an input/select — fire one from the panel's search input.
-  panel.querySelector<HTMLInputElement>("#kb-search")
-    ?.dispatchEvent(new Event("change", { bubbles: true }));
+  // Sanctioned settings-shell mechanism for non-native edits (same event
+  // the appearance panel's font picker uses) — enables the footer Apply.
+  panel.dispatchEvent(new CustomEvent("tterm-settings-changed", { bubbles: true }));
 }
 
 function setPending(panel: HTMLElement, commandId: string, combo: string): void {
   if (!_pending) _pending = { ...configStore.get("keybindings") };
-  if ((_pending[commandId] ?? "") === combo) return;
+  // Compare against the EFFECTIVE binding (defaults included): a command
+  // with no stored override still has a default combo, and unbinding it
+  // must be recorded as an explicit "" override.
+  if ((effectiveBindings()[commandId] ?? "") === combo) return;
   _pending[commandId] = combo;
   markDirty(panel);
 }
@@ -61,6 +63,7 @@ function renderRows(panel: HTMLElement): void {
     if (query && !query.split(/\s+/).every(w => haystack.includes(w))) continue;
 
     const row = el("div", "kb-row");
+    row.dataset.command = cmd.id;
 
     const info = el("div", "kb-info");
     info.appendChild(el("div", "kb-title", cmd.title));
