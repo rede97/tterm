@@ -47,7 +47,7 @@ const visibleInstance = () =>
     const core = tab.terminal._core;
     const dims = core._renderService.dimensions.css.cell;
     const buf = tab.terminal.buffer.active;
-    const anchor = tab._imeAnchorCell();
+    const anchor = tab.fakeCursorCell();
     return {
       cursorHiddenClass: inst.classList.contains("cursor-hidden"),
       mirrorOnClass: inst.classList.contains("ime-mirror-on"),
