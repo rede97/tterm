@@ -1,154 +1,162 @@
 # 前端规范化治理计划
 
 > 状态：计划文档（2026-08，v1.0.3 之后）
-> 范围：`src/` 前端（~9,400 行 TS，约 50 个文件）。后端 Rust 质量已达标，不在范围内。
-> 依据：v1.0.3 开发过程中的全面代码评审 + 定量扫描（文件行数、`as any`/裸 catch/innerHTML 计数、tsconfig 检查、CI 配置审查）。
+> 范围：`src/` 前端为主（~9,400 行 TS，约 50 个文件）；后端关联项单列一节。
+> 依据：v1.0.3 开发过程中的代码评审 + 定量扫描，**合并外部两轮审计**（基线 v1.0.2 `a8b2b15` / v1.0.3 `e5f4e71`，三路逐文件审读）。审计关键论断已抽查复核属实（H1 / M1 / M5 均回源码确认）。
 
 ## 总评
 
-骨架是认真设计过的：configStore 声明式 schema、handler 注入破循环、共享 UI 组件（toast/modal/confirm/stepper）、AGENT.md 根因级文档、L0–L3 测试金字塔。欠的是**用工具把纪律固化**和**给两个大文件做截肢**。
+骨架是认真设计过的：configStore 声明式 schema、handler 注入破循环、共享 UI 组件、AGENT.md 根因级文档、L0–L3 测试金字塔。审计对 v1.0.3 新增快捷键模块的评价是"全仓库集成质量最高的一批代码"。
 
-决策记录：**不引入前端框架**。本项目复杂度在 xterm/PTY/IME 层（框架零收益），UI 表面小（标签条、6 个设置面板、菜单、模态）；现有痛点全部是代码组织问题，框架治不了 god object——只会得到 800 行的 god component。重估触发条件：设置面板膨胀到十几个并出现跨面板联动状态，或多窗口共享组件库；届时首选 Solid / lit-html（模板即 DOM，不推翻现有架构）。
+但两轮审计的共同结论：**增量代码质量远高于存量体系化水平——每个新功能都遵循最好的范式，没人回头收敛旧碎片，审计债连续两轮零偿还。** 前端规整性评分 6.5/10：缺陷修复、范式收敛、纪律工具化三件事必须排期。
+
+决策记录：**不引入前端框架**（理由与重估触发条件见末节）。
 
 ---
+
+# 第一部分：缺陷修复清单（审计确认，按 ROI 排序）
+
+## A. 立即修 — 数据安全 / 功能失效
+
+### A1. `store.load()` 通知语义缺陷（一处改动解三个问题）⭐ 最高 ROI
+- **现状**：`load()` 末尾 `_notify(Object.keys(cfg))`（store.ts L159）只通知磁盘文件里存在的 key。配置被删除（Reset All）→ 返回 `{}` → **通知空集**，所有订阅者（含 v1.0.3 的 keymap 查找表）保持旧值直到重启；旧版配置文件缺少新 key（如 `keybindings`）时，Revert 同样无法把内存值回滚为默认。
+- **后果**：M1 Reset All 后界面不生效；N1 Reset All 后旧快捷键继续生效到重启；版本升级后 Revert 不回滚新配置项。
+- **修法**：`load()` 通知**全部 schema 键**（缺失 key 已被 `_applyConfig` 重置为默认值，订阅者需要知道）。同步排查 Revert 与防抖写盘竞态（L6：pending 写可能把被撤销的旧值写回——Revert 前先 `flush()` 或清 pending）。
+- **验证**：补单测——load 空配置后 subscribe 收到全部 key；keymap `_lookup` 在 Reset All 后重建为默认。
+
+### A2. SSH config 保存丢失 `Host *` 全局段与 preProps（H1，数据丢失）
+- **现状**：解析时 `Host *` 收进 `wildcardProps`、首个 Host 前的全局键收进 `preProps`（ssh-config.ts L12-25），但 `generateSshConfig(hosts)`（L72-97）**只遍历 hosts，两段永不写回** → 用户的 `ProxyJump`/`ServerAliveInterval` 等全局默认在 Save SSH Config 后被静默丢弃。`.tt.bak` 备份只是缓冲，仍是真实数据破坏路径。
+- **修法**：`SshHost` 解析结果携带 wildcard/preProps 段（或模块级保留原始段文本），generate 时先写回 `Host *` 段再写 hosts；用 wildcard 继承的现有单测扩展一个"全局段往返"用例。
+
+### A3. `pasteWarning` 是死功能（M5）
+- **现状**：设置项存在并持久化（schema + general.ts 复选框），但**两条粘贴路径从未读取它**——多行粘贴无任何警告。
+- **修法**：二选一——在 `tab.ts` 粘贴路径按设置弹 confirmDialog（多行时）；或删除设置项。建议补实现（用户可见功能已在 UI 中承诺）。
+
+### A4. README 宣传已移除的功能（D1，高）
+- **现状**：README 中/英文版宣称"串口设备参数按 VID:PID 记忆"，该功能 v0.12.0 已移除（全 src 无记忆逻辑，VID:PID 仅用于菜单显示）。
+- **修法**：两版 README 删除/改写该条；顺手核对 README 其他特性描述与现状。
+
+## B. 尽快修 — 资源泄漏 / 并发
+
+### B1. tab.ts 资源清理不完整（M2/M3/M4）
+- M2：IME 重定位 `refreshTimer` 在组词中关 tab 时无清理路径（tab.ts L495-504），持续访问已 dispose 的终端。
+- M3：`destroy()` 不关 WebSocket、不 dispose attachAddon；`pty_kill` 失败被吞时会话与定时器残留。
+- M4：`new TerminalTab` 在 try 外，WebglAddon 抛异常时 PTY 已 spawn 但无人 kill（tabmanager.ts L190-204），新建按钮 fire-and-forget。
+- **修法**：destroy() 收编所有定时器/socket/addon 清理；`_finalizeTab` 失败路径 kill 已 spawn 的会话。补"构造失败不留孤儿"单测。
+
+### B2. `FrontendPrompter::park` 无超时（M8，后端）
+- **现状**：前端失联时 SSH 认证永久挂起；dead-mode auto-retry 路径下永久占住 blocking 线程。同项目 share.rs 已有 1500ms 超时先例、`client::connect` 有 15s 超时，标准不一。
+- **修法**：park 加超时（建议 5min 用户等待级 + auto-retry 路径短超时），超时按认证取消处理。
+
+### B3. `DeadWatcher::write` 持 writer 锁同步 respawn（M9，后端）
+- **现状**：SSH 重连可达 15s+，期间该会话所有输入被挡（relay.rs L379-391）。
+- **修法**：respawn 移出锁临界区（先释放锁再执行，或转 spawned task）。
+
+### B4. 多窗口 config.json 读-改-写竞态（M6）
+- **现状**：每窗口一个 ConfigStore，防抖读-改-写，后写覆盖先写；`beforeunload` 的 flush 不 await。
+- **修法**：接受现状（低频、损失为一个设置项）或写前重读合并；至少在 AGENT.md 记录为已知限制。
+
+## C. v1.0.3 新引入（本次迭代自身欠账，诚实记录）
+
+| # | 问题 | 修法 |
+|---|---|---|
+| C1 | N1 已并入 A1（同一处修复） | — |
+| C2 | window.ts：`onResized` 返回的 unlisten 被丢弃；`catch (_) {}` 空捕获破窗 | initWindowControls 保留 unlisten；改用 `swallow`/`logCatch` |
+| C3 | 键位文法覆盖不全：`ctrl++`（`+` 键本身）解析为 null；小键盘键名未处理 | parseCombo 对尾部 `+` 特判；补小键盘键名映射 |
+| C4 | tabswitcher 测试塞在 keymap.test.ts；shortcuts.ts 面板逻辑（录制/冲突拒绝/collect 往返）无单测 | 拆 `tests/tabswitcher.test.ts`；补 shortcuts 面板 DOM 测试（沿用 settings-revert 的 mock 模式） |
+| C5 | 录制提交靠派发合成 change 事件点亮 Apply，跨文件暗契约 | settings 壳导出 `markDirty(root)` 公共助手替代合成事件 |
+| C6 | switcher 打开期间 tab 被关/重排时列表快照不刷新，commit 死 id 静默无响应 | commit 前校验 id 存活，已死则按当前快照重选或关闭浮层 |
+| C7 | 干净退出自动关页签时可能闪现一帧断连横幅（观感竞态） | 低优先，记录 |
+
+## D. 低严重度摘要（审计 L 级，排期随缘）
+
+| # | 问题 | 位置 |
+|---|---|---|
+| L1 | quickpanel 可选链 `.catch` 三式并存（当前不炸，误导） | quickpanel.ts L421/435/441 |
+| L2 | 复制串口 tab 打开本地 shell；rename 清 command 后复制退化 | tabmanager.ts L634-644 |
+| L3 | `pty_resize` 双份 IPC（onResize 统一负责 vs 多处手动 invoke） | tab.ts / tabmanager.ts |
+| L4 | `_onResize` 10ms 定时器闭包持旧 active，已销毁 tab 上 fit 抛错 | tabmanager.ts |
+| L5 | 分享截图 promise 无 catch | main.ts |
+| L7 | fontconfig `_resolveSystemFonts` 死代码；profile.ts `<label>` 嵌套；sshkeys clipboard 无 catch | 各文件 |
+| L8 | `exec_capture` 按 chunk 解码 UTF-8，跨包边界产生 U+FFFD（后端） | sshclient.rs |
+| L9 | `serial_reconnect` 300ms 固定 sleep 代替握手（后端） | serial.rs |
+| L10 | 托盘 Quit PID 重用竞态 + TerminateProcess（后端） | tray.rs |
+| L11 | WS token 非常量时间比较（loopback 实际不可利用） | relay.rs |
+| L12 | `remove_known_host` 不支持 hashed known_hosts（后端） | sshclient.rs |
+| L13 | SSH 上行 pump cancel 仅空闲时生效（后端） | sshclient.rs |
+
+---
+
+# 第二部分：体系化治理（范式收敛）
 
 ## P1 — 纪律没有工具固化（最高优先级）
 
-**现状**
-- 无 linter / formatter（AGENT.md 自述 "No linters configured"）。
-- `tsconfig` 已有 `strict` + `noUnusedLocals`，是好的底线，但风格、`!` 断言（仅 tabmanager.ts 就 39 处）、import 顺序、AGENT.md 硬规则全靠 review 自觉。
-- `.github/workflows/ci.yml` 只跑 `tauri build`——**不跑 vitest、不跑 cargo test、不跑 lint**。测试完全依赖开发者本地自觉执行。
+**现状**：无 linter/formatter；`tsconfig` 有 strict 底线，但风格、`!` 断言（tabmanager 39 处）、AGENT.md 硬规则全靠 review 自觉。**`ci.yml` 只跑 build——不跑 vitest、不跑 cargo test、不跑 lint**，测试靠本地自觉。
 
-**原因**
-项目由文档驱动纪律（AGENT.md 硬规则写得很细），早期单人开发时有效；但规则只存在于文档中就会随人手和 Agent 使用频率漂移——本次快捷键开发中 Agent 自己就两次违反项目规则（inline import type、`as any`），靠规则提醒而非机器拦截才发现。
+**原因**：文档驱动纪律在早期单人开发有效；规则只在文档里就会漂移——本轮迭代 Agent 自己就留下空 catch 和 `el()` 复制（见 C2/审计 7.2），靠规则提醒而非机器拦截。
 
-**方法**
-1. 引入 **Biome**（单二进制，formatter + linter 一体，零配置起步，Rust 实现速度快，与 Bun 工具链气质一致）。备选 oxlint + prettier。
-2. 用 `no-restricted-syntax` 类规则把 AGENT.md 硬规则机器化：
+**方法**：引入 **Biome**（单二进制 formatter+linter，备选 oxlint+prettier）；`no-restricted-syntax` 把硬规则机器化（禁裸 catch、禁 `prompt/alert/confirm`、`import/no-cycle`）；纳入 CI（见末节）。存量 `!` 不清洗，新代码禁新增。
 
-   | AGENT.md 约定 | 机器规则 |
-   |---|---|
-   | `tab.ts` 禁止 import `tabmanager.ts` | `import/no-cycle`（或 Biome 自定义插件） |
-   | 错误处理必须走 `logCatch`/`logError`/`swallow`，禁止裸 `.catch(() => {})` | AST 选择器：`CallExpression[callee.property.name='catch'] > ArrowFunctionExpression[body.body.length=0]` |
-   | 原生对话框禁用 | 禁止 `prompt(`/`alert(`/`confirm(` 调用 |
-   | 用户错误必须 `showToast` | 保留 review（语义判断，无法机器化） |
-3. 配 `lint` script：`biome check src tests e2e`，纳入 CI（见下文 CI 集成）。
-4. 存量 `!` 非空断言不一次性清洗（收益低风险高），规则设为 warn，新代码禁止新增。
+**收益**：AGENT.md 检查清单从"靠记忆"变成"每次 push 机器强制"，是多人/多 Agent 协作的前提。
 
-**收益**
-- AGENT.md 检查清单从"发版前靠记忆执行"变成"每次 push 机器强制"；
-- 消除纪律漂移这一类风险，对多 Agent/多人协作是前提条件；
-- 一次性投入约半天，之后零维护成本。
+## P2 — god object 吸积
 
----
+**现状**：`tabmanager.ts` 882 行 8+ 职责（本轮 MRU/session-exited 也只能塞进去）；`tab.ts` 671 行。后端同类：`sshclient.rs` 2226 行五职责域；`lib.rs` debug/release **双份 `generate_handler!` 列表**——本轮各加 3 个 `window_*` 命令，双份维护成本当场兑现。
 
-## P2 — god object 吸积：tabmanager.ts / tab.ts
+**方法**：
+- tabmanager 按既有切缝拆分（tablifecycle / tabactions / settingsshell / serialctl），目标 <400 行，纯移动代码，e2e 即安全网；tab.ts 暂缓（IME 耦合深，单独立项）。
+- `lib.rs` 双份 handler 合并：基础列表 + `#[cfg]` 局部拼接 debug-only 命令。
+- sshclient.rs 按 Prompter/hostkey/转发/SOCKS5/keygen 拆分（后端排期项）。
 
-**现状**
-- `tabmanager.ts` 882 行，职责至少 8 类：tab 生命周期、SSH 配置转发应用（`_applyConfigForwards`）、串口参数（5 个 setter）、分享（`shareTab`）、导出、内联重命名、badge/溢出、Sortable 拖拽、MRU、settings 页生命周期。
-- `tab.ts` 671 行同理（xterm 装配、IME、socket 重连、OSC、分享快照、串口输入）。
-- v1.0.3 的 MRU 跟踪和 session-exited 监听也只能继续塞进去——没有别的落点。
+## P3 — UI 构建双范式 + 字符串契约
 
-**原因**
-概念上的切缝早就存在，但每个新功能都选"最省事的落点"（现有的类），长期吸积。类内私有方法互相缠绕（`_onResize`/`triggerResize` 是复制体），安全网是 e2e 而非单元测试，重构心理成本高，进一步助长吸积。
+**现状**（审计量化）：
+- innerHTML 插值模板 17 个文件（ssh.ts 60+ 处插值靠手工 `esc()`）vs DOM 构建并存；**`el()` 辅助函数已复制 5 份**（v1.0.3 新增 2 份）。
+- `querySelector/getElementById` 共 **156 处、24 个文件**，零常量化；index.html 15 个静态 id 被字符串直接引用；跨语言隐式契约（`tab-{n}` 格式呼应 TS 与 pty.rs）。
+- ssh.ts 覆盖 `~/.ssh/config` 用原生 `confirm()`（且内联 `onclick` 被 CSP 拦截报违规），与项目自建 confirmDialog 矛盾（themeeditor/serialprofileeditor 同有原生 confirm）。
 
-**方法**
-按既有切缝纯移动代码，不改行为，e2e 即安全网：
+**方法**：~30 行自动转义 `html` 标签模板助手收敛模板写法；公共 `el()` 收进 `ui/dom.ts`；DOM id 常量表（`core/dom-ids.ts`）；原生 confirm 全部替换为 confirmDialog。
 
-```
-terminal/
-  tabmanager.ts      编排 + tabs Map + switchTo/closeTab（目标 <400 行）
-  tablifecycle.ts    create*Tab 四件套 + _finalizeTab + _register + 字体竞态
-  tabactions.ts      rename/share/duplicate/export/closeRight/closeOther
-  settingsshell.ts   settings 页打开/关闭/工厂（从 tabmanager 剥离）
-  serialctl.ts       5 个串口 live setter + setSerialProfile
-```
+## P4 — main.ts 接线堆 + 通知机制三套并存
 
-tab.ts 暂缓（IME 与渲染耦合深，单独立项，见 P5 备注）。
+**现状**：main.ts 284 行内联块堆叠；通知机制三套——configStore.subscribe（仅 2 处）/ settings 壳 CustomEvent / handler 注入——仅注入有成文设计。模块放错层：fontpicker.ts（纯 UI 浮层）在 terminal/，forwarding 特性横跨 terminal/ 与 ui/。
 
-**收益**
-- 新功能有明确落点，止住吸积；
-- `tablifecycle`/`serialctl` 变成可单测的纯逻辑（现在只能 e2e 覆盖）；
-- 882 行 → 每个文件一个主题，AGENT.md 的 repo layout 重新名副其实。
+**方法**：每 feature 一个 init 模块，main <150 行；通知机制定型为"配置走 store.subscribe、feature 间走注入"，settings 壳 CustomEvent 视为壳内私有；fontpicker 挪 ui/，forwarding 收拢一层。
+
+## P5 — 状态分裂与复制体
+
+**现状**（审计 2.1 补充）：ConfigStore 自称唯一事实源，但 `themes.ts`/`serial-profiles.ts`/`fontconfig.ts`/`settings/ssh.ts` 各自维护模块级可变状态，无订阅通知，一致性靠调用纪律；`_onResize`/`triggerResize` 复制体（settle 修复只落一份）；`(window as any).__tterm`。
+
+**方法**：模块级状态登记为"启动期加载的运行时数据"，统一从 store.load 流程驱动刷新；合并复制体为 `scheduleFit(active, { settle })`；`__tterm` 收进类型化的 `core/devhooks.ts`。
 
 ---
 
-## P3 — 两种 UI 构建风格并存，innerHTML 插值是 XSS 温床
+# 第三部分：文档同步
 
-**现状**
-- settings 各面板（general/appearance/ssh/serial/profile 等 17 处文件）用 `innerHTML` 字符串插值，防注入靠手工 `esc()`——ssh.ts 单文件 60+ 处插值；
-- quickpanel/tabswitcher/shortcuts/contextmenu 用 DOM 构建（`createElement`），冗长但安全。
-
-**原因**
-历史演进：settings 面板写得早，图省事用了模板字符串；后来 UI 组件层形成了 DOM 构建风格，两套并存。目前没出安全事故是因为作者小心（ssh.ts 有 `esc()`），不是模式安全——插值模式只要漏一处 `esc()` 就是注入点（SSH hostname、串口名都是外部数据）。
-
-**方法**
-写一个 ~30 行的 `html` tagged-template 助手（插值自动转义，`html`<div>${userData}</div>`），放在 `src/ui/`：
-
-```ts
-// src/ui/html.ts — 插值默认转义；显式 unsafe() 才放行原始 HTML
-```
-
-然后把 settings 面板的插值模板逐个迁移（每个面板独立小 PR，e2e/单测现成的）。DOM 构建风格保持不变，两套收敛为"模板走 html 助手（自动转义）、动态结构走 createElement"。
-
-**收益**
-- 消灭一整类注入风险，且不靠自觉；
-- 模板可读性保留（不用改写成 createElement 长链）；
-- 新面板有唯一标准写法，结束风格分叉。
+| # | 问题 | 修法 |
+|---|---|---|
+| D1 | README 中/英 VID:PID 记忆宣传（见 A4） | 随 A4 一并修 |
+| D2 | AGENT.md 列幽灵文件 `serial-memory.ts`；invoke 命令清单漏约 20 个（`ssh_*`/串口控制/`tray_*`） | 删幽灵条目，命令清单改为"以 lib.rs generate_handler! 为准"并补全 |
+| D3 | testing.md Rust 测试计数 91→实际 101；msedgedriver 版本号过期 | 改为"以 `cargo test` 输出为准"，去掉易过期硬编码数字 |
 
 ---
 
-## P4 — main.ts 接线堆
-
-**现状**
-`main.ts` 284 行且以"内联块"方式持续堆叠：DOM refs、welcome、settings 工厂、config 订阅、keymap 接线（v1.0.3 新增的内联块）、quickpanel/contextmenu handler 注入、share 事件、初始化序列全在一个文件。
-
-**原因**
-没有"每功能一个 init 模块"的约定，handler 注入模式（好模式）天然把接线代码推向 main.ts，无人收口。
-
-**方法**
-约定：每个 feature 一个 `init*.ts`（`initKeymap()`、`initSharing()`、`initQuickPanel()`…），main.ts 只保留编排顺序，目标 <150 行。随 P2 一起做（都涉及 tabmanager 边界）。
-
-**收益**
-main.ts 重新可读完；feature 接线可独立 review；新增功能的 diff 不再碰公共文件，降低冲突面。
-
----
-
-## P5 — 复制体与类型断言（低优先，随改随清）
-
-**现状**
-- `_onResize` / `triggerResize` 是复制体（v1.0.3 的 settle 修复只落在后者——窗口 resize 不变更 metrics，行为正确，但复制体迟早分叉）；
-- `!` 非空断言 tabmanager.ts 39 处；`(window as any).__tterm` 调试钩子；
-- 测试断言脆弱：面板数量硬编码 5→6 时破两处（作为回归保护可接受，但断言的是计数不是契约）。
-
-**方法**
-- 合并 `_onResize`/`triggerResize` 为一个私有 `scheduleFit(active, { settle })`；
-- `__tterm` 收拢进 `src/core/devhooks.ts` 并声明类型；
-- 存量 `!` 不专项清洗，P1 的 lint 规则防新增即可。
-
-**收益**
-消除"修了一个忘了另一个"的整类 bug（v1.0.3 的 settle 修复差点就是先例）。
-
----
-
-## 分期计划
+# 分期计划（缺陷修复优先于范式治理）
 
 | 阶段 | 内容 | 验收 | 风险 |
 |---|---|---|---|
-| **0. 工具链**（0.5 天） | 装 Biome，配规则，全量 format（一次性 diff），加 `lint` script | `bun run lint` 通过；CI check job 绿 | format 大 diff 与在途分支冲突 → 选无在途工作时做 |
-| **1. CI 门禁**（0.5 天） | ci.yml 增加 check job（lint + tsc + vitest + cargo test） | 故意制造 lint/test 失败能被 CI 拦下 | Windows runner 上 cargo test 时长 → 用 rust-cache |
-| **2. html 助手 + 面板迁移**（2–3 天，可拆小 PR） | `ui/html.ts` + settings 面板逐个迁移 | 每面板现有单测/e2e 全绿；grep 无裸插值 | 低，逐面板独立 |
-| **3. tabmanager 截肢 + main 收口**（2–3 天） | P2 拆分 + P4 init 模块 + P5 复制体合并 | e2e 全绿；tabmanager <400 行 | 中：拖拽/MRU 顺序敏感，e2e 覆盖关键点 |
-
-阶段 0/1 互为依赖一并做；2、3 独立可并行。
+| **-1. 缺陷修复**（1–2 天） | A1（store.load 通知）、A2（Host \*）、A3（pasteWarning）、A4（README）、C2–C6 | A1/A2 新单测过；C 项回归测试过 | 低，各自独立 |
+| **0. 工具链 + CI**（1 天） | Biome 引入 + 全量 format + ci.yml `check` job（lint+tsc+vitest+cargo test） | 故意制造 lint/test 失败被 CI 拦下 | format 大 diff 撞在途分支 |
+| **1. 资源与并发**（1–2 天） | B1 tab.ts 清理、B2/B3 后端超时与锁、lib.rs handler 合并 | 新增回归单测/e2e | 中：死锁排查需 Rust 测试 |
+| **2. UI 收敛**（2–3 天，可拆小 PR） | html 助手 + el() 收编 + id 常量表 + confirmDialog 替换 | grep 无裸插值/原生 confirm | 低 |
+| **3. 结构拆分**（2–3 天） | tabmanager 截肢 + main 收口 + 状态登记 | e2e 全绿；tabmanager <400 行 | 中 |
+| **4. 后端排期**（独立） | sshclient.rs 拆分、L8-L13 择项 | cargo test 全绿 | 中 |
 
 ---
 
-## 约束工具集成 CI：可以，且应该
+# 约束工具集成 CI：可以，且现在最需要
 
-**现状**：`ci.yml` 只有 build job（bun install → rust toolchain → tauri build → 上传安装包），**测试和 lint 都不在 CI 里**。release.yml 同理只构建。也就是说当前"发版前跑测试"是流程要求，不是机器保证。
-
-**设计**：在 ci.yml 增加 `check` job，与 `build` 并行（build 慢，check 快，失败早反馈）：
+`ci.yml` 目前只有 build job（bun install → rust toolchain → tauri build → 上传安装包），**测试和 lint 都不在 CI**。设计：新增 `check` job 与 build 并行（快反馈）：
 
 ```yaml
   check:
@@ -157,30 +165,21 @@ main.ts 重新可读完；feature 接线可独立 review；新增功能的 diff 
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install
-      - run: bunx biome check src tests e2e   # P1 落地后；此前可跳过
-      - run: bun run build                    # tsc 类型检查 + vite 构建
+      - run: bunx biome check src tests e2e   # P1 落地后启用
+      - run: bun run build                    # tsc 类型检查 + vite
       - run: bun run test                     # vitest L1/L2
-
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
       - run: cargo test --manifest-path src-tauri/Cargo.toml
-      # 可选：cargo clippy -- -D warnings（后端已高质量，开了大概率直接过）
+      # 可选：cargo clippy -- -D warnings
 ```
 
-**e2e 是否进 CI**：可以但单独成 job（`e2e`），不进 PR 门禁。docs/testing.md 已有 CI 要点：windows-latest 自带 WebView2，需要下载钉版 msedgedriver + `cargo install tauri-driver`（均可缓存）+ debug 二进制。建议 nightly 或 release 前触发，避免拖慢 PR 反馈。
-
-**收益**：AGENT.md 的"提交前必须 `bun run build`""发版前零警告"从口头流程变成分支保护；P1 的 lint 规则只有进了 CI 才算真正固化。
+e2e 单独成 job 不进 PR 门禁（msedgedriver 钉版 + tauri-driver 缓存，见 testing.md），nightly 或发版前触发。
 
 ---
 
-## 收益汇总
+# 附：不引入前端框架的决策
 
-| 投入 | 产出 |
-|---|---|
-| ~1 天（阶段 0+1） | 纪律机器化：lint/format/test/类型全部 CI 强制，消除漂移风险 |
-| ~2–3 天（阶段 2） | 消灭 XSS 温床模式，UI 写法收敛唯一标准 |
-| ~2–3 天（阶段 3） | 止住 god object 吸积，核心逻辑可单测化，main.ts 可读 |
-
-总投入约一周，之后每个新功能（无论人写还是 Agent 写）都落在有边界、有门禁的结构里——前端达到与后端同一水准。
+复杂度在 xterm/PTY/IME 层（框架零收益），UI 表面小；现有痛点全是代码组织问题，框架只会得到 god component。重估触发条件：设置面板十几个且跨面板联动 / 多窗口共享组件库 → 届时首选 Solid / lit-html。低成本替代：`html` 标签模板助手（P3）解决模板 ergonomics。
