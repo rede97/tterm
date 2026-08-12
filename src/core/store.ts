@@ -7,7 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { buildFontFamily, defaultFontStack } from "../util/fontconfig";
 import { DEFAULT_THEME_NAME } from "../util/themes";
-import { logError } from "./errorlog";
+import { logError, swallow } from "./errorlog";
 import type { LocalProfile, SerialPort, SshHost, VsInstallation } from "./types";
 
 // ---- All config state in one interface ----
@@ -180,7 +180,7 @@ export class ConfigStore {
       try {
         kb = JSON.parse(kbRaw);
       } catch {
-        // broken keybindings.json — defaults, never take the config down.
+        swallow(); // broken keybindings.json — defaults, never take the config down.
       }
       const kbValid: Record<string, string> = SCHEMA.keybindings.validate(kb) ? kb : {};
 
@@ -287,7 +287,7 @@ export class ConfigStore {
           const raw = await invoke<string>("read_config_file", { name: "config" });
           existing = JSON.parse(raw);
         } catch {
-          /* first write or read error — start fresh */
+          swallow(); // first write or read error — start fresh
         }
         // keybindings never lands in config.json, even if a stale copy
         // survived the migration (hand-edited file).

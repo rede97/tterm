@@ -27,7 +27,13 @@ import { showToast } from "./ui/toast";
 import { initWindowControls } from "./ui/window";
 import { parseFontFamily, setSystemFonts, updateFontStack } from "./util/fontconfig";
 import { applyTerminalBackground, findTheme, setWtThemes } from "./util/themes";
-import { initContextMenuWiring, initQuickPanelWiring, initShortcutsWiring } from "./wiring";
+import {
+  initContextMenuWiring,
+  initDirMenuWiring,
+  initQuickPanelWiring,
+  initSearchWiring,
+  initShortcutsWiring,
+} from "./wiring";
 
 // -- DOM refs ---
 
@@ -150,6 +156,8 @@ initSshAuthDialogs();
 initShortcutsWiring();
 initQuickPanelWiring();
 initContextMenuWiring();
+initSearchWiring();
+initDirMenuWiring();
 
 // AI session sharing: the hub asks the frontend for a screen snapshot —
 // the xterm buffer is the ground-truth character grid.

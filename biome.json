@@ -16,6 +16,7 @@
       "src-tauri/capabilities/*.json"
     ]
   },
+  "plugins": ["./plugins/no-empty-catch.grit", "./plugins/no-native-dialogs.grit"],
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
@@ -31,7 +32,8 @@
         "noDescendingSpecificity": "warn"
       },
       "suspicious": {
-        "noExplicitAny": "warn"
+        "noExplicitAny": "warn",
+        "noImportCycles": "error"
       },
       "complexity": {
         "noImportantStyles": "off"

@@ -8,7 +8,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { logCatch } from "./core/errorlog";
 import { initKeymap } from "./core/keymap";
+import { setDirMenuHandlers } from "./terminal/dirmenu";
 import { pasteIntoTerminal } from "./terminal/paste";
+import { setSearchHandlers } from "./terminal/search";
 import type { TerminalTab } from "./terminal/tab";
 import { tabManager } from "./terminal/tabmanager";
 import { openQuickOpen, setTabSwitcherHandlers, stepMruSwitcher } from "./ui/tabswitcher";
@@ -112,5 +114,16 @@ export function initContextMenuWiring(): void {
       },
     });
     m.initContextMenu();
+  });
+}
+
+export function initSearchWiring(): void {
+  setSearchHandlers({ getTab: (id) => tabManager.get(id) });
+}
+
+export function initDirMenuWiring(): void {
+  setDirMenuHandlers({
+    defaultLocalProfile: () => tabManager.defaultLocalProfile(),
+    createLocalTab: (command, label, cwd) => tabManager.createLocalTab(command, label, cwd),
   });
 }

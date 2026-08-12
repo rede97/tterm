@@ -6,11 +6,20 @@ const { invokeMock } = vi.hoisted(() => ({
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 
 import { configStore } from "../src/core/store";
-import { launchDirectoryTab } from "../src/terminal/dirmenu";
+import { launchDirectoryTab, setDirMenuHandlers } from "../src/terminal/dirmenu";
 import { tabManager } from "../src/terminal/tabmanager";
 
 const PS = { name: "PowerShell", command: "powershell.exe" };
 const CMD = { name: "Command Prompt", command: "cmd.exe" };
+
+// Production wiring (src/wiring.ts) binds these to the tabManager; tests bind
+// the same shape so the spy below still intercepts createLocalTab.
+beforeEach(() => {
+  setDirMenuHandlers({
+    defaultLocalProfile: () => tabManager.defaultLocalProfile(),
+    createLocalTab: (command, label, cwd) => tabManager.createLocalTab(command, label, cwd),
+  });
+});
 
 beforeEach(() => {
   configStore.set({

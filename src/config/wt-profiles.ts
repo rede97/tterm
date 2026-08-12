@@ -2,7 +2,7 @@
 // Reads WT settings.json and fragment files via Tauri IPC.
 
 import { invoke } from "@tauri-apps/api/core";
-import { logError } from "../core/errorlog";
+import { logError, swallow } from "../core/errorlog";
 import type { LocalProfile, SerialPort, VsInstallation } from "../core/types";
 import type { ThemeDef } from "../util/themes";
 import { parseWtSchemes } from "../util/themes";
@@ -97,7 +97,7 @@ export async function loadAllWtData(): Promise<WtLoadResult> {
         try {
           parseProfilesFromJson(JSON.parse(frag), localProfiles, vsInstalls);
         } catch {
-          /* skip malformed fragments */
+          swallow(); // skip malformed fragments
         }
       }
     }

@@ -1,0 +1,13 @@
+// Hard rule (AGENT.md): no bare/silent catch. Handle the error or route it
+// through swallow()/logCatch so the decision is explicit.
+// Matches `catch { }` with an empty statement list (comments only is still
+// empty as far as the CST is concerned).
+engine biome(1.0)
+language js(typescript, jsx)
+
+JsCatchClause(body = JsBlockStatement(statements = [])) as $catch where {
+    register_diagnostic(
+        span = $catch,
+        message = "Empty catch blocks are not allowed. Handle the error, or call swallow()/logCatch to make the ignore explicit."
+    )
+}

@@ -8,6 +8,8 @@
 // never injects text into the terminal — the committed string travels
 // xterm's own textarea → onData → PTY path, untouched.
 
+import { swallow } from "../core/errorlog";
+
 export interface CursorPos {
   x: number; // px, relative to the terminal element
   y: number;
@@ -32,7 +34,7 @@ function loadMode(): ImeMirrorMode {
     const v = localStorage.getItem(MODE_STORAGE_KEY);
     if (v === "auto" || v === "always" || v === "off") return v;
   } catch {
-    /* localStorage unavailable (tests) */
+    swallow(); // localStorage unavailable (tests)
   }
   return DEFAULT_MODE;
 }
@@ -49,7 +51,7 @@ export function setImeMirrorMode(m: ImeMirrorMode): void {
   try {
     localStorage.setItem(MODE_STORAGE_KEY, m);
   } catch {
-    /* ignore */
+    swallow(); // localStorage unavailable (tests)
   }
   for (const fn of modeListeners) fn(m);
 }

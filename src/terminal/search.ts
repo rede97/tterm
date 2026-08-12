@@ -1,6 +1,18 @@
 import { ChevronDown, ChevronUp, createElement, X } from "lucide";
 import { DOM_ID } from "../core/dom-ids";
-import { tabManager } from "./tabmanager";
+import type { TerminalTab } from "./tab";
+
+// ---- Injected handlers (bound by wiring.ts — no tabmanager import here) ----
+
+export interface SearchHandlers {
+  getTab: (tabId: string) => TerminalTab | undefined;
+}
+
+let handlers: SearchHandlers;
+
+export function setSearchHandlers(h: SearchHandlers): void {
+  handlers = h;
+}
 
 // -- DOM --
 
@@ -36,7 +48,7 @@ searchBar.appendChild(searchClose);
 
 function currentTab() {
   const tabId = searchInput.dataset.tabId;
-  return tabId ? tabManager.get(tabId) : undefined;
+  return tabId ? handlers.getTab(tabId) : undefined;
 }
 
 export function closeFind() {
@@ -72,7 +84,7 @@ function doFindPrev() {
 }
 
 export function openFind(tabId: string) {
-  const tab = tabManager.get(tabId);
+  const tab = handlers.getTab(tabId);
   if (!tab?.searchAddon) return;
 
   searchInput.dataset.tabId = tabId;

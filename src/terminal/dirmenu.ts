@@ -7,7 +7,19 @@ import { invoke } from "@tauri-apps/api/core";
 import { createElement, Folder, FolderOpen, Trash2 } from "lucide";
 import { logCatch } from "../core/errorlog";
 import { configStore } from "../core/store";
-import { tabManager } from "./tabmanager";
+
+// ---- Injected handlers (bound by wiring.ts — no tabmanager import here) ----
+
+export interface DirMenuHandlers {
+  defaultLocalProfile: () => { command: string; name: string } | null;
+  createLocalTab: (command?: string, label?: string, cwd?: string) => Promise<unknown>;
+}
+
+let handlers: DirMenuHandlers;
+
+export function setDirMenuHandlers(h: DirMenuHandlers): void {
+  handlers = h;
+}
 
 const MAX_RECENT = 10;
 
@@ -27,8 +39,8 @@ export async function launchDirectoryTab(dir: string): Promise<void> {
   rememberDirectory(dir);
   // Launch the user's default profile (settings → Profiles), not the
   // backend's hardcoded fallback shell.
-  const p = tabManager.defaultLocalProfile();
-  await tabManager.createLocalTab(p?.command, dirName(dir), dir);
+  const p = handlers.defaultLocalProfile();
+  await handlers.createLocalTab(p?.command, dirName(dir), dir);
 }
 
 export async function pickAndLaunchDirectory(): Promise<void> {

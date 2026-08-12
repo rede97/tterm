@@ -1,0 +1,19 @@
+// Hard rule (AGENT.md): no native dialogs. Use the project's confirmDialog /
+// modal / toast UI instead (native dialogs are also blocked by CSP in some
+// contexts and cannot be styled).
+engine biome(1.0)
+language js(typescript, jsx)
+
+or {
+    `alert($...)` as $call,
+    `confirm($...)` as $call,
+    `prompt($...)` as $call,
+    `window.alert($...)` as $call,
+    `window.confirm($...)` as $call,
+    `window.prompt($...)` as $call
+} where {
+    register_diagnostic(
+        span = $call,
+        message = "Native dialogs (alert/confirm/prompt) are not allowed. Use confirmDialog / modal / toast from src/ui instead."
+    )
+}

@@ -82,6 +82,7 @@ describe("custom themes", () => {
         const mgr = window.__tterm.mgr;
         if (document.querySelector('[data-tab-id="#settings"]')) mgr.closeSettings(true);
       });
+      // biome-ignore lint/plugin: best-effort test cleanup — failure must not mask the suite result
     } catch {
       /* best-effort cleanup */
     }
