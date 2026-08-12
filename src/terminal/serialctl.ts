@@ -1,0 +1,70 @@
+// Live parameter control for open SERIAL sessions (this session only, unless
+// noted). Extracted from TabManager — these functions operate purely on the
+// tab object + backend IPC + configStore, no manager internals.
+//
+//   setSerialProfile        apply a named profile; becomes the global default
+//   setSerialBaud           live baud switch (backend) + tab-label refresh
+//   setSerialInputMode      frontend input modes (normal/echo/line)
+//   setSerialEnterNewline   frontend Enter terminator
+//   setSerialOutputNewline  backend output newline
+
+import { invoke } from "@tauri-apps/api/core";
+import { findSerialProfile } from "../config/serial-profiles";
+import { configStore } from "../core/store";
+import type { SerialEnterNewline, SerialInputMode, SerialOutputNewline } from "../core/types";
+import type { TerminalTab } from "./tab";
+
+function serialTab(tab: TerminalTab | undefined): TerminalTab | undefined {
+  return tab?.type === "serial" ? tab : undefined;
+}
+
+// Apply a profile to a live serial session: input mode + Enter terminator
+// (frontend input handler), output newline + flow control (backend).
+// The choice becomes the global default for the next tab.
+export async function setSerialProfile(tab: TerminalTab | undefined, name: string): Promise<void> {
+  const t = serialTab(tab);
+  if (!t) return;
+  const profile = findSerialProfile(name);
+  t.setSerialInputMode(profile.inputMode);
+  t.setSerialEnterNewline(profile.enterNewline);
+  await invoke("serial_set_output_newline", { id: t.id, mode: profile.outputNewline });
+  await invoke("serial_set_flow_control", { id: t.id, flow: profile.flowControl });
+  t.outputNewline = profile.outputNewline;
+  t.flowControl = profile.flowControl;
+  t.serialProfile = profile.name;
+  configStore.set({ serialProfile: profile.name });
+}
+
+// Live Enter-key newline switch (frontend-side, this session only).
+export async function setSerialEnterNewline(
+  tab: TerminalTab | undefined,
+  mode: SerialEnterNewline,
+): Promise<void> {
+  serialTab(tab)?.setSerialEnterNewline(mode);
+}
+
+// Live input-mode switch for an open serial session (this session only).
+export function setSerialInputMode(tab: TerminalTab | undefined, mode: SerialInputMode): void {
+  serialTab(tab)?.setSerialInputMode(mode);
+}
+
+// Live output-newline switch for an open serial session (this session only).
+export async function setSerialOutputNewline(
+  tab: TerminalTab | undefined,
+  mode: SerialOutputNewline,
+): Promise<void> {
+  const t = serialTab(tab);
+  if (!t) return;
+  await invoke("serial_set_output_newline", { id: t.id, mode });
+  t.outputNewline = mode;
+}
+
+// Live baud switch for an open serial session (this session only).
+export async function setSerialBaud(tab: TerminalTab | undefined, baud: number): Promise<void> {
+  const t = serialTab(tab);
+  if (!t?.serialPortName) return;
+  await invoke("serial_set_baud", { id: t.id, baudRate: baud });
+  t.serialBaud = baud;
+  // Baud display update, not a user rename — keep OSC title tracking live.
+  t.rename(`${t.serialPortName} · ${baud}`, false);
+}

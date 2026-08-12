@@ -8,7 +8,7 @@
   "files": {
     "includes": [
       "src/**",
-      "!src/assets/**",
+      "!!src/assets",
       "tests/**",
       "e2e/**",
       "*.json",

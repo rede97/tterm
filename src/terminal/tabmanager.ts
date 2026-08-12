@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
 import { createElement, FolderOpen } from "lucide";
 import Sortable from "sortablejs";
 import { findSerialProfile } from "../config/serial-profiles";
@@ -22,7 +21,24 @@ import { showToast } from "../ui/toast";
 import { addForward, type NewForward } from "./forwarding";
 import { closeQuickPanel, closeQuickPanelForTab, updateQuickButton } from "./quickpanel";
 import { closeFindForTab } from "./search";
+import {
+  setSerialBaud,
+  setSerialEnterNewline,
+  setSerialInputMode,
+  setSerialOutputNewline,
+  setSerialProfile,
+} from "./serialctl";
+import { SettingsShell } from "./settingsshell";
 import { TerminalTab } from "./tab";
+import {
+  clearTab as actionClearTab,
+  closeOtherTabs as actionCloseOtherTabs,
+  closeTabsRight as actionCloseTabsRight,
+  duplicateTab as actionDuplicateTab,
+  exportTab as actionExportTab,
+  renameTab as actionRenameTab,
+  shareTab as actionShareTab,
+} from "./tabactions";
 
 /// Toggle the strip's layout-state classes from live metrics:
 /// `overflowing` (strip scrolls → +/dropdown pin), `can-scroll-left`
@@ -37,15 +53,19 @@ export function syncTabStripState(el: HTMLElement): void {
 export class TabManager {
   tabs = new Map<string, TerminalTab>();
   activeTabId: string | null = null;
-  settingsOpen = false;
 
   // Most-recently-used tab ids, front = current. Drives the Ctrl+Tab
   // switcher order. Updated on switch, pruned on close.
   private _mru: string[] = [];
 
-  private settingsEl: HTMLElement | null = null;
-  private settingsTabEl: HTMLElement | null = null;
-  private _createSettingsContent: (() => Promise<HTMLElement>) | null = null;
+  // The settings pseudo-tab's lifecycle lives in SettingsShell (created by
+  // initSettingsShell once real containers exist). External readers keep
+  // using the `settingsOpen` getter.
+  private _settings!: SettingsShell;
+
+  get settingsOpen(): boolean {
+    return this._settings?.open ?? false;
+  }
 
   readonly tabsContainer: HTMLElement;
   readonly terminalContainer: HTMLElement;
@@ -353,53 +373,26 @@ export class TabManager {
     return this._finalizeTab(tab, result);
   }
 
-  // Apply a profile to a live serial session: input mode + Enter terminator
-  // (frontend input handler), output newline + flow control (backend).
-  // The choice becomes the global default for the next tab.
+  // Serial live setters delegate to terminal/serialctl.ts (pure tab+IPC
+  // functions, extracted from this class).
   async setSerialProfile(tabId: string, name: string): Promise<void> {
-    const tab = this.tabs.get(tabId);
-    if (tab?.type !== "serial") return;
-    const profile = findSerialProfile(name);
-    tab.setSerialInputMode(profile.inputMode);
-    tab.setSerialEnterNewline(profile.enterNewline);
-    await invoke("serial_set_output_newline", { id: tabId, mode: profile.outputNewline });
-    await invoke("serial_set_flow_control", { id: tabId, flow: profile.flowControl });
-    tab.outputNewline = profile.outputNewline;
-    tab.flowControl = profile.flowControl;
-    tab.serialProfile = profile.name;
-    configStore.set({ serialProfile: profile.name });
+    await setSerialProfile(this.tabs.get(tabId), name);
   }
 
-  // Live Enter-key newline switch (frontend-side, this session only).
   async setSerialEnterNewline(tabId: string, mode: SerialEnterNewline): Promise<void> {
-    const tab = this.tabs.get(tabId);
-    if (tab?.type !== "serial") return;
-    tab.setSerialEnterNewline(mode);
+    await setSerialEnterNewline(this.tabs.get(tabId), mode);
   }
 
-  // Live input-mode switch for an open serial session (this session only).
   setSerialInputMode(tabId: string, mode: SerialInputMode): void {
-    const tab = this.tabs.get(tabId);
-    if (tab?.type !== "serial") return;
-    tab.setSerialInputMode(mode);
+    setSerialInputMode(this.tabs.get(tabId), mode);
   }
 
-  // Live output-newline switch for an open serial session (this session only).
   async setSerialOutputNewline(tabId: string, mode: SerialOutputNewline): Promise<void> {
-    const tab = this.tabs.get(tabId);
-    if (tab?.type !== "serial") return;
-    await invoke("serial_set_output_newline", { id: tabId, mode });
-    tab.outputNewline = mode;
+    await setSerialOutputNewline(this.tabs.get(tabId), mode);
   }
 
-  // Live baud switch for an open serial session (this session only).
   async setSerialBaud(tabId: string, baud: number): Promise<void> {
-    const tab = this.tabs.get(tabId);
-    if (tab?.type !== "serial" || !tab.serialPortName) return;
-    await invoke("serial_set_baud", { id: tabId, baudRate: baud });
-    tab.serialBaud = baud;
-    // Baud display update, not a user rename — keep OSC title tracking live.
-    tab.rename(`${tab.serialPortName} · ${baud}`, false);
+    await setSerialBaud(this.tabs.get(tabId), baud);
   }
 
   async createDemoTab(): Promise<TerminalTab | null> {
@@ -467,7 +460,7 @@ export class TabManager {
   switchTo(id: string): void {
     const wasSettingsOpen = this.settingsOpen;
     if (wasSettingsOpen) {
-      this._closeSettings(false);
+      this._settings.close(false);
     }
 
     if (this.activeTabId === id) {
@@ -608,212 +601,64 @@ export class TabManager {
   // -- tab features --
 
   renameTab(id: string): void {
-    const tab = this.tabs.get(id);
-    if (!tab) return;
-    const labelEl = tab.tabElement.querySelector(".tab-label") as HTMLElement | null;
-    if (!labelEl || labelEl.querySelector("input")) return;
-
-    // Inline editing: the native prompt() dialog shows the dev URL as its
-    // title ("127.0.0.1:1420 says…") and looks foreign to the app.
-    const input = document.createElement("input");
-    input.className = "tab-rename-input";
-    input.value = tab.label;
-    labelEl.textContent = "";
-    labelEl.appendChild(input);
-
-    // Editing must not trigger tab switching or SortableJS drag.
-    for (const ev of ["click", "dblclick", "mousedown", "pointerdown"]) {
-      input.addEventListener(ev, (e) => e.stopPropagation());
-    }
-
-    let done = false;
-    const finish = (save: boolean) => {
-      if (done) return;
-      done = true;
-      const name = input.value.trim();
-      if (save && name && name !== tab.label) {
-        tab.rename(name); // also locks the OSC title
-      } else if (save && !name && tab.titleLocked) {
-        tab.resetTitle(); // emptied: back to tracking the terminal title
-      } else {
-        labelEl.textContent = tab.label;
-      }
-    };
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        finish(true);
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        finish(false);
-      }
-      e.stopPropagation();
-    });
-    input.addEventListener("blur", () => finish(true));
-
-    input.focus();
-    input.select();
+    actionRenameTab(this, id);
   }
 
   async shareTab(id: string): Promise<void> {
-    const tab = this.tabs.get(id);
-    if (!tab) return;
-    if (tab.shared) {
-      await invoke("share_revoke", { id }).catch(logCatch("share.revoke"));
-      tab.shared = false;
-      tab.shareUrl = undefined;
-      tab.tabElement.classList.remove("shared");
-      showToast("AI sharing stopped", "info");
-      updateQuickButton();
-      return;
-    }
-    try {
-      const res = await invoke<{ url: string }>("share_create", {
-        id,
-        label: tab.label,
-        kind: tab.type,
-        allowWrite: true,
-      });
-      await clipboardWriteText(res.url).catch(logCatch("clipboard.write"));
-      tab.shared = true;
-      tab.shareUrl = res.url;
-      tab.tabElement.classList.add("shared");
-      showToast("Share link copied — paste it to your AI agent", "info", 6000);
-      updateQuickButton();
-    } catch (e) {
-      showToast(`Failed to share session: ${e}`, "error");
-    }
+    await actionShareTab(this, id);
   }
 
   clearTab(id: string): void {
-    const tab = this.tabs.get(id);
-    if (!tab) return;
-    tab.terminal.clear();
+    actionClearTab(this, id);
   }
 
   async duplicateTab(id: string): Promise<void> {
-    const tab = this.tabs.get(id);
-    if (!tab) return;
-    if (tab.type === "ssh" && tab.sshHost) {
-      await this.createSshTab(tab.sshHost);
-    } else if (tab.command) {
-      await this.createLocalTab(tab.command, tab.label);
-    } else {
-      await this.createLocalTab(undefined, tab.label);
-    }
+    await actionDuplicateTab(this, id);
   }
 
   exportTab(id: string): void {
-    const tab = this.tabs.get(id);
-    if (!tab) return;
-    const buffer = tab.terminal.buffer.active;
-    const lines: string[] = [];
-    for (let y = 0; y < buffer.length; y++) {
-      const line = buffer.getLine(y);
-      if (line) lines.push(line.translateToString().trimEnd());
-    }
-    invoke("save_text_file", { content: lines.join("\n") }).catch(console.error);
+    actionExportTab(this, id);
   }
 
   closeTabsRight(id: string): void {
-    const idx = this.getTabIndex(id);
-    if (idx === -1) return;
-    const ids = Array.from(this.tabs.keys()).filter((tid) => this.getTabIndex(tid) > idx);
-    for (const tid of ids) this.closeTab(tid);
+    actionCloseTabsRight(this, id);
   }
 
   closeOtherTabs(id: string): void {
-    const ids = Array.from(this.tabs.keys()).filter((tid) => tid !== id);
-    for (const tid of ids) this.closeTab(tid);
+    actionCloseOtherTabs(this, id);
   }
 
-  // -- settings --
+  // -- settings (lifecycle lives in terminal/settingsshell.ts) --
+
+  // Called once real containers exist (same timing as initSortable).
+  initSettingsShell(): void {
+    this._settings = new SettingsShell(this.tabsContainer, this.terminalContainer, {
+      hideAllTabs: () => {
+        for (const tab of this.tabs.values()) tab.hide();
+      },
+      restoreActiveView: () => {
+        const tab = this.activeTabId ? this.tabs.get(this.activeTabId) : undefined;
+        if (tab) {
+          tab.show();
+          if (tab.needsResize) tab.fitDeferred();
+        } else if (!this.activeTabId) {
+          this._showWelcome();
+        }
+      },
+      syncStrip: () => this._syncTabsOverflow(),
+    });
+  }
 
   setSettingsFactory(fn: () => Promise<HTMLElement>): void {
-    this._createSettingsContent = fn;
+    this._settings.setFactory(fn);
   }
 
   toggleSettings(): void {
-    if (this.settingsOpen) return;
-    this._openSettings();
-  }
-
-  private async _openSettings(): Promise<void> {
-    if (this.settingsEl || !this._createSettingsContent) return;
-
-    this.settingsOpen = true;
-    closeQuickPanel();
-    updateQuickButton();
-
-    for (const tab of this.tabs.values()) tab.hide();
-
-    if (!this.settingsTabEl) {
-      this.settingsTabEl = document.createElement("div");
-      this.settingsTabEl.className = "tab";
-      this.settingsTabEl.dataset.tabId = "#settings";
-      const label = document.createElement("span");
-      label.className = "tab-label";
-      label.textContent = "Settings";
-      this.settingsTabEl.appendChild(label);
-      const closeBtn = document.createElement("button");
-      closeBtn.className = "tab-close";
-      closeBtn.textContent = "\xd7";
-      closeBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        this._closeSettings(true);
-      });
-      this.settingsTabEl.appendChild(closeBtn);
-      this.settingsTabEl.addEventListener("click", () => this.toggleSettings());
-      this.tabsContainer.insertBefore(this.settingsTabEl, this.tabsContainer.firstChild);
-      this._syncTabsOverflow();
-    }
-    this.settingsTabEl.classList.add("active");
-    const sCloseBtn = this.settingsTabEl.querySelector(".tab-close") as HTMLElement;
-    if (sCloseBtn) sCloseBtn.style.opacity = "1";
-
-    const settingsEl = await this._createSettingsContent();
-    // The factory is a dynamic import — genuinely async. If the user
-    // closed settings (or switched to a tab) while it was in flight,
-    // discard the page: appending it now would stick it on screen with
-    // no live settings tab to dismiss it.
-    if (!this.settingsOpen) return;
-    this.settingsEl = settingsEl;
-    this.terminalContainer.appendChild(this.settingsEl);
-  }
-
-  private _closeSettings(restore: boolean): void {
-    if (this.settingsEl) {
-      this.settingsEl.remove();
-      this.settingsEl = null;
-    }
-    if (this.settingsTabEl) {
-      if (restore) {
-        this.settingsTabEl.remove();
-        this.settingsTabEl = null;
-        this._syncTabsOverflow();
-      } else {
-        this.settingsTabEl.classList.remove("active");
-        const sCloseBtn = this.settingsTabEl.querySelector(".tab-close") as HTMLElement;
-        if (sCloseBtn) sCloseBtn.style.opacity = "";
-      }
-    }
-
-    this.settingsOpen = false;
-    updateQuickButton();
-
-    if (restore && this.activeTabId) {
-      const tab = this.tabs.get(this.activeTabId);
-      if (tab) {
-        tab.show();
-        if (tab.needsResize) tab.fitDeferred();
-      }
-    } else if (restore) {
-      this._showWelcome();
-    }
+    this._settings.toggle();
   }
 
   closeSettings(restore?: boolean): void {
-    this._closeSettings(restore ?? true);
+    this._settings.close(restore ?? true);
   }
 
   // -- resize --
@@ -916,6 +761,7 @@ export function initTabManager(
 ): TabManager {
   Object.assign(tabManager, { tabsContainer, terminalContainer, _welcomeEl: welcomeEl });
   tabManager.initSortable();
+  tabManager.initSettingsShell();
   setTrayTabsProvider(() => ({
     tabs: [...tabManager.tabs.values()].map((t) => t.label),
     active: tabManager.activeTab?.label ?? "",

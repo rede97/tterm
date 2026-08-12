@@ -16,20 +16,17 @@ import { loadSerialProfiles } from "./config/serial-profiles";
 import { loadSshHosts } from "./config/ssh-config";
 import { loadAllWtData } from "./config/wt-profiles";
 import { logCatch, logError, swallow } from "./core/errorlog";
-import { initKeymap } from "./core/keymap";
 import { configStore } from "./core/store";
 import { scheduleAutoUpdateCheck } from "./core/updater";
-import { pasteIntoTerminal } from "./terminal/paste";
 import { initProfileMenu } from "./terminal/profilemenu";
 import { initSearchBar } from "./terminal/search";
 import { initSshAuthDialogs } from "./terminal/sshauth";
-import type { TerminalTab } from "./terminal/tab";
 import { initTabManager, tabManager } from "./terminal/tabmanager";
-import { openQuickOpen, setTabSwitcherHandlers, stepMruSwitcher } from "./ui/tabswitcher";
 import { showToast } from "./ui/toast";
-import { initWindowControls, toggleFullscreenMode, toggleZenMode } from "./ui/window";
+import { initWindowControls } from "./ui/window";
 import { parseFontFamily, setSystemFonts, updateFontStack } from "./util/fontconfig";
 import { applyTerminalBackground, findTheme, setWtThemes } from "./util/themes";
+import { initContextMenuWiring, initQuickPanelWiring, initShortcutsWiring } from "./wiring";
 
 // -- DOM refs ---
 
@@ -147,101 +144,10 @@ initSearchBar();
 initProfileMenu();
 initSshAuthDialogs();
 
-// Keyboard shortcuts: global dispatcher (core/keymap) + tab switcher overlay.
-// Commands are rebindable in Settings → Keyboard.
-{
-  const toItem = ([id, t]: [string, TerminalTab], i: number) => ({
-    id,
-    label: t.label,
-    index: i + 1,
-    active: id === tabManager.activeTabId,
-    disconnected: t.disconnected,
-  });
-  setTabSwitcherHandlers({
-    listTabs: (mode) => {
-      const entries = [...tabManager.tabs.entries()];
-      if (mode === "mru") {
-        const byId = new Map(entries);
-        return tabManager.mruTabIds().map((id) => {
-          const i = entries.findIndex(([eid]) => eid === id);
-          return toItem([id, byId.get(id)!], i);
-        });
-      }
-      return entries.map((e, i) => toItem(e, i));
-    },
-    switchTo: (id) => tabManager.switchTo(id),
-  });
-  initKeymap({
-    "workbench.action.quickOpen": () => openQuickOpen(),
-    "workbench.action.nextTab": () => stepMruSwitcher(1),
-    "workbench.action.prevTab": () => stepMruSwitcher(-1),
-    "workbench.action.closeTab": () => {
-      if (tabManager.settingsOpen) {
-        tabManager.closeSettings(true);
-        return;
-      }
-      if (tabManager.activeTabId) tabManager.closeTab(tabManager.activeTabId);
-    },
-    "workbench.action.toggleFullScreen": () => {
-      toggleFullscreenMode()
-        .then(() => tabManager.triggerResize())
-        .catch(logCatch("window.fullScreen"));
-    },
-    "workbench.action.toggleZenMode": () => {
-      toggleZenMode()
-        .then(() => tabManager.triggerResize())
-        .catch(logCatch("window.zenMode"));
-    },
-    "workbench.action.terminal.clear": () => {
-      const t = tabManager.activeTab;
-      if (t) t.terminal.clear();
-    },
-  });
-}
-
-import("./terminal/quickpanel").then((m) => {
-  m.setQuickPanelHandlers({
-    getActiveTab: () => (tabManager.settingsOpen ? undefined : tabManager.activeTab),
-    getTab: (id) => tabManager.get(id),
-    shareTab: (id) => tabManager.shareTab(id),
-    setSerialBaud: (id, baud) => tabManager.setSerialBaud(id, baud),
-    setSerialProfile: (id, name) => tabManager.setSerialProfile(id, name),
-    setSerialInputMode: (id, mode) => tabManager.setSerialInputMode(id, mode),
-    setSerialOutputNewline: (id, mode) => tabManager.setSerialOutputNewline(id, mode),
-    setSerialEnterNewline: (id, mode) => tabManager.setSerialEnterNewline(id, mode),
-  });
-  m.initQuickPanel();
-});
-import("./terminal/contextmenu").then((m) => {
-  m.setContextMenuHandlers({
-    createLocalTab: () => tabManager.createLocalTab(),
-    newWindow: () => invoke("open_new_window").catch(logCatch("window.openNew")),
-    getTabLabel: (id) => tabManager.get(id)?.label ?? "",
-    setTabColor: (id, color) => tabManager.get(id)?.setColor(color),
-    renameTab: (id) => tabManager.renameTab(id),
-    duplicateTab: (id) => tabManager.duplicateTab(id),
-    closeTab: (id) => tabManager.closeTab(id),
-    closeTabsRight: (id) => tabManager.closeTabsRight(id),
-    closeOtherTabs: (id) => tabManager.closeOtherTabs(id),
-    getSelection: (id) => tabManager.get(id)?.terminal.getSelection() ?? "",
-    pasteToTab: (id, text) => {
-      const t = tabManager.get(id);
-      if (t) pasteIntoTerminal(t.terminal, text);
-    },
-    clearTab: (id) => tabManager.clearTab(id),
-    switchTo: (id) => tabManager.switchTo(id),
-    exportTab: (id) => tabManager.exportTab(id),
-    getActiveTabId: () => tabManager.activeTabId,
-    shareTab: (id) => tabManager.shareTab(id),
-    isTabShared: (id) => tabManager.get(id)?.shared ?? false,
-    getShareUrl: (id) => tabManager.get(id)?.shareUrl,
-    isEmbeddedSshTab: (id) => {
-      const t = tabManager.get(id);
-      return !!t && t.type === "ssh" && t.sshEmbedded === true;
-    },
-  });
-  m.initContextMenu();
-});
+// Feature wiring lives in ./wiring (composition root for handler injection).
+initShortcutsWiring();
+initQuickPanelWiring();
+initContextMenuWiring();
 
 // AI session sharing: the hub asks the frontend for a screen snapshot —
 // the xterm buffer is the ground-truth character grid.
