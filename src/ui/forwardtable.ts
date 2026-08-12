@@ -8,8 +8,8 @@
 // pinned to 127.0.0.1 by design: only its port is editable. Dynamic
 // forwards are SOCKS5 listeners and have no target endpoint.
 
-import { showToast } from "./toast";
 import type { ForwardEditorValue, ForwardKind } from "./forwardeditor";
+import { showToast } from "./toast";
 
 export interface ForwardTableOptions {
   // Narrow containers (quick panel): rows stack listen/target on two lines.
@@ -66,9 +66,30 @@ interface GroupDef {
 }
 
 const GROUPS: GroupDef[] = [
-  { kind: "local", title: "Local (-L)", desc: "Listen here, reach a target through the server", hasTarget: true, accent: "ft-g-local", targetHostPh: "127.0.0.1 (Remote)" },
-  { kind: "remote", title: "Remote (-R)", desc: "Listen on the server, reach a target from here", hasTarget: true, accent: "ft-g-remote", targetHostPh: "127.0.0.1 (Local)" },
-  { kind: "dynamic", title: "Dynamic (-D)", desc: "SOCKS5 proxy listening here, any destination", hasTarget: false, accent: "ft-g-dynamic", targetHostPh: "" },
+  {
+    kind: "local",
+    title: "Local (-L)",
+    desc: "Listen here, reach a target through the server",
+    hasTarget: true,
+    accent: "ft-g-local",
+    targetHostPh: "127.0.0.1 (Remote)",
+  },
+  {
+    kind: "remote",
+    title: "Remote (-R)",
+    desc: "Listen on the server, reach a target from here",
+    hasTarget: true,
+    accent: "ft-g-remote",
+    targetHostPh: "127.0.0.1 (Local)",
+  },
+  {
+    kind: "dynamic",
+    title: "Dynamic (-D)",
+    desc: "SOCKS5 proxy listening here, any destination",
+    hasTarget: false,
+    accent: "ft-g-dynamic",
+    targetHostPh: "",
+  },
 ];
 
 // -- Row model ------------------------------------------------------------
@@ -115,7 +136,13 @@ export function parseForwardLine(line: string, kind: ForwardKind): ForwardEditor
   if (kind === "dynamic") {
     const m = line.trim().match(/^(\S+):(\d+)$/);
     if (!m) return null;
-    return { kind, listenHost: m[1], listenPort: parseInt(m[2], 10), targetHost: "", targetPort: 0 };
+    return {
+      kind,
+      listenHost: m[1],
+      listenPort: parseInt(m[2], 10),
+      targetHost: "",
+      targetPort: 0,
+    };
   }
   const m = line.trim().match(/^(\S+):(\d+)\s+(\S+):(\d+)$/);
   if (!m) return null;
@@ -151,7 +178,13 @@ function mkBtn(className: string, text: string, title: string): HTMLButtonElemen
   return b;
 }
 
-function mkInput(aria: string, placeholder: string, port: boolean, value: string, rule: Rule): HTMLInputElement {
+function mkInput(
+  aria: string,
+  placeholder: string,
+  port: boolean,
+  value: string,
+  rule: Rule,
+): HTMLInputElement {
   const input = document.createElement("input");
   input.className = port ? "ft-port" : "ft-host";
   input.type = "text";
@@ -171,7 +204,7 @@ export function createForwardTable(
   initial: ForwardEditorValue[] = [],
   opts: ForwardTableOptions = {},
 ): ForwardTable {
-  const data: ForwardEditorValue[] = initial.map(r => ({ ...r }));
+  const data: ForwardEditorValue[] = initial.map((r) => ({ ...r }));
   const root = el("div", opts.compact ? "ft ft-compact" : "ft");
 
   /** Edit-mode row inside a group: pinned listen host + port, target
@@ -194,7 +227,13 @@ export function createForwardTable(
     row.appendChild(listen);
 
     const inputs: { input: HTMLInputElement; rule: Rule; apply(): void }[] = [
-      { input: listenPort, rule: portRule, apply: () => { draft.listenPort = listenPort.value; } },
+      {
+        input: listenPort,
+        rule: portRule,
+        apply: () => {
+          draft.listenPort = listenPort.value;
+        },
+      },
     ];
 
     if (group.hasTarget) {
@@ -206,8 +245,20 @@ export function createForwardTable(
       target.appendChild(port);
       row.appendChild(target);
       inputs.push(
-        { input: host, rule: hostRule, apply: () => { draft.targetHost = host.value; } },
-        { input: port, rule: portRule, apply: () => { draft.targetPort = port.value; } },
+        {
+          input: host,
+          rule: hostRule,
+          apply: () => {
+            draft.targetHost = host.value;
+          },
+        },
+        {
+          input: port,
+          rule: portRule,
+          apply: () => {
+            draft.targetPort = port.value;
+          },
+        },
       );
     } else {
       row.appendChild(el("span", "ft-cell ft-target ft-socks", "any destination (SOCKS5)"));
@@ -217,8 +268,11 @@ export function createForwardTable(
     // Compact rows save button area with a bare plus icon; the title keeps
     // the full action name discoverable.
     const label = opts.compact && commitLabel === "Add" ? ICON_PLUS : commitLabel;
-    const ok = mkBtn(`ft-btn ft-ok${commitLabel === "Add" ? " ft-add" : ""}`, label,
-      commitLabel === "Add" ? `Add ${group.kind} forward` : "Apply");
+    const ok = mkBtn(
+      `ft-btn ft-ok${commitLabel === "Add" ? " ft-add" : ""}`,
+      label,
+      commitLabel === "Add" ? `Add ${group.kind} forward` : "Apply",
+    );
     ok.addEventListener("click", () => {
       for (const f of inputs) {
         const err = f.rule.check(f.input.value);
@@ -245,22 +299,36 @@ export function createForwardTable(
   /** A committed row in display mode. */
   function displayRow(r: ForwardEditorValue, render: () => void): HTMLElement {
     const row = el("div", "ft-row");
-    const listenCell = el("span", "ft-cell ft-listen",
-      opts.compact ? String(r.listenPort) : `${r.listenHost}:${r.listenPort}`);
+    const listenCell = el(
+      "span",
+      "ft-cell ft-listen",
+      opts.compact ? String(r.listenPort) : `${r.listenHost}:${r.listenPort}`,
+    );
     listenCell.title = `${r.listenHost}:${r.listenPort}`;
     row.appendChild(listenCell);
-    row.appendChild(el("span", `ft-cell ft-target${r.kind === "dynamic" ? " ft-socks" : ""}`,
-      r.kind === "dynamic" ? "any destination (SOCKS5)" : `${r.targetHost}:${r.targetPort}`));
+    row.appendChild(
+      el(
+        "span",
+        `ft-cell ft-target${r.kind === "dynamic" ? " ft-socks" : ""}`,
+        r.kind === "dynamic" ? "any destination (SOCKS5)" : `${r.targetHost}:${r.targetPort}`,
+      ),
+    );
     const actions = el("span", "ft-cell ft-actions");
     if (opts.editable !== false) {
       const edit = mkBtn("ft-btn ft-edit", "✎", "Edit forward");
       edit.addEventListener("click", () => {
-        const group = GROUPS.find(g => g.kind === r.kind)!;
-        const editor = editRow(group, fromRow(r), (d) => {
-          const idx = data.indexOf(r);
-          if (idx >= 0) data[idx] = toRow(d);
-          render();
-        }, render, "✓");
+        const group = GROUPS.find((g) => g.kind === r.kind)!;
+        const editor = editRow(
+          group,
+          fromRow(r),
+          (d) => {
+            const idx = data.indexOf(r);
+            if (idx >= 0) data[idx] = toRow(d);
+            render();
+          },
+          render,
+          "✓",
+        );
         row.replaceWith(editor);
       });
       actions.appendChild(edit);
@@ -270,7 +338,10 @@ export function createForwardTable(
       if (opts.onRemove) {
         del.disabled = true;
         opts.onRemove(r).then((ok) => {
-          if (!ok) { del.disabled = false; return; }
+          if (!ok) {
+            del.disabled = false;
+            return;
+          }
           const idx = data.indexOf(r);
           if (idx >= 0) data.splice(idx, 1);
           render();
@@ -289,7 +360,7 @@ export function createForwardTable(
   function render(): void {
     root.innerHTML = "";
     for (const group of GROUPS) {
-      const rows = data.filter(r => r.kind === group.kind);
+      const rows = data.filter((r) => r.kind === group.kind);
       // Empty groups with nothing to show collapse to just their add-row.
       const sec = el("div", "ft-group");
       const head = el("div", "ft-group-head");
@@ -298,19 +369,25 @@ export function createForwardTable(
       sec.appendChild(head);
       for (const r of rows) sec.appendChild(displayRow(r, render));
       const draft: Draft = { kind: group.kind, listenPort: "", targetHost: "", targetPort: "" };
-      const addRow = editRow(group, draft, (d) => {
-        const row = toRow(d);
-        if (opts.onAdd) {
-          opts.onAdd(row).then((ok) => {
-            if (!ok) return;
-            data.push(row);
-            render();
-          });
-          return;
-        }
-        data.push(row);
-        render();
-      }, null, "Add");
+      const addRow = editRow(
+        group,
+        draft,
+        (d) => {
+          const row = toRow(d);
+          if (opts.onAdd) {
+            opts.onAdd(row).then((ok) => {
+              if (!ok) return;
+              data.push(row);
+              render();
+            });
+            return;
+          }
+          data.push(row);
+          render();
+        },
+        null,
+        "Add",
+      );
       addRow.classList.add("ft-add-row");
       addRow.classList.remove("ft-editing");
       sec.appendChild(addRow);
@@ -319,5 +396,5 @@ export function createForwardTable(
   }
 
   render();
-  return { el: root, rows: () => data.map(r => ({ ...r })) };
+  return { el: root, rows: () => data.map((r) => ({ ...r })) };
 }

@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  shouldAutoReattach,
-  reattachDelayForAttempt,
   REATTACH_DELAYS,
+  reattachDelayForAttempt,
+  shouldAutoReattach,
 } from "../src/util/disconnect";
 
 // Session death is handled in-band by the backend (deadmode.rs: reset +

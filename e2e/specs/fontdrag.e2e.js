@@ -5,9 +5,7 @@
 
 async function selectedFonts() {
   return browser.execute(() =>
-    [...document.querySelectorAll("#fp-selected .fp-selected-item")].map(
-      (el) => el.dataset.family
-    )
+    [...document.querySelectorAll("#fp-selected .fp-selected-item")].map((el) => el.dataset.family),
   );
 }
 
@@ -17,7 +15,11 @@ async function rowGeometry(index) {
     const el = rows[i];
     if (!el) return null;
     const r = el.getBoundingClientRect();
-    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), h: r.height };
+    return {
+      x: Math.round(r.left + r.width / 2),
+      y: Math.round(r.top + r.height / 2),
+      h: r.height,
+    };
   }, index);
 }
 
@@ -38,10 +40,10 @@ describe("font picker fallback chain", () => {
     await $(".font-picker-overlay").waitForExist({ timeout: 10000 });
 
     // The default stack ships several fonts — need at least two rows.
-    await browser.waitUntil(
-      async () => (await $$("#fp-selected .fp-selected-item")).length >= 2,
-      { timeout: 10000, timeoutMsg: "fallback chain did not render" }
-    );
+    await browser.waitUntil(async () => (await $$("#fp-selected .fp-selected-item")).length >= 2, {
+      timeout: 10000,
+      timeoutMsg: "fallback chain did not render",
+    });
 
     const before = await selectedFonts();
     const g0 = await rowGeometry(0);

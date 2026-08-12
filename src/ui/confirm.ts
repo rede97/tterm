@@ -41,7 +41,9 @@ export function confirmDialog(options: ConfirmOptions): Promise<boolean> {
   overlay.querySelector(".confirm-text")!.textContent = options.message;
   const cancelBtn = overlay.querySelector<HTMLButtonElement>(".sshauth-btn-cancel")!;
   cancelBtn.textContent = options.cancelLabel ?? "Cancel";
-  const okBtn = overlay.querySelector<HTMLButtonElement>(".sshauth-footer .sshauth-btn:last-child")!;
+  const okBtn = overlay.querySelector<HTMLButtonElement>(
+    ".sshauth-footer .sshauth-btn:last-child",
+  )!;
   okBtn.textContent = options.okLabel ?? "OK";
   document.body.appendChild(overlay);
 

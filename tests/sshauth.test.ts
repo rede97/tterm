@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(() => Promise.resolve(null)) }));
 
@@ -24,7 +24,9 @@ describe("SSH auth dialogs", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    document.querySelectorAll(".sshauth-overlay").forEach(el => el.remove());
+    document.querySelectorAll(".sshauth-overlay").forEach((el) => {
+      el.remove();
+    });
   });
 
   const fireAuth = (payload: unknown) => listeners.get("ssh-auth-request")!({ payload });
@@ -49,7 +51,11 @@ describe("SSH auth dialogs", () => {
   });
 
   it("(b) Cancel responds with secret:null", () => {
-    fireAuth({ reqId: 8, kind: "passphrase", prompt: "Enter passphrase for key '/home/u/.ssh/id_ed25519':" });
+    fireAuth({
+      reqId: 8,
+      kind: "passphrase",
+      prompt: "Enter passphrase for key '/home/u/.ssh/id_ed25519':",
+    });
 
     const overlay = document.querySelector(".sshauth-overlay")!;
     overlay.querySelector<HTMLButtonElement>(".sshauth-btn-cancel")!.click();
@@ -75,8 +81,9 @@ describe("SSH auth dialogs", () => {
     expect(overlay.textContent).toContain("SHA256:abc123def456");
     expect(overlay.querySelector(".sshauth-dialog-danger")).toBeNull();
 
-    const trustBtn = [...overlay.querySelectorAll<HTMLButtonElement>("button")]
-      .find(b => b.textContent === "Trust & Connect")!;
+    const trustBtn = [...overlay.querySelectorAll<HTMLButtonElement>("button")].find(
+      (b) => b.textContent === "Trust & Connect",
+    )!;
     trustBtn.click();
 
     expect(invoke).toHaveBeenCalledWith("ssh_hostkey_response", { reqId: 11, accept: true });
@@ -95,12 +102,15 @@ describe("SSH auth dialogs", () => {
 
     const overlay = document.querySelector(".sshauth-overlay")!;
     expect(overlay.querySelector(".sshauth-dialog-danger")).not.toBeNull();
-    expect(overlay.querySelector(".sshauth-header")!.textContent).toBe("WARNING: SSH Host Key CHANGED");
+    expect(overlay.querySelector(".sshauth-header")!.textContent).toBe(
+      "WARNING: SSH Host Key CHANGED",
+    );
     expect(overlay.textContent).toContain("man-in-the-middle");
     expect(overlay.textContent).toContain("SHA256:zzz999");
 
-    const rejectBtn = [...overlay.querySelectorAll<HTMLButtonElement>("button")]
-      .find(b => b.textContent === "Reject")!;
+    const rejectBtn = [...overlay.querySelectorAll<HTMLButtonElement>("button")].find(
+      (b) => b.textContent === "Reject",
+    )!;
     rejectBtn.click();
 
     expect(invoke).toHaveBeenCalledWith("ssh_hostkey_response", { reqId: 12, accept: false });
@@ -112,7 +122,12 @@ describe("SSH auth dialogs", () => {
     expect(invoke).toHaveBeenCalledWith("ssh_auth_response", { reqId: 20, secret: null });
 
     fireHostkey({
-      reqId: 21, host: "h", port: 22, keyType: "ssh-ed25519", fingerprint: "SHA256:x", mismatch: false,
+      reqId: 21,
+      host: "h",
+      port: 22,
+      keyType: "ssh-ed25519",
+      fingerprint: "SHA256:x",
+      mismatch: false,
     });
     pressEscape();
     expect(invoke).toHaveBeenCalledWith("ssh_hostkey_response", { reqId: 21, accept: false });

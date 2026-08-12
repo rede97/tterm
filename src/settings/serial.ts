@@ -3,16 +3,16 @@
 // Per-device parameter memory is gone: named profiles (serial-profiles.json)
 // replace it.
 
-import { configStore, type ConfigState } from "../core/store";
-import { SERIAL_BAUD_RATES, esc } from "../core/common";
 import {
   allSerialProfiles,
-  findSerialProfile,
-  dedupeSerialProfileName,
   DEFAULT_SERIAL_PROFILE,
+  dedupeSerialProfileName,
+  findSerialProfile,
   type SerialProfileDef,
 } from "../config/serial-profiles";
-import { showSerialProfileEditor, serialProfileSummary } from "./serialprofileeditor";
+import { esc, SERIAL_BAUD_RATES } from "../core/common";
+import { type ConfigState, configStore } from "../core/store";
+import { serialProfileSummary, showSerialProfileEditor } from "./serialprofileeditor";
 
 export function createSerialPanel(): HTMLElement {
   const panel = document.createElement("div");
@@ -63,19 +63,32 @@ export function refreshSerialPanel(root: HTMLElement): void {
 
 // Legacy name kept for src/settings/index.ts (Revert flow).
 function baudOptionsHtml(current: number): string {
-  return SERIAL_BAUD_RATES.map(b =>
-    `<option value="${b}" ${current === b ? "selected" : ""}>${b}</option>`).join("");
+  return SERIAL_BAUD_RATES.map(
+    (b) => `<option value="${b}" ${current === b ? "selected" : ""}>${b}</option>`,
+  ).join("");
 }
 
 function profileOptionsHtml(selected: string): string {
   const profiles = allSerialProfiles();
   const group = (label: string, list: SerialProfileDef[]): string =>
     `<optgroup label="${label}">` +
-    list.map(p =>
-      `<option value="${esc(p.name)}" ${p.name === selected ? "selected" : ""}>${esc(p.name)}</option>`).join("") +
+    list
+      .map(
+        (p) =>
+          `<option value="${esc(p.name)}" ${p.name === selected ? "selected" : ""}>${esc(p.name)}</option>`,
+      )
+      .join("") +
     `</optgroup>`;
-  return group("Built-in", profiles.filter(p => p.source === "builtin")) +
-         group("Custom", profiles.filter(p => p.source === "custom"));
+  return (
+    group(
+      "Built-in",
+      profiles.filter((p) => p.source === "builtin"),
+    ) +
+    group(
+      "Custom",
+      profiles.filter((p) => p.source === "custom"),
+    )
+  );
 }
 
 /** Rebuild the default-profile select, keeping the pending choice when valid. */
@@ -83,7 +96,7 @@ function refreshProfileSelect(root: HTMLElement, selected?: string): void {
   const sel = root.querySelector<HTMLSelectElement>("#set-serial-profile");
   if (!sel) return;
   const want = selected ?? (sel.value || configStore.get("serialProfile"));
-  const valid = allSerialProfiles().some(p => p.name === want) ? want : DEFAULT_SERIAL_PROFILE;
+  const valid = allSerialProfiles().some((p) => p.name === want) ? want : DEFAULT_SERIAL_PROFILE;
   sel.innerHTML = profileOptionsHtml(valid);
   sel.value = valid;
 }
@@ -135,8 +148,8 @@ export function renderProfileGallery(root: HTMLElement): void {
   };
 
   const profiles = allSerialProfiles();
-  const builtin = profiles.filter(p => p.source === "builtin");
-  const custom = profiles.filter(p => p.source === "custom");
+  const builtin = profiles.filter((p) => p.source === "builtin");
+  const custom = profiles.filter((p) => p.source === "custom");
 
   const builtinHeader = document.createElement("div");
   builtinHeader.className = "theme-group-title";
@@ -170,7 +183,11 @@ export function renderProfileGallery(root: HTMLElement): void {
 }
 
 /** Open the profile editor and reconcile the gallery/default afterwards. */
-function openProfileEditor(root: HTMLElement, base: SerialProfileDef, editName: string | undefined): void {
+function openProfileEditor(
+  root: HTMLElement,
+  base: SerialProfileDef,
+  editName: string | undefined,
+): void {
   showSerialProfileEditor({
     base,
     editName,

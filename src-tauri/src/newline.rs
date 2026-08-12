@@ -53,7 +53,10 @@ pub struct NewlineFilter {
 
 impl NewlineFilter {
     pub fn new(mode: NewlineMode) -> Self {
-        Self { mode, pending_cr: false }
+        Self {
+            mode,
+            pending_cr: false,
+        }
     }
 
     pub fn set_mode(&mut self, mode: NewlineMode) {
@@ -134,7 +137,15 @@ mod tests {
 
     #[test]
     fn mode_roundtrip() {
-        for s in ["keep", "cr-in-lf", "lf-in-cr", "force-crlf", "force-lf", "force-cr", "strip"] {
+        for s in [
+            "keep",
+            "cr-in-lf",
+            "lf-in-cr",
+            "force-crlf",
+            "force-lf",
+            "force-cr",
+            "strip",
+        ] {
             assert_eq!(NewlineMode::from_str(s).unwrap().as_str(), s);
         }
         assert!(NewlineMode::from_str("bogus").is_err());
@@ -142,7 +153,10 @@ mod tests {
 
     #[test]
     fn keep_passes_through() {
-        assert_eq!(run(NewlineMode::Keep, &[b"a\rb\r\nc\n"]), b"a\rb\r\nc\n".to_vec());
+        assert_eq!(
+            run(NewlineMode::Keep, &[b"a\rb\r\nc\n"]),
+            b"a\rb\r\nc\n".to_vec()
+        );
     }
 
     #[test]
@@ -163,17 +177,26 @@ mod tests {
 
     #[test]
     fn force_crlf_normalizes_everything() {
-        assert_eq!(run(NewlineMode::ForceCrlf, &[b"a\rb\nc\r\nd"]), b"a\r\nb\r\nc\r\nd".to_vec());
+        assert_eq!(
+            run(NewlineMode::ForceCrlf, &[b"a\rb\nc\r\nd"]),
+            b"a\r\nb\r\nc\r\nd".to_vec()
+        );
     }
 
     #[test]
     fn force_lf_collapses_pairs() {
-        assert_eq!(run(NewlineMode::ForceLf, &[b"a\r\nb\rc\n"]), b"a\nb\nc\n".to_vec());
+        assert_eq!(
+            run(NewlineMode::ForceLf, &[b"a\r\nb\rc\n"]),
+            b"a\nb\nc\n".to_vec()
+        );
     }
 
     #[test]
     fn force_cr_collapses_to_cr() {
-        assert_eq!(run(NewlineMode::ForceCr, &[b"a\r\nb\nc\n"]), b"a\rb\rc\r".to_vec());
+        assert_eq!(
+            run(NewlineMode::ForceCr, &[b"a\r\nb\nc\n"]),
+            b"a\rb\rc\r".to_vec()
+        );
     }
 
     #[test]
@@ -184,10 +207,19 @@ mod tests {
     #[test]
     fn crlf_split_across_chunks() {
         // CR at end of chunk 1, LF at start of chunk 2 -> recognized as pair
-        assert_eq!(run(NewlineMode::ForceLf, &[b"a\r", b"\nb"]), b"a\nb".to_vec());
-        assert_eq!(run(NewlineMode::CrInLf, &[b"a\r", b"\nb"]), b"a\r\nb".to_vec());
+        assert_eq!(
+            run(NewlineMode::ForceLf, &[b"a\r", b"\nb"]),
+            b"a\nb".to_vec()
+        );
+        assert_eq!(
+            run(NewlineMode::CrInLf, &[b"a\r", b"\nb"]),
+            b"a\r\nb".to_vec()
+        );
         // held CR followed by non-LF -> lone CR handling
-        assert_eq!(run(NewlineMode::ForceCrlf, &[b"a\r", b"bc"]), b"a\r\nbc".to_vec());
+        assert_eq!(
+            run(NewlineMode::ForceCrlf, &[b"a\r", b"bc"]),
+            b"a\r\nbc".to_vec()
+        );
     }
 
     #[test]

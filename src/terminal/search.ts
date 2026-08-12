@@ -1,5 +1,5 @@
+import { ChevronDown, ChevronUp, createElement, X } from "lucide";
 import { tabManager } from "./tabmanager";
-import { createElement, ChevronUp, ChevronDown, X } from "lucide";
 
 // -- DOM --
 
@@ -17,7 +17,9 @@ searchPrev.appendChild(createElement(ChevronUp, { stroke: "currentColor", width:
 searchBar.appendChild(searchPrev);
 
 const searchNext = document.createElement("button");
-searchNext.appendChild(createElement(ChevronDown, { stroke: "currentColor", width: 14, height: 14 }));
+searchNext.appendChild(
+  createElement(ChevronDown, { stroke: "currentColor", width: 14, height: 14 }),
+);
 searchBar.appendChild(searchNext);
 
 const searchResults = document.createElement("span");
@@ -104,6 +106,3 @@ export function initSearchBar() {
   searchPrev.addEventListener("click", doFindPrev);
   searchClose.addEventListener("click", closeFind);
 }
-
-
-

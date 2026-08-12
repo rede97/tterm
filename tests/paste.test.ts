@@ -1,12 +1,17 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(() => Promise.resolve(null)) }));
 
-import { pasteIntoTerminal } from "../src/terminal/paste";
 import { configStore } from "../src/core/store";
+import { pasteIntoTerminal } from "../src/terminal/paste";
 
 function target() {
-  return { pasted: [] as string[], paste(text: string) { this.pasted.push(text); } };
+  return {
+    pasted: [] as string[],
+    paste(text: string) {
+      this.pasted.push(text);
+    },
+  };
 }
 
 async function flushMicrotasks(): Promise<void> {

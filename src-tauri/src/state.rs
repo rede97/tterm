@@ -56,8 +56,15 @@ pub struct SerialSession {
 // Parameters needed to respawn a session (reconnect).
 #[derive(Clone)]
 pub enum SpawnSpec {
-    Pty { command: Option<String>, cwd: Option<PathBuf> },
-    Ssh { hostname: String, port: u16, user: String },
+    Pty {
+        command: Option<String>,
+        cwd: Option<PathBuf>,
+    },
+    Ssh {
+        hostname: String,
+        port: u16,
+        user: String,
+    },
     Serial {
         port_name: String,
         baud_rate: u32,
@@ -122,7 +129,11 @@ pub struct AppState {
 impl AppState {
     // Connect info handed back to the frontend after (re)spawning a session.
     pub(crate) fn ws_result(&self, id: String) -> WsConnectResult {
-        WsConnectResult { id, port: self.hub.port, token: self.hub.token.clone() }
+        WsConnectResult {
+            id,
+            port: self.hub.port,
+            token: self.hub.token.clone(),
+        }
     }
 
     // Create the shared auto-reconnect flag for a session being registered.

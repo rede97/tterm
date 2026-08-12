@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { createForwardTable, forwardConfigLine, parseForwardLine } from "../src/ui/forwardtable";
 
 // Group order is fixed: Local, Remote, Dynamic.
@@ -52,7 +52,13 @@ describe("forward table — groups", () => {
     a.targetPort!.value = "5432";
     a.add.click();
     expect(t.rows()).toEqual([
-      { kind: "local", listenHost: "127.0.0.1", listenPort: 8080, targetHost: "db.internal", targetPort: 5432 },
+      {
+        kind: "local",
+        listenHost: "127.0.0.1",
+        listenPort: 8080,
+        targetHost: "db.internal",
+        targetPort: 5432,
+      },
     ]);
     expect(displayRowsIn(group(t.el, "local"))[0].textContent).toContain("db.internal:5432");
   });
@@ -96,13 +102,25 @@ describe("forward table — groups", () => {
     a.targetPort!.value = "80";
     a.add.click();
     expect(t.rows()).toEqual([
-      { kind: "remote", listenHost: "127.0.0.1", listenPort: 9090, targetHost: "127.0.0.1", targetPort: 80 },
+      {
+        kind: "remote",
+        listenHost: "127.0.0.1",
+        listenPort: 9090,
+        targetHost: "127.0.0.1",
+        targetPort: 80,
+      },
     ]);
   });
 
   it("edit swaps a row to inputs and ✓ applies the change", () => {
     const t = createForwardTable([
-      { kind: "local", listenHost: "127.0.0.1", listenPort: 8080, targetHost: "db.internal", targetPort: 5432 },
+      {
+        kind: "local",
+        listenHost: "127.0.0.1",
+        listenPort: 8080,
+        targetHost: "db.internal",
+        targetPort: 5432,
+      },
     ]);
     document.body.appendChild(t.el);
     displayRowsIn(group(t.el, "local"))[0].querySelector<HTMLButtonElement>(".ft-edit")!.click();
@@ -119,7 +137,13 @@ describe("forward table — groups", () => {
 
   it("edit cancel leaves the row untouched; delete removes it", () => {
     const t = createForwardTable([
-      { kind: "remote", listenHost: "127.0.0.1", listenPort: 9090, targetHost: "a", targetPort: 80 },
+      {
+        kind: "remote",
+        listenHost: "127.0.0.1",
+        listenPort: 9090,
+        targetHost: "a",
+        targetPort: 80,
+      },
     ]);
     document.body.appendChild(t.el);
     displayRowsIn(group(t.el, "remote"))[0].querySelector<HTMLButtonElement>(".ft-edit")!.click();
@@ -133,9 +157,18 @@ describe("forward table — groups", () => {
   });
 
   it("compact mode drops the pinned loopback and uses a bare + button", () => {
-    const t = createForwardTable([
-      { kind: "local", listenHost: "127.0.0.1", listenPort: 8080, targetHost: "db.internal", targetPort: 5432 },
-    ], { compact: true });
+    const t = createForwardTable(
+      [
+        {
+          kind: "local",
+          listenHost: "127.0.0.1",
+          listenPort: 8080,
+          targetHost: "db.internal",
+          targetPort: 5432,
+        },
+      ],
+      { compact: true },
+    );
     document.body.appendChild(t.el);
 
     // Add-row: no "127.0.0.1 :" pin, icon-only add button.
@@ -153,14 +186,26 @@ describe("forward table — groups", () => {
 
 describe("forward config line helpers", () => {
   it("forwardConfigLine and parseForwardLine round-trip local/remote", () => {
-    const row = { kind: "local" as const, listenHost: "127.0.0.1", listenPort: 8080, targetHost: "db.internal", targetPort: 5432 };
+    const row = {
+      kind: "local" as const,
+      listenHost: "127.0.0.1",
+      listenPort: 8080,
+      targetHost: "db.internal",
+      targetPort: 5432,
+    };
     expect(forwardConfigLine(row)).toBe("127.0.0.1:8080 db.internal:5432");
     expect(parseForwardLine("127.0.0.1:8080 db.internal:5432", "local")).toEqual(row);
     expect(parseForwardLine("garbage", "local")).toBeNull();
   });
 
   it("dynamic lines carry a single endpoint", () => {
-    const row = { kind: "dynamic" as const, listenHost: "127.0.0.1", listenPort: 1080, targetHost: "", targetPort: 0 };
+    const row = {
+      kind: "dynamic" as const,
+      listenHost: "127.0.0.1",
+      listenPort: 1080,
+      targetHost: "",
+      targetPort: 0,
+    };
     expect(forwardConfigLine(row)).toBe("127.0.0.1:1080");
     expect(parseForwardLine("127.0.0.1:1080", "dynamic")).toEqual(row);
     expect(parseForwardLine("127.0.0.1:1080 extra:1", "dynamic")).toBeNull();

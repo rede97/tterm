@@ -1,27 +1,29 @@
-import { Terminal, IDisposable, IBufferCell } from "@xterm/xterm";
+import { invoke } from "@tauri-apps/api/core";
+import {
+  readText as clipboardReadText,
+  writeText as clipboardWriteText,
+} from "@tauri-apps/plugin-clipboard-manager";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebglAddon } from "@xterm/addon-webgl";
-import { invoke } from "@tauri-apps/api/core";
-import { readText as clipboardReadText, writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
+import { type IBufferCell, type IDisposable, Terminal } from "@xterm/xterm";
 import { logCatch } from "../core/errorlog";
-import type { TabType } from "../core/types";
-import { hysteresis } from "../util/hysteresis";
-import { notifyTrayTabs } from "../core/traytabs";
-import { parseOsc9Progress, applyProgressToTabElement } from "../util/osc";
-import { SizeHint } from "../util/sizehint";
-import { shouldAutoReattach, reattachDelayForAttempt } from "../util/disconnect";
-import { ImeBox, imeMirrorActiveFor, getImeDebugFlags } from "../util/imebox";
-import { CursorPositionFilter } from "../util/imefilter";
-import type { SshHost, SerialInputMode, SerialEnterNewline } from "../core/types";
-import { pasteIntoTerminal } from "./paste";
 import { configStore } from "../core/store";
+import { notifyTrayTabs } from "../core/traytabs";
+import type { SerialEnterNewline, SerialInputMode, SshHost, TabType } from "../core/types";
+import { reattachDelayForAttempt, shouldAutoReattach } from "../util/disconnect";
+import { hysteresis } from "../util/hysteresis";
+import { getImeDebugFlags, ImeBox, imeMirrorActiveFor } from "../util/imebox";
+import { CursorPositionFilter } from "../util/imefilter";
+import { applyProgressToTabElement, parseOsc9Progress } from "../util/osc";
 import { createSerialInputHandler } from "../util/serialinput";
+import { SizeHint } from "../util/sizehint";
 import { findTheme } from "../util/themes";
+import { cellDimensions, cursorIsHidden, terminalTextarea } from "../util/xterm-internals";
 import { BatchAttachAddon } from "./batchattach";
-import { cursorIsHidden, cellDimensions, terminalTextarea } from "../util/xterm-internals";
-import { buildShareSnapshot, buildShareScreenshot } from "./sharescreen";
 import { setupTerminalLinks } from "./links";
+import { pasteIntoTerminal } from "./paste";
+import { buildShareScreenshot, buildShareSnapshot } from "./sharescreen";
 
 export class TerminalTab {
   id: string;
@@ -123,7 +125,7 @@ export class TerminalTab {
     // fitDeferred's explicit invoke alone misses font-race refits, which left
     // size-dependent sessions (Anime TTY) rendering for a stale grid.
     this.terminal.onResize(({ cols, rows }) => {
-      invoke("pty_resize", { id: this.id, cols, rows }).catch(() => { });
+      invoke("pty_resize", { id: this.id, cols, rows }).catch(() => {});
     });
 
     this.terminal.onTitleChange((title: string) => {
@@ -148,31 +150,41 @@ export class TerminalTab {
     const viewport = this.element.querySelector(".xterm-viewport") as HTMLElement | null;
     const xtermEl = this.element.querySelector(".xterm") as HTMLElement | null;
     for (const el of [viewport, xtermEl]) {
-      el?.addEventListener("scroll", () => {
-        if (el.scrollLeft !== 0) el.scrollLeft = 0;
-      }, { passive: true });
+      el?.addEventListener(
+        "scroll",
+        () => {
+          if (el.scrollLeft !== 0) el.scrollLeft = 0;
+        },
+        { passive: true },
+      );
     }
 
     // right-click: copy/paste normally, shift+right-click for context menu
     // use capture phase so this fires before xterm.js internal handler
-    this.element.addEventListener("contextmenu", (e: MouseEvent) => {
-      if (e.shiftKey) {
+    this.element.addEventListener(
+      "contextmenu",
+      (e: MouseEvent) => {
+        if (e.shiftKey) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          this._showContextMenu(e.clientX, e.clientY);
+          return;
+        }
         e.preventDefault();
-        e.stopImmediatePropagation();
-        this._showContextMenu(e.clientX, e.clientY);
-        return;
-      }
-      e.preventDefault();
-      const sel = this.terminal.getSelection();
-      if (sel.length > 0) {
-        clipboardWriteText(sel).catch(logCatch("clipboard.write"));
-        this.terminal.clearSelection();
-      } else {
-        clipboardReadText().then(t => {
-          if (t) pasteIntoTerminal(this.terminal, t);
-        }).catch(logCatch("clipboard.read"));
-      }
-    }, true);
+        const sel = this.terminal.getSelection();
+        if (sel.length > 0) {
+          clipboardWriteText(sel).catch(logCatch("clipboard.write"));
+          this.terminal.clearSelection();
+        } else {
+          clipboardReadText()
+            .then((t) => {
+              if (t) pasteIntoTerminal(this.terminal, t);
+            })
+            .catch(logCatch("clipboard.read"));
+        }
+      },
+      true,
+    );
 
     // Sample cursor position on every render — the dwell filter uses these
     // samples to pick a stable IME anchor even during animated redraws.
@@ -185,7 +197,7 @@ export class TerminalTab {
         const now = Date.now();
         if (now - this.lastShareSeqSent > 200) {
           this.lastShareSeqSent = now;
-          invoke("share_screen_changed", { id: this.id, seq: this.shareSeq }).catch(() => { });
+          invoke("share_screen_changed", { id: this.id, seq: this.shareSeq }).catch(() => {});
         }
       }
     });
@@ -313,10 +325,15 @@ export class TerminalTab {
 
   private async _openSocket(): Promise<void> {
     const gen = ++this.socketGen;
-    const socket = new WebSocket(`ws://127.0.0.1:${this.socketPort}/pty/${encodeURIComponent(this.id)}?token=${this.socketToken}`);
+    const socket = new WebSocket(
+      `ws://127.0.0.1:${this.socketPort}/pty/${encodeURIComponent(this.id)}?token=${this.socketToken}`,
+    );
 
     socket.addEventListener("open", () => {
-      if (gen !== this.socketGen) { socket.close(); return; }
+      if (gen !== this.socketGen) {
+        socket.close();
+        return;
+      }
       this.reattachAttempt = 0;
       this.attachAddon?.dispose();
       this.attachAddon = undefined;
@@ -439,16 +456,16 @@ export class TerminalTab {
       set(target, prop, value, receiver) {
         if (left !== null && top !== null) {
           if (prop === "left") {
-            return Reflect.set(target, prop, left + "px", receiver);
+            return Reflect.set(target, prop, `${left}px`, receiver);
           }
           if (prop === "top") {
-            return Reflect.set(target, prop, top + "px", receiver);
+            return Reflect.set(target, prop, `${top}px`, receiver);
           }
           // Prevent xterm.js from setting width to a huge value (screen width).
           // Clamp to one cell width so IME candidate window stays at correct position.
           if (prop === "width") {
             const cellW = cellDimensions(terminal)?.width ?? 8;
-            return Reflect.set(target, prop, Math.max(cellW, 1) + "px", receiver);
+            return Reflect.set(target, prop, `${Math.max(cellW, 1)}px`, receiver);
           }
           // With the composition-view suppressed (display:none), xterm measures
           // its bounds as 0 and would shrink the textarea to 1px x 1px —
@@ -456,18 +473,22 @@ export class TerminalTab {
           // Keep the textarea a full cell so the TSF composition stays alive.
           if (prop === "height" || prop === "lineHeight") {
             const cellH = cellDimensions(terminal)?.height ?? 16;
-            return Reflect.set(target, prop, Math.max(cellH, 1) + "px", receiver);
+            return Reflect.set(target, prop, `${Math.max(cellH, 1)}px`, receiver);
           }
         }
         return Reflect.set(target, prop, value, receiver);
-      }
+      },
     };
 
     // Override the textarea's style property descriptor so that every
     // `this._textarea.style.left = ...` call in xterm.js goes through our proxy.
     Object.defineProperty(ta, "style", {
-      get() { return new Proxy(origStyle, proxyHandler); },
-      set(_v: CSSStyleDeclaration) { /* ignore */ },
+      get() {
+        return new Proxy(origStyle, proxyHandler);
+      },
+      set(_v: CSSStyleDeclaration) {
+        /* ignore */
+      },
       configurable: true,
     });
 
@@ -498,8 +519,8 @@ export class TerminalTab {
           if (!q || (q.x === left && q.y === top)) return;
           left = q.x;
           top = q.y;
-          origStyle.left = q.x + "px";
-          origStyle.top = q.y + "px";
+          origStyle.left = `${q.x}px`;
+          origStyle.top = `${q.y}px`;
         }, 200);
       }
     };
@@ -552,7 +573,7 @@ export class TerminalTab {
     const xs = getComputedStyle(this.terminal.element!);
     let padH = parseFloat(xs.paddingLeft) + parseFloat(xs.paddingRight);
     // xterm-screen padding-right = scrollbar safe area
-    const scr = this.terminal.element!.querySelector(".xterm-screen");
+    const scr = this.terminal.element?.querySelector(".xterm-screen");
     if (scr) padH += parseFloat(getComputedStyle(scr).paddingRight) || 0;
     const padV = parseFloat(xs.paddingTop) + parseFloat(xs.paddingBottom);
 
@@ -584,7 +605,7 @@ export class TerminalTab {
         if (this.element.style.display === "none") return;
         const { cols, rows } = this.fit();
         this.needsResize = false;
-        invoke("pty_resize", { id: this.id, cols, rows }).catch(() => { });
+        invoke("pty_resize", { id: this.id, cols, rows }).catch(() => {});
       });
     });
   }
@@ -653,7 +674,8 @@ export class TerminalTab {
     // Stop pending re-attach retries and stale socket callbacks.
     this.socketGen++;
     this._clearReattachTimer();
-    if (this._imeCompStart) document.removeEventListener("compositionstart", this._imeCompStart, true);
+    if (this._imeCompStart)
+      document.removeEventListener("compositionstart", this._imeCompStart, true);
     if (this._imeCompEnd) document.removeEventListener("compositionend", this._imeCompEnd, true);
     this.sizeHint.destroy();
     this.imeBox.destroy();
@@ -664,8 +686,6 @@ export class TerminalTab {
   }
 
   private _showContextMenu(x: number, y: number): void {
-    import("./contextmenu").then(m => m.showTerminalContextMenu(this.id, x, y));
+    import("./contextmenu").then((m) => m.showTerminalContextMenu(this.id, x, y));
   }
 }
-
-

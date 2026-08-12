@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ssh.ts reads the raw config via invoke; the store starts empty.
 vi.mock("@tauri-apps/api/core", () => ({
@@ -11,7 +11,12 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 import { invoke } from "@tauri-apps/api/core";
 import { configStore } from "../src/core/store";
-import { createSshPanel, syncSshHostOrder, resetSshConfigDirty, isSshConfigDirty } from "../src/settings/ssh";
+import {
+  createSshPanel,
+  isSshConfigDirty,
+  resetSshConfigDirty,
+  syncSshHostOrder,
+} from "../src/settings/ssh";
 
 const invokeMock = vi.mocked(invoke);
 
@@ -34,15 +39,24 @@ function openEditor(): HTMLElement {
 }
 
 /** Fill a group's trailing add-row and commit it. */
-function addForwardRow(overlay: HTMLElement, groupIdx: number, opts: {
-  listenPort: string; targetHost?: string; targetPort?: string;
-}): void {
+function addForwardRow(
+  overlay: HTMLElement,
+  groupIdx: number,
+  opts: {
+    listenPort: string;
+    targetHost?: string;
+    targetPort?: string;
+  },
+): void {
   const group = overlay.querySelectorAll<HTMLElement>(".ft-group")[groupIdx];
   const addRow = group.querySelector<HTMLElement>(".ft-add-row")!;
-  addRow.querySelector<HTMLInputElement>('input[aria-label="Listen port"]')!.value = opts.listenPort;
+  addRow.querySelector<HTMLInputElement>('input[aria-label="Listen port"]')!.value =
+    opts.listenPort;
   if (opts.targetHost !== undefined) {
-    addRow.querySelector<HTMLInputElement>('input[aria-label="Target host"]')!.value = opts.targetHost;
-    addRow.querySelector<HTMLInputElement>('input[aria-label="Target port"]')!.value = opts.targetPort!;
+    addRow.querySelector<HTMLInputElement>('input[aria-label="Target host"]')!.value =
+      opts.targetHost;
+    addRow.querySelector<HTMLInputElement>('input[aria-label="Target port"]')!.value =
+      opts.targetPort!;
   }
   addRow.querySelector<HTMLButtonElement>(".ft-add")!.click();
 }
@@ -78,8 +92,16 @@ describe("settings — SSH host editor modal", () => {
     overlay.querySelector<HTMLInputElement>(".she-user")!.value = "deploy";
     overlay.querySelector<HTMLInputElement>('.she-opt input[data-key="forwardagent"]')!.click();
 
-    addForwardRow(overlay, GROUP.local, { listenPort: "8080", targetHost: "db.internal", targetPort: "5432" });
-    addForwardRow(overlay, GROUP.remote, { listenPort: "9090", targetHost: "127.0.0.1", targetPort: "3000" });
+    addForwardRow(overlay, GROUP.local, {
+      listenPort: "8080",
+      targetHost: "db.internal",
+      targetPort: "5432",
+    });
+    addForwardRow(overlay, GROUP.remote, {
+      listenPort: "9090",
+      targetHost: "127.0.0.1",
+      targetPort: "3000",
+    });
     addForwardRow(overlay, GROUP.dynamic, { listenPort: "1080" });
 
     overlay.querySelector<HTMLButtonElement>(".she-save")!.click();
@@ -98,13 +120,15 @@ describe("settings — SSH host editor modal", () => {
 
   it("Edit prefills the modal and preserves unmanaged directives", () => {
     configStore.set({
-      sshHosts: [{
-        name: "web",
-        HostName: "10.0.0.1",
-        User: "root",
-        IdentityFile: "~/.ssh/id_ed25519",
-        LocalForward: "127.0.0.1:8080 127.0.0.1:80",
-      }],
+      sshHosts: [
+        {
+          name: "web",
+          HostName: "10.0.0.1",
+          User: "root",
+          IdentityFile: "~/.ssh/id_ed25519",
+          LocalForward: "127.0.0.1:8080 127.0.0.1:80",
+        },
+      ],
     });
     const panel = openPanel();
     panel.querySelector<HTMLButtonElement>(".ssh-btn-edit")!.click();
@@ -149,9 +173,7 @@ describe("settings — SSH key management", () => {
       if (cmd === "ssh_list_keys") return Promise.resolve([KEY]);
       if (cmd === "ssh_keygen") return Promise.resolve(KEY);
       if (cmd === "ssh_install_pubkey") {
-        return installResult
-          ? Promise.resolve(installResult)
-          : Promise.reject("auth failed");
+        return installResult ? Promise.resolve(installResult) : Promise.reject("auth failed");
       }
       return Promise.resolve(null);
     });
@@ -161,7 +183,12 @@ describe("settings — SSH key management", () => {
     mockKeyInvoke();
     const copied: string[] = [];
     Object.defineProperty(navigator, "clipboard", {
-      value: { writeText: (s: string) => { copied.push(s); return Promise.resolve(); } },
+      value: {
+        writeText: (s: string) => {
+          copied.push(s);
+          return Promise.resolve();
+        },
+      },
       configurable: true,
     });
     const panel = openPanel();
@@ -233,8 +260,9 @@ describe("settings — SSH key management", () => {
     // The "Generate one…" shortcut swaps to the keygen modal.
     overlay.querySelector<HTMLButtonElement>(".ski-gen")!.click();
     await vi.waitFor(() => {
-      expect(document.querySelector<HTMLElement>(".she-overlay .she-header")!.textContent)
-        .toBe("Generate SSH Key");
+      expect(document.querySelector<HTMLElement>(".she-overlay .she-header")!.textContent).toBe(
+        "Generate SSH Key",
+      );
     });
   });
 });
@@ -254,7 +282,7 @@ describe("settings — SSH host list order & detail", () => {
     expect(cards).toHaveLength(3);
     list.insertBefore(cards[2], cards[0]); // Sortable's DOM move: c, a, b
     syncSshHostOrder(list);
-    expect(configStore.get("sshHosts").map(h => h.name)).toEqual(["c", "a", "b"]);
+    expect(configStore.get("sshHosts").map((h) => h.name)).toEqual(["c", "a", "b"]);
   });
 
   it("sync refuses to drop hosts when DOM and store disagree", () => {
@@ -268,12 +296,14 @@ describe("settings — SSH host list order & detail", () => {
     const list = panel.querySelector<HTMLElement>(".ssh-host-list")!;
     list.querySelector<HTMLElement>('.ssh-host-card[data-name="b"]')!.remove();
     syncSshHostOrder(list);
-    expect(configStore.get("sshHosts").map(h => h.name)).toEqual(["a", "b"]);
+    expect(configStore.get("sshHosts").map((h) => h.name)).toEqual(["a", "b"]);
   });
 
   it("expanding marks the card non-draggable and lists one property per line", () => {
     configStore.set({
-      sshHosts: [{ name: "a", HostName: "10.0.0.1", IdentityFile: "~/.ssh/id_ed25519", ForwardAgent: "yes" }],
+      sshHosts: [
+        { name: "a", HostName: "10.0.0.1", IdentityFile: "~/.ssh/id_ed25519", ForwardAgent: "yes" },
+      ],
     });
     const panel = openPanel();
     const card = panel.querySelector<HTMLElement>(".ssh-host-card")!;

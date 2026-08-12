@@ -60,8 +60,8 @@ export function showKeygenModal(opts: { onSaved: (key: SshKeyInfo) => void }): v
   const nameInput = modal.overlay.querySelector<HTMLInputElement>(".skg-name")!;
   const algoInput = modal.overlay.querySelector<HTMLSelectElement>(".skg-algo")!;
   const passInput = modal.overlay.querySelector<HTMLInputElement>(".skg-pass")!;
-  modal.overlay.querySelector(".skg-cancel")!.addEventListener("click", modal.close);
-  modal.overlay.querySelector(".skg-save")!.addEventListener("click", async () => {
+  modal.overlay.querySelector(".skg-cancel")?.addEventListener("click", modal.close);
+  modal.overlay.querySelector(".skg-save")?.addEventListener("click", async () => {
     try {
       const key = await invoke<SshKeyInfo>("ssh_keygen", {
         algorithm: algoInput.value,
@@ -97,13 +97,13 @@ export function showInstallKeyModal(target: InstallTarget): void {
 
   const body = modal.overlay.querySelector<HTMLElement>(".ski-body")!;
   const installBtn = modal.overlay.querySelector<HTMLButtonElement>(".ski-install")!;
-  modal.overlay.querySelector(".ski-cancel")!.addEventListener("click", modal.close);
+  modal.overlay.querySelector(".ski-cancel")?.addEventListener("click", modal.close);
 
   listKeys().then((keys) => {
     if (keys.length === 0) {
       body.innerHTML = `No key pairs found in ~/.ssh.
         <button class="settings-link-btn ski-gen" type="button" style="margin-left:8px;">Generate one…</button>`;
-      body.querySelector(".ski-gen")!.addEventListener("click", () => {
+      body.querySelector(".ski-gen")?.addEventListener("click", () => {
         modal.close();
         showKeygenModal({ onSaved: () => showInstallKeyModal(target) });
       });
@@ -127,8 +127,10 @@ export function showInstallKeyModal(target: InstallTarget): void {
       </div>`;
     installBtn.disabled = false;
     installBtn.addEventListener("click", async () => {
-      const key = keys[body.querySelector<HTMLSelectElement>(".ski-key")!.selectedIndex];
-      const os = body.querySelector<HTMLSelectElement>(".ski-os")!.value;
+      const keySel = body.querySelector<HTMLSelectElement>(".ski-key");
+      const key = keySel ? keys[keySel.selectedIndex] : undefined;
+      if (!key) return;
+      const os = body.querySelector<HTMLSelectElement>(".ski-os")?.value;
       installBtn.disabled = true;
       installBtn.textContent = "Installing…";
       try {

@@ -4,10 +4,10 @@
 // Recent folders persist in config.recentDirectories (most-recent first).
 
 import { invoke } from "@tauri-apps/api/core";
-import { createElement, FolderOpen, Folder, Trash2 } from "lucide";
+import { createElement, Folder, FolderOpen, Trash2 } from "lucide";
+import { logCatch } from "../core/errorlog";
 import { configStore } from "../core/store";
 import { tabManager } from "./tabmanager";
-import { logCatch } from "../core/errorlog";
 
 const MAX_RECENT = 10;
 
@@ -17,8 +17,9 @@ function dirName(p: string): string {
 }
 
 export function rememberDirectory(dir: string): void {
-  const rest = configStore.get("recentDirectories")
-    .filter(d => d.toLowerCase() !== dir.toLowerCase());
+  const rest = configStore
+    .get("recentDirectories")
+    .filter((d) => d.toLowerCase() !== dir.toLowerCase());
   configStore.set({ recentDirectories: [dir, ...rest].slice(0, MAX_RECENT) });
 }
 
@@ -55,7 +56,11 @@ export function closeDirectoryMenu(): void {
   }
 }
 
-function mkItem(iconFn: Parameters<typeof createElement>[0], label: string, onClick: () => void): HTMLElement {
+function mkItem(
+  iconFn: Parameters<typeof createElement>[0],
+  label: string,
+  onClick: () => void,
+): HTMLElement {
   const item = document.createElement("div");
   item.className = "profile-item";
   const iconWrap = document.createElement("span");
@@ -86,7 +91,11 @@ export function showDirectoryMenu(anchor: HTMLElement): void {
   col.className = "profile-col";
   menu.appendChild(col);
 
-  col.appendChild(mkItem(FolderOpen, "Browse…", () => { pickAndLaunchDirectory(); }));
+  col.appendChild(
+    mkItem(FolderOpen, "Browse…", () => {
+      pickAndLaunchDirectory();
+    }),
+  );
 
   const recent = configStore.get("recentDirectories");
   if (recent.length > 0) {
@@ -94,16 +103,20 @@ export function showDirectoryMenu(anchor: HTMLElement): void {
     sep.className = "profile-separator";
     col.appendChild(sep);
     for (const dir of recent) {
-      const item = mkItem(Folder, dirName(dir), () => { launchDirectoryTab(dir); });
+      const item = mkItem(Folder, dirName(dir), () => {
+        launchDirectoryTab(dir);
+      });
       item.title = dir;
       col.appendChild(item);
     }
     const sep2 = document.createElement("div");
     sep2.className = "profile-separator";
     col.appendChild(sep2);
-    col.appendChild(mkItem(Trash2, "Clear history", () => {
-      configStore.set({ recentDirectories: [] });
-    }));
+    col.appendChild(
+      mkItem(Trash2, "Clear history", () => {
+        configStore.set({ recentDirectories: [] });
+      }),
+    );
   }
 
   document.body.appendChild(menu);
@@ -111,14 +124,16 @@ export function showDirectoryMenu(anchor: HTMLElement): void {
 
   // Anchor under the + button; flip inside the window if needed.
   const rect = anchor.getBoundingClientRect();
-  menu.style.left = rect.left + "px";
-  menu.style.top = rect.bottom + "px";
+  menu.style.left = `${rect.left}px`;
+  menu.style.top = `${rect.bottom}px`;
   requestAnimationFrame(() => {
     if (menuEl !== menu) return;
     const mw = menu.offsetWidth;
     const mh = menu.offsetHeight;
-    if (rect.left + mw > window.innerWidth - 4) menu.style.left = Math.max(4, window.innerWidth - mw - 4) + "px";
-    if (rect.bottom + mh > window.innerHeight - 4) menu.style.top = Math.max(4, rect.top - mh) + "px";
+    if (rect.left + mw > window.innerWidth - 4)
+      menu.style.left = `${Math.max(4, window.innerWidth - mw - 4)}px`;
+    if (rect.bottom + mh > window.innerHeight - 4)
+      menu.style.top = `${Math.max(4, rect.top - mh)}px`;
   });
 
   const onDocClick = (e: MouseEvent) => {

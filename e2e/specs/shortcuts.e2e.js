@@ -45,11 +45,15 @@ describe("TTerm keyboard shortcuts", () => {
   it("Ctrl+Tab switches to the most recently used tab on release", async () => {
     // Establish a known MRU: [front, second, ...] then expect "second".
     const ids = await tabIds();
-    await browser.execute((a, b) => {
-      const mgr = window.__tterm.mgr;
-      mgr.switchTo(a);
-      mgr.switchTo(b);
-    }, ids[2], ids[0]);
+    await browser.execute(
+      (a, b) => {
+        const mgr = window.__tterm.mgr;
+        mgr.switchTo(a);
+        mgr.switchTo(b);
+      },
+      ids[2],
+      ids[0],
+    );
     await browser.pause(200);
     const expected = (await mruTabIds())[1];
 

@@ -1,14 +1,19 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   filterSwitcherItems,
-  stepIndex,
-  setTabSwitcherHandlers,
   openQuickOpen,
   type SwitcherItem,
+  setTabSwitcherHandlers,
+  stepIndex,
 } from "../src/ui/tabswitcher";
 
-const mkItem = (id: string, label: string, index: number): SwitcherItem =>
-  ({ id, label, index, active: false, disconnected: false });
+const mkItem = (id: string, label: string, index: number): SwitcherItem => ({
+  id,
+  label,
+  index,
+  active: false,
+  disconnected: false,
+});
 
 describe("filterSwitcherItems (Ctrl+P quick open)", () => {
   const items: SwitcherItem[] = [
@@ -23,12 +28,12 @@ describe("filterSwitcherItems (Ctrl+P quick open)", () => {
   });
 
   it("numeric query matches the tab number", () => {
-    expect(filterSwitcherItems(items, "2").map(i => i.id)).toEqual(["tab-2"]);
+    expect(filterSwitcherItems(items, "2").map((i) => i.id)).toEqual(["tab-2"]);
   });
 
   it("text query matches the label case-insensitively", () => {
-    expect(filterSwitcherItems(items, "PROD").map(i => i.id)).toEqual(["tab-2"]);
-    expect(filterSwitcherItems(items, "com3").map(i => i.id)).toEqual(["tab-3"]);
+    expect(filterSwitcherItems(items, "PROD").map((i) => i.id)).toEqual(["tab-2"]);
+    expect(filterSwitcherItems(items, "com3").map((i) => i.id)).toEqual(["tab-3"]);
   });
 
   it("no match yields an empty list", () => {
@@ -64,7 +69,7 @@ describe("overlay commit", () => {
   it("clicking a live row switches; a row whose tab died since open is refused", () => {
     let live = [mkItem("tab-1", "one", 1), mkItem("tab-2", "two", 2)];
     const switched: string[] = [];
-    setTabSwitcherHandlers({ listTabs: () => live, switchTo: id => switched.push(id) });
+    setTabSwitcherHandlers({ listTabs: () => live, switchTo: (id) => switched.push(id) });
 
     openQuickOpen();
     // Tab dies (clean exit auto-close) while the overlay shows its snapshot.

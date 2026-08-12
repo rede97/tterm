@@ -38,7 +38,10 @@ pub(crate) fn disconnect_notice() -> Vec<u8> {
     let mut s = String::new();
     s.push_str(TERMINAL_RESET);
     s.push_str("\r\n\r\n");
-    s.push_str(&format!("\x1b[1;31m── Session ended at {} ──\x1b[0m\r\n", ts));
+    s.push_str(&format!(
+        "\x1b[1;31m── Session ended at {} ──\x1b[0m\r\n",
+        ts
+    ));
     s.push_str("\x1b[2mPress Enter to reconnect\x1b[0m\r\n");
     s.into_bytes()
 }
@@ -46,7 +49,11 @@ pub(crate) fn disconnect_notice() -> Vec<u8> {
 // One-line failure report when a respawn attempt fails (e.g. serial port
 // still unplugged); dead mode stays active afterwards.
 pub(crate) fn respawn_failed(msg: &str) -> Vec<u8> {
-    format!("\x1b[31mReconnect failed: {}\x1b[0m — \x1b[2mpress Enter to retry\x1b[0m\r\n", msg).into_bytes()
+    format!(
+        "\x1b[31mReconnect failed: {}\x1b[0m — \x1b[2mpress Enter to retry\x1b[0m\r\n",
+        msg
+    )
+    .into_bytes()
 }
 
 // Pre-resume scroll, sent downstream right after a successful respawn.
@@ -80,7 +87,10 @@ mod tests {
         assert!(n.contains("\x1b[?1049l"), "leaves alt screen");
         assert!(n.contains("\x1b[?25h"), "restores cursor");
         assert!(n.contains("\x1b[?2004l"), "disables bracketed paste");
-        assert!(n.contains("\x1b[r"), "resets scroll region (remote TUI deaths)");
+        assert!(
+            n.contains("\x1b[r"),
+            "resets scroll region (remote TUI deaths)"
+        );
         assert!(n.contains("\x1b[?6l"), "origin mode off");
         assert!(n.contains("\x1b(B"), "ASCII charset (DEC graphics reset)");
         assert!(n.contains("Session ended at"), "has timestamp line");
@@ -108,7 +118,10 @@ mod tests {
     #[test]
     fn resume_scroll_parks_cursor_and_scrolls_one_viewport() {
         let v = resume_scroll(24);
-        assert!(v.starts_with(b"\x1b[999B"), "cursor parked at bottom row first");
+        assert!(
+            v.starts_with(b"\x1b[999B"),
+            "cursor parked at bottom row first"
+        );
         assert_eq!(v.iter().filter(|&&b| b == b'\n').count(), 24);
         assert_eq!(v.len(), 6 + 24);
     }

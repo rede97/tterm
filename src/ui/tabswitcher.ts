@@ -39,14 +39,14 @@ export function setTabSwitcherHandlers(h: TabSwitcherHandlers): void {
 export function filterSwitcherItems(items: SwitcherItem[], query: string): SwitcherItem[] {
   const q = query.trim().toLowerCase();
   if (!q) return items;
-  if (/^\d+$/.test(q)) return items.filter(it => String(it.index).startsWith(q));
-  return items.filter(it => it.label.toLowerCase().includes(q));
+  if (/^\d+$/.test(q)) return items.filter((it) => String(it.index).startsWith(q));
+  return items.filter((it) => it.label.toLowerCase().includes(q));
 }
 
 /** Wrap-around step for the MRU highlight. */
 export function stepIndex(current: number, delta: number, length: number): number {
   if (length <= 0) return 0;
-  return ((current + delta) % length + length) % length;
+  return (((current + delta) % length) + length) % length;
 }
 
 // ---- Overlay ----
@@ -105,7 +105,7 @@ function renderList(): void {
   }
   selected = Math.min(selected, visible.length - 1);
   visible.forEach((it, i) => {
-    const row = el("div", "tab-switcher-row" + (i === selected ? " selected" : ""));
+    const row = el("div", `tab-switcher-row${i === selected ? " selected" : ""}`);
     row.dataset.tabId = it.id;
     row.appendChild(el("span", "tab-switcher-badge", String(it.index)));
     const label = el("span", "tab-switcher-label", it.label);
@@ -114,9 +114,12 @@ function renderList(): void {
     if (it.active) row.appendChild(el("span", "tab-switcher-current", "current"));
     row.addEventListener("click", () => commit(it.id));
     row.addEventListener("mousemove", () => {
-      if (selected !== i) { selected = i; renderList(); }
+      if (selected !== i) {
+        selected = i;
+        renderList();
+      }
     });
-    listEl!.appendChild(row);
+    listEl?.appendChild(row);
   });
   listEl.querySelector(".tab-switcher-row.selected")?.scrollIntoView({ block: "nearest" });
 }
@@ -134,7 +137,10 @@ function open(nextMode: "quick" | "mru", startSelected: number): void {
     inputEl = document.createElement("input");
     inputEl.className = "tab-switcher-input";
     inputEl.placeholder = "Go to tab — type a number or name";
-    inputEl.addEventListener("input", () => { selected = 0; renderList(); });
+    inputEl.addEventListener("input", () => {
+      selected = 0;
+      renderList();
+    });
     inputEl.addEventListener("keydown", onQuickKeydown);
     panel.appendChild(inputEl);
   } else {
@@ -144,12 +150,14 @@ function open(nextMode: "quick" | "mru", startSelected: number): void {
   panel.appendChild(listEl);
   overlay.appendChild(panel);
   // Click on the backdrop cancels (MRU: no switch; quick: just close).
-  overlay.addEventListener("mousedown", (e) => { if (e.target === overlay) close(); });
+  overlay.addEventListener("mousedown", (e) => {
+    if (e.target === overlay) close();
+  });
   document.body.appendChild(overlay);
   renderList();
 
   if (mode === "quick") {
-    inputEl!.focus();
+    inputEl?.focus();
   } else {
     // MRU commits when Ctrl is released; Escape cancels; a focus loss
     // (Alt+Tab away mid-gesture) commits so the overlay can't wedge.
@@ -179,7 +187,7 @@ function commit(id: string): void {
   // The item list is a snapshot: a tab can die (clean exit auto-close,
   // Ctrl+W elsewhere) while the overlay is open. Re-check against the
   // live list or the switch silently no-ops.
-  if (h && m && h.listTabs(m).some(t => t.id === id)) h.switchTo(id);
+  if (h && m && h.listTabs(m).some((t) => t.id === id)) h.switchTo(id);
 }
 
 // -- quick open --
@@ -201,7 +209,10 @@ function onQuickKeydown(e: KeyboardEvent): void {
 }
 
 export function openQuickOpen(): void {
-  if (mode === "quick") { close(); return; } // toggle, like VS Code
+  if (mode === "quick") {
+    close();
+    return;
+  } // toggle, like VS Code
   open("quick", 0);
 }
 
@@ -211,7 +222,7 @@ function onMruKeyup(e: KeyboardEvent): void {
   // The gesture ends when the LAST held binding modifier is released:
   // switch to the highlighted tab.
   if (!(e.key in MOD_EVENT_KEYS) || !commitMods.includes(e.key)) return;
-  const stillHeld = commitMods.some(m => m !== e.key && e[MOD_EVENT_KEYS[m]]);
+  const stillHeld = commitMods.some((m) => m !== e.key && e[MOD_EVENT_KEYS[m]]);
   if (stillHeld) return;
   e.preventDefault();
   e.stopPropagation();

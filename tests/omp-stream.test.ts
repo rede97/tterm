@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Terminal } from "@xterm/xterm";
+import { describe, expect, it } from "vitest";
 
 /**
  * Regression tests for issue rede97/tterm#1:

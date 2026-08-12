@@ -16,7 +16,10 @@ async function waitForPort(port, host, timeoutMs) {
   while (Date.now() < deadline) {
     const ok = await new Promise((resolve) => {
       const sock = net.connect({ port, host });
-      sock.once("connect", () => { sock.end(); resolve(true); });
+      sock.once("connect", () => {
+        sock.end();
+        resolve(true);
+      });
       sock.once("error", () => resolve(false));
     });
     if (ok) return;
@@ -71,8 +74,7 @@ export const config = {
     });
     tauriDriver.on("error", (e) => console.error("tauri-driver spawn failed:", e));
 
-    return waitForPort(1420, "127.0.0.1", 30000)
-      .then(() => waitForPort(4444, "127.0.0.1", 15000));
+    return waitForPort(1420, "127.0.0.1", 30000).then(() => waitForPort(4444, "127.0.0.1", 15000));
   },
 
   afterSession: () => {

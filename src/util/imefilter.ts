@@ -33,8 +33,8 @@ export class CursorPositionFilter {
   private lastStable: CompletedRun | null = null;
 
   constructor(
-    private minStableMs = 120,    // a run held this long counts as settled
-    private maxStableAgeMs = 3000 // ignore stable runs that ended longer ago
+    private minStableMs = 120, // a run held this long counts as settled
+    private maxStableAgeMs = 3000, // ignore stable runs that ended longer ago
   ) {}
 
   sample(x: number, y: number): void {

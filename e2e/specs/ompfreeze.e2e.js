@@ -33,7 +33,7 @@ const probe = () =>
     const buf = tab.terminal.buffer.active;
     let text = "";
     for (let y = 0; y < tab.terminal.rows; y++) {
-      text += (buf.getLine(buf.viewportY + y)?.translateToString(true) ?? "") + "\n";
+      text += `${buf.getLine(buf.viewportY + y)?.translateToString(true) ?? ""}\n`;
     }
     return {
       shareSeq: tab.shareSeq,
@@ -52,9 +52,11 @@ describe("omp byte-stream replay via WS path (issue #1)", () => {
     await browser.execute(() => {
       window.__reproErrors = [];
       window.addEventListener("error", (e) =>
-        window.__reproErrors.push(String(e.error?.stack ?? e.message)));
+        window.__reproErrors.push(String(e.error?.stack ?? e.message)),
+      );
       window.addEventListener("unhandledrejection", (e) =>
-        window.__reproErrors.push("rejection: " + String(e.reason?.stack ?? e.reason)));
+        window.__reproErrors.push(`rejection: ${String(e.reason?.stack ?? e.reason)}`),
+      );
       const mgr = window.__tterm.mgr;
       const tab = mgr.get(mgr.activeTabId);
       window.__reproRenders = 0;
@@ -68,14 +70,20 @@ describe("omp byte-stream replay via WS path (issue #1)", () => {
       const tab = mgr.get(mgr.activeTabId);
       const addon = tab.attachAddon;
       const ws = addon && Object.values(addon).find((v) => v instanceof WebSocket);
-      if (!ws) { done("NO-SOCKET"); return; }
+      if (!ws) {
+        done("NO-SOCKET");
+        return;
+      }
       const bin = atob(b64);
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       const CHUNK = 32 * 1024;
       let off = 0;
       (function pump() {
-        if (off >= bytes.length) { done(bytes.length); return; }
+        if (off >= bytes.length) {
+          done(bytes.length);
+          return;
+        }
         const slice = bytes.slice(off, off + CHUNK);
         ws.dispatchEvent(new MessageEvent("message", { data: slice.buffer }));
         off += CHUNK;

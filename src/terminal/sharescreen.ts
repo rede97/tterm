@@ -4,7 +4,7 @@
 // WebGL canvas has no preserveDrawingBuffer, so reading it back yields a
 // blank image — we redraw onto a 2D canvas instead).
 
-import type { Terminal, IBufferCell } from "@xterm/xterm";
+import type { IBufferCell, Terminal } from "@xterm/xterm";
 import type { TabType } from "../core/types";
 import { cellDimensions } from "../util/xterm-internals";
 
@@ -73,12 +73,40 @@ export async function buildShareScreenshot(
     ctx.scale(scale, scale);
 
     const DEFAULT16 = [
-      "#000000", "#cd3131", "#00bc00", "#949800", "#0451a5", "#bc05bc", "#0598bc", "#555555",
-      "#666666", "#f14c4c", "#23d18b", "#f5f543", "#3b8eea", "#d670d6", "#29b8db", "#e5e5e5",
+      "#000000",
+      "#cd3131",
+      "#00bc00",
+      "#949800",
+      "#0451a5",
+      "#bc05bc",
+      "#0598bc",
+      "#555555",
+      "#666666",
+      "#f14c4c",
+      "#23d18b",
+      "#f5f543",
+      "#3b8eea",
+      "#d670d6",
+      "#29b8db",
+      "#e5e5e5",
     ];
     const THEME16 = [
-      "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
-      "brightBlack", "brightRed", "brightGreen", "brightYellow", "brightBlue", "brightMagenta", "brightCyan", "brightWhite",
+      "black",
+      "red",
+      "green",
+      "yellow",
+      "blue",
+      "magenta",
+      "cyan",
+      "white",
+      "brightBlack",
+      "brightRed",
+      "brightGreen",
+      "brightYellow",
+      "brightBlue",
+      "brightMagenta",
+      "brightCyan",
+      "brightWhite",
     ];
     const CUBE = [0, 95, 135, 175, 215, 255];
     const palette = (i: number): string => {

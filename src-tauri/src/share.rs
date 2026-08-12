@@ -45,7 +45,8 @@ pub(crate) struct ShareEntry {
 
 pub(crate) type ShareRegistry = Arc<Mutex<HashMap<String, Arc<ShareEntry>>>>;
 
-pub(crate) type PendingScreens = Arc<Mutex<HashMap<u64, tokio::sync::oneshot::Sender<serde_json::Value>>>>;
+pub(crate) type PendingScreens =
+    Arc<Mutex<HashMap<u64, tokio::sync::oneshot::Sender<serde_json::Value>>>>;
 
 pub(crate) fn new_share_registry() -> ShareRegistry {
     Arc::new(Mutex::new(HashMap::new()))
@@ -75,13 +76,31 @@ pub struct ShareCreated {
 // SSH sessions (missing from the original check — sharing an embedded SSH
 // tab failed with "no such session").
 pub(crate) fn session_exists(state: &AppState, id: &str) -> bool {
-    state.sessions.lock().map(|t| t.contains_key(id)).unwrap_or(false)
-        || state.serial_sessions.lock().map(|t| t.contains_key(id)).unwrap_or(false)
-        || state.ssh_sessions.lock().map(|t| t.contains_key(id)).unwrap_or(false)
+    state
+        .sessions
+        .lock()
+        .map(|t| t.contains_key(id))
+        .unwrap_or(false)
+        || state
+            .serial_sessions
+            .lock()
+            .map(|t| t.contains_key(id))
+            .unwrap_or(false)
+        || state
+            .ssh_sessions
+            .lock()
+            .map(|t| t.contains_key(id))
+            .unwrap_or(false)
 }
 
 #[tauri::command]
-pub fn share_create(state: tauri::State<AppState>, id: String, label: String, kind: String, allow_write: bool) -> Result<ShareCreated, String> {
+pub fn share_create(
+    state: tauri::State<AppState>,
+    id: String,
+    label: String,
+    kind: String,
+    allow_write: bool,
+) -> Result<ShareCreated, String> {
     if !session_exists(&state, &id) {
         return Err("no such session".into());
     }
@@ -96,9 +115,17 @@ pub fn share_create(state: tauri::State<AppState>, id: String, label: String, ki
         last_screen_poll: Mutex::new(None),
         last_shot_poll: Mutex::new(None),
     });
-    state.hub.shares.lock().map_err(|e| e.to_string())?.insert(token.clone(), entry);
+    state
+        .hub
+        .shares
+        .lock()
+        .map_err(|e| e.to_string())?
+        .insert(token.clone(), entry);
     Ok(ShareCreated {
-        url: format!("http://127.0.0.1:{}/share/{}?token={}", state.hub.port, id, token),
+        url: format!(
+            "http://127.0.0.1:{}/share/{}?token={}",
+            state.hub.port, id, token
+        ),
         token,
     })
 }
@@ -121,15 +148,29 @@ pub fn share_revoke(state: tauri::State<AppState>, id: String) -> Result<(), Str
 }
 
 #[tauri::command]
-pub fn share_screen_response(state: tauri::State<AppState>, req: u64, snapshot: serde_json::Value) -> Result<(), String> {
-    if let Some(tx) = state.hub.pending_screens.lock().map_err(|e| e.to_string())?.remove(&req) {
+pub fn share_screen_response(
+    state: tauri::State<AppState>,
+    req: u64,
+    snapshot: serde_json::Value,
+) -> Result<(), String> {
+    if let Some(tx) = state
+        .hub
+        .pending_screens
+        .lock()
+        .map_err(|e| e.to_string())?
+        .remove(&req)
+    {
         let _ = tx.send(snapshot);
     }
     Ok(())
 }
 
 #[tauri::command]
-pub fn share_screen_changed(state: tauri::State<AppState>, id: String, seq: u64) -> Result<(), String> {
+pub fn share_screen_changed(
+    state: tauri::State<AppState>,
+    id: String,
+    seq: u64,
+) -> Result<(), String> {
     let shares = state.hub.shares.lock().map_err(|e| e.to_string())?;
     for e in shares.values() {
         if e.session_id == id {
@@ -188,7 +229,14 @@ struct HttpRequest {
 
 pub(crate) async fn handle_http(hub: Arc<WsHub>, mut stream: tokio::net::TcpStream) {
     let Some(req) = read_request(&mut stream).await else {
-        let _ = stream.write_all(&respond(400, "text/plain; charset=utf-8", b"bad request", "")).await;
+        let _ = stream
+            .write_all(&respond(
+                400,
+                "text/plain; charset=utf-8",
+                b"bad request",
+                "",
+            ))
+            .await;
         let _ = stream.shutdown().await;
         return;
     };
@@ -243,7 +291,12 @@ async fn read_request(stream: &mut tokio::net::TcpStream) -> Option<HttpRequest>
         body.extend_from_slice(&chunk[..n]);
     }
     body.truncate(content_len);
-    Some(HttpRequest { method, path, query, body })
+    Some(HttpRequest {
+        method,
+        path,
+        query,
+        body,
+    })
 }
 
 fn reason(code: u16) -> &'static str {
@@ -322,13 +375,20 @@ async fn route(hub: &Arc<WsHub>, req: &HttpRequest) -> Vec<u8> {
         ("GET", "screen") => handle_screen(hub, &entry, token, req).await,
         ("GET", "screenshot") => handle_screenshot(hub, &entry, req).await,
         ("POST", "input") => handle_input(&entry, writer, req).await,
-        ("GET", "input") | ("POST", "screen") | ("POST", "screenshot") => text(405, "method not allowed\n"),
+        ("GET", "input") | ("POST", "screen") | ("POST", "screenshot") => {
+            text(405, "method not allowed\n")
+        }
         _ => text(404, "unknown route\n"),
     }
 }
 
 // GET /share/<id>/screen — rate-limited plain polls, long-poll with wait=.
-async fn handle_screen(hub: &Arc<WsHub>, entry: &Arc<ShareEntry>, token: &str, req: &HttpRequest) -> Vec<u8> {
+async fn handle_screen(
+    hub: &Arc<WsHub>,
+    entry: &Arc<ShareEntry>,
+    token: &str,
+    req: &HttpRequest,
+) -> Vec<u8> {
     let wait: Option<u64> = query_param(Some(&req.query), "wait").and_then(|v| v.parse().ok());
     match wait {
         None => {
@@ -372,7 +432,12 @@ async fn handle_screen(hub: &Arc<WsHub>, entry: &Arc<ShareEntry>, token: &str, r
         }
     }
     match fetch_screen(hub, &entry.session_id).await {
-        Ok(snapshot) => respond(200, "application/json; charset=utf-8", snapshot.to_string().as_bytes(), ""),
+        Ok(snapshot) => respond(
+            200,
+            "application/json; charset=utf-8",
+            snapshot.to_string().as_bytes(),
+            "",
+        ),
         Err(e) => text(503, &format!("screen unavailable: {}\n", e)),
     }
 }
@@ -380,7 +445,11 @@ async fn handle_screen(hub: &Arc<WsHub>, entry: &Arc<ShareEntry>, token: &str, r
 // Ask the frontend for the current screen (the xterm buffer is the ground
 // truth character grid) via an event + command round-trip. `extra` is merged
 // into the request payload (e.g. format/scale for PNG screenshots).
-async fn fetch_snapshot(hub: &Arc<WsHub>, id: &str, extra: serde_json::Value) -> Result<serde_json::Value, String> {
+async fn fetch_snapshot(
+    hub: &Arc<WsHub>,
+    id: &str,
+    extra: serde_json::Value,
+) -> Result<serde_json::Value, String> {
     let req_id = hub.next_screen_req.fetch_add(1, Ordering::Relaxed);
     let (tx, rx) = tokio::sync::oneshot::channel();
     hub.pending_screens
@@ -398,7 +467,10 @@ async fn fetch_snapshot(hub: &Arc<WsHub>, id: &str, extra: serde_json::Value) ->
         Ok(Ok(v)) => Ok(v),
         Ok(Err(_)) => Err("frontend dropped the request".into()),
         Err(_) => {
-            hub.pending_screens.lock().ok().and_then(|mut m| m.remove(&req_id));
+            hub.pending_screens
+                .lock()
+                .ok()
+                .and_then(|mut m| m.remove(&req_id));
             Err("screen snapshot timed out".into())
         }
     }
@@ -411,7 +483,11 @@ async fn fetch_screen(hub: &Arc<WsHub>, id: &str) -> Result<serde_json::Value, S
 // GET /share/<id>/screenshot — PNG render of the screen (rate-limited like
 // plain /screen polls; the frontend redraws the buffer on a 2D canvas —
 // xterm's WebGL canvas has no preserveDrawingBuffer and reads back blank).
-async fn handle_screenshot(hub: &Arc<WsHub>, entry: &Arc<ShareEntry>, req: &HttpRequest) -> Vec<u8> {
+async fn handle_screenshot(
+    hub: &Arc<WsHub>,
+    entry: &Arc<ShareEntry>,
+    req: &HttpRequest,
+) -> Vec<u8> {
     {
         let mut last = match entry.last_shot_poll.lock() {
             Ok(l) => l,
@@ -428,12 +504,21 @@ async fn handle_screenshot(hub: &Arc<WsHub>, entry: &Arc<ShareEntry>, req: &Http
         .and_then(|v| v.parse::<u32>().ok())
         .unwrap_or(2)
         .clamp(1, 4);
-    let snap = match fetch_snapshot(hub, &entry.session_id, serde_json::json!({ "format": "png", "scale": scale })).await {
+    let snap = match fetch_snapshot(
+        hub,
+        &entry.session_id,
+        serde_json::json!({ "format": "png", "scale": scale }),
+    )
+    .await
+    {
         Ok(v) => v,
         Err(e) => return text(503, &format!("screenshot unavailable: {}\n", e)),
     };
     let Some(b64) = snap.get("png").and_then(|p| p.as_str()) else {
-        let err = snap.get("error").and_then(|e| e.as_str()).unwrap_or("no png data");
+        let err = snap
+            .get("error")
+            .and_then(|e| e.as_str())
+            .unwrap_or("no png data");
         return text(503, &format!("screenshot unavailable: {}\n", err));
     };
     use base64::Engine;
@@ -469,7 +554,8 @@ fn build_input_bytes(body: &[u8]) -> Result<Vec<u8>, String> {
     if trimmed.first() != Some(&b'{') {
         return Ok(body.to_vec());
     }
-    let j: InputJson = serde_json::from_slice(body).map_err(|e| format!("invalid JSON input: {}", e))?;
+    let j: InputJson =
+        serde_json::from_slice(body).map_err(|e| format!("invalid JSON input: {}", e))?;
     let mut out = Vec::new();
     if let Some(keys) = j.keys {
         for k in keys {
@@ -593,7 +679,11 @@ async fn handle_input(
 
 fn prompt_document(hub: &WsHub, entry: &ShareEntry, token: &str) -> String {
     let base = format!("http://127.0.0.1:{}/share/{}", hub.port, entry.session_id);
-    let access = if entry.allow_write { "read screen + write input" } else { "read-only" };
+    let access = if entry.allow_write {
+        "read screen + write input"
+    } else {
+        "read-only"
+    };
     let input_section = if entry.allow_write {
         format!(
             r#"### Typing (keystrokes, not commands)
@@ -726,7 +816,9 @@ mod tests {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let session_side = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
         let (shell_side, _) = listener.accept().unwrap();
-        shell_side.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        shell_side
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
         let session_reader = session_side.try_clone().unwrap();
         crate::relay::register_session(&hub, id, session_reader, session_side, None).unwrap();
         (hub, shell_side)
@@ -783,7 +875,8 @@ mod tests {
             crate::state::SerialSession {
                 cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)),
                 ctl: ctl_tx,
-                spec: None, auto_hold_restore: false
+                spec: None,
+                auto_hold_restore: false,
             },
         );
         assert!(session_exists(&state, "tab-2"));
@@ -836,18 +929,42 @@ mod tests {
         add_share(&hub, "tab-s", "tok123", true);
 
         // Missing / wrong token → 403; unknown route → 404.
-        assert_eq!(status(&http(&hub, "GET /share/tab-s HTTP/1.1\r\nHost: x\r\n\r\n")), 403);
-        assert_eq!(status(&http(&hub, "GET /share/tab-s?token=nope HTTP/1.1\r\nHost: x\r\n\r\n")), 403);
-        assert_eq!(status(&http(&hub, "GET /other HTTP/1.1\r\nHost: x\r\n\r\n")), 404);
+        assert_eq!(
+            status(&http(&hub, "GET /share/tab-s HTTP/1.1\r\nHost: x\r\n\r\n")),
+            403
+        );
+        assert_eq!(
+            status(&http(
+                &hub,
+                "GET /share/tab-s?token=nope HTTP/1.1\r\nHost: x\r\n\r\n"
+            )),
+            403
+        );
+        assert_eq!(
+            status(&http(&hub, "GET /other HTTP/1.1\r\nHost: x\r\n\r\n")),
+            404
+        );
         // Token bound to a DIFFERENT session must not match.
-        assert_eq!(status(&http(&hub, "GET /share/tab-other?token=tok123 HTTP/1.1\r\nHost: x\r\n\r\n")), 403);
+        assert_eq!(
+            status(&http(
+                &hub,
+                "GET /share/tab-other?token=tok123 HTTP/1.1\r\nHost: x\r\n\r\n"
+            )),
+            403
+        );
 
         // The prompt document: 200, mentions the endpoints and the rules.
-        let doc = http(&hub, "GET /share/tab-s?token=tok123 HTTP/1.1\r\nHost: x\r\n\r\n");
+        let doc = http(
+            &hub,
+            "GET /share/tab-s?token=tok123 HTTP/1.1\r\nHost: x\r\n\r\n",
+        );
         assert_eq!(status(&doc), 200);
         assert!(doc.contains("/screen"), "prompt should document /screen");
         assert!(doc.contains("/input"), "prompt should document /input");
-        assert!(doc.contains("untrusted"), "prompt should warn about untrusted content");
+        assert!(
+            doc.contains("untrusted"),
+            "prompt should warn about untrusted content"
+        );
         assert!(doc.contains(&format!("127.0.0.1:{}", hub.port)));
     }
 
@@ -855,7 +972,10 @@ mod tests {
     fn share_readonly_prompt_omits_input() {
         let (hub, _shell) = start_hub_with_session("tab-ro");
         add_share(&hub, "tab-ro", "tokro", false);
-        let doc = http(&hub, "GET /share/tab-ro?token=tokro HTTP/1.1\r\nHost: x\r\n\r\n");
+        let doc = http(
+            &hub,
+            "GET /share/tab-ro?token=tokro HTTP/1.1\r\nHost: x\r\n\r\n",
+        );
         assert!(doc.contains("read-only"));
     }
 
@@ -866,7 +986,10 @@ mod tests {
         add_share(&hub, "tab-i", "tokr", false);
 
         // Read-only token → 403.
-        let r = http(&hub, "POST /share/tab-i/input?token=tokr HTTP/1.1\r\nHost: x\r\nContent-Length: 2\r\n\r\nhi");
+        let r = http(
+            &hub,
+            "POST /share/tab-i/input?token=tokr HTTP/1.1\r\nHost: x\r\nContent-Length: 2\r\n\r\nhi",
+        );
         assert_eq!(status(&r), 403);
 
         // Write token → bytes reach the session verbatim.
@@ -884,10 +1007,16 @@ mod tests {
 
         // First plain poll: no frontend is attached in tests, so the
         // snapshot round-trip fails fast with 503 — but the poll COUNTS.
-        let r1 = http(&hub, "GET /share/tab-rl/screen?token=tokrl HTTP/1.1\r\nHost: x\r\n\r\n");
+        let r1 = http(
+            &hub,
+            "GET /share/tab-rl/screen?token=tokrl HTTP/1.1\r\nHost: x\r\n\r\n",
+        );
         assert_eq!(status(&r1), 503);
         // Immediate second poll → 429.
-        let r2 = http(&hub, "GET /share/tab-rl/screen?token=tokrl HTTP/1.1\r\nHost: x\r\n\r\n");
+        let r2 = http(
+            &hub,
+            "GET /share/tab-rl/screen?token=tokrl HTTP/1.1\r\nHost: x\r\n\r\n",
+        );
         assert_eq!(status(&r2), 429);
     }
 
@@ -916,8 +1045,14 @@ mod tests {
             }
         });
         let start = Instant::now();
-        let r = http(&hub, "GET /share/tab-lp/screen?token=toklp&wait=1&timeout=25 HTTP/1.1\r\nHost: x\r\n\r\n");
-        assert!(start.elapsed() < Duration::from_secs(5), "long-poll should wake on seq bump");
+        let r = http(
+            &hub,
+            "GET /share/tab-lp/screen?token=toklp&wait=1&timeout=25 HTTP/1.1\r\nHost: x\r\n\r\n",
+        );
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "long-poll should wake on seq bump"
+        );
         assert_eq!(status(&r), 503);
     }
 
@@ -980,11 +1115,29 @@ mod tests {
         let (hub, _shell) = start_hub_with_session("tab-ss");
         add_share(&hub, "tab-ss", "tokss", true);
         // Bad token → 403.
-        assert_eq!(status(&http(&hub, "GET /share/tab-ss/screenshot?token=no HTTP/1.1\r\nHost: x\r\n\r\n")), 403);
+        assert_eq!(
+            status(&http(
+                &hub,
+                "GET /share/tab-ss/screenshot?token=no HTTP/1.1\r\nHost: x\r\n\r\n"
+            )),
+            403
+        );
         // First call: 503 (no frontend attached in tests) — but it counts.
-        assert_eq!(status(&http(&hub, "GET /share/tab-ss/screenshot?token=tokss HTTP/1.1\r\nHost: x\r\n\r\n")), 503);
+        assert_eq!(
+            status(&http(
+                &hub,
+                "GET /share/tab-ss/screenshot?token=tokss HTTP/1.1\r\nHost: x\r\n\r\n"
+            )),
+            503
+        );
         // Immediate second → 429.
-        assert_eq!(status(&http(&hub, "GET /share/tab-ss/screenshot?token=tokss HTTP/1.1\r\nHost: x\r\n\r\n")), 429);
+        assert_eq!(
+            status(&http(
+                &hub,
+                "GET /share/tab-ss/screenshot?token=tokss HTTP/1.1\r\nHost: x\r\n\r\n"
+            )),
+            429
+        );
     }
 
     // The WS data path must be unaffected by the HTTP/WS peek split.
@@ -998,7 +1151,10 @@ mod tests {
             stream,
         )
         .expect("WS handshake should survive the HTTP peek");
-        ws.get_mut().set_read_timeout(Some(Duration::from_secs(5))).unwrap();
-        ws.send(tungstenite::Message::Binary(b"ping".to_vec())).unwrap();
+        ws.get_mut()
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        ws.send(tungstenite::Message::Binary(b"ping".to_vec()))
+            .unwrap();
     }
 }

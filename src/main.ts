@@ -1,7 +1,7 @@
+import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { getVersion } from "@tauri-apps/api/app";
-import { createElement, Cog } from "lucide";
+import { Cog, createElement } from "lucide";
 import "@xterm/xterm/css/xterm.css";
 import "@fontsource/jetbrains-mono";
 import "@fontsource/fira-mono";
@@ -11,25 +11,25 @@ import "@fontsource/ibm-plex-mono";
 import "@fontsource/roboto-mono";
 import "@fontsource/ubuntu-mono";
 import "./assets/fonts/nerd-fonts.css";
-import { parseFontFamily, updateFontStack, setSystemFonts } from "./util/fontconfig";
-import { tabManager, initTabManager } from "./terminal/tabmanager";
-import { initSearchBar } from "./terminal/search";
-import { initProfileMenu } from "./terminal/profilemenu";
-import { initSshAuthDialogs } from "./terminal/sshauth";
-import { initWindowControls, toggleZenMode, toggleFullscreenMode } from "./ui/window";
-import { initKeymap } from "./core/keymap";
-import { setTabSwitcherHandlers, openQuickOpen, stepMruSwitcher } from "./ui/tabswitcher";
-import { pasteIntoTerminal } from "./terminal/paste";
-import type { TerminalTab } from "./terminal/tab";
-import { configStore } from "./core/store";
-import { loadSshHosts } from "./config/ssh-config";
-import { loadAllWtData } from "./config/wt-profiles";
-import { setWtThemes, findTheme, applyTerminalBackground } from "./util/themes";
 import { loadCustomThemes } from "./config/custom-themes";
 import { loadSerialProfiles } from "./config/serial-profiles";
+import { loadSshHosts } from "./config/ssh-config";
+import { loadAllWtData } from "./config/wt-profiles";
 import { logCatch, logError, swallow } from "./core/errorlog";
-import { showToast } from "./ui/toast";
+import { initKeymap } from "./core/keymap";
+import { configStore } from "./core/store";
 import { scheduleAutoUpdateCheck } from "./core/updater";
+import { pasteIntoTerminal } from "./terminal/paste";
+import { initProfileMenu } from "./terminal/profilemenu";
+import { initSearchBar } from "./terminal/search";
+import { initSshAuthDialogs } from "./terminal/sshauth";
+import type { TerminalTab } from "./terminal/tab";
+import { initTabManager, tabManager } from "./terminal/tabmanager";
+import { openQuickOpen, setTabSwitcherHandlers, stepMruSwitcher } from "./ui/tabswitcher";
+import { showToast } from "./ui/toast";
+import { initWindowControls, toggleFullscreenMode, toggleZenMode } from "./ui/window";
+import { parseFontFamily, setSystemFonts, updateFontStack } from "./util/fontconfig";
+import { applyTerminalBackground, findTheme, setWtThemes } from "./util/themes";
 
 // -- DOM refs ---
 
@@ -37,15 +37,18 @@ const terminalContainer = document.getElementById("terminal-container")!;
 const tabsContainer = document.getElementById("tabs")!;
 
 // scroll wheel on tab bar ->horizontal scroll
-tabsContainer.addEventListener("wheel", (e) => {
-  if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-    tabsContainer.scrollLeft += e.deltaY;
-  }
-}, { passive: true });
+tabsContainer.addEventListener(
+  "wheel",
+  (e) => {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      tabsContainer.scrollLeft += e.deltaY;
+    }
+  },
+  { passive: true },
+);
 
 // block all browser native context menus
-document.addEventListener("contextmenu", e => e.preventDefault());
-
+document.addEventListener("contextmenu", (e) => e.preventDefault());
 
 // -- welcome screen --
 
@@ -82,7 +85,7 @@ settingsBtn.addEventListener("click", () => {
 
 // Subscribe to config changes — update all open terminals when relevant keys change
 configStore.subscribe((keys) => {
-  if (keys.some(k => ["fontFamily", "fontSize", "scrollback", "themeName"].includes(k))) {
+  if (keys.some((k) => ["fontFamily", "fontSize", "scrollback", "themeName"].includes(k))) {
     const theme = findTheme(configStore.get("themeName")).theme;
     // The whole terminal chrome (active tab, container frame, xterm edge
     // strips) follows the theme background via one CSS variable.
@@ -97,9 +100,14 @@ configStore.subscribe((keys) => {
     // A newly chosen webfont family loads lazily: the fit above can measure
     // fallback metrics and leave the grid oversized (bottom clipped) once
     // the real glyphs arrive. Load the primary family explicitly, then refit.
-    const primary = configStore.get("fontFamily").split(",")[0]?.trim().replace(/^["']|["']$/g, "");
+    const primary = configStore
+      .get("fontFamily")
+      .split(",")[0]
+      ?.trim()
+      .replace(/^["']|["']$/g, "");
     if (primary) {
-      document.fonts.load(`${configStore.get("fontSize")}px "${primary}"`)
+      document.fonts
+        .load(`${configStore.get("fontSize")}px "${primary}"`)
         .then(() => tabManager.triggerResize())
         .catch(swallow);
     }
@@ -112,8 +120,14 @@ configStore.subscribe((keys) => {
 // NOTE: tabs must be a getter — _syncTabOrderFromDom reassigns the Map on
 // drag reorder, a captured reference would go stale.
 if (import.meta.env.DEV) {
-  (window as any).__tterm = { get tabs() { return tabManager.tabs; }, mgr: tabManager, config: configStore };
-  import("./util/imebox").then(m => {
+  (window as any).__tterm = {
+    get tabs() {
+      return tabManager.tabs;
+    },
+    mgr: tabManager,
+    config: configStore,
+  };
+  import("./util/imebox").then((m) => {
     (window as any).__tterm.setImeMirrorMode = (mode: "auto" | "always" | "off") => {
       m.setImeMirrorMode(mode);
       for (const t of tabManager.tabs.values()) t.refreshImeClasses();
@@ -148,7 +162,7 @@ initSshAuthDialogs();
       const entries = [...tabManager.tabs.entries()];
       if (mode === "mru") {
         const byId = new Map(entries);
-        return tabManager.mruTabIds().map(id => {
+        return tabManager.mruTabIds().map((id) => {
           const i = entries.findIndex(([eid]) => eid === id);
           return toItem([id, byId.get(id)!], i);
         });
@@ -162,14 +176,21 @@ initSshAuthDialogs();
     "workbench.action.nextTab": () => stepMruSwitcher(1),
     "workbench.action.prevTab": () => stepMruSwitcher(-1),
     "workbench.action.closeTab": () => {
-      if (tabManager.settingsOpen) { tabManager.closeSettings(true); return; }
+      if (tabManager.settingsOpen) {
+        tabManager.closeSettings(true);
+        return;
+      }
       if (tabManager.activeTabId) tabManager.closeTab(tabManager.activeTabId);
     },
     "workbench.action.toggleFullScreen": () => {
-      toggleFullscreenMode().then(() => tabManager.triggerResize()).catch(logCatch("window.fullScreen"));
+      toggleFullscreenMode()
+        .then(() => tabManager.triggerResize())
+        .catch(logCatch("window.fullScreen"));
     },
     "workbench.action.toggleZenMode": () => {
-      toggleZenMode().then(() => tabManager.triggerResize()).catch(logCatch("window.zenMode"));
+      toggleZenMode()
+        .then(() => tabManager.triggerResize())
+        .catch(logCatch("window.zenMode"));
     },
     "workbench.action.terminal.clear": () => {
       const t = tabManager.activeTab;
@@ -178,7 +199,7 @@ initSshAuthDialogs();
   });
 }
 
-import("./terminal/quickpanel").then(m => {
+import("./terminal/quickpanel").then((m) => {
   m.setQuickPanelHandlers({
     getActiveTab: () => (tabManager.settingsOpen ? undefined : tabManager.activeTab),
     getTab: (id) => tabManager.get(id),
@@ -191,7 +212,7 @@ import("./terminal/quickpanel").then(m => {
   });
   m.initQuickPanel();
 });
-import("./terminal/contextmenu").then(m => {
+import("./terminal/contextmenu").then((m) => {
   m.setContextMenuHandlers({
     createLocalTab: () => tabManager.createLocalTab(),
     newWindow: () => invoke("open_new_window").catch(logCatch("window.openNew")),
@@ -203,7 +224,10 @@ import("./terminal/contextmenu").then(m => {
     closeTabsRight: (id) => tabManager.closeTabsRight(id),
     closeOtherTabs: (id) => tabManager.closeOtherTabs(id),
     getSelection: (id) => tabManager.get(id)?.terminal.getSelection() ?? "",
-    pasteToTab: (id, text) => { const t = tabManager.get(id); if (t) pasteIntoTerminal(t.terminal, text); },
+    pasteToTab: (id, text) => {
+      const t = tabManager.get(id);
+      if (t) pasteIntoTerminal(t.terminal, text);
+    },
     clearTab: (id) => tabManager.clearTab(id),
     switchTo: (id) => tabManager.switchTo(id),
     exportTab: (id) => tabManager.exportTab(id),
@@ -221,18 +245,23 @@ import("./terminal/contextmenu").then(m => {
 
 // AI session sharing: the hub asks the frontend for a screen snapshot —
 // the xterm buffer is the ground-truth character grid.
-listen<{ id: string; req: number; format?: string; scale?: number }>("share-screen-request", (e) => {
-  const respond = (snapshot: unknown) =>
-    invoke("share_screen_response", { req: e.payload.req, snapshot }).catch(logCatch("share.screenResponse"));
-  const tab = tabManager.get(e.payload.id);
-  if (!tab) {
-    respond({ error: "session has no terminal" });
-  } else if (e.payload.format === "png") {
-    tab.buildShareScreenshot(e.payload.scale ?? 2).then(respond);
-  } else {
-    respond(tab.buildShareSnapshot());
-  }
-});
+listen<{ id: string; req: number; format?: string; scale?: number }>(
+  "share-screen-request",
+  (e) => {
+    const respond = (snapshot: unknown) =>
+      invoke("share_screen_response", { req: e.payload.req, snapshot }).catch(
+        logCatch("share.screenResponse"),
+      );
+    const tab = tabManager.get(e.payload.id);
+    if (!tab) {
+      respond({ error: "session has no terminal" });
+    } else if (e.payload.format === "png") {
+      tab.buildShareScreenshot(e.payload.scale ?? 2).then(respond);
+    } else {
+      respond(tab.buildShareSnapshot());
+    }
+  },
+);
 initWindowControls();
 
 // Flush pending debounced config writes before the window closes.
@@ -240,45 +269,56 @@ window.addEventListener("beforeunload", () => configStore.flush());
 
 // -- initial tab --
 
-getVersion().then(v => { welcomeVersion.textContent = "v" + v; }).catch(logCatch("app.version"));
+getVersion()
+  .then((v) => {
+    welcomeVersion.textContent = `v${v}`;
+  })
+  .catch(logCatch("app.version"));
 
 // Load SSH hosts and store in config
-loadSshHosts().then(hosts => {
-  configStore.set({ sshHosts: hosts });
-}).catch(logCatch("ssh.loadHosts"));
+loadSshHosts()
+  .then((hosts) => {
+    configStore.set({ sshHosts: hosts });
+  })
+  .catch(logCatch("ssh.loadHosts"));
 
 // Load system fonts in background (non-blocking)
-invoke<string[]>("list_system_fonts").then(fonts => {
-  setSystemFonts(fonts);
-}).catch(logCatch("font.listSystem"));
+invoke<string[]>("list_system_fonts")
+  .then((fonts) => {
+    setSystemFonts(fonts);
+  })
+  .catch(logCatch("font.listSystem"));
 
 // Load config, then profiles, then open initial tab
-configStore.load().then(async () => {
-  updateFontStack(parseFontFamily(configStore.get("fontFamily")));
-  // Terminal chrome background tracks the active theme from the start.
-  applyTerminalBackground(findTheme(configStore.get("themeName")).theme);
+configStore
+  .load()
+  .then(async () => {
+    updateFontStack(parseFontFamily(configStore.get("fontFamily")));
+    // Terminal chrome background tracks the active theme from the start.
+    applyTerminalBackground(findTheme(configStore.get("themeName")).theme);
 
-  // Load WT profiles + VS installs + themes, plus user custom themes
-  // (themes.json — separate from config.json by design).
-  const wt = await loadAllWtData();
-  setWtThemes(wt.themes);
-  await loadCustomThemes();
-  await loadSerialProfiles();
-  configStore.set({
-    localProfiles: wt.profiles,
-    vsInstalls: wt.vsInstalls,
+    // Load WT profiles + VS installs + themes, plus user custom themes
+    // (themes.json — separate from config.json by design).
+    const wt = await loadAllWtData();
+    setWtThemes(wt.themes);
+    await loadCustomThemes();
+    await loadSerialProfiles();
+    configStore.set({
+      localProfiles: wt.profiles,
+      vsInstalls: wt.vsInstalls,
+    });
+
+    const p = tabManager.defaultLocalProfile();
+    if (p) await tabManager.createLocalTab(p.command, p.name);
+    else await tabManager.createLocalTab();
+  })
+  .catch((e) => {
+    // load() never rejects — this is a downstream failure (WT data, themes,
+    // first tab). Surface it instead of a bare welcome screen.
+    logError("app.init", e);
+    showToast(`Startup failed: ${e}`, "error");
+    welcomeEl.style.display = "flex";
   });
-
-  const p = tabManager.defaultLocalProfile();
-  if (p) await tabManager.createLocalTab(p.command, p.name);
-  else await tabManager.createLocalTab();
-}).catch((e) => {
-  // load() never rejects — this is a downstream failure (WT data, themes,
-  // first tab). Surface it instead of a bare welcome screen.
-  logError("app.init", e);
-  showToast(`Startup failed: ${e}`, "error");
-  welcomeEl.style.display = "flex";
-});
 
 // Check for updates in the background (no-op in dev builds without a signed release;
 // skipped when disabled in Settings → General → Updates)

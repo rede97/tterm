@@ -4,14 +4,14 @@
 // raw file I/O; parsing/validation lives here. Mirrors custom-themes.ts.
 
 import { invoke } from "@tauri-apps/api/core";
-import type {
-  SerialProfile,
-  SerialInputMode,
-  SerialEnterNewline,
-  SerialOutputNewline,
-  SerialFlowControl,
-} from "../core/types";
 import { logError } from "../core/errorlog";
+import type {
+  SerialEnterNewline,
+  SerialFlowControl,
+  SerialInputMode,
+  SerialOutputNewline,
+  SerialProfile,
+} from "../core/types";
 
 export interface SerialProfileDef extends SerialProfile {
   source: "builtin" | "custom";
@@ -51,7 +51,15 @@ export const DEFAULT_SERIAL_PROFILE = "Normal";
 
 const INPUT_MODES: readonly SerialInputMode[] = ["normal", "echo", "line"];
 const ENTER_NEWLINES: readonly SerialEnterNewline[] = ["cr", "lf", "crlf"];
-const OUTPUT_NEWLINES: readonly SerialOutputNewline[] = ["keep", "cr-in-lf", "lf-in-cr", "force-crlf", "force-lf", "force-cr", "strip"];
+const OUTPUT_NEWLINES: readonly SerialOutputNewline[] = [
+  "keep",
+  "cr-in-lf",
+  "lf-in-cr",
+  "force-crlf",
+  "force-lf",
+  "force-cr",
+  "strip",
+];
 const FLOW_CONTROLS: readonly SerialFlowControl[] = ["none", "software", "hardware"];
 
 function pick<T extends string>(v: unknown, allowed: readonly T[], fallback: T): T {

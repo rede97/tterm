@@ -27,7 +27,9 @@ pub fn serial_list_ports() -> Vec<SerialPortInfo> {
     let mut result: Vec<SerialPortInfo> = serial_enumerator::get_serial_list()
         .into_iter()
         .map(|p| {
-            let (vid, pid) = p.usb_info.map_or((String::new(), String::new()), |u| (u.vid, u.pid));
+            let (vid, pid) = p
+                .usb_info
+                .map_or((String::new(), String::new()), |u| (u.vid, u.pid));
             SerialPortInfo {
                 name: p.name,
                 driver: p.driver.unwrap_or_default(),
@@ -77,7 +79,10 @@ pub(crate) fn map_parity(parity: &str) -> Result<serialport::Parity, String> {
         "none" => Ok(serialport::Parity::None),
         "odd" => Ok(serialport::Parity::Odd),
         "even" => Ok(serialport::Parity::Even),
-        _ => Err(format!("Invalid parity: {} (expected none|odd|even)", parity)),
+        _ => Err(format!(
+            "Invalid parity: {} (expected none|odd|even)",
+            parity
+        )),
     }
 }
 
@@ -94,7 +99,10 @@ pub(crate) fn map_flow_control(flow: &str) -> Result<serialport::FlowControl, St
         "none" => Ok(serialport::FlowControl::None),
         "software" | "xonxoff" => Ok(serialport::FlowControl::Software),
         "hardware" | "rtscts" => Ok(serialport::FlowControl::Hardware),
-        _ => Err(format!("Invalid flow control: {} (expected none|software|hardware)", flow)),
+        _ => Err(format!(
+            "Invalid flow control: {} (expected none|software|hardware)",
+            flow
+        )),
     }
 }
 
@@ -102,9 +110,16 @@ pub(crate) fn map_flow_control(flow: &str) -> Result<serialport::FlowControl, St
 pub(crate) fn serial_open_error(port_name: &str, err: &serialport::Error) -> String {
     let msg = err.to_string();
     let lower = msg.to_lowercase();
-    if lower.contains("access") || lower.contains("denied") || lower.contains("busy") || lower.contains("being used") {
+    if lower.contains("access")
+        || lower.contains("denied")
+        || lower.contains("busy")
+        || lower.contains("being used")
+    {
         format!("{} is busy — opened by another application", port_name)
-    } else if lower.contains("not found") || lower.contains("cannot find") || lower.contains("does not exist") {
+    } else if lower.contains("not found")
+        || lower.contains("cannot find")
+        || lower.contains("does not exist")
+    {
         format!("{} not found — device may have been unplugged", port_name)
     } else {
         format!("Failed to open {}: {}", port_name, msg)
@@ -112,7 +127,12 @@ pub(crate) fn serial_open_error(port_name: &str, err: &serialport::Error) -> Str
 }
 
 fn open_serial(
-    port_name: &str, baud_rate: u32, data_bits: u8, parity: &str, stop_bits: u8, flow_control: &str,
+    port_name: &str,
+    baud_rate: u32,
+    data_bits: u8,
+    parity: &str,
+    stop_bits: u8,
+    flow_control: &str,
 ) -> Result<Box<dyn serialport::SerialPort>, String> {
     let mut port = serialport::new(port_name, baud_rate)
         .data_bits(map_data_bits(data_bits)?)
@@ -161,9 +181,9 @@ struct SerialIoWriter {
 
 impl Write for SerialIoWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.tx
-            .send(buf.to_vec())
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::BrokenPipe, "serial I/O pump gone"))?;
+        self.tx.send(buf.to_vec()).map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::BrokenPipe, "serial I/O pump gone")
+        })?;
         Ok(buf.len())
     }
     fn flush(&mut self) -> std::io::Result<()> {
@@ -283,7 +303,14 @@ pub(crate) fn spawn_serial_session(
     flow_control: &str,
     output_newline: &str,
 ) -> Result<(), String> {
-    let port = open_serial(port_name, baud_rate, data_bits, parity, stop_bits, flow_control)?;
+    let port = open_serial(
+        port_name,
+        baud_rate,
+        data_bits,
+        parity,
+        stop_bits,
+        flow_control,
+    )?;
     let spec = SpawnSpec::Serial {
         port_name: port_name.to_string(),
         baud_rate,
@@ -301,17 +328,34 @@ pub(crate) fn spawn_serial_session(
 fn start_pump(
     port: Box<dyn serialport::SerialPort>,
     nl_mode: NewlineMode,
-) -> (SerialIoReader, SerialIoWriter, Arc<AtomicBool>, std::sync::mpsc::Sender<SerialCtl>) {
+) -> (
+    SerialIoReader,
+    SerialIoWriter,
+    Arc<AtomicBool>,
+    std::sync::mpsc::Sender<SerialCtl>,
+) {
     let cancel = Arc::new(AtomicBool::new(false));
     let (out_tx, out_rx) = std::sync::mpsc::channel::<Vec<u8>>();
     let (in_tx, in_rx) = std::sync::mpsc::channel::<Vec<u8>>();
     let (ctl_tx, ctl_rx) = std::sync::mpsc::channel::<SerialCtl>();
     std::thread::spawn({
         let cancel = cancel.clone();
-        move || serial_io_loop(port, out_tx, in_rx, ctl_rx, cancel, NewlineFilter::new(nl_mode))
+        move || {
+            serial_io_loop(
+                port,
+                out_tx,
+                in_rx,
+                ctl_rx,
+                cancel,
+                NewlineFilter::new(nl_mode),
+            )
+        }
     });
     (
-        SerialIoReader { rx: out_rx, cur: std::collections::VecDeque::new() },
+        SerialIoReader {
+            rx: out_rx,
+            cur: std::collections::VecDeque::new(),
+        },
         SerialIoWriter { tx: in_tx },
         cancel,
         ctl_tx,
@@ -321,7 +365,12 @@ fn start_pump(
 // Reconnect hooks for serial sessions: the relay calls `respawn` when the
 // user presses Enter at the in-band disconnect prompt (e.g. after unplug).
 // Runs on a blocking relay thread.
-fn serial_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec, auto_retry: Arc<AtomicBool>) -> ReconnectHooks {
+fn serial_hooks(
+    app: tauri::AppHandle,
+    id: String,
+    spec: SpawnSpec,
+    auto_retry: Arc<AtomicBool>,
+) -> ReconnectHooks {
     let serial_sessions = app.state::<AppState>().serial_sessions.clone();
     ReconnectHooks {
         auto_retry: Some(auto_retry),
@@ -331,12 +380,24 @@ fn serial_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec, auto_retry: 
         on_state: {
             let id = id.clone();
             Box::new(move |alive| {
-                let _ = app.emit("session-state", SessionState { id: id.clone(), alive });
+                let _ = app.emit(
+                    "session-state",
+                    SessionState {
+                        id: id.clone(),
+                        alive,
+                    },
+                );
             })
         },
         respawn: Box::new(move || {
             let SpawnSpec::Serial {
-                port_name, baud_rate, data_bits, parity, stop_bits, flow_control, output_newline,
+                port_name,
+                baud_rate,
+                data_bits,
+                parity,
+                stop_bits,
+                flow_control,
+                output_newline,
             } = &spec
             else {
                 return Err("not a serial session".into());
@@ -349,13 +410,25 @@ fn serial_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec, auto_retry: 
             let mock: Option<Box<dyn serialport::SerialPort>> = None;
             let port = match mock {
                 Some(p) => p,
-                None => open_serial(port_name, *baud_rate, *data_bits, parity, *stop_bits, flow_control)?,
+                None => open_serial(
+                    port_name,
+                    *baud_rate,
+                    *data_bits,
+                    parity,
+                    *stop_bits,
+                    flow_control,
+                )?,
             };
             let (reader, writer, cancel, ctl) = start_pump(port, nl_mode);
-            serial_sessions
-                .lock()
-                .map_err(|e| e.to_string())?
-                .insert(id.clone(), SerialSession { cancel, ctl, spec: Some(spec.clone()), auto_hold_restore: false });
+            serial_sessions.lock().map_err(|e| e.to_string())?.insert(
+                id.clone(),
+                SerialSession {
+                    cancel,
+                    ctl,
+                    spec: Some(spec.clone()),
+                    auto_hold_restore: false,
+                },
+            );
             Ok((
                 Box::new(reader) as Box<dyn Read + Send>,
                 Box::new(writer) as Box<dyn Write + Send>,
@@ -390,7 +463,15 @@ pub(crate) fn start_serial_session(
         .serial_sessions
         .lock()
         .map_err(|e| e.to_string())?
-        .insert(id, SerialSession { cancel, ctl: ctl_tx, spec, auto_hold_restore: false });
+        .insert(
+            id,
+            SerialSession {
+                cancel,
+                ctl: ctl_tx,
+                spec,
+                auto_hold_restore: false,
+            },
+        );
 
     Ok(())
 }
@@ -434,20 +515,37 @@ pub fn serial_spawn(
     }
 
     spawn_serial_session(
-        &state, &app, id.clone(), &port_name, baud_rate, data_bits, &parity, stop_bits, &flow_control, nl,
+        &state,
+        &app,
+        id.clone(),
+        &port_name,
+        baud_rate,
+        data_bits,
+        &parity,
+        stop_bits,
+        &flow_control,
+        nl,
     )?;
 
     Ok(state.ws_result(id))
 }
 
 #[tauri::command]
-pub fn serial_set_baud(state: tauri::State<AppState>, id: &str, baud_rate: u32) -> Result<(), String> {
+pub fn serial_set_baud(
+    state: tauri::State<AppState>,
+    id: &str,
+    baud_rate: u32,
+) -> Result<(), String> {
     let mut sessions = state.serial_sessions.lock().map_err(|e| e.to_string())?;
     let session = sessions
         .get_mut(id)
         .ok_or_else(|| format!("No serial session: {}", id))?;
     // Keep the spec in sync so (auto-)reconnect reopens at the current baud.
-    if let Some(SpawnSpec::Serial { baud_rate: spec_baud, .. }) = &mut session.spec {
+    if let Some(SpawnSpec::Serial {
+        baud_rate: spec_baud,
+        ..
+    }) = &mut session.spec
+    {
         *spec_baud = baud_rate;
     }
     session
@@ -484,7 +582,11 @@ pub fn serial_set_dtr(state: tauri::State<AppState>, id: &str, on: bool) -> Resu
 
 // Switch flow control on a live session (no port reopen).
 #[tauri::command]
-pub fn serial_set_flow_control(state: tauri::State<AppState>, id: &str, flow: &str) -> Result<(), String> {
+pub fn serial_set_flow_control(
+    state: tauri::State<AppState>,
+    id: &str,
+    flow: &str,
+) -> Result<(), String> {
     map_flow_control(flow)?; // validate before touching the session
     let mut sessions = state.serial_sessions.lock().map_err(|e| e.to_string())?;
     let session = sessions
@@ -551,7 +653,10 @@ pub async fn serial_reconnect(state: tauri::State<'_, AppState>, id: String) -> 
 
 // Sample the modem lines for the quick panel (RTS tracked, CTS read live).
 #[tauri::command]
-pub fn serial_line_status(state: tauri::State<AppState>, id: &str) -> Result<crate::state::SerialLineState, String> {
+pub fn serial_line_status(
+    state: tauri::State<AppState>,
+    id: &str,
+) -> Result<crate::state::SerialLineState, String> {
     let sessions = state.serial_sessions.lock().map_err(|e| e.to_string())?;
     let session = sessions
         .get(id)
@@ -567,7 +672,11 @@ pub fn serial_line_status(state: tauri::State<AppState>, id: &str) -> Result<cra
 }
 
 #[tauri::command]
-pub fn serial_set_output_newline(state: tauri::State<AppState>, id: &str, mode: &str) -> Result<(), String> {
+pub fn serial_set_output_newline(
+    state: tauri::State<AppState>,
+    id: &str,
+    mode: &str,
+) -> Result<(), String> {
     let mode = NewlineMode::from_str(mode)?;
     let mut sessions = state.serial_sessions.lock().map_err(|e| e.to_string())?;
     let session = sessions
@@ -591,8 +700,14 @@ mod tests {
 
     #[test]
     fn serial_data_bits_valid_range() {
-        assert!(matches!(map_data_bits(5).unwrap(), serialport::DataBits::Five));
-        assert!(matches!(map_data_bits(8).unwrap(), serialport::DataBits::Eight));
+        assert!(matches!(
+            map_data_bits(5).unwrap(),
+            serialport::DataBits::Five
+        ));
+        assert!(matches!(
+            map_data_bits(8).unwrap(),
+            serialport::DataBits::Eight
+        ));
     }
 
     #[test]
@@ -603,24 +718,48 @@ mod tests {
 
     #[test]
     fn serial_parity_case_insensitive() {
-        assert!(matches!(map_parity("none").unwrap(), serialport::Parity::None));
-        assert!(matches!(map_parity("Odd").unwrap(), serialport::Parity::Odd));
-        assert!(matches!(map_parity("EVEN").unwrap(), serialport::Parity::Even));
+        assert!(matches!(
+            map_parity("none").unwrap(),
+            serialport::Parity::None
+        ));
+        assert!(matches!(
+            map_parity("Odd").unwrap(),
+            serialport::Parity::Odd
+        ));
+        assert!(matches!(
+            map_parity("EVEN").unwrap(),
+            serialport::Parity::Even
+        ));
         assert!(map_parity("mark").is_err());
     }
 
     #[test]
     fn serial_stop_bits() {
-        assert!(matches!(map_stop_bits(1).unwrap(), serialport::StopBits::One));
-        assert!(matches!(map_stop_bits(2).unwrap(), serialport::StopBits::Two));
+        assert!(matches!(
+            map_stop_bits(1).unwrap(),
+            serialport::StopBits::One
+        ));
+        assert!(matches!(
+            map_stop_bits(2).unwrap(),
+            serialport::StopBits::Two
+        ));
         assert!(map_stop_bits(3).is_err());
     }
 
     #[test]
     fn serial_flow_control_aliases() {
-        assert!(matches!(map_flow_control("none").unwrap(), serialport::FlowControl::None));
-        assert!(matches!(map_flow_control("xonxoff").unwrap(), serialport::FlowControl::Software));
-        assert!(matches!(map_flow_control("rtscts").unwrap(), serialport::FlowControl::Hardware));
+        assert!(matches!(
+            map_flow_control("none").unwrap(),
+            serialport::FlowControl::None
+        ));
+        assert!(matches!(
+            map_flow_control("xonxoff").unwrap(),
+            serialport::FlowControl::Software
+        ));
+        assert!(matches!(
+            map_flow_control("rtscts").unwrap(),
+            serialport::FlowControl::Hardware
+        ));
         assert!(map_flow_control("magic").is_err());
     }
 
@@ -631,7 +770,11 @@ mod tests {
         let result = open_serial("\\\\.\\COM254", 115200, 8, "none", 1, "none");
         assert!(result.is_err());
         let msg = result.err().unwrap();
-        assert!(msg.contains("COM254"), "error should name the port: {}", msg);
+        assert!(
+            msg.contains("COM254"),
+            "error should name the port: {}",
+            msg
+        );
     }
 
     #[test]
@@ -688,13 +831,19 @@ mod tests {
         let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
         drop(rx);
         let mut writer = SerialIoWriter { tx };
-        assert_eq!(writer.write(b"x").unwrap_err().kind(), std::io::ErrorKind::BrokenPipe);
+        assert_eq!(
+            writer.write(b"x").unwrap_err().kind(),
+            std::io::ErrorKind::BrokenPipe
+        );
     }
 
     #[test]
     fn serial_io_reader_eof_when_pump_gone() {
         let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
-        let mut reader = SerialIoReader { rx, cur: std::collections::VecDeque::new() };
+        let mut reader = SerialIoReader {
+            rx,
+            cur: std::collections::VecDeque::new(),
+        };
         tx.send(b"device-data".to_vec()).unwrap();
         drop(tx);
         let mut buf = [0u8; 64];

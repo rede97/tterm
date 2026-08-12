@@ -7,6 +7,43 @@ on:
     branches: [main]
 
 jobs:
+  # Fast gate: lint, typecheck, unit tests (frontend + backend). Runs in
+  # parallel with the slow bundle build so failures report early.
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install frontend dependencies
+        run: bun install
+
+      - name: Lint (Biome)
+        run: bun run lint
+
+      - name: Typecheck + vite build
+        run: bun run build
+
+      - name: Frontend tests (vitest)
+        run: bun run test
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Rust formatting (cargo fmt --check)
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+
+      - name: Backend tests (cargo test)
+        run: bun run test:rust
+
   build:
     runs-on: windows-latest
     steps:

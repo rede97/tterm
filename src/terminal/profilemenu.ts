@@ -1,7 +1,7 @@
-import { createElement, Terminal as TerminalIcon, Globe, Cable, FlaskConical, Film } from "lucide";
-import { configStore } from "../core/store";
-import { hostProp } from "../core/common";
+import { Cable, createElement, Film, FlaskConical, Globe, Terminal as TerminalIcon } from "lucide";
 import { loadSerialPorts } from "../config/wt-profiles";
+import { hostProp } from "../core/common";
+import { configStore } from "../core/store";
 import { tabManager } from "./tabmanager";
 
 const menuBtn = document.getElementById("new-tab-menu-btn")!;
@@ -13,8 +13,8 @@ document.body.appendChild(profileMenu);
 
 function positionMenu() {
   const rect = menuBtn.getBoundingClientRect();
-  profileMenu.style.left = (rect.left + rect.width / 2) + "px";
-  profileMenu.style.top = rect.bottom + "px";
+  profileMenu.style.left = `${rect.left + rect.width / 2}px`;
+  profileMenu.style.top = `${rect.bottom}px`;
 }
 
 function flipMenu() {
@@ -30,11 +30,17 @@ function flipMenu() {
   if (left + mw > window.innerWidth) left = window.innerWidth - mw - pad;
   if (top + mh > window.innerHeight) top = Math.max(pad, btnRect.top - mh);
 
-  profileMenu.style.left = left + "px";
-  profileMenu.style.top = top + "px";
+  profileMenu.style.left = `${left}px`;
+  profileMenu.style.top = `${top}px`;
 }
 
-function createMenuItem(iconFn: any, label: string, detail: string, onClick: () => void, subline = ""): HTMLElement {
+function createMenuItem(
+  iconFn: any,
+  label: string,
+  detail: string,
+  onClick: () => void,
+  subline = "",
+): HTMLElement {
   const item = document.createElement("div");
   item.className = "profile-item";
 
@@ -97,15 +103,25 @@ function populateMenu() {
   if (localProfiles.length > 0) {
     for (const p of localProfiles) {
       if (hiddenProfiles.includes(p.name)) continue;
-      localCol.appendChild(createMenuItem(TerminalIcon, p.name, "", () => tabManager.createLocalTab(p.command, p.name)));
+      localCol.appendChild(
+        createMenuItem(TerminalIcon, p.name, "", () =>
+          tabManager.createLocalTab(p.command, p.name),
+        ),
+      );
     }
   } else {
-    localCol.appendChild(createMenuItem(TerminalIcon, "Default shell", "", () => tabManager.createLocalTab()));
+    localCol.appendChild(
+      createMenuItem(TerminalIcon, "Default shell", "", () => tabManager.createLocalTab()),
+    );
   }
 
   if (import.meta.env.DEV) {
-    localCol.appendChild(createMenuItem(FlaskConical, "Demo TTY", "debug", () => tabManager.createDemoTab()));
-    localCol.appendChild(createMenuItem(Film, "Anime TTY", "debug", () => tabManager.createAnimeTab()));
+    localCol.appendChild(
+      createMenuItem(FlaskConical, "Demo TTY", "debug", () => tabManager.createDemoTab()),
+    );
+    localCol.appendChild(
+      createMenuItem(Film, "Anime TTY", "debug", () => tabManager.createAnimeTab()),
+    );
   }
   profileMenu.appendChild(localCol);
 
@@ -121,7 +137,9 @@ function populateMenu() {
     for (const host of sshHosts) {
       if (hiddenSshHosts.includes(host.name)) continue;
       const detail = `${hostProp(host, "user") || "root"}@${hostProp(host, "hostname") || host.name}:${hostProp(host, "port") || "22"}`;
-      sshCol.appendChild(createMenuItem(Globe, host.name, detail, () => tabManager.createSshTab(host)));
+      sshCol.appendChild(
+        createMenuItem(Globe, host.name, detail, () => tabManager.createSshTab(host)),
+      );
     }
     profileMenu.appendChild(sshCol);
   }
@@ -140,7 +158,9 @@ function populateMenu() {
       const subline = [port.manufacturer, ids].filter(Boolean).join(" ");
       const friendly = port.product || port.driver;
       const label = friendly ? `${port.name} · ${friendly}` : port.name;
-      serialCol.appendChild(createMenuItem(Cable, label, "", () => tabManager.createSerialTab(port), subline));
+      serialCol.appendChild(
+        createMenuItem(Cable, label, "", () => tabManager.createSerialTab(port), subline),
+      );
     }
     profileMenu.appendChild(serialCol);
   }
@@ -156,7 +176,7 @@ export function initProfileMenu() {
       positionMenu();
       profileMenu.classList.add("open");
       requestAnimationFrame(() => flipMenu());
-      loadSerialPorts().then(ports => {
+      loadSerialPorts().then((ports) => {
         configStore.set({ serialPorts: ports });
         if (profileMenu.classList.contains("open")) {
           populateMenu();
@@ -167,7 +187,11 @@ export function initProfileMenu() {
   });
 
   document.addEventListener("click", (e) => {
-    if (profileMenu.classList.contains("open") && !profileMenu.contains(e.target as Node) && e.target !== menuBtn) {
+    if (
+      profileMenu.classList.contains("open") &&
+      !profileMenu.contains(e.target as Node) &&
+      e.target !== menuBtn
+    ) {
       profileMenu.classList.remove("open");
     }
   });

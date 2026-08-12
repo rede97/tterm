@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { invokeMock, checkMock } = vi.hoisted(() => ({
   invokeMock: vi.fn((cmd: string) => {
@@ -14,9 +14,9 @@ vi.mock("@tauri-apps/plugin-updater", () => ({ check: checkMock }));
 vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: vi.fn() }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
 
-import { createSettingsContent } from "../src/settings/index";
 import { configStore } from "../src/core/store";
 import { scheduleAutoUpdateCheck } from "../src/core/updater";
+import { createSettingsContent } from "../src/settings/index";
 
 function generalPanel(root: HTMLElement): HTMLElement {
   const el = root.querySelector<HTMLElement>('.settings-panel-content[data-panel="general"]');
@@ -53,18 +53,19 @@ describe("settings — updates", () => {
     const root = createSettingsContent();
     document.body.appendChild(root);
     autoUpdateToggle(root).checked = false;
-    const applyBtn = [...root.querySelectorAll<HTMLButtonElement>(".settings-btn")]
-      .find(b => b.textContent === "Apply")!;
+    const applyBtn = [...root.querySelectorAll<HTMLButtonElement>(".settings-btn")].find(
+      (b) => b.textContent === "Apply",
+    )!;
     applyBtn.click();
     await vi.waitFor(() => {
-      const write = invokeMock.mock.calls.find(c => c[0] === "write_config");
+      const write = invokeMock.mock.calls.find((c) => c[0] === "write_config");
       expect(write).toBeTruthy();
       expect(JSON.parse((write![1] as any).content).autoCheckUpdates).toBe(false);
     });
     expect(configStore.get("autoCheckUpdates")).toBe(false);
   });
 
-  it("\"Check for Updates\" button triggers a manual check", async () => {
+  it('"Check for Updates" button triggers a manual check', async () => {
     const root = createSettingsContent();
     document.body.appendChild(root);
     const btn = generalPanel(root).querySelector<HTMLButtonElement>("#set-check-update")!;

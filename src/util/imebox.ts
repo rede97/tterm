@@ -31,7 +31,9 @@ function loadMode(): ImeMirrorMode {
   try {
     const v = localStorage.getItem(MODE_STORAGE_KEY);
     if (v === "auto" || v === "always" || v === "off") return v;
-  } catch { /* localStorage unavailable (tests) */ }
+  } catch {
+    /* localStorage unavailable (tests) */
+  }
   return DEFAULT_MODE;
 }
 
@@ -44,7 +46,11 @@ export function getImeMirrorMode(): ImeMirrorMode {
 
 export function setImeMirrorMode(m: ImeMirrorMode): void {
   mode = m;
-  try { localStorage.setItem(MODE_STORAGE_KEY, m); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(MODE_STORAGE_KEY, m);
+  } catch {
+    /* ignore */
+  }
   for (const fn of modeListeners) fn(m);
 }
 
@@ -87,7 +93,7 @@ function trace(msg: string): void {
 // ---- Mirror component ----------------------------------------------------
 
 const LINGER_MS = 0; // stay visible after commit (bridges the echo gap)
-const FADE_MS = 0;   // opacity transition, must match .ime-box CSS
+const FADE_MS = 0; // opacity transition, must match .ime-box CSS
 
 export class ImeBox {
   private el: HTMLElement;
@@ -97,7 +103,10 @@ export class ImeBox {
   private fadeTimer: number | null = null;
   private placeRaf: number | null = null;
 
-  constructor(private parent: HTMLElement, fontFamily = "") {
+  constructor(
+    private parent: HTMLElement,
+    fontFamily = "",
+  ) {
     this.el = document.createElement("div");
     this.el.className = "ime-box";
     if (fontFamily) this.el.style.fontFamily = fontFamily;
@@ -138,7 +147,8 @@ export class ImeBox {
       // synchronous layout mid-composition is a composition-stability risk
       // with real TSF IMEs.
       if (this.placeRaf === null) {
-        const raf = window.requestAnimationFrame ?? ((f: FrameRequestCallback) => window.setTimeout(f, 0));
+        const raf =
+          window.requestAnimationFrame ?? ((f: FrameRequestCallback) => window.setTimeout(f, 0));
         this.placeRaf = raf(() => {
           this.placeRaf = null;
           if (this.active) this._place();
@@ -193,8 +203,14 @@ export class ImeBox {
   }
 
   private _cancelTimers(): void {
-    if (this.lingerTimer !== null) { clearTimeout(this.lingerTimer); this.lingerTimer = null; }
-    if (this.fadeTimer !== null) { clearTimeout(this.fadeTimer); this.fadeTimer = null; }
+    if (this.lingerTimer !== null) {
+      clearTimeout(this.lingerTimer);
+      this.lingerTimer = null;
+    }
+    if (this.fadeTimer !== null) {
+      clearTimeout(this.fadeTimer);
+      this.fadeTimer = null;
+    }
     if (this.placeRaf !== null) {
       const caf = window.cancelAnimationFrame ?? clearTimeout;
       caf(this.placeRaf);

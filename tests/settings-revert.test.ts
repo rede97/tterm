@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { invokeMock } = vi.hoisted(() => ({
   invokeMock: vi.fn((cmd: string) => {
@@ -12,9 +12,9 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 vi.mock("@tauri-apps/api/app", () => ({ getVersion: () => Promise.resolve("1.0.1") }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
 
+import { configStore } from "../src/core/store";
 import { createSettingsContent } from "../src/settings/index";
 import { resetSshConfigDirty } from "../src/settings/ssh";
-import { configStore } from "../src/core/store";
 
 beforeEach(() => {
   document.body.innerHTML = "";
@@ -38,23 +38,30 @@ describe("settings — panel visibility", () => {
     document.body.appendChild(root);
 
     const panels = [...root.querySelectorAll<HTMLElement>(".settings-panel-content")];
-    expect(panels.map(p => p.dataset.panel)).toEqual(
-      ["general", "appearance", "profile", "ssh", "serial", "keyboard"],
-    );
+    expect(panels.map((p) => p.dataset.panel)).toEqual([
+      "general",
+      "appearance",
+      "profile",
+      "ssh",
+      "serial",
+      "keyboard",
+    ]);
     // Only General shows on open — a panel that forgets display:none
     // renders stacked over the General page.
     for (const p of panels) {
-      expect(p.style.display, `${p.dataset.panel} initial visibility`)
-        .toBe(p.dataset.panel === "general" ? "" : "none");
+      expect(p.style.display, `${p.dataset.panel} initial visibility`).toBe(
+        p.dataset.panel === "general" ? "" : "none",
+      );
     }
 
     // Sidebar navigation flips visibility.
-    root.querySelectorAll<HTMLElement>(".settings-nav-item").forEach(n => {
+    root.querySelectorAll<HTMLElement>(".settings-nav-item").forEach((n) => {
       if (n.dataset.panel === "keyboard") n.click();
     });
     for (const p of panels) {
-      expect(p.style.display, `${p.dataset.panel} after switching`)
-        .toBe(p.dataset.panel === "keyboard" ? "" : "none");
+      expect(p.style.display, `${p.dataset.panel} after switching`).toBe(
+        p.dataset.panel === "keyboard" ? "" : "none",
+      );
     }
   });
 });
@@ -66,7 +73,9 @@ describe("settings — Revert", () => {
 
     revertButton(root).click();
     await vi.waitFor(() => {
-      expect(root.querySelector(".settings-feedback")!.textContent).toBe("Reverted to saved config");
+      expect(root.querySelector(".settings-feedback")!.textContent).toBe(
+        "Reverted to saved config",
+      );
     });
 
     // Page chrome survives: sidebar with all six panels, footer buttons.
@@ -100,7 +109,9 @@ describe("settings — Revert", () => {
     for (let i = 0; i < 2; i++) {
       revertButton(root).click();
       await vi.waitFor(() => {
-        expect(root.querySelector(".settings-feedback")!.textContent).toBe("Reverted to saved config");
+        expect(root.querySelector(".settings-feedback")!.textContent).toBe(
+          "Reverted to saved config",
+        );
       });
       // feedback clears after 2s; don't wait, just proceed
     }

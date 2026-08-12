@@ -12,7 +12,7 @@ export interface ToastHandle extends HTMLElement {
 let container: HTMLElement | null = null;
 
 function ensureContainer(): HTMLElement {
-  if (!container || !container.isConnected) {
+  if (!container?.isConnected) {
     container = document.createElement("div");
     container.id = "toast-container";
     document.body.appendChild(container);

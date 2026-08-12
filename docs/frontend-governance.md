@@ -93,6 +93,8 @@
 
 ## P1 — 纪律没有工具固化（最高优先级）
 
+> **进度（2026-08）**：✅ Biome 2.5.8 已落地（`biome.json`，formatter + recommended linter，`bun run lint` / `lint:fix`）；全库一次性 format + 修复清零 error（存量 `!`/`any`/CSS specificity 降级为 warn 作棘轮）；`ci.yml` 新增 `check` job（biome → tsc+vite → vitest → cargo fmt --check → cargo test，与 build 并行）；`cargo fmt` 原本即干净，已纳入同一门禁；检查纪律已写入 AGENT.md（修而不压、unsafe fix 后必跑测试——本次 unsafe `x!`→`x?.` 转换就吞出两个 tsc 错误，实证该原则）。待办：自定义规则（裸 catch / 原生对话框 / no-cycle）需 Biome 插件或 eslint 补充，P1 长尾。
+
 **现状**：无 linter/formatter；`tsconfig` 有 strict 底线，但风格、`!` 断言（tabmanager 39 处）、AGENT.md 硬规则全靠 review 自觉。**`ci.yml` 只跑 build——不跑 vitest、不跑 cargo test、不跑 lint**，测试靠本地自觉。
 
 **原因**：文档驱动纪律在早期单人开发有效；规则只在文档里就会漂移——本轮迭代 Agent 自己就留下空 catch 和 `el()` 复制（见 C2/审计 7.2），靠规则提醒而非机器拦截。

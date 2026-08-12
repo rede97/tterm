@@ -28,7 +28,10 @@ async function waitForPort(port, host, timeoutMs) {
   while (Date.now() < deadline) {
     const ok = await new Promise((resolve) => {
       const sock = net.connect({ port, host });
-      sock.once("connect", () => { sock.end(); resolve(true); });
+      sock.once("connect", () => {
+        sock.end();
+        resolve(true);
+      });
       sock.once("error", () => resolve(false));
     });
     if (ok) return;

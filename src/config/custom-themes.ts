@@ -4,15 +4,32 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type { ITheme } from "@xterm/xterm";
-import { setCustomThemes, allThemes, type ThemeDef } from "../util/themes";
 import { logError } from "../core/errorlog";
+import { allThemes, setCustomThemes, type ThemeDef } from "../util/themes";
 
 // The 21 editable colors, in editor display order.
 export const THEME_COLOR_KEYS = [
-  "background", "foreground", "cursor", "cursorAccent", "selectionBackground",
-  "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
-  "brightBlack", "brightRed", "brightGreen", "brightYellow",
-  "brightBlue", "brightMagenta", "brightCyan", "brightWhite",
+  "background",
+  "foreground",
+  "cursor",
+  "cursorAccent",
+  "selectionBackground",
+  "black",
+  "red",
+  "green",
+  "yellow",
+  "blue",
+  "magenta",
+  "cyan",
+  "white",
+  "brightBlack",
+  "brightRed",
+  "brightGreen",
+  "brightYellow",
+  "brightBlue",
+  "brightMagenta",
+  "brightCyan",
+  "brightWhite",
 ] as const;
 
 export type ThemeColorKey = (typeof THEME_COLOR_KEYS)[number];

@@ -49,14 +49,69 @@ pub struct TrayWindowEntry {
 // Candidate window names: programming languages — short, pronounceable,
 // distinct. Meeting-room style: easy to remember and refer to.
 const LANGUAGE_NAMES: &[&str] = &[
-    "Rust", "Go", "Python", "Ruby", "Swift", "Kotlin", "Scala", "Haskell",
-    "Erlang", "Elixir", "Clojure", "Lua", "Perl", "Dart", "Julia", "Zig",
-    "Nim", "Crystal", "OCaml", "Fortran", "Cobol", "Pascal", "Ada", "Lisp",
-    "Prolog", "Racket", "Scheme", "Groovy", "Elm", "Raku", "Pony", "Pharo",
-    "Gleam", "Roc", "Mojo", "Carbon", "Odin", "Hare", "V", "Idris",
-    "Agda", "Coq", "Solidity", "Move", "Cairo", "Vyper", "Nix", "Dhall",
-    "Haxe", "Jule", "Vale", "Ballerina", "Fantom", "Ceylon", "Eiffel",
-    "Forth", "Logo", "Tcl", "Rexx", "Bash", "D", "Squirrel", "Wren",
+    "Rust",
+    "Go",
+    "Python",
+    "Ruby",
+    "Swift",
+    "Kotlin",
+    "Scala",
+    "Haskell",
+    "Erlang",
+    "Elixir",
+    "Clojure",
+    "Lua",
+    "Perl",
+    "Dart",
+    "Julia",
+    "Zig",
+    "Nim",
+    "Crystal",
+    "OCaml",
+    "Fortran",
+    "Cobol",
+    "Pascal",
+    "Ada",
+    "Lisp",
+    "Prolog",
+    "Racket",
+    "Scheme",
+    "Groovy",
+    "Elm",
+    "Raku",
+    "Pony",
+    "Pharo",
+    "Gleam",
+    "Roc",
+    "Mojo",
+    "Carbon",
+    "Odin",
+    "Hare",
+    "V",
+    "Idris",
+    "Agda",
+    "Coq",
+    "Solidity",
+    "Move",
+    "Cairo",
+    "Vyper",
+    "Nix",
+    "Dhall",
+    "Haxe",
+    "Jule",
+    "Vale",
+    "Ballerina",
+    "Fantom",
+    "Ceylon",
+    "Eiffel",
+    "Forth",
+    "Logo",
+    "Tcl",
+    "Rexx",
+    "Bash",
+    "D",
+    "Squirrel",
+    "Wren",
 ];
 
 // This window's assigned name; assigned once and reused on later parks so
@@ -91,8 +146,8 @@ fn assign_name(taken: &std::collections::HashSet<String>) -> String {
         }
         // All 8 draws collided (or list exhausted): first free word, then
         // "Word N".
-        picked.unwrap_or_else(|| {
-            match LANGUAGE_NAMES.iter().find(|w| !taken.contains(**w)) {
+        picked.unwrap_or_else(
+            || match LANGUAGE_NAMES.iter().find(|w| !taken.contains(**w)) {
                 Some(w) => w.to_string(),
                 None => {
                     let mut n = 2;
@@ -104,8 +159,8 @@ fn assign_name(taken: &std::collections::HashSet<String>) -> String {
                         n += 1;
                     }
                 }
-            }
-        })
+            },
+        )
     };
     *ASSIGNED_NAME.lock() = Some(name.clone());
     name
@@ -182,7 +237,11 @@ fn with_registry_lock<R>(base: &Path, f: impl FnOnce(&Path) -> R) -> R {
     let lock = base.join("tray.lock");
     let mut attempts = 0;
     loop {
-        match std::fs::OpenOptions::new().write(true).create_new(true).open(&lock) {
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&lock)
+        {
             Ok(_) => break,
             Err(_) if attempts < 40 => {
                 attempts += 1;
@@ -221,7 +280,12 @@ pub(crate) fn mark_hidden(base: &Path, pid: u32, tabs: Vec<String>) {
         let taken: std::collections::HashSet<String> =
             entries.iter().map(|e| e.name.clone()).collect();
         let name = assign_name(&taken);
-        entries.push(TrayWindowEntry { pid, name, tabs, since: now_secs() });
+        entries.push(TrayWindowEntry {
+            pid,
+            name,
+            tabs,
+            since: now_secs(),
+        });
         write_hidden(base, &entries);
     });
 }
@@ -252,7 +316,11 @@ fn ensure_owner(base: &Path, pid: u32) -> bool {
             // Dead or unreadable owner: take over.
             let _ = std::fs::remove_file(&lock);
         }
-        match std::fs::OpenOptions::new().write(true).create_new(true).open(&lock) {
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&lock)
+        {
             Ok(mut f) => {
                 use std::io::Write;
                 let _ = write!(f, "{}", pid);
@@ -284,7 +352,9 @@ fn release_owner(base: &Path, pid: u32) {
 fn hwnd_of_pid(pid: u32) -> Option<windows::Win32::Foundation::HWND> {
     use windows::core::BOOL;
     use windows::Win32::Foundation::{HWND, LPARAM};
-    use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetClassNameW, GetWindowThreadProcessId};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        EnumWindows, GetClassNameW, GetWindowThreadProcessId,
+    };
 
     struct Ctx {
         want: u32,
@@ -306,7 +376,10 @@ fn hwnd_of_pid(pid: u32) -> Option<windows::Win32::Foundation::HWND> {
         BOOL(1)
     }
 
-    let mut ctx = Ctx { want: pid, found: None };
+    let mut ctx = Ctx {
+        want: pid,
+        found: None,
+    };
     unsafe {
         let _ = EnumWindows(Some(cb), LPARAM(&mut ctx as *mut Ctx as isize));
     }
@@ -318,7 +391,9 @@ fn show_window_by_pid(pid: u32) -> bool {
     use windows::Win32::UI::WindowsAndMessaging::{
         IsIconic, SetForegroundWindow, ShowWindow, SW_RESTORE, SW_SHOW,
     };
-    let Some(hwnd) = hwnd_of_pid(pid) else { return false };
+    let Some(hwnd) = hwnd_of_pid(pid) else {
+        return false;
+    };
     unsafe {
         if IsIconic(hwnd).as_bool() {
             let _ = ShowWindow(hwnd, SW_RESTORE);
@@ -365,7 +440,10 @@ fn menu_order(entries: &[TrayWindowEntry]) -> Vec<TrayWindowEntry> {
 // Menu layout: one submenu per parked window ("Rust#Tab 3" = window "Rust"
 // with 3 tabs) listing its tab labels — the tabs are how the user tells
 // windows apart. Clicking any tab item restores that window.
-fn build_menu(app: &tauri::AppHandle, entries: &[TrayWindowEntry]) -> tauri::menu::Menu<tauri::Wry> {
+fn build_menu(
+    app: &tauri::AppHandle,
+    entries: &[TrayWindowEntry],
+) -> tauri::menu::Menu<tauri::Wry> {
     let mut builder = tauri::menu::MenuBuilder::new(app);
     for e in menu_order(entries).iter() {
         let title = if e.name.is_empty() {
@@ -382,7 +460,11 @@ fn build_menu(app: &tauri::AppHandle, entries: &[TrayWindowEntry]) -> tauri::men
             sub = sub.item(&item);
         } else {
             for (j, tab) in e.tabs.iter().enumerate() {
-                let label = if tab.is_empty() { format!("Tab {}", j + 1) } else { tab.clone() };
+                let label = if tab.is_empty() {
+                    format!("Tab {}", j + 1)
+                } else {
+                    tab.clone()
+                };
                 let item = tauri::menu::MenuItemBuilder::new(label)
                     .id(format!("{}{}:{}", ITEM_SHOW_PREFIX, e.pid, j))
                     .build(app)
@@ -400,10 +482,7 @@ fn build_menu(app: &tauri::AppHandle, entries: &[TrayWindowEntry]) -> tauri::men
         .id(ITEM_QUIT)
         .build(app)
         .expect("tray menu item");
-    builder
-        .item(&quit)
-        .build()
-        .expect("tray menu")
+    builder.item(&quit).build().expect("tray menu")
 }
 
 fn on_menu_event(app: &tauri::AppHandle, id: &str) {
@@ -445,7 +524,11 @@ fn write_pending_tab(base: &Path, pid: u32, tab: usize) {
 
 fn take_pending_tab(base: &Path, pid: u32) -> Option<usize> {
     let path = pending_tab_path(base, pid);
-    let tab = std::fs::read_to_string(&path).ok()?.trim().parse::<usize>().ok();
+    let tab = std::fs::read_to_string(&path)
+        .ok()?
+        .trim()
+        .parse::<usize>()
+        .ok();
     if tab.is_some() {
         let _ = std::fs::remove_file(&path);
     }
@@ -639,7 +722,9 @@ pub fn tray_set_tabs(window: tauri::Window, tabs: Vec<String>, active: String) {
     let title = if active.is_empty() { "TTerm" } else { &active };
     let _ = window.set_title(title);
     *LAST_TABS.lock() = tabs.clone();
-    let Some(base) = config_base(&window.app_handle()) else { return };
+    let Some(base) = config_base(&window.app_handle()) else {
+        return;
+    };
     let pid = std::process::id();
     with_registry_lock(&base, |base| {
         let mut entries = list_hidden(base);
@@ -657,7 +742,9 @@ pub fn tray_set_tabs(window: tauri::Window, tabs: Vec<String>, active: String) {
 #[tauri::command]
 pub fn tray_take_pending_tab(window: tauri::Window) -> Option<usize> {
     use tauri::Manager;
-    let Some(base) = config_base(&window.app_handle()) else { return None };
+    let Some(base) = config_base(&window.app_handle()) else {
+        return None;
+    };
     take_pending_tab(&base, std::process::id())
 }
 
@@ -666,7 +753,8 @@ mod tests {
     use super::*;
 
     fn temp_base(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("tterm-tray-test-{}-{}", tag, std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("tterm-tray-test-{}-{}", tag, std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
@@ -682,7 +770,10 @@ mod tests {
         mark_hidden(&base, 100, vec!["renamed".into()]);
         let entries = list_hidden(&base);
         assert_eq!(entries.len(), 2);
-        assert_eq!(entries.iter().find(|e| e.pid == 100).unwrap().tabs, vec!["renamed".to_string()]);
+        assert_eq!(
+            entries.iter().find(|e| e.pid == 100).unwrap().tabs,
+            vec!["renamed".to_string()]
+        );
         unmark(&base, 100);
         let entries = list_hidden(&base);
         assert_eq!(entries.len(), 1);
@@ -713,13 +804,24 @@ mod tests {
 
     #[test]
     fn menu_order_is_chronological_even_if_registry_is_not() {
-        let e = |pid: u32, since: u64| TrayWindowEntry { pid, name: String::new(), tabs: vec![], since };
+        let e = |pid: u32, since: u64| TrayWindowEntry {
+            pid,
+            name: String::new(),
+            tabs: vec![],
+            since,
+        };
         let shuffled = vec![e(3, 30), e(1, 10), e(2, 20)];
         let ordered = menu_order(&shuffled);
-        assert_eq!(ordered.iter().map(|x| x.pid).collect::<Vec<_>>(), vec![1, 2, 3]);
+        assert_eq!(
+            ordered.iter().map(|x| x.pid).collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
         // Same-second ties keep the incoming (file) order — stable sort.
         let tied = vec![e(9, 10), e(8, 10)];
-        assert_eq!(menu_order(&tied).iter().map(|x| x.pid).collect::<Vec<_>>(), vec![9, 8]);
+        assert_eq!(
+            menu_order(&tied).iter().map(|x| x.pid).collect::<Vec<_>>(),
+            vec![9, 8]
+        );
     }
 
     #[test]

@@ -40,8 +40,9 @@ async function openAppearanceSettings() {
 
 async function clickApply() {
   const applied = await browser.execute(() => {
-    const btn = [...document.querySelectorAll(".settings-btn")]
-      .find((b) => b.textContent === "Apply");
+    const btn = [...document.querySelectorAll(".settings-btn")].find(
+      (b) => b.textContent === "Apply",
+    );
     if (btn) btn.click();
     return !!btn;
   });
@@ -51,9 +52,7 @@ async function clickApply() {
 
 async function selectThemeCard(name) {
   const found = await browser.execute((n) => {
-    const card = [...document.querySelectorAll(".theme-card")].find(
-      (c) => c.dataset.theme === n
-    );
+    const card = [...document.querySelectorAll(".theme-card")].find((c) => c.dataset.theme === n);
     if (card) card.click();
     return !!card;
   }, name);
@@ -69,7 +68,7 @@ describe("custom themes", () => {
       await clickApply();
       await browser.execute(() => {
         const card = [...document.querySelectorAll(".theme-card")].find(
-          (c) => c.dataset.theme === "E2E Custom"
+          (c) => c.dataset.theme === "E2E Custom",
         );
         if (card) {
           [...card.querySelectorAll(".theme-card-action")]
@@ -83,7 +82,9 @@ describe("custom themes", () => {
         const mgr = window.__tterm.mgr;
         if (document.querySelector('[data-tab-id="#settings"]')) mgr.closeSettings(true);
       });
-    } catch { /* best-effort cleanup */ }
+    } catch {
+      /* best-effort cleanup */
+    }
   });
 
   it("container background follows the theme; duplicate creates an editable copy in the Custom section", async () => {
@@ -118,21 +119,21 @@ describe("custom themes", () => {
     expect(chrome.activeTab).toBe("rgb(30, 30, 30)"); // stays #1e1e1e
     expect(chrome.container).toBe("rgb(253, 246, 227)");
     expect(chrome.body).toBe("rgb(253, 246, 227)");
-    const settingsPadding = await browser.execute(() =>
-      getComputedStyle(document.getElementById("terminal-container")).padding
+    const settingsPadding = await browser.execute(
+      () => getComputedStyle(document.getElementById("terminal-container")).padding,
     );
     expect(settingsPadding).toBe("0px"); // settings page covers the frame
 
     // Gallery is split into Built-in / Custom sections.
     const groupTitles = await browser.execute(() =>
-      [...document.querySelectorAll(".theme-group-title")].map((el) => el.textContent)
+      [...document.querySelectorAll(".theme-group-title")].map((el) => el.textContent),
     );
     expect(groupTitles).toEqual(["Built-in", "Custom"]);
 
     // Duplicate Solarized Light into a custom copy.
     await browser.execute(() => {
       const card = [...document.querySelectorAll(".theme-card")].find(
-        (c) => c.dataset.theme === "Solarized Light"
+        (c) => c.dataset.theme === "Solarized Light",
       );
       card.querySelector(".theme-card-action").click(); // Duplicate
     });
@@ -146,15 +147,14 @@ describe("custom themes", () => {
     });
     await $(".te-save").click();
     await browser.waitUntil(
-      async () =>
-        browser.execute(() => !document.querySelector(".te-overlay")),
-      { timeout: 5000, timeoutMsg: "editor did not close after save" }
+      async () => browser.execute(() => !document.querySelector(".te-overlay")),
+      { timeout: 5000, timeoutMsg: "editor did not close after save" },
     );
 
     // The custom theme shows in the Custom section with an Edit action.
     const customCard = await browser.execute(() => {
       const card = [...document.querySelectorAll(".theme-card")].find(
-        (c) => c.dataset.theme === "E2E Custom"
+        (c) => c.dataset.theme === "E2E Custom",
       );
       if (!card) return null;
       return {
@@ -187,7 +187,7 @@ describe("custom themes", () => {
     await clickApply();
     await browser.execute(() => {
       const card = [...document.querySelectorAll(".theme-card")].find(
-        (c) => c.dataset.theme === "E2E Custom"
+        (c) => c.dataset.theme === "E2E Custom",
       );
       [...card.querySelectorAll(".theme-card-action")]
         .find((b) => b.textContent === "Edit")
@@ -200,18 +200,18 @@ describe("custom themes", () => {
         browser.execute(
           () =>
             ![...document.querySelectorAll(".theme-card")].some(
-              (c) => c.dataset.theme === "E2E Custom"
-            )
+              (c) => c.dataset.theme === "E2E Custom",
+            ),
         ),
-      { timeout: 5000, timeoutMsg: "custom theme was not deleted" }
+      { timeout: 5000, timeoutMsg: "custom theme was not deleted" },
     );
 
     // Close settings back to the terminal; the 2px theme-colored frame
     // around the terminal returns.
     await browser.execute(() => window.__tterm.mgr.closeSettings(true));
     await browser.pause(200);
-    const paddingAfter = await browser.execute(() =>
-      getComputedStyle(document.getElementById("terminal-container")).padding
+    const paddingAfter = await browser.execute(
+      () => getComputedStyle(document.getElementById("terminal-container")).padding,
     );
     expect(paddingAfter).toBe("2px");
   });

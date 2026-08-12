@@ -2,8 +2,8 @@
 // Frontend owns all parsing — the backend only reads/writes the raw file.
 
 import { invoke } from "@tauri-apps/api/core";
-import type { SshHost } from "../core/types";
 import { logError } from "../core/errorlog";
+import type { SshHost } from "../core/types";
 
 // Config-wide sections captured verbatim on parse and written back on
 // generate — without this, Save SSH Config silently DELETED them:
@@ -23,7 +23,11 @@ function captureGlobalSections(raw: string): void {
   let block: string[] | null = null;
   let seenHost = false;
   const hostNames = (line: string): string[] =>
-    line.trim().slice(line.trim().search(/\s/) + 1).trim().split(/\s+/);
+    line
+      .trim()
+      .slice(line.trim().search(/\s/) + 1)
+      .trim()
+      .split(/\s+/);
   const isPureWildcard = (line: string): boolean => {
     const names = hostNames(line);
     return names.length === 1 && names[0] === "*";
@@ -96,12 +100,13 @@ export function parseSshConfig(raw: string): SshHost[] {
       // and "HostName" then "hostname" keeps last-wins instead of
       // emitting both on save.
       const existing = Object.keys(current).find(
-        k => k !== "name" && !k.startsWith("__") && k.toLowerCase() === key);
+        (k) => k !== "name" && !k.startsWith("__") && k.toLowerCase() === key,
+      );
       // Forward directives may repeat (one per rule); merge into a
       // newline-separated value so nothing is lost. Other keywords keep
       // last-wins behavior.
       if (key === "localforward" || key === "remoteforward" || key === "dynamicforward") {
-        if (existing) current[existing] += "\n" + value;
+        if (existing) current[existing] += `\n${value}`;
         else current[rawKey] = value;
       } else {
         current[existing ?? rawKey] = value;
@@ -112,7 +117,9 @@ export function parseSshConfig(raw: string): SshHost[] {
   }
   // flush last host
   flush();
-  for (const h of hosts) { delete (h as any).__names; }
+  for (const h of hosts) {
+    delete (h as any).__names;
+  }
   return hosts;
 }
 
@@ -136,7 +143,7 @@ export function generateSshConfig(hosts: SshHost[]): string {
     const ordered = ["hostname", "user", "port"];
     const written = new Set<string>();
     for (const lk of ordered) {
-      const origKey = Object.keys(h).find(k => k !== "name" && k.toLowerCase() === lk);
+      const origKey = Object.keys(h).find((k) => k !== "name" && k.toLowerCase() === lk);
       if (origKey) {
         emit(origKey, h[origKey]);
         written.add(origKey);
@@ -152,7 +159,7 @@ export function generateSshConfig(hosts: SshHost[]): string {
     lines.push(section);
     lines.push("");
   }
-  return lines.join("\n") + "\n";
+  return `${lines.join("\n")}\n`;
 }
 
 /** Read the raw SSH config file and parse it. Returns the parsed hosts. */

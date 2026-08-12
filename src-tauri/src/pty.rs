@@ -1,9 +1,9 @@
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
 use tauri::{Emitter, Manager};
 
 use crate::cmdparse::parse_command;
@@ -51,7 +51,11 @@ fn spawn_pty_child(
     let nonce = SESSION_NONCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     sessions.lock().map_err(|e| e.to_string())?.insert(
         id.to_string(),
-        PtySession { master: Some(master), nonce, size },
+        PtySession {
+            master: Some(master),
+            nonce,
+            size,
+        },
     );
 
     // Watchdog: when the child exits, drop the master from the session table.
@@ -91,7 +95,12 @@ fn spawn_pty_child(
 // Reconnect hooks for PTY/SSH sessions: the relay calls `respawn` when the
 // user presses Enter at the in-band disconnect prompt. Runs on a blocking
 // relay thread.
-fn pty_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec, auto_retry: Arc<std::sync::atomic::AtomicBool>) -> ReconnectHooks {
+fn pty_hooks(
+    app: tauri::AppHandle,
+    id: String,
+    spec: SpawnSpec,
+    auto_retry: Arc<std::sync::atomic::AtomicBool>,
+) -> ReconnectHooks {
     let state = app.state::<AppState>();
     let sessions = state.sessions.clone();
     let initial_cwd = state.initial_cwd.clone();
@@ -114,7 +123,13 @@ fn pty_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec, auto_retry: Arc
         on_state: {
             let id = id.clone();
             Box::new(move |alive| {
-                let _ = app.emit("session-state", SessionState { id: id.clone(), alive });
+                let _ = app.emit(
+                    "session-state",
+                    SessionState {
+                        id: id.clone(),
+                        alive,
+                    },
+                );
             })
         },
         respawn: Box::new(move || {
@@ -124,7 +139,11 @@ fn pty_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec, auto_retry: Arc
                 SpawnSpec::Pty { command, cwd } => {
                     command_builder(command.as_deref(), cwd.as_ref().or(initial_cwd.as_ref()))
                 }
-                SpawnSpec::Ssh { hostname, port, user } => {
+                SpawnSpec::Ssh {
+                    hostname,
+                    port,
+                    user,
+                } => {
                     let mut cmd = CommandBuilder::new("ssh");
                     cmd.arg(format!("{}@{}", user, hostname));
                     cmd.arg("-p");
@@ -149,7 +168,12 @@ fn pty_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec, auto_retry: Arc
     }
 }
 
-pub(crate) fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBuilder, spec: SpawnSpec) -> Result<(), String> {
+pub(crate) fn spawn_pty(
+    app_handle: tauri::AppHandle,
+    id: String,
+    cmd: CommandBuilder,
+    spec: SpawnSpec,
+) -> Result<(), String> {
     let state = app_handle.state::<AppState>();
     let sessions = state.sessions.clone();
     let auto = state.register_auto_reconnect(&id);
@@ -157,11 +181,22 @@ pub(crate) fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBu
         &sessions,
         &id,
         cmd,
-        PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 },
+        PtySize {
+            rows: 24,
+            cols: 80,
+            pixel_width: 0,
+            pixel_height: 0,
+        },
         &app_handle,
     )?;
     let hub = app_handle.state::<AppState>().hub.clone();
-    register_session(&hub, &id, reader, writer, Some(pty_hooks(app_handle, id.clone(), spec, auto)))?;
+    register_session(
+        &hub,
+        &id,
+        reader,
+        writer,
+        Some(pty_hooks(app_handle, id.clone(), spec, auto)),
+    )?;
     Ok(())
 }
 
@@ -176,7 +211,10 @@ pub(crate) fn apply_initial_cwd(cmd: &mut CommandBuilder, cwd: Option<&PathBuf>)
 
 // Build a CommandBuilder for a local session: explicit command (with args),
 // or the default shell when command is None/empty.
-pub(crate) fn command_builder(command: Option<&str>, initial_cwd: Option<&PathBuf>) -> CommandBuilder {
+pub(crate) fn command_builder(
+    command: Option<&str>,
+    initial_cwd: Option<&PathBuf>,
+) -> CommandBuilder {
     let mut builder = match command {
         Some(cmd) if !cmd.is_empty() => {
             let (exe, args) = parse_command(cmd);
@@ -193,7 +231,12 @@ pub(crate) fn command_builder(command: Option<&str>, initial_cwd: Option<&PathBu
 }
 
 #[tauri::command]
-pub fn pty_spawn(state: tauri::State<AppState>, app: tauri::AppHandle, command: Option<String>, cwd: Option<String>) -> Result<WsConnectResult, String> {
+pub fn pty_spawn(
+    state: tauri::State<AppState>,
+    app: tauri::AppHandle,
+    command: Option<String>,
+    cwd: Option<String>,
+) -> Result<WsConnectResult, String> {
     let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
     let id = format!("tab-{}", *next);
     *next += 1;
@@ -205,7 +248,10 @@ pub fn pty_spawn(state: tauri::State<AppState>, app: tauri::AppHandle, command: 
         .map(PathBuf::from)
         .filter(|p| p.is_dir())
         .or_else(|| state.initial_cwd.clone());
-    let spec = SpawnSpec::Pty { command: command.clone(), cwd: cwd.clone() };
+    let spec = SpawnSpec::Pty {
+        command: command.clone(),
+        cwd: cwd.clone(),
+    };
     let builder = command_builder(command.as_deref(), cwd.as_ref());
     spawn_pty(app.clone(), id.clone(), builder, spec)?;
 
@@ -216,7 +262,9 @@ pub(crate) fn launch_working_directory() -> Option<PathBuf> {
     parse_working_dir(std::env::args_os().skip(1))
 }
 
-pub(crate) fn parse_working_dir<I: Iterator<Item = std::ffi::OsString>>(mut args: I) -> Option<PathBuf> {
+pub(crate) fn parse_working_dir<I: Iterator<Item = std::ffi::OsString>>(
+    mut args: I,
+) -> Option<PathBuf> {
     while let Some(arg) = args.next() {
         if arg == "--working-directory" {
             return args.next().map(PathBuf::from).filter(|path| path.is_dir());
@@ -225,7 +273,13 @@ pub(crate) fn parse_working_dir<I: Iterator<Item = std::ffi::OsString>>(mut args
     None
 }
 #[tauri::command]
-pub fn pty_spawn_ssh(state: tauri::State<AppState>, app: tauri::AppHandle, hostname: String, port: u16, user: String) -> Result<WsConnectResult, String> {
+pub fn pty_spawn_ssh(
+    state: tauri::State<AppState>,
+    app: tauri::AppHandle,
+    hostname: String,
+    port: u16,
+    user: String,
+) -> Result<WsConnectResult, String> {
     let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
     let id = format!("tab-{}", *next);
     *next += 1;
@@ -238,17 +292,31 @@ pub fn pty_spawn_ssh(state: tauri::State<AppState>, app: tauri::AppHandle, hostn
     cmd.arg("-p");
     cmd.arg(&port_str);
 
-    let spec = SpawnSpec::Ssh { hostname, port, user };
+    let spec = SpawnSpec::Ssh {
+        hostname,
+        port,
+        user,
+    };
     spawn_pty(app, id.clone(), cmd, spec)?;
     Ok(state.ws_result(id))
 }
 
 #[tauri::command]
-pub fn pty_resize(state: tauri::State<AppState>, id: &str, cols: u16, rows: u16) -> Result<(), String> {
+pub fn pty_resize(
+    state: tauri::State<AppState>,
+    id: &str,
+    cols: u16,
+    rows: u16,
+) -> Result<(), String> {
     resize_session(&state, id, cols, rows)
 }
 
-pub(crate) fn resize_session(state: &AppState, id: &str, cols: u16, rows: u16) -> Result<(), String> {
+pub(crate) fn resize_session(
+    state: &AppState,
+    id: &str,
+    cols: u16,
+    rows: u16,
+) -> Result<(), String> {
     let mut sessions = state.sessions.lock().map_err(|e| e.to_string())?;
     if let Some(session) = sessions.get_mut(id) {
         let size = PtySize {
@@ -328,10 +396,17 @@ mod tests {
         let (ctl_tx, ctl_rx) = std::sync::mpsc::channel::<crate::state::SerialCtl>();
         state.serial_sessions.lock().unwrap().insert(
             "tab-9".to_string(),
-            crate::state::SerialSession { cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)), ctl: ctl_tx, spec: None, auto_hold_restore: false },
+            crate::state::SerialSession {
+                cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                ctl: ctl_tx,
+                spec: None,
+                auto_hold_restore: false,
+            },
         );
         resize_session(&state, "tab-9", 177, 52).unwrap();
-        let msg = ctl_rx.recv_timeout(std::time::Duration::from_secs(2)).expect("SetSize not forwarded");
+        let msg = ctl_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("SetSize not forwarded");
         assert!(matches!(msg, crate::state::SerialCtl::SetSize(177, 52)));
         // unknown id: no panic, no message
         resize_session(&state, "nope", 80, 24).unwrap();
@@ -378,6 +453,4 @@ mod tests {
     fn get_shell_is_cmd_on_windows() {
         assert_eq!(get_shell(), "cmd.exe");
     }
-
 }
-

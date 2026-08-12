@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { invokeMock } = vi.hoisted(() => ({
   invokeMock: vi.fn((cmd: string) => {
@@ -11,9 +11,9 @@ const { invokeMock } = vi.hoisted(() => ({
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 vi.mock("@tauri-apps/api/app", () => ({ getVersion: () => Promise.resolve("0.2.0") }));
 
+import { configStore } from "../src/core/store";
 import { createSettingsContent } from "../src/settings/index";
 import { BUILTIN_THEMES } from "../src/util/themes";
-import { configStore } from "../src/core/store";
 
 describe("settings — theme gallery", () => {
   beforeEach(() => {
@@ -31,8 +31,7 @@ describe("settings — theme gallery", () => {
     // preview uses the real terminal font stack, not generic monospace
     // (happy-dom normalizes quote styles, so compare quote-insensitively)
     const fontFamily = configStore.get("fontFamily");
-    expect(preview.style.fontFamily.replace(/["']/g, ""))
-      .toBe(fontFamily.replace(/["']/g, ""));
+    expect(preview.style.fontFamily.replace(/["']/g, "")).toBe(fontFamily.replace(/["']/g, ""));
     expect(first.querySelectorAll(".theme-card-swatch")).toHaveLength(16);
   });
 
@@ -45,24 +44,29 @@ describe("settings — theme gallery", () => {
 
   it("clicking a card updates selection and pending themeName", () => {
     const root = createSettingsContent();
-    const target = [...root.querySelectorAll<HTMLElement>(".theme-card")]
-      .find(c => c.dataset.theme === "Dracula")!;
+    const target = [...root.querySelectorAll<HTMLElement>(".theme-card")].find(
+      (c) => c.dataset.theme === "Dracula",
+    )!;
     target.click();
     expect(root.dataset.themeName).toBe("Dracula");
     expect(root.querySelectorAll(".theme-card.selected")).toHaveLength(1);
-    expect((root.querySelector(".theme-card.selected") as HTMLElement).dataset.theme).toBe("Dracula");
+    expect((root.querySelector(".theme-card.selected") as HTMLElement).dataset.theme).toBe(
+      "Dracula",
+    );
   });
 
   it("apply persists the clicked theme via themeName", async () => {
     const root = createSettingsContent();
     document.body.appendChild(root);
     [...root.querySelectorAll<HTMLElement>(".theme-card")]
-      .find(c => c.dataset.theme === "Nord")!.click();
-    const applyBtn = [...root.querySelectorAll<HTMLButtonElement>(".settings-btn")]
-      .find(b => b.textContent === "Apply")!;
+      .find((c) => c.dataset.theme === "Nord")!
+      .click();
+    const applyBtn = [...root.querySelectorAll<HTMLButtonElement>(".settings-btn")].find(
+      (b) => b.textContent === "Apply",
+    )!;
     applyBtn.click();
     await vi.waitFor(() => {
-      const write = invokeMock.mock.calls.find(c => c[0] === "write_config");
+      const write = invokeMock.mock.calls.find((c) => c[0] === "write_config");
       expect(write).toBeTruthy();
       expect(JSON.parse((write![1] as any).content).themeName).toBe("Nord");
     });

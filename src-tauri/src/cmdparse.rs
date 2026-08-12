@@ -5,12 +5,18 @@ pub(crate) fn expand_env_str(s: &str) -> String {
         if c == '%' {
             let mut var = String::new();
             for next in chars.by_ref() {
-                if next == '%' { break; }
+                if next == '%' {
+                    break;
+                }
                 var.push(next);
             }
             match std::env::var(&var) {
                 Ok(v) => out.push_str(&v),
-                Err(_) => { out.push('%'); out.push_str(&var); out.push('%'); }
+                Err(_) => {
+                    out.push('%');
+                    out.push_str(&var);
+                    out.push('%');
+                }
             }
         } else {
             out.push(c);
@@ -27,14 +33,21 @@ pub(crate) fn parse_command(cmd_str: &str) -> (String, Vec<String>) {
         match c {
             '"' => in_quote = !in_quote,
             ' ' if !in_quote => {
-                if !cur.is_empty() { tokens.push(cur.clone()); cur.clear(); }
+                if !cur.is_empty() {
+                    tokens.push(cur.clone());
+                    cur.clear();
+                }
             }
             _ => cur.push(c),
         }
     }
-    if !cur.is_empty() { tokens.push(cur); }
+    if !cur.is_empty() {
+        tokens.push(cur);
+    }
 
-    if tokens.is_empty() { return (cmd_str.to_string(), Vec::new()); }
+    if tokens.is_empty() {
+        return (cmd_str.to_string(), Vec::new());
+    }
 
     let expanded: Vec<String> = tokens.into_iter().map(|t| expand_env_str(&t)).collect();
     let mut i = expanded.into_iter();
@@ -58,7 +71,8 @@ mod tests {
 
     #[test]
     fn parse_command_quoted_path_with_spaces() {
-        let (exe, args) = parse_command("\"C:\\Program Files\\app\\tool.exe\" -k \"arg with spaces\"");
+        let (exe, args) =
+            parse_command("\"C:\\Program Files\\app\\tool.exe\" -k \"arg with spaces\"");
         assert_eq!(exe, "C:\\Program Files\\app\\tool.exe");
         assert_eq!(args, vec!["-k", "arg with spaces"]);
     }
@@ -109,19 +123,24 @@ mod tests {
 
     #[test]
     fn expand_env_missing_var_kept_verbatim() {
-        assert_eq!(expand_env_str("%TTERM_DEFINITELY_MISSING_VAR%"), "%TTERM_DEFINITELY_MISSING_VAR%");
+        assert_eq!(
+            expand_env_str("%TTERM_DEFINITELY_MISSING_VAR%"),
+            "%TTERM_DEFINITELY_MISSING_VAR%"
+        );
     }
 
     #[test]
     fn expand_env_multiple_vars_and_literal_text() {
         std::env::set_var("TTERM_TEST_A", "foo");
         std::env::set_var("TTERM_TEST_B", "bar");
-        assert_eq!(expand_env_str("pre-%TTERM_TEST_A%-mid-%TTERM_TEST_B%-post"), "pre-foo-mid-bar-post");
+        assert_eq!(
+            expand_env_str("pre-%TTERM_TEST_A%-mid-%TTERM_TEST_B%-post"),
+            "pre-foo-mid-bar-post"
+        );
     }
 
     #[test]
     fn expand_env_no_percent_passthrough() {
         assert_eq!(expand_env_str("plain text"), "plain text");
     }
-
 }

@@ -1,20 +1,27 @@
 import { invoke } from "@tauri-apps/api/core";
-import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
-import { createElement, FolderOpen } from "lucide";
-import type { SshHost, SerialPort, SerialInputMode, SerialOutputNewline, SerialEnterNewline, WsConnectResult } from "../core/types";
-import { hostProp } from "../core/common";
-import { configStore } from "../core/store";
-import { logCatch } from "../core/errorlog";
-import { findSerialProfile } from "../config/serial-profiles";
-import { addForward, type NewForward } from "./forwarding";
-import { showToast } from "../ui/toast";
-import { TerminalTab } from "./tab";
-import { updateQuickButton, closeQuickPanel, closeQuickPanelForTab } from "./quickpanel";
-import { closeFindForTab } from "./search";
-import { notifyTrayTabs, setTrayTabsProvider } from "../core/traytabs";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
+import { createElement, FolderOpen } from "lucide";
 import Sortable from "sortablejs";
+import { findSerialProfile } from "../config/serial-profiles";
+import { hostProp } from "../core/common";
+import { logCatch } from "../core/errorlog";
+import { configStore } from "../core/store";
+import { notifyTrayTabs, setTrayTabsProvider } from "../core/traytabs";
+import type {
+  SerialEnterNewline,
+  SerialInputMode,
+  SerialOutputNewline,
+  SerialPort,
+  SshHost,
+  WsConnectResult,
+} from "../core/types";
+import { showToast } from "../ui/toast";
+import { addForward, type NewForward } from "./forwarding";
+import { closeQuickPanel, closeQuickPanelForTab, updateQuickButton } from "./quickpanel";
+import { closeFindForTab } from "./search";
+import { TerminalTab } from "./tab";
 
 /// Toggle the strip's layout-state classes from live metrics:
 /// `overflowing` (strip scrolls → +/dropdown pin), `can-scroll-left`
@@ -23,10 +30,7 @@ import Sortable from "sortablejs";
 export function syncTabStripState(el: HTMLElement): void {
   el.classList.toggle("overflowing", el.scrollWidth > el.clientWidth + 1);
   el.classList.toggle("can-scroll-left", el.scrollLeft > 1);
-  el.classList.toggle(
-    "can-scroll-right",
-    el.scrollWidth - el.clientWidth - el.scrollLeft > 1,
-  );
+  el.classList.toggle("can-scroll-right", el.scrollWidth - el.clientWidth - el.scrollLeft > 1);
 }
 
 export class TabManager {
@@ -48,11 +52,7 @@ export class TabManager {
 
   private _resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(
-    tabsContainer: HTMLElement,
-    terminalContainer: HTMLElement,
-    welcomeEl: HTMLElement,
-  ) {
+  constructor(tabsContainer: HTMLElement, terminalContainer: HTMLElement, welcomeEl: HTMLElement) {
     this.tabsContainer = tabsContainer;
     this.terminalContainer = terminalContainer;
     this._welcomeEl = welcomeEl;
@@ -85,8 +85,10 @@ export class TabManager {
       getCurrentWindow().onFocusChanged((f) => {
         if (!f.payload) return;
         invoke<number | null>("tray_take_pending_tab")
-          .then((idx) => { if (typeof idx === "number") this.activateTabAt(idx); })
-          .catch(() => { });
+          .then((idx) => {
+            if (typeof idx === "number") this.activateTabAt(idx);
+          })
+          .catch(() => {});
       });
     }
   }
@@ -98,11 +100,13 @@ export class TabManager {
   initSortable(): void {
     // Edge shadows track scrolling itself, not just structural changes
     // (add/close/resize already funnel through _syncTabsOverflow).
-    this.tabsContainer.addEventListener("scroll", () => this._syncTabsOverflow(), { passive: true });
+    this.tabsContainer.addEventListener("scroll", () => this._syncTabsOverflow(), {
+      passive: true,
+    });
     new Sortable(this.tabsContainer, {
       animation: 150,
       direction: "horizontal",
-      draggable: ".tab[data-tab-id^=\"tab-\"]",
+      draggable: '.tab[data-tab-id^="tab-"]',
       filter: ".tab-close",
       preventOnFilter: false,
       forceFallback: true,
@@ -153,7 +157,7 @@ export class TabManager {
     el.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      import("./contextmenu").then(m => m.showTabContextMenu(tab.id, e.clientX, e.clientY));
+      import("./contextmenu").then((m) => m.showTabContextMenu(tab.id, e.clientX, e.clientY));
     });
 
     tab.tabElement = el;
@@ -163,7 +167,9 @@ export class TabManager {
   // Rebuild the tabs Map in DOM order after a drag reorder.
   private _syncTabOrderFromDom(): void {
     const ordered = new Map<string, TerminalTab>();
-    for (const el of this.tabsContainer.querySelectorAll<HTMLElement>(".tab[data-tab-id^=\"tab-\"]")) {
+    for (const el of this.tabsContainer.querySelectorAll<HTMLElement>(
+      '.tab[data-tab-id^="tab-"]',
+    )) {
       const tab = this.tabs.get(el.dataset.tabId!);
       if (tab) ordered.set(tab.id, tab);
     }
@@ -195,12 +201,17 @@ export class TabManager {
   // back to the first known profile. Returns null when no profiles are
   // loaded (backend get_shell() fallback kicks in).
   defaultLocalProfile(): { command: string; name: string } | null {
-    const defName = configStore.get("defaultLocalProfile") ?? configStore.get("localProfiles")[0]?.name ?? null;
-    const p = defName ? configStore.get("localProfiles").find(x => x.name === defName) : null;
+    const defName =
+      configStore.get("defaultLocalProfile") ?? configStore.get("localProfiles")[0]?.name ?? null;
+    const p = defName ? configStore.get("localProfiles").find((x) => x.name === defName) : null;
     return p ? { command: p.command, name: p.name } : null;
   }
 
-  async createLocalTab(command?: string, label?: string, cwd?: string): Promise<TerminalTab | null> {
+  async createLocalTab(
+    command?: string,
+    label?: string,
+    cwd?: string,
+  ): Promise<TerminalTab | null> {
     let result: WsConnectResult;
     try {
       result = await invoke("pty_spawn", {
@@ -212,7 +223,9 @@ export class TabManager {
       return null;
     }
     const tab = new TerminalTab(result.id, "local", label || "Terminal", this.terminalContainer);
-    if (command) { tab.command = command; }
+    if (command) {
+      tab.command = command;
+    }
     return this._finalizeTab(tab, result);
   }
 
@@ -301,8 +314,9 @@ export class TabManager {
       }
     }
     // Sequential: listener binds stay ordered and errors don't interleave.
-    (async () => { for (const s of specs) await addForward(tabId, s); })()
-      .catch(logCatch("ssh.configForwards"));
+    (async () => {
+      for (const s of specs) await addForward(tabId, s);
+    })().catch(logCatch("ssh.configForwards"));
   }
 
   async createSerialTab(port: SerialPort): Promise<TerminalTab | null> {
@@ -324,7 +338,12 @@ export class TabManager {
       showToast(String(e), "error");
       return null;
     }
-    const tab = new TerminalTab(result.id, "serial", `${port.name} · ${baud}`, this.terminalContainer);
+    const tab = new TerminalTab(
+      result.id,
+      "serial",
+      `${port.name} · ${baud}`,
+      this.terminalContainer,
+    );
     tab.serialPortName = port.name;
     tab.serialBaud = baud;
     tab.serialProfile = profile.name;
@@ -340,7 +359,7 @@ export class TabManager {
   // The choice becomes the global default for the next tab.
   async setSerialProfile(tabId: string, name: string): Promise<void> {
     const tab = this.tabs.get(tabId);
-    if (!tab || tab.type !== "serial") return;
+    if (tab?.type !== "serial") return;
     const profile = findSerialProfile(name);
     tab.setSerialInputMode(profile.inputMode);
     tab.setSerialEnterNewline(profile.enterNewline);
@@ -355,21 +374,21 @@ export class TabManager {
   // Live Enter-key newline switch (frontend-side, this session only).
   async setSerialEnterNewline(tabId: string, mode: SerialEnterNewline): Promise<void> {
     const tab = this.tabs.get(tabId);
-    if (!tab || tab.type !== "serial") return;
+    if (tab?.type !== "serial") return;
     tab.setSerialEnterNewline(mode);
   }
 
   // Live input-mode switch for an open serial session (this session only).
   setSerialInputMode(tabId: string, mode: SerialInputMode): void {
     const tab = this.tabs.get(tabId);
-    if (!tab || tab.type !== "serial") return;
+    if (tab?.type !== "serial") return;
     tab.setSerialInputMode(mode);
   }
 
   // Live output-newline switch for an open serial session (this session only).
   async setSerialOutputNewline(tabId: string, mode: SerialOutputNewline): Promise<void> {
     const tab = this.tabs.get(tabId);
-    if (!tab || tab.type !== "serial") return;
+    if (tab?.type !== "serial") return;
     await invoke("serial_set_output_newline", { id: tabId, mode });
     tab.outputNewline = mode;
   }
@@ -377,7 +396,7 @@ export class TabManager {
   // Live baud switch for an open serial session (this session only).
   async setSerialBaud(tabId: string, baud: number): Promise<void> {
     const tab = this.tabs.get(tabId);
-    if (!tab || tab.type !== "serial" || !tab.serialPortName) return;
+    if (tab?.type !== "serial" || !tab.serialPortName) return;
     await invoke("serial_set_baud", { id: tabId, baudRate: baud });
     tab.serialBaud = baud;
     // Baud display update, not a user rename — keep OSC title tracking live.
@@ -454,7 +473,7 @@ export class TabManager {
     if (prev) prev.hide();
     next.show();
     this.activeTabId = id;
-    this._mru = [id, ...this._mru.filter(x => x !== id)];
+    this._mru = [id, ...this._mru.filter((x) => x !== id)];
     // The quick panel tracks the active tab; switching closes it.
     closeQuickPanel();
     updateQuickButton();
@@ -479,43 +498,43 @@ export class TabManager {
     if (!tab || this._closing.has(id)) return;
     this._closing.add(id);
     try {
-      if (tab.shared) invoke("share_revoke", { id }).catch(() => { });
+      if (tab.shared) invoke("share_revoke", { id }).catch(() => {});
       // UI close must not depend on the backend ack.
-      await invoke("pty_kill", { id }).catch(() => { });
+      await invoke("pty_kill", { id }).catch(() => {});
 
       // Panels bound to the dying tab must not outlive it.
       closeQuickPanelForTab(id);
       closeFindForTab(id);
 
-    // Find the next live tab to the right. Non-tab elements share the #tabs
-    // container (the new-tab group is the last flex item), and the settings
-    // tab is skipped too — anything without a live tab id must not count,
-    // or closing the rightmost tab silently strands the window blank.
-    let nextEl: Element | null = tab.tabElement.nextElementSibling;
-    while (nextEl && !this.tabs.has((nextEl as HTMLElement).dataset.tabId ?? "")) {
-      nextEl = nextEl.nextElementSibling;
-    }
-
-    const remaining = Array.from(this.tabs.keys()).filter(k => k !== id);
-    const wasActive = this.activeTabId === id;
-
-    tab.destroy();
-    this.tabs.delete(id);
-    this._mru = this._mru.filter(x => x !== id);
-
-    if (wasActive) {
-      if (nextEl) {
-        this.switchTo((nextEl as HTMLElement).dataset.tabId!);
-      } else if (remaining.length > 0) {
-        this.switchTo(remaining[remaining.length - 1]);
-      } else {
-        this.activeTabId = null;
-        this._showWelcome();
+      // Find the next live tab to the right. Non-tab elements share the #tabs
+      // container (the new-tab group is the last flex item), and the settings
+      // tab is skipped too — anything without a live tab id must not count,
+      // or closing the rightmost tab silently strands the window blank.
+      let nextEl: Element | null = tab.tabElement.nextElementSibling;
+      while (nextEl && !this.tabs.has((nextEl as HTMLElement).dataset.tabId ?? "")) {
+        nextEl = nextEl.nextElementSibling;
       }
-    }
-    this.refreshBadges();
-    updateQuickButton();
-    notifyTrayTabs();
+
+      const remaining = Array.from(this.tabs.keys()).filter((k) => k !== id);
+      const wasActive = this.activeTabId === id;
+
+      tab.destroy();
+      this.tabs.delete(id);
+      this._mru = this._mru.filter((x) => x !== id);
+
+      if (wasActive) {
+        if (nextEl) {
+          this.switchTo((nextEl as HTMLElement).dataset.tabId!);
+        } else if (remaining.length > 0) {
+          this.switchTo(remaining[remaining.length - 1]);
+        } else {
+          this.activeTabId = null;
+          this._showWelcome();
+        }
+      }
+      this.refreshBadges();
+      updateQuickButton();
+      notifyTrayTabs();
     } finally {
       this._closing.delete(id);
     }
@@ -538,14 +557,14 @@ export class TabManager {
 
   // MRU-ordered live tab ids (front = most recently active) for the Ctrl+Tab switcher.
   mruTabIds(): string[] {
-    return this._mru.filter(id => this.tabs.has(id));
+    return this._mru.filter((id) => this.tabs.has(id));
   }
 
   getTabIndex(id: string): number {
     const tab = this.tabs.get(id);
     if (!tab?.tabElement.parentElement) return -1;
     return Array.from(tab.tabElement.parentElement.children)
-      .filter(el => (el as HTMLElement).dataset.tabId !== "#settings")
+      .filter((el) => (el as HTMLElement).dataset.tabId !== "#settings")
       .indexOf(tab.tabElement);
   }
 
@@ -588,7 +607,7 @@ export class TabManager {
 
     // Editing must not trigger tab switching or SortableJS drag.
     for (const ev of ["click", "dblclick", "mousedown", "pointerdown"]) {
-      input.addEventListener(ev, e => e.stopPropagation());
+      input.addEventListener(ev, (e) => e.stopPropagation());
     }
 
     let done = false;
@@ -605,8 +624,13 @@ export class TabManager {
       }
     };
     input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") { e.preventDefault(); finish(true); }
-      else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        finish(true);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        finish(false);
+      }
       e.stopPropagation();
     });
     input.addEventListener("blur", () => finish(true));
@@ -678,12 +702,12 @@ export class TabManager {
   closeTabsRight(id: string): void {
     const idx = this.getTabIndex(id);
     if (idx === -1) return;
-    const ids = Array.from(this.tabs.keys()).filter(tid => this.getTabIndex(tid) > idx);
+    const ids = Array.from(this.tabs.keys()).filter((tid) => this.getTabIndex(tid) > idx);
     for (const tid of ids) this.closeTab(tid);
   }
 
   closeOtherTabs(id: string): void {
-    const ids = Array.from(this.tabs.keys()).filter(tid => tid !== id);
+    const ids = Array.from(this.tabs.keys()).filter((tid) => tid !== id);
     for (const tid of ids) this.closeTab(tid);
   }
 
@@ -841,7 +865,7 @@ export class TabManager {
 
     btn.addEventListener("click", (e) => {
       if (e.shiftKey) {
-        import("./dirmenu").then(m => m.pickAndLaunchDirectory());
+        import("./dirmenu").then((m) => m.pickAndLaunchDirectory());
         return;
       }
       const p = this.defaultLocalProfile();
@@ -851,14 +875,18 @@ export class TabManager {
     btn.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      import("./dirmenu").then(m => m.showDirectoryMenu(btn));
+      import("./dirmenu").then((m) => m.showDirectoryMenu(btn));
     });
   }
 
   // -- helpers ---
 
-  private _hideWelcome(): void { this._welcomeEl.style.display = "none"; }
-  private _showWelcome(): void { this._welcomeEl.style.display = "flex"; }
+  private _hideWelcome(): void {
+    this._welcomeEl.style.display = "none";
+  }
+  private _showWelcome(): void {
+    this._welcomeEl.style.display = "flex";
+  }
 }
 
 // -- singleton ---
@@ -878,5 +906,3 @@ export function initTabManager(
   }));
   return tabManager;
 }
-
-

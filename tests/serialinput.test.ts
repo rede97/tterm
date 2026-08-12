@@ -1,10 +1,15 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createSerialInputHandler } from "../src/util/serialinput";
 
 function make(mode: "normal" | "echo" | "line", enter: "cr" | "lf" | "crlf" = "cr") {
   const sent: string[] = [];
   const echoed: string[] = [];
-  const handler = createSerialInputHandler(mode, enter, d => sent.push(d), d => echoed.push(d));
+  const handler = createSerialInputHandler(
+    mode,
+    enter,
+    (d) => sent.push(d),
+    (d) => echoed.push(d),
+  );
   return { sent, echoed, handler };
 }
 
@@ -26,8 +31,8 @@ describe("serial input modes", () => {
   it("line: buffers locally and sends whole line on Enter", () => {
     const { sent, echoed, handler } = make("line");
     handler("ati");
-    expect(sent.join("")).toBe("");          // nothing sent yet
-    expect(echoed.join("")).toBe("ati");     // local echo while editing
+    expect(sent.join("")).toBe(""); // nothing sent yet
+    expect(echoed.join("")).toBe("ati"); // local echo while editing
     handler("\r");
     expect(sent.join("")).toBe("ati\r");
     expect(echoed.join("")).toBe("ati\r\n");

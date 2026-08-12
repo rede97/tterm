@@ -1,8 +1,8 @@
 export interface FontDef {
-  family: string;       // CSS font-family name
-  label: string;        // display name
+  family: string; // CSS font-family name
+  label: string; // display name
   source: "builtin" | "nerdfont" | "system";
-  importPath?: string;  // Vite import path for builtin fonts
+  importPath?: string; // Vite import path for builtin fonts
 }
 
 // Built-in fonts from @fontsource (no ligatures where possible)
@@ -28,13 +28,19 @@ export function allBuiltinFonts(): FontDef[] {
 
 // Current font stack (ordered fallback list).
 // "monospace" is implicit — always appended as the final fallback, never stored or displayed.
-export let fontStack: string[] = ["JetBrains Mono", "Noto Sans SC", "Noto Sans JP", "Noto Sans KR", "Consolas"];
+export let fontStack: string[] = [
+  "JetBrains Mono",
+  "Noto Sans SC",
+  "Noto Sans JP",
+  "Noto Sans KR",
+  "Consolas",
+];
 
 // Build CSS font-family value from stack. Always appends "monospace" as final fallback.
 export function buildFontFamily(fonts: string[]): string {
-  const stack = fonts.filter(f => f.toLowerCase() !== "monospace");
+  const stack = fonts.filter((f) => f.toLowerCase() !== "monospace");
   stack.push("monospace");
-  return stack.map(f => f.includes(" ") ? `'${f}'` : f).join(", ");
+  return stack.map((f) => (f.includes(" ") ? `'${f}'` : f)).join(", ");
 }
 
 export function parseFontFamily(css: string): string[] {
@@ -57,12 +63,11 @@ export function parseFontFamily(css: string): string[] {
     }
   }
   parts.push(cur);
-  return parts.map(s => s.trim())
-    .filter(f => f && f.toLowerCase() !== "monospace");
+  return parts.map((s) => s.trim()).filter((f) => f && f.toLowerCase() !== "monospace");
 }
 
 export function updateFontStack(stack: string[]) {
-  fontStack = stack.filter(f => f.toLowerCase() !== "monospace");
+  fontStack = stack.filter((f) => f.toLowerCase() !== "monospace");
 }
 
 export function defaultFontStack(): string[] {
@@ -84,9 +89,9 @@ export function setSystemFonts(fonts: string[]) {
 
 export function systemFontDefs(): FontDef[] {
   const builtinFamilies = new Set(
-    [...BUILTIN_FONTS, ...NERDFONT_BUILTIN].map(f => f.family.toLowerCase())
+    [...BUILTIN_FONTS, ...NERDFONT_BUILTIN].map((f) => f.family.toLowerCase()),
   );
   return _systemFonts
-    .filter(name => !builtinFamilies.has(name.toLowerCase()))
-    .map(name => ({ family: name, label: name, source: "system" as const }));
+    .filter((name) => !builtinFamilies.has(name.toLowerCase()))
+    .map((name) => ({ family: name, label: name, source: "system" as const }));
 }

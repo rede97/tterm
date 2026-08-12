@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { createForwardEditor } from "../src/ui/forwardeditor";
 
 function parts(root: HTMLElement) {

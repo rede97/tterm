@@ -1,12 +1,20 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { syncTabStripState } from "../src/terminal/tabmanager";
 
 // jsdom has no layout: scroll metrics are stubbed per-element.
-function strip(metrics: { clientWidth: number; scrollWidth: number; scrollLeft: number }): HTMLElement {
+function strip(metrics: {
+  clientWidth: number;
+  scrollWidth: number;
+  scrollLeft: number;
+}): HTMLElement {
   const el = document.createElement("div");
   Object.defineProperty(el, "clientWidth", { value: metrics.clientWidth, configurable: true });
   Object.defineProperty(el, "scrollWidth", { value: metrics.scrollWidth, configurable: true });
-  Object.defineProperty(el, "scrollLeft", { value: metrics.scrollLeft, configurable: true, writable: true });
+  Object.defineProperty(el, "scrollLeft", {
+    value: metrics.scrollLeft,
+    configurable: true,
+    writable: true,
+  });
   return el;
 }
 

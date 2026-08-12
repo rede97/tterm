@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ImeBox, setImeDebugFlags } from "../src/util/imebox";
 
 function setup(width = 400, height = 300) {
@@ -83,7 +83,7 @@ describe("ImeBox", () => {
     box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }));
     composition(textarea, "compositionstart");
     composition(textarea, "compositionend", "a"); // hide timers pending
-    composition(textarea, "compositionstart");   // cancels them synchronously
+    composition(textarea, "compositionstart"); // cancels them synchronously
     expect(box.isVisible).toBe(true);
     expect(box.isFading).toBe(false);
     vi.advanceTimersByTime(1000); // stale timers must not hide it
@@ -92,7 +92,11 @@ describe("ImeBox", () => {
 
   it("does not show when shouldMirror returns false", () => {
     const { textarea, box } = setup();
-    box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }), () => false);
+    box.attach(
+      textarea,
+      () => ({ x: 10, y: 20, cellH: 16 }),
+      () => false,
+    );
     composition(textarea, "compositionstart");
     composition(textarea, "compositionupdate", "nihao");
     expect(box.isVisible).toBe(false);
@@ -102,7 +106,11 @@ describe("ImeBox", () => {
   it("shouldMirror is evaluated per composition (live gate)", () => {
     const { textarea, box } = setup();
     let allow = false;
-    box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }), () => allow);
+    box.attach(
+      textarea,
+      () => ({ x: 10, y: 20, cellH: 16 }),
+      () => allow,
+    );
     composition(textarea, "compositionstart");
     expect(box.isVisible).toBe(false);
     allow = true;

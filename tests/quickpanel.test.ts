@@ -1,15 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
-vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({ writeText: vi.fn(() => Promise.resolve()) }));
+vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
+  writeText: vi.fn(() => Promise.resolve()),
+}));
 
 import {
+  closeQuickPanel,
   initQuickPanel,
+  type QuickPanelHandlers,
   setQuickPanelHandlers,
   updateQuickButton,
-  closeQuickPanel,
-  type QuickPanelHandlers,
 } from "../src/terminal/quickpanel";
 import type { TerminalTab } from "../src/terminal/tab";
 
@@ -55,14 +57,18 @@ function openPanel(): HTMLElement {
 }
 
 function switchOf(row: Element | null): HTMLElement {
-  return row?.querySelector<HTMLElement>(".qp-switch")!;
+  if (!row) throw new Error("switch row missing");
+  const sw = row.querySelector<HTMLElement>(".qp-switch");
+  if (!sw) throw new Error(".qp-switch missing in row");
+  return sw;
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   invokeMock.mockImplementation((cmd: string) => {
     if (cmd === "session_get_auto_reconnect") return Promise.resolve(false);
-    if (cmd === "serial_line_status") return Promise.resolve({ rts: true, cts: true, dtr: true, dsr: true, supported: true });
+    if (cmd === "serial_line_status")
+      return Promise.resolve({ rts: true, cts: true, dtr: true, dsr: true, supported: true });
     if (cmd === "ssh_forward_list") return Promise.resolve([]);
     return Promise.resolve(null);
   });
@@ -131,14 +137,21 @@ describe("quick panel — local tab", () => {
 
 describe("quick panel — serial tab", () => {
   beforeEach(() => {
-    activeTab = fakeTab({ id: "tab-7", type: "serial", serialBaud: 115200, outputNewline: "keep", serialProfile: "Normal" });
+    activeTab = fakeTab({
+      id: "tab-7",
+      type: "serial",
+      serialBaud: 115200,
+      outputNewline: "keep",
+      serialProfile: "Normal",
+    });
   });
 
   // Rows are matched by their label span (select option text like
   // "Hardware (RTS/CTS)" would collide with a plain textContent search).
   function rowOf(sec: Element, label: string): HTMLElement | undefined {
-    return [...sec.querySelectorAll<HTMLElement>(".qp-row")]
-      .find((r) => r.querySelector(".qp-label")?.textContent === label);
+    return [...sec.querySelectorAll<HTMLElement>(".qp-row")].find(
+      (r) => r.querySelector(".qp-label")?.textContent === label,
+    );
   }
 
   it("shows the profile select with built-in profiles first", () => {
@@ -152,7 +165,11 @@ describe("quick panel — serial tab", () => {
     const sel = profileRow.querySelector("select")!;
     expect(sel.value).toBe("Normal");
     const builtin = sel.querySelector('optgroup[label="Built-in"]')!;
-    expect([...builtin.querySelectorAll("option")].map((o) => o.value)).toEqual(["Normal", "Log", "AT"]);
+    expect([...builtin.querySelectorAll("option")].map((o) => o.value)).toEqual([
+      "Normal",
+      "Log",
+      "AT",
+    ]);
     expect(rowOf(sec, "Baud rate")).toBeDefined();
     expect(rowOf(sec, "Auto-reconnect")).toBeDefined();
     expect(rowOf(sec, "Input mode")).toBeDefined();
@@ -226,7 +243,10 @@ describe("quick panel — serial tab", () => {
     expect(rowOf(sec, "RTS")).toBeUndefined();
     expect(rowOf(sec, "DTR")).toBeUndefined();
     switchOf(rowOf(sec, "Auto-reconnect")!).click();
-    expect(invokeMock).toHaveBeenCalledWith("session_set_auto_reconnect", { id: "tab-7", enabled: true });
+    expect(invokeMock).toHaveBeenCalledWith("session_set_auto_reconnect", {
+      id: "tab-7",
+      enabled: true,
+    });
   });
 
   it("flow control select calls serial_set_flow_control and reveals RTS/DTR/CTS/DSR rows", async () => {
@@ -237,7 +257,10 @@ describe("quick panel — serial tab", () => {
     expect(flowSel.disabled).toBe(false);
     flowSel.value = "hardware";
     flowSel.dispatchEvent(new Event("change"));
-    expect(invokeMock).toHaveBeenCalledWith("serial_set_flow_control", { id: "tab-7", flow: "hardware" });
+    expect(invokeMock).toHaveBeenCalledWith("serial_set_flow_control", {
+      id: "tab-7",
+      flow: "hardware",
+    });
 
     await vi.waitFor(() => {
       expect(rowOf(sec, "CTS")!.querySelector(".qp-line-val")!.textContent).toBe("asserted");
@@ -253,11 +276,23 @@ describe("quick panel — serial tab", () => {
 
   it("greys out flow control when the port does not support modem lines", async () => {
     invokeMock.mockImplementation((cmd: string) => {
-      if (cmd === "serial_line_status") return Promise.resolve({ rts: false, cts: false, dtr: false, dsr: false, supported: false });
+      if (cmd === "serial_line_status")
+        return Promise.resolve({
+          rts: false,
+          cts: false,
+          dtr: false,
+          dsr: false,
+          supported: false,
+        });
       if (cmd === "session_get_auto_reconnect") return Promise.resolve(false);
       return Promise.resolve(null);
     });
-    activeTab = fakeTab({ id: "tab-7", type: "serial", serialProfile: "Normal", flowControl: "hardware" });
+    activeTab = fakeTab({
+      id: "tab-7",
+      type: "serial",
+      serialProfile: "Normal",
+      flowControl: "hardware",
+    });
     const p = openPanel();
     const sec = p.querySelector('[data-section="serial"]')!;
     const flowRow = rowOf(sec, "Flow control")!;
@@ -302,10 +337,12 @@ describe("quick panel — ssh tab", () => {
     await vi.waitFor(() => {
       expect(sec.querySelectorAll(".ft-group")).toHaveLength(3);
     });
-    const localAdd = sec.querySelectorAll<HTMLElement>(".ft-group")[0]
+    const localAdd = sec
+      .querySelectorAll<HTMLElement>(".ft-group")[0]
       .querySelector<HTMLElement>(".ft-add-row")!;
     localAdd.querySelector<HTMLInputElement>('input[aria-label="Listen port"]')!.value = "8080";
-    localAdd.querySelector<HTMLInputElement>('input[aria-label="Target host"]')!.value = "db.internal";
+    localAdd.querySelector<HTMLInputElement>('input[aria-label="Target host"]')!.value =
+      "db.internal";
     localAdd.querySelector<HTMLInputElement>('input[aria-label="Target port"]')!.value = "5432";
     localAdd.querySelector<HTMLButtonElement>(".ft-add")!.click();
     await vi.waitFor(() => {

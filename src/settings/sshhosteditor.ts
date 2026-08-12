@@ -10,17 +10,13 @@
 // ServerAliveInterval, …) untouched; only the keys this editor owns are
 // rewritten.
 
-import { configStore } from "../core/store";
 import { esc, hostProp } from "../core/common";
+import { configStore } from "../core/store";
 import type { SshHost } from "../core/types";
-import { showToast } from "../ui/toast";
-import { createModal } from "../ui/modal";
-import {
-  createForwardTable,
-  forwardConfigLine,
-  parseForwardLine,
-} from "../ui/forwardtable";
 import type { ForwardEditorValue } from "../ui/forwardeditor";
+import { createForwardTable, forwardConfigLine, parseForwardLine } from "../ui/forwardtable";
+import { createModal } from "../ui/modal";
+import { showToast } from "../ui/toast";
 
 export interface SshHostEditorOptions {
   // Edit mode when set (prefills fields, enables rename semantics).
@@ -30,9 +26,14 @@ export interface SshHostEditorOptions {
 
 // Keys this editor owns; everything else on the host passes through.
 const MANAGED: Record<string, true> = {
-  hostname: true, user: true, port: true,
-  forwardagent: true, forwardx11: true,
-  localforward: true, remoteforward: true, dynamicforward: true,
+  hostname: true,
+  user: true,
+  port: true,
+  forwardagent: true,
+  forwardx11: true,
+  localforward: true,
+  remoteforward: true,
+  dynamicforward: true,
 };
 
 const BOOL_OPTIONS: { key: string; label: string; desc: string }[] = [
@@ -70,16 +71,16 @@ export function showSshHostEditor(opts: SshHostEditorOptions): void {
                  value="${esc(base?.name ?? "")}" /></label>
         <label class="she-field"><span>HostName</span>
           <input class="settings-input she-hostname" type="text" spellcheck="false" placeholder="default: alias"
-                 value="${esc(base ? hostProp(base, "hostname") ?? "" : "")}" /></label>
+                 value="${esc(base ? (hostProp(base, "hostname") ?? "") : "")}" /></label>
         <label class="she-field"><span>User</span>
           <input class="settings-input she-user" type="text" spellcheck="false" placeholder="root"
-                 value="${esc(base ? hostProp(base, "user") ?? "" : "")}" /></label>
+                 value="${esc(base ? (hostProp(base, "user") ?? "") : "")}" /></label>
         <label class="she-field"><span>Port</span>
           <input class="settings-input she-port" type="number" min="1" max="65535" placeholder="22"
-                 value="${esc(base ? hostProp(base, "port") ?? "" : "")}" /></label>
+                 value="${esc(base ? (hostProp(base, "port") ?? "") : "")}" /></label>
       </div>
       <div class="she-opts">
-        ${BOOL_OPTIONS.map(o => {
+        ${BOOL_OPTIONS.map((o) => {
           const on = base ? (hostProp(base, o.key) ?? "").toLowerCase() === "yes" : false;
           return `<label class="settings-toggle-row she-opt" title="${esc(o.desc)}">
             <input type="checkbox" data-key="${o.key}" ${on ? "checked" : ""} />
@@ -98,16 +99,16 @@ export function showSshHostEditor(opts: SshHostEditorOptions): void {
   document.body.appendChild(overlay);
 
   const table = createForwardTable(base ? baseForwards(base) : []);
-  overlay.querySelector(".she-table-slot")!.replaceWith(table.el);
+  overlay.querySelector(".she-table-slot")?.replaceWith(table.el);
 
   const aliasInput = overlay.querySelector<HTMLInputElement>(".she-alias")!;
   const hostnameInput = overlay.querySelector<HTMLInputElement>(".she-hostname")!;
   const userInput = overlay.querySelector<HTMLInputElement>(".she-user")!;
   const portInput = overlay.querySelector<HTMLInputElement>(".she-port")!;
 
-  overlay.querySelector(".she-cancel")!.addEventListener("click", modal.close);
+  overlay.querySelector(".she-cancel")?.addEventListener("click", modal.close);
 
-  overlay.querySelector(".she-save")!.addEventListener("click", () => {
+  overlay.querySelector(".she-save")?.addEventListener("click", () => {
     const alias = aliasInput.value.trim();
     if (!alias) {
       showToast("Alias is required", "error");
@@ -118,8 +119,9 @@ export function showSshHostEditor(opts: SshHostEditorOptions): void {
       showToast("Alias must be a single word without wildcards", "error");
       return;
     }
-    const collision = configStore.get("sshHosts")
-      .some(h => h.name === alias && h.name !== originalName);
+    const collision = configStore
+      .get("sshHosts")
+      .some((h) => h.name === alias && h.name !== originalName);
     if (collision) {
       showToast(`A host named "${alias}" already exists`, "error");
       return;
@@ -142,12 +144,21 @@ export function showSshHostEditor(opts: SshHostEditorOptions): void {
     const user = userInput.value.trim();
     if (user) host.User = user;
     if (portRaw && portRaw !== "22") host.Port = portRaw;
-    overlay.querySelectorAll<HTMLInputElement>(".she-opt input").forEach(cb => {
+    overlay.querySelectorAll<HTMLInputElement>(".she-opt input").forEach((cb) => {
       if (cb.checked) host[cb.dataset.key === "forwardx11" ? "ForwardX11" : "ForwardAgent"] = "yes";
     });
-    const locals = table.rows().filter(r => r.kind === "local").map(forwardConfigLine);
-    const remotes = table.rows().filter(r => r.kind === "remote").map(forwardConfigLine);
-    const dynamics = table.rows().filter(r => r.kind === "dynamic").map(forwardConfigLine);
+    const locals = table
+      .rows()
+      .filter((r) => r.kind === "local")
+      .map(forwardConfigLine);
+    const remotes = table
+      .rows()
+      .filter((r) => r.kind === "remote")
+      .map(forwardConfigLine);
+    const dynamics = table
+      .rows()
+      .filter((r) => r.kind === "dynamic")
+      .map(forwardConfigLine);
     if (locals.length > 0) host.LocalForward = locals.join("\n");
     if (remotes.length > 0) host.RemoteForward = remotes.join("\n");
     if (dynamics.length > 0) host.DynamicForward = dynamics.join("\n");

@@ -3,7 +3,14 @@
 export type TabType = "local" | "ssh" | "serial";
 export type SerialInputMode = "normal" | "echo" | "line";
 export type SerialEnterNewline = "cr" | "lf" | "crlf";
-export type SerialOutputNewline = "keep" | "cr-in-lf" | "lf-in-cr" | "force-crlf" | "force-lf" | "force-cr" | "strip";
+export type SerialOutputNewline =
+  | "keep"
+  | "cr-in-lf"
+  | "lf-in-cr"
+  | "force-crlf"
+  | "force-lf"
+  | "force-cr"
+  | "strip";
 
 export interface SshHost {
   name: string;

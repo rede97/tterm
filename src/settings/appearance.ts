@@ -1,13 +1,13 @@
 // Settings — Appearance panel
 // Font family, font size, color scheme gallery
 
-import { configStore, type ConfigState } from "../core/store";
-import { buildFontFamily, updateFontStack } from "../util/fontconfig";
-import { allThemes, findTheme, DEFAULT_THEME_NAME, type ThemeDef } from "../util/themes";
 import { dedupeThemeName } from "../config/custom-themes";
-import { showThemeEditor } from "./themeeditor";
-import { attachStepper } from "../ui/stepper";
 import { esc } from "../core/common";
+import { type ConfigState, configStore } from "../core/store";
+import { attachStepper } from "../ui/stepper";
+import { buildFontFamily, updateFontStack } from "../util/fontconfig";
+import { allThemes, DEFAULT_THEME_NAME, findTheme, type ThemeDef } from "../util/themes";
+import { showThemeEditor } from "./themeeditor";
 
 export function createAppearancePanel(): HTMLElement {
   const panel = document.createElement("div");
@@ -47,8 +47,8 @@ export function createAppearancePanel(): HTMLElement {
   attachStepper(panel.querySelector<HTMLInputElement>("#set-font-size")!);
 
   // Font config button — opens font picker
-  panel.querySelector("#set-font-config")!.addEventListener("click", () => {
-    import("../terminal/fontpicker").then(m => {
+  panel.querySelector("#set-font-config")?.addEventListener("click", () => {
+    import("../terminal/fontpicker").then((m) => {
       m.showFontPickerDialog((stack) => {
         updateFontStack(stack);
         configStore.set({ fontFamily: buildFontFamily(stack) });
@@ -105,8 +105,24 @@ export function renderThemeGallery(root: HTMLElement): void {
 
     const swatches = document.createElement("div");
     swatches.className = "theme-card-swatches";
-    for (const c of [th.black, th.red, th.green, th.yellow, th.blue, th.magenta, th.cyan, th.white,
-      th.brightBlack, th.brightRed, th.brightGreen, th.brightYellow, th.brightBlue, th.brightMagenta, th.brightCyan, th.brightWhite]) {
+    for (const c of [
+      th.black,
+      th.red,
+      th.green,
+      th.yellow,
+      th.blue,
+      th.magenta,
+      th.cyan,
+      th.white,
+      th.brightBlack,
+      th.brightRed,
+      th.brightGreen,
+      th.brightYellow,
+      th.brightBlue,
+      th.brightMagenta,
+      th.brightCyan,
+      th.brightWhite,
+    ]) {
       const s = document.createElement("span");
       s.className = "theme-card-swatch";
       s.style.background = c ?? "transparent";
@@ -201,7 +217,10 @@ function openThemeEditor(root: HTMLElement, base: ThemeDef, editName: string | u
     onSaved: (savedName) => {
       // Renaming the theme that is currently selected: follow the new name
       // everywhere (pending gallery selection + live terminals).
-      if (editName && (root.dataset.themeName === editName || configStore.get("themeName") === editName)) {
+      if (
+        editName &&
+        (root.dataset.themeName === editName || configStore.get("themeName") === editName)
+      ) {
         root.dataset.themeName = savedName;
       }
       // The saved theme is the live one: re-apply (colors may have changed
@@ -227,8 +246,7 @@ function openThemeEditor(root: HTMLElement, base: ThemeDef, editName: string | u
 
 export function renderThemeGallerySelection(root: HTMLElement): void {
   const current = root.dataset.themeName || configStore.get("themeName");
-  root.querySelectorAll<HTMLElement>("#set-theme-gallery .theme-card").forEach(card => {
+  root.querySelectorAll<HTMLElement>("#set-theme-gallery .theme-card").forEach((card) => {
     card.classList.toggle("selected", card.dataset.theme === current);
   });
 }
-

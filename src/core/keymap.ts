@@ -103,7 +103,7 @@ export function comboFromEvent(e: {
   let key = normKey(e.key);
   // Numpad keys share e.key with their main-row twins ("1", "+") — use
   // e.code so they stay separately bindable ("ctrl+num1" ≠ "ctrl+1").
-  if (e.code?.startsWith("Numpad")) key = "num" + e.code.slice(6).toLowerCase();
+  if (e.code?.startsWith("Numpad")) key = `num${e.code.slice(6).toLowerCase()}`;
   if (key in MODIFIER_KEYS || key === "dead") return null;
   const parts: string[] = [];
   if (e.ctrlKey) parts.push("ctrl");
@@ -121,10 +121,10 @@ export function parseCombo(combo: string): ParsedCombo | null {
   // it before splitting, or split("+") yields an empty final segment.
   // Only the canonical doubled form counts — "ctrl+" stays malformed.
   const plusKey = combo === "+" || combo.endsWith("++");
-  const parts = (plusKey ? combo.slice(0, -1) : combo).split("+").filter(p => p !== "");
+  const parts = (plusKey ? combo.slice(0, -1) : combo).split("+").filter((p) => p !== "");
   let key: string;
   let mods: Set<string>;
-  if (plusKey && parts.every(p => p in COMBO_MODS)) {
+  if (plusKey && parts.every((p) => p in COMBO_MODS)) {
     key = "+";
     mods = new Set(parts);
   } else {
@@ -187,7 +187,10 @@ export function formatCombo(combo: string): string {
   if (parsed.shift) parts.push("Shift");
   if (parsed.meta) parts.push("Meta");
   const k = parsed.key;
-  parts.push(PRETTY_KEYS[k] ?? (/^f\d{1,2}$/.test(k) ? k.toUpperCase() : k.length === 1 ? k.toUpperCase() : k));
+  parts.push(
+    PRETTY_KEYS[k] ??
+      (/^f\d{1,2}$/.test(k) ? k.toUpperCase() : k.length === 1 ? k.toUpperCase() : k),
+  );
   return parts.join("+");
 }
 
@@ -227,7 +230,7 @@ export function findConflict(
 }
 
 export function commandTitle(id: string): string {
-  return KEY_COMMANDS.find(c => c.id === id)?.title ?? id;
+  return KEY_COMMANDS.find((c) => c.id === id)?.title ?? id;
 }
 
 // ---- Dispatcher ----
@@ -250,8 +253,12 @@ function rebuildLookup(): void {
 }
 
 /** Pause the global dispatcher (settings keybinding capture). Pair with resumeKeymap. */
-export function suspendKeymap(): void { _suspended++; }
-export function resumeKeymap(): void { _suspended = Math.max(0, _suspended - 1); }
+export function suspendKeymap(): void {
+  _suspended++;
+}
+export function resumeKeymap(): void {
+  _suspended = Math.max(0, _suspended - 1);
+}
 
 /** Reset module state (tests). */
 export function resetKeymapForTests(): void {

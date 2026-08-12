@@ -1,23 +1,40 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
-  BUILTIN_THEMES, DEFAULT_THEME_NAME, findTheme, allThemes,
-  parseWtSchemes, setWtThemes,
+  allThemes,
+  BUILTIN_THEMES,
+  DEFAULT_THEME_NAME,
+  findTheme,
+  parseWtSchemes,
+  setWtThemes,
 } from "../src/util/themes";
 
 const ANSI_KEYS = [
-  "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
-  "brightBlack", "brightRed", "brightGreen", "brightYellow",
-  "brightBlue", "brightMagenta", "brightCyan", "brightWhite",
+  "black",
+  "red",
+  "green",
+  "yellow",
+  "blue",
+  "magenta",
+  "cyan",
+  "white",
+  "brightBlack",
+  "brightRed",
+  "brightGreen",
+  "brightYellow",
+  "brightBlue",
+  "brightMagenta",
+  "brightCyan",
+  "brightWhite",
 ] as const;
 
 describe("built-in themes", () => {
   it("have unique names", () => {
-    const names = BUILTIN_THEMES.map(t => t.name);
+    const names = BUILTIN_THEMES.map((t) => t.name);
     expect(new Set(names).size).toBe(names.length);
   });
 
   it("include the default theme", () => {
-    expect(BUILTIN_THEMES.some(t => t.name === DEFAULT_THEME_NAME)).toBe(true);
+    expect(BUILTIN_THEMES.some((t) => t.name === DEFAULT_THEME_NAME)).toBe(true);
   });
 
   it("every theme defines background, foreground and all 16 ANSI colors", () => {
@@ -31,7 +48,7 @@ describe("built-in themes", () => {
   });
 
   it("includes both dark and light schemes", () => {
-    expect(BUILTIN_THEMES.some(t => t.name.includes("Light"))).toBe(true);
+    expect(BUILTIN_THEMES.some((t) => t.name.includes("Light"))).toBe(true);
   });
 });
 
@@ -56,13 +73,26 @@ describe("parseWtSchemes (Windows Terminal import)", () => {
     schemes: [
       {
         name: "My Custom",
-        background: "#101010", foreground: "#eeeeee",
-        cursorColor: "#00ff00", selectionBackground: "#333333",
-        black: "#000000", red: "#ff0000", green: "#00ff00", yellow: "#ffff00",
-        blue: "#0000ff", purple: "#ff00ff", cyan: "#00ffff", white: "#ffffff",
-        brightBlack: "#111111", brightRed: "#ff1111", brightGreen: "#11ff11",
-        brightYellow: "#ffff11", brightBlue: "#1111ff", brightPurple: "#ff11ff",
-        brightCyan: "#11ffff", brightWhite: "#ffffff",
+        background: "#101010",
+        foreground: "#eeeeee",
+        cursorColor: "#00ff00",
+        selectionBackground: "#333333",
+        black: "#000000",
+        red: "#ff0000",
+        green: "#00ff00",
+        yellow: "#ffff00",
+        blue: "#0000ff",
+        purple: "#ff00ff",
+        cyan: "#00ffff",
+        white: "#ffffff",
+        brightBlack: "#111111",
+        brightRed: "#ff1111",
+        brightGreen: "#11ff11",
+        brightYellow: "#ffff11",
+        brightBlue: "#1111ff",
+        brightPurple: "#ff11ff",
+        brightCyan: "#11ffff",
+        brightWhite: "#ffffff",
       },
       // duplicates a built-in name -> skipped (built-in wins)
       { name: "Dracula", background: "#000000", foreground: "#ffffff" },
@@ -77,15 +107,15 @@ describe("parseWtSchemes (Windows Terminal import)", () => {
     const t = themes[0];
     expect(t.name).toBe("My Custom");
     expect(t.source).toBe("wt");
-    expect(t.theme.cursor).toBe("#00ff00");          // cursorColor -> cursor
-    expect(t.theme.magenta).toBe("#ff00ff");         // purple -> magenta
-    expect(t.theme.brightMagenta).toBe("#ff11ff");   // brightPurple -> brightMagenta
+    expect(t.theme.cursor).toBe("#00ff00"); // cursorColor -> cursor
+    expect(t.theme.magenta).toBe("#ff00ff"); // purple -> magenta
+    expect(t.theme.brightMagenta).toBe("#ff11ff"); // brightPurple -> brightMagenta
   });
 
   it("skips duplicates of built-in names and malformed entries", () => {
     const themes = parseWtSchemes(WT_SETTINGS);
-    expect(themes.some(t => t.name === "Dracula")).toBe(false);
-    expect(themes.some(t => t.name === "Broken")).toBe(false);
+    expect(themes.some((t) => t.name === "Dracula")).toBe(false);
+    expect(themes.some((t) => t.name === "Broken")).toBe(false);
   });
 
   it("returns empty array for invalid JSON or missing schemes", () => {
@@ -103,15 +133,19 @@ describe("parseWtSchemes (Windows Terminal import)", () => {
 
 describe("parseWtSchemes color validation", () => {
   it("drops non-hex colors instead of passing them to markup", () => {
-    const schemes = parseWtSchemes(JSON.stringify({
-      schemes: [{
-        name: "Evil",
-        background: "#101010",
-        foreground: "#e0e0e0",
-        blue: 'red"><img src=x onerror=alert(1)>',
-        cursorColor: "not-a-color",
-      }],
-    }));
+    const schemes = parseWtSchemes(
+      JSON.stringify({
+        schemes: [
+          {
+            name: "Evil",
+            background: "#101010",
+            foreground: "#e0e0e0",
+            blue: 'red"><img src=x onerror=alert(1)>',
+            cursorColor: "not-a-color",
+          },
+        ],
+      }),
+    );
     expect(schemes).toHaveLength(1);
     expect(schemes[0].theme.blue).toBeUndefined();
     expect(schemes[0].theme.cursor).toBeUndefined();
@@ -119,9 +153,11 @@ describe("parseWtSchemes color validation", () => {
   });
 
   it("skips schemes whose background/foreground are not hex colors", () => {
-    const schemes = parseWtSchemes(JSON.stringify({
-      schemes: [{ name: "Bad", background: "url(x)", foreground: "#fff" }],
-    }));
+    const schemes = parseWtSchemes(
+      JSON.stringify({
+        schemes: [{ name: "Bad", background: "url(x)", foreground: "#fff" }],
+      }),
+    );
     expect(schemes).toHaveLength(0);
   });
 });

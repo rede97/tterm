@@ -2,10 +2,10 @@
 // Silent on "no update" and on network errors; only surfaces real updates
 // and failures of an update the user already accepted.
 
-import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { showToast } from "../ui/toast";
+import { check } from "@tauri-apps/plugin-updater";
 import { confirmDialog } from "../ui/confirm";
+import { showToast } from "../ui/toast";
 import { logCatch } from "./errorlog";
 import { configStore } from "./store";
 
@@ -38,11 +38,12 @@ export async function checkForUpdates(manual = false): Promise<void> {
     const toast = showToast("Downloading update…", "info", 600000);
     let downloaded = 0;
     let total = 0;
-    await update.downloadAndInstall(e => {
+    await update.downloadAndInstall((e) => {
       if (e.event === "Started" && e.data.contentLength) total = e.data.contentLength;
       else if (e.event === "Progress") {
         downloaded += e.data.chunkLength;
-        if (total > 0) toast.textContent = `Downloading update… ${Math.round((downloaded / total) * 100)}%`;
+        if (total > 0)
+          toast.textContent = `Downloading update… ${Math.round((downloaded / total) * 100)}%`;
       } else if (e.event === "Finished") {
         toast.textContent = "Installing update…";
       }

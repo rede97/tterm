@@ -71,7 +71,12 @@ impl FrontendPrompter {
         Self { hub, pending }
     }
 
-    fn park<T: Send + 'static>(&self, event: &str, payload: serde_json::Value, wrap: fn(PromptAnswer) -> Option<T>) -> BoxFuture<Option<T>> {
+    fn park<T: Send + 'static>(
+        &self,
+        event: &str,
+        payload: serde_json::Value,
+        wrap: fn(PromptAnswer) -> Option<T>,
+    ) -> BoxFuture<Option<T>> {
         let req_id = NEXT_PROMPT.fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = tokio::sync::oneshot::channel::<PromptAnswer>();
         if let Ok(mut map) = self.pending.lock() {
@@ -120,7 +125,11 @@ impl Prompter for FrontendPrompter {
 }
 
 #[tauri::command]
-pub fn ssh_auth_response(state: tauri::State<AppState>, req_id: u64, secret: Option<String>) -> Result<(), String> {
+pub fn ssh_auth_response(
+    state: tauri::State<AppState>,
+    req_id: u64,
+    secret: Option<String>,
+) -> Result<(), String> {
     let tx = state
         .pending_prompts
         .lock()
@@ -133,7 +142,11 @@ pub fn ssh_auth_response(state: tauri::State<AppState>, req_id: u64, secret: Opt
 }
 
 #[tauri::command]
-pub fn ssh_hostkey_response(state: tauri::State<AppState>, req_id: u64, accept: bool) -> Result<(), String> {
+pub fn ssh_hostkey_response(
+    state: tauri::State<AppState>,
+    req_id: u64,
+    accept: bool,
+) -> Result<(), String> {
     let tx = state
         .pending_prompts
         .lock()
@@ -255,7 +268,10 @@ impl client::Handler for SshHandler {
                 if !self.prompter.confirm_host_key(prompt(false)).await {
                     return Ok(false);
                 }
-                Ok(russh::keys::known_hosts::learn_known_hosts_path(&self.host, self.port, key, &path).is_ok())
+                Ok(russh::keys::known_hosts::learn_known_hosts_path(
+                    &self.host, self.port, key, &path,
+                )
+                .is_ok())
             }
             Err(russh::keys::Error::KeyChanged { .. }) => {
                 if !self.prompter.confirm_host_key(prompt(true)).await {
@@ -264,7 +280,10 @@ impl client::Handler for SshHandler {
                 if remove_known_host(&path, &self.host, self.port).is_err() {
                     return Ok(false);
                 }
-                Ok(russh::keys::known_hosts::learn_known_hosts_path(&self.host, self.port, key, &path).is_ok())
+                Ok(russh::keys::known_hosts::learn_known_hosts_path(
+                    &self.host, self.port, key, &path,
+                )
+                .is_ok())
             }
             Err(_) => Ok(false),
         }
@@ -283,15 +302,11 @@ impl client::Handler for SshHandler {
         _session: &mut client::Session,
     ) -> Result<(), Self::Error> {
         reply.accept().await;
-        let target = self
-            .forwards
-            .lock()
-            .ok()
-            .and_then(|t| {
-                t.values()
-                    .find(|f| f.info.kind == "remote" && f.info.listen_port as u32 == connected_port)
-                    .map(|f| (f.info.target_host.clone(), f.info.target_port))
-            });
+        let target = self.forwards.lock().ok().and_then(|t| {
+            t.values()
+                .find(|f| f.info.kind == "remote" && f.info.listen_port as u32 == connected_port)
+                .map(|f| (f.info.target_host.clone(), f.info.target_port))
+        });
         if let Some((host, port)) = target {
             tauri::async_runtime::spawn(async move {
                 match tokio::net::TcpStream::connect((host.as_str(), port)).await {
@@ -332,7 +347,10 @@ where
         while let Some(msg) = ch_read.wait().await {
             match msg {
                 russh::ChannelMsg::Data { data } => {
-                    if tokio::io::AsyncWriteExt::write_all(&mut tcp_write, &data).await.is_err() {
+                    if tokio::io::AsyncWriteExt::write_all(&mut tcp_write, &data)
+                        .await
+                        .is_err()
+                    {
                         break;
                     }
                 }
@@ -493,10 +511,7 @@ async fn authenticate(
     // 3. Password: cached (reconnect) first, then up to 3 dialog attempts.
     let cached = cached_password.lock().ok().and_then(|c| c.clone());
     if let Some(pw) = cached {
-        if let Ok(r) = handle
-            .authenticate_password(spec.user.clone(), pw)
-            .await
-        {
+        if let Ok(r) = handle.authenticate_password(spec.user.clone(), pw).await {
             if r.success() {
                 return Ok(());
             }
@@ -561,7 +576,11 @@ async fn connect_session_with(
 
     let mut handle = tokio::time::timeout(
         Duration::from_secs(15),
-        client::connect(Arc::new(config), (spec.hostname.as_str(), spec.port), handler),
+        client::connect(
+            Arc::new(config),
+            (spec.hostname.as_str(), spec.port),
+            handler,
+        ),
     )
     .await
     .map_err(|_| format!("Connection to {} timed out", spec.hostname))?
@@ -638,8 +657,17 @@ async fn connect_session_with(
     let handle = Arc::new(handle);
     reapply_forwards(&handle, session).await;
 
-    *session.live.lock().await = Some(SshLive { handle, shell_writer });
-    Ok((Box::new(SshReader { rx: out_rx, cur: std::collections::VecDeque::new() }), Box::new(SshWriter { tx: in_tx })))
+    *session.live.lock().await = Some(SshLive {
+        handle,
+        shell_writer,
+    });
+    Ok((
+        Box::new(SshReader {
+            rx: out_rx,
+            cur: std::collections::VecDeque::new(),
+        }),
+        Box::new(SshWriter { tx: in_tx }),
+    ))
 }
 
 /// Re-apply every recorded forwarding after a (re)connect. Listener tasks
@@ -686,7 +714,9 @@ async fn spawn_local_forward(
     session: &SshSession,
     info: &ForwardInfo,
 ) -> Option<tauri::async_runtime::JoinHandle<()>> {
-    let listener = tokio::net::TcpListener::bind((info.listen_host.as_str(), info.listen_port)).await.ok()?;
+    let listener = tokio::net::TcpListener::bind((info.listen_host.as_str(), info.listen_port))
+        .await
+        .ok()?;
     let handle = handle.clone();
     let notify = session.close_notify.clone();
     let target_host = info.target_host.clone();
@@ -727,7 +757,9 @@ async fn spawn_dynamic_forward(
     session: &SshSession,
     info: &ForwardInfo,
 ) -> Option<tauri::async_runtime::JoinHandle<()>> {
-    let listener = tokio::net::TcpListener::bind((info.listen_host.as_str(), info.listen_port)).await.ok()?;
+    let listener = tokio::net::TcpListener::bind((info.listen_host.as_str(), info.listen_port))
+        .await
+        .ok()?;
     let handle = handle.clone();
     let notify = session.close_notify.clone();
     Some(tauri::async_runtime::spawn(async move {
@@ -806,7 +838,10 @@ async fn socks5_connect(
         .await
         .ok()?;
     // Success reply: VER=5 REP=0 RSV ATYP=IPv4 BND.ADDR=0.0.0.0 BND.PORT=0
-    stream.write_all(&[5, 0, 0, 1, 0, 0, 0, 0, 0, 0]).await.ok()?;
+    stream
+        .write_all(&[5, 0, 0, 1, 0, 0, 0, 0, 0, 0])
+        .await
+        .ok()?;
     Some((ch, stream))
 }
 
@@ -837,7 +872,13 @@ fn ssh_hooks(app: tauri::AppHandle, id: String, auto_retry: Arc<AtomicBool>) -> 
         on_state: {
             let id = id.clone();
             Box::new(move |alive| {
-                let _ = app.emit("session-state", SessionState { id: id.clone(), alive });
+                let _ = app.emit(
+                    "session-state",
+                    SessionState {
+                        id: id.clone(),
+                        alive,
+                    },
+                );
             })
         },
         respawn: Box::new(move || {
@@ -894,7 +935,13 @@ pub async fn ssh_spawn_embedded(
         .insert(id.clone(), session);
 
     let auto = state.register_auto_reconnect(&id);
-    register_session(&state.hub, &id, reader, writer, Some(ssh_hooks(app, id.clone(), auto)))?;
+    register_session(
+        &state.hub,
+        &id,
+        reader,
+        writer,
+        Some(ssh_hooks(app, id.clone(), auto)),
+    )?;
     Ok(state.ws_result(id))
 }
 
@@ -907,7 +954,10 @@ pub(crate) fn resize_ssh_session(session: &SshSession, cols: u16, rows: u16) {
     tauri::async_runtime::spawn(async move {
         let guard = live.lock().await;
         if let Some(l) = &*guard {
-            let _ = l.shell_writer.window_change(cols as u32, rows as u32, 0, 0).await;
+            let _ = l
+                .shell_writer
+                .window_change(cols as u32, rows as u32, 0, 0)
+                .await;
         }
     });
 }
@@ -957,7 +1007,12 @@ async fn add_forward(
             Some(
                 spawn_local_forward(&live.handle, session, &info)
                     .await
-                    .ok_or_else(|| format!("Failed to listen on {}:{}", info.listen_host, info.listen_port))?,
+                    .ok_or_else(|| {
+                        format!(
+                            "Failed to listen on {}:{}",
+                            info.listen_host, info.listen_port
+                        )
+                    })?,
             )
         }
         "remote" => {
@@ -975,7 +1030,12 @@ async fn add_forward(
             Some(
                 spawn_dynamic_forward(&live.handle, session, &info)
                     .await
-                    .ok_or_else(|| format!("Failed to listen on {}:{}", info.listen_host, info.listen_port))?,
+                    .ok_or_else(|| {
+                        format!(
+                            "Failed to listen on {}:{}",
+                            info.listen_host, info.listen_port
+                        )
+                    })?,
             )
         }
         _ => return Err("kind must be \"local\", \"remote\" or \"dynamic\"".into()),
@@ -1001,16 +1061,34 @@ pub async fn ssh_forward_add(
 ) -> Result<u64, String> {
     let session = {
         let table = state.ssh_sessions.lock().map_err(|e| e.to_string())?;
-        table.get(&id).cloned().ok_or("not an embedded ssh session")?
+        table
+            .get(&id)
+            .cloned()
+            .ok_or("not an embedded ssh session")?
     };
-    add_forward(&session, &kind, listen_host, listen_port, target_host, target_port).await
+    add_forward(
+        &session,
+        &kind,
+        listen_host,
+        listen_port,
+        target_host,
+        target_port,
+    )
+    .await
 }
 
 #[tauri::command]
-pub async fn ssh_forward_remove(state: tauri::State<'_, AppState>, id: String, forward_id: u64) -> Result<(), String> {
+pub async fn ssh_forward_remove(
+    state: tauri::State<'_, AppState>,
+    id: String,
+    forward_id: u64,
+) -> Result<(), String> {
     let session = {
         let table = state.ssh_sessions.lock().map_err(|e| e.to_string())?;
-        table.get(&id).cloned().ok_or("not an embedded ssh session")?
+        table
+            .get(&id)
+            .cloned()
+            .ok_or("not an embedded ssh session")?
     };
     let entry = session
         .forwards
@@ -1025,7 +1103,10 @@ pub async fn ssh_forward_remove(state: tauri::State<'_, AppState>, id: String, f
             if let Some(l) = &*guard {
                 let _ = l
                     .handle
-                    .cancel_tcpip_forward(entry.info.listen_host.clone(), entry.info.listen_port as u32)
+                    .cancel_tcpip_forward(
+                        entry.info.listen_host.clone(),
+                        entry.info.listen_port as u32,
+                    )
                     .await;
             }
         }
@@ -1034,7 +1115,10 @@ pub async fn ssh_forward_remove(state: tauri::State<'_, AppState>, id: String, f
 }
 
 #[tauri::command]
-pub fn ssh_forward_list(state: tauri::State<AppState>, id: String) -> Result<Vec<ForwardInfo>, String> {
+pub fn ssh_forward_list(
+    state: tauri::State<AppState>,
+    id: String,
+) -> Result<Vec<ForwardInfo>, String> {
     let table = state.ssh_sessions.lock().map_err(|e| e.to_string())?;
     let session = table.get(&id).ok_or("not an embedded ssh session")?;
     let forwards = session
@@ -1053,9 +1137,9 @@ pub fn ssh_forward_list(state: tauri::State<AppState>, id: String) -> Result<Vec
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SshKeyInfo {
-    pub name: String,       // file stem, e.g. "id_ed25519"
-    pub path: String,       // private key path
-    pub public_key: String, // OpenSSH one-liner (with comment)
+    pub name: String,        // file stem, e.g. "id_ed25519"
+    pub path: String,        // private key path
+    pub public_key: String,  // OpenSSH one-liner (with comment)
     pub fingerprint: String, // "SHA256:…"
 }
 
@@ -1178,9 +1262,13 @@ fn keygen_in(
     let mut key = ssh_key::PrivateKey::random(&mut rng, algorithm).map_err(|e| e.to_string())?;
     key.set_comment("tterm");
     if let Some(pp) = passphrase.filter(|p| !p.is_empty()) {
-        key = key.encrypt(&mut rng, pp.as_bytes()).map_err(|e| e.to_string())?;
+        key = key
+            .encrypt(&mut rng, pp.as_bytes())
+            .map_err(|e| e.to_string())?;
     }
-    let priv_pem = key.to_openssh(ssh_key::LineEnding::LF).map_err(|e| e.to_string())?;
+    let priv_pem = key
+        .to_openssh(ssh_key::LineEnding::LF)
+        .map_err(|e| e.to_string())?;
     std::fs::write(&priv_path, priv_pem.as_bytes()).map_err(|e| e.to_string())?;
     // 0600 on unix — OpenSSH clients refuse world-readable private keys.
     #[cfg(unix)]
@@ -1246,8 +1334,10 @@ impl TargetShell {
 fn probe_plan(target_os: Option<&str>) -> Vec<(TargetShell, &'static str)> {
     const POSIX: (TargetShell, &str) = (TargetShell::Posix, "sh -c \"uname -s\"");
     const CMD: (TargetShell, &str) = (TargetShell::WindowsCmd, "ver");
-    const PS: (TargetShell, &str) =
-        (TargetShell::WindowsPowerShell, "$PSVersionTable.PSVersion | Out-Null");
+    const PS: (TargetShell, &str) = (
+        TargetShell::WindowsPowerShell,
+        "$PSVersionTable.PSVersion | Out-Null",
+    );
     match target_os {
         Some("windows") => vec![PS, CMD],
         Some("linux") | Some("macos") => vec![POSIX],
@@ -1409,14 +1499,7 @@ pub async fn ssh_install_pubkey(
         state.hub.clone(),
         state.pending_prompts.clone(),
     ));
-    install_pubkey_with(
-        &spec,
-        &public_key,
-        target_os,
-        prompter,
-        known_hosts_path(),
-    )
-    .await
+    install_pubkey_with(&spec, &public_key, target_os, prompter, known_hosts_path()).await
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -1535,7 +1618,9 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             reply.accept().await;
             let (host, _) = self.state.lock().direct_tcpip_target.clone();
             tauri::async_runtime::spawn(async move {
-                if let Ok(stream) = tokio::net::TcpStream::connect((host.as_str(), port as u16)).await {
+                if let Ok(stream) =
+                    tokio::net::TcpStream::connect((host.as_str(), port as u16)).await
+                {
                     bridge_tcp_channel(stream, channel).await;
                 }
             });
@@ -1657,7 +1742,9 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
         let port = listener.local_addr().unwrap().port();
         tauri::async_runtime::spawn(async move {
             loop {
-                let Ok((mut s, _)) = listener.accept().await else { break };
+                let Ok((mut s, _)) = listener.accept().await else {
+                    break;
+                };
                 tauri::async_runtime::spawn(async move {
                     let (mut r, mut w) = s.split();
                     let _ = tokio::io::copy(&mut r, &mut w).await;
@@ -1686,7 +1773,11 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
     }
 
     fn temp_known_hosts(tag: &str) -> PathBuf {
-        std::env::temp_dir().join(format!("tterm-test-known-hosts-{}-{}", std::process::id(), tag))
+        std::env::temp_dir().join(format!(
+            "tterm-test-known-hosts-{}-{}",
+            std::process::id(),
+            tag
+        ))
     }
 
     /// Full round trip against the in-process server: password auth, shell
@@ -1712,14 +1803,18 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
                 let state = server_state.clone();
                 tauri::async_runtime::spawn(async move {
                     loop {
-                        let Ok((stream, _)) = listener.accept().await else { break };
+                        let Ok((stream, _)) = listener.accept().await else {
+                            break;
+                        };
                         let key = russh::keys::PrivateKey::from_openssh(TEST_HOST_KEY).unwrap();
                         let config = Arc::new(server::Config {
                             keys: vec![key],
                             auth_rejection_time: Duration::ZERO,
                             ..Default::default()
                         });
-                        let handler = TestServer { state: state.clone() };
+                        let handler = TestServer {
+                            state: state.clone(),
+                        };
                         tauri::async_runtime::spawn(async move {
                             let _ = server::run_stream(config, stream, handler).await;
                         });
@@ -1731,9 +1826,10 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             let kh = temp_known_hosts("e2e");
             let _ = std::fs::remove_file(&kh);
             let session = test_session(ssh_port);
-            let (reader, mut writer) = connect_session_with(&session, Arc::new(TestPrompter), Some(kh.clone()))
-                .await
-                .expect("connect + auth + shell");
+            let (reader, mut writer) =
+                connect_session_with(&session, Arc::new(TestPrompter), Some(kh.clone()))
+                    .await
+                    .expect("connect + auth + shell");
 
             // Host key should have been learned (TOFU accepted by prompter).
             let learned = std::fs::read_to_string(&kh).expect("known_hosts written");
@@ -1773,9 +1869,16 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             );
 
             // Dynamic local forward: add at runtime, then push bytes through.
-            let fwd_id = add_forward(&session, "local", "127.0.0.1".into(), 0, "127.0.0.1".into(), echo_port)
-                .await
-                .expect("add forward");
+            let fwd_id = add_forward(
+                &session,
+                "local",
+                "127.0.0.1".into(),
+                0,
+                "127.0.0.1".into(),
+                echo_port,
+            )
+            .await
+            .expect("add forward");
             let listen_port = {
                 let t = session.forwards.lock().unwrap();
                 // port 0 means the OS picked one — read it back from the entry
@@ -1790,16 +1893,27 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
                     let probe = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
                     let free = probe.local_addr().unwrap().port();
                     drop(probe);
-                    add_forward(&session, "local", "127.0.0.1".into(), free, "127.0.0.1".into(), echo_port)
-                        .await
-                        .expect("add forward fixed port");
+                    add_forward(
+                        &session,
+                        "local",
+                        "127.0.0.1".into(),
+                        free,
+                        "127.0.0.1".into(),
+                        echo_port,
+                    )
+                    .await
+                    .expect("add forward fixed port");
                     free
                 }
                 Some(p) => p,
             };
             tokio::time::sleep(Duration::from_millis(200)).await;
-            let mut proxied = tokio::net::TcpStream::connect(("127.0.0.1", listen_port)).await.unwrap();
-            tokio::io::AsyncWriteExt::write_all(&mut proxied, b"tunnel").await.unwrap();
+            let mut proxied = tokio::net::TcpStream::connect(("127.0.0.1", listen_port))
+                .await
+                .unwrap();
+            tokio::io::AsyncWriteExt::write_all(&mut proxied, b"tunnel")
+                .await
+                .unwrap();
             let mut got = vec![0u8; 6];
             tokio::time::timeout(
                 Duration::from_secs(5),
@@ -1808,7 +1922,10 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             .await
             .expect("tunnel reply in time")
             .expect("tunnel reply");
-            assert_eq!(&got, b"tunnel", "bytes round-tripped through the SSH tunnel");
+            assert_eq!(
+                &got, b"tunnel",
+                "bytes round-tripped through the SSH tunnel"
+            );
 
             kill_ssh_session(&session);
         });
@@ -1836,14 +1953,18 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
                 let state = server_state.clone();
                 tauri::async_runtime::spawn(async move {
                     loop {
-                        let Ok((stream, _)) = listener.accept().await else { break };
+                        let Ok((stream, _)) = listener.accept().await else {
+                            break;
+                        };
                         let key = russh::keys::PrivateKey::from_openssh(TEST_HOST_KEY).unwrap();
                         let config = Arc::new(server::Config {
                             keys: vec![key],
                             auth_rejection_time: Duration::ZERO,
                             ..Default::default()
                         });
-                        let handler = TestServer { state: state.clone() };
+                        let handler = TestServer {
+                            state: state.clone(),
+                        };
                         tauri::async_runtime::spawn(async move {
                             let _ = server::run_stream(config, stream, handler).await;
                         });
@@ -1862,13 +1983,22 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             let probe = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
             let socks_port = probe.local_addr().unwrap().port();
             drop(probe);
-            add_forward(&session, "dynamic", "127.0.0.1".into(), socks_port, String::new(), 0)
-                .await
-                .expect("add dynamic forward");
+            add_forward(
+                &session,
+                "dynamic",
+                "127.0.0.1".into(),
+                socks_port,
+                String::new(),
+                0,
+            )
+            .await
+            .expect("add dynamic forward");
             tokio::time::sleep(Duration::from_millis(200)).await;
 
             use tokio::io::{AsyncReadExt, AsyncWriteExt};
-            let mut socks = tokio::net::TcpStream::connect(("127.0.0.1", socks_port)).await.unwrap();
+            let mut socks = tokio::net::TcpStream::connect(("127.0.0.1", socks_port))
+                .await
+                .unwrap();
             // Greeting: one method, no-auth.
             socks.write_all(&[5, 1, 0]).await.unwrap();
             let mut reply = [0u8; 2];
@@ -1891,7 +2021,10 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
                 .await
                 .expect("reply in time")
                 .expect("reply");
-            assert_eq!(&got, b"tunnel", "bytes round-tripped via SOCKS5 + direct-tcpip");
+            assert_eq!(
+                &got, b"tunnel",
+                "bytes round-tripped via SOCKS5 + direct-tcpip"
+            );
 
             kill_ssh_session(&session);
         });
@@ -1935,14 +2068,18 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
                 let state = server_state.clone();
                 tauri::async_runtime::spawn(async move {
                     loop {
-                        let Ok((stream, _)) = listener.accept().await else { break };
+                        let Ok((stream, _)) = listener.accept().await else {
+                            break;
+                        };
                         let key = russh::keys::PrivateKey::from_openssh(TEST_HOST_KEY).unwrap();
                         let config = Arc::new(server::Config {
                             keys: vec![key],
                             auth_rejection_time: Duration::ZERO,
                             ..Default::default()
                         });
-                        let handler = TestServer { state: state.clone() };
+                        let handler = TestServer {
+                            state: state.clone(),
+                        };
                         tauri::async_runtime::spawn(async move {
                             let _ = server::run_stream(config, stream, handler).await;
                         });
@@ -1966,7 +2103,10 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
 
             let stream = std::net::TcpStream::connect(format!("127.0.0.1:{}", hub.port)).unwrap();
             let (mut ws, _resp) = tungstenite::client(
-                format!("ws://127.0.0.1:{}/pty/tab-flood?token={}", hub.port, hub.token),
+                format!(
+                    "ws://127.0.0.1:{}/pty/tab-flood?token={}",
+                    hub.port, hub.token
+                ),
                 stream,
             )
             .expect("handshake");
@@ -1994,7 +2134,8 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
                     replies_sent = true;
                     // DA + DECRP answers, ~130 bytes total, as xterm emits them.
                     for _ in 0..7 {
-                        ws.send(tungstenite::Message::Binary(b"\x1b[?1;2c".to_vec())).unwrap();
+                        ws.send(tungstenite::Message::Binary(b"\x1b[?1;2c".to_vec()))
+                            .unwrap();
                     }
                     for mode in [2026u32, 2031, 2048, 1010, 1011] {
                         ws.send(tungstenite::Message::Binary(
@@ -2039,14 +2180,18 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
         let state = server_state.clone();
         tauri::async_runtime::spawn(async move {
             loop {
-                let Ok((stream, _)) = listener.accept().await else { break };
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
                 let key = russh::keys::PrivateKey::from_openssh(TEST_HOST_KEY).unwrap();
                 let config = Arc::new(server::Config {
                     keys: vec![key],
                     auth_rejection_time: Duration::ZERO,
                     ..Default::default()
                 });
-                let handler = TestServer { state: state.clone() };
+                let handler = TestServer {
+                    state: state.clone(),
+                };
                 tauri::async_runtime::spawn(async move {
                     let _ = server::run_stream(config, stream, handler).await;
                 });
@@ -2064,7 +2209,11 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
         // ed25519: private half loads, public half matches the listing.
         let info = keygen_in(&dir, "ed25519", "id_test", None).expect("keygen ed25519");
         assert_eq!(info.name, "id_test");
-        assert!(info.fingerprint.starts_with("SHA256:"), "{}", info.fingerprint);
+        assert!(
+            info.fingerprint.starts_with("SHA256:"),
+            "{}",
+            info.fingerprint
+        );
         let key = russh::keys::load_secret_key(&info.path, None).expect("load private key");
         assert_eq!(key.public_key().to_openssh().unwrap(), info.public_key);
         #[cfg(unix)]
@@ -2082,7 +2231,8 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
         // Name validation, duplicate refusal, passphrase round-trip.
         assert!(keygen_in(&dir, "ed25519", "bad/name", None).is_err());
         assert!(keygen_in(&dir, "ed25519", "id_test", None).is_err());
-        let enc = keygen_in(&dir, "ed25519", "id_enc", Some("pw".into())).expect("keygen encrypted");
+        let enc =
+            keygen_in(&dir, "ed25519", "id_enc", Some("pw".into())).expect("keygen encrypted");
         assert!(russh::keys::load_secret_key(&enc.path, None).is_err());
         assert!(russh::keys::load_secret_key(&enc.path, Some("pw")).is_ok());
 
@@ -2107,34 +2257,54 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
                 let _ = std::fs::remove_file(&kh);
                 async move {
                     let spec = test_session(port).spec;
-                    install_pubkey_with(&spec, &pub_key, target_os, Arc::new(TestPrompter), Some(kh)).await
+                    install_pubkey_with(
+                        &spec,
+                        &pub_key,
+                        target_os,
+                        Arc::new(TestPrompter),
+                        Some(kh),
+                    )
+                    .await
                 }
             };
 
             // POSIX target: the sh probe answers, sh syntax is used.
             let (port, state) = spawn_exec_server(ExecSim::Posix, false).await;
-            let res = install(port, None, "inst-posix").await.expect("install posix");
+            let res = install(port, None, "inst-posix")
+                .await
+                .expect("install posix");
             assert_eq!(res.outcome, "installed");
             assert_eq!(res.shell, "posix");
             let log = state.lock().exec_log.join("\n");
             assert!(log.contains("uname -s"), "probe ran: {log}");
             assert!(log.contains("mkdir -p ~/.ssh"), "prepare ran: {log}");
-            assert!(log.contains(">> ~/.ssh/authorized_keys"), "append ran: {log}");
+            assert!(
+                log.contains(">> ~/.ssh/authorized_keys"),
+                "append ran: {log}"
+            );
 
             // Already-authorized key: reported, append skipped.
             let (port, state) = spawn_exec_server(ExecSim::Posix, true).await;
-            let res = install(port, None, "inst-already").await.expect("install already");
+            let res = install(port, None, "inst-already")
+                .await
+                .expect("install already");
             assert_eq!(res.outcome, "already");
             let log = state.lock().exec_log.join("\n");
             assert!(log.contains("grep -qxF"), "contains probe ran: {log}");
-            assert!(!log.contains(">> ~/.ssh/authorized_keys"), "append skipped: {log}");
+            assert!(
+                !log.contains(">> ~/.ssh/authorized_keys"),
+                "append skipped: {log}"
+            );
 
             // Windows targets: cmd answers `ver`, powershell $PSVersionTable.
             let (port, state) = spawn_exec_server(ExecSim::WindowsCmd, false).await;
             let res = install(port, None, "inst-cmd").await.expect("install cmd");
             assert_eq!(res.shell, "windows-cmd");
             let log = state.lock().exec_log.join("\n");
-            assert!(log.contains("%USERPROFILE%\\.ssh\\authorized_keys"), "cmd append: {log}");
+            assert!(
+                log.contains("%USERPROFILE%\\.ssh\\authorized_keys"),
+                "cmd append: {log}"
+            );
 
             let (port, state) = spawn_exec_server(ExecSim::WindowsPs, false).await;
             let res = install(port, None, "inst-ps").await.expect("install ps");
@@ -2147,17 +2317,24 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             // Detection must still pick the real default shell — the POSIX
             // `&&` prepare chain is a syntax error on PowerShell 5.1.
             let (port, state) = spawn_exec_server(ExecSim::WindowsPsWithSh, false).await;
-            let res = install(port, None, "inst-ps-git").await.expect("install ps+git");
+            let res = install(port, None, "inst-ps-git")
+                .await
+                .expect("install ps+git");
             assert_eq!(res.shell, "windows-powershell");
             let log = state.lock().exec_log.join("\n");
             assert!(log.contains("Add-Content"), "ps append: {log}");
             assert!(!log.contains("chmod"), "posix steps must not run: {log}");
 
             let (port, state) = spawn_exec_server(ExecSim::WindowsCmdWithSh, false).await;
-            let res = install(port, None, "inst-cmd-git").await.expect("install cmd+git");
+            let res = install(port, None, "inst-cmd-git")
+                .await
+                .expect("install cmd+git");
             assert_eq!(res.shell, "windows-cmd");
             let log = state.lock().exec_log.join("\n");
-            assert!(log.contains("%USERPROFILE%\\.ssh\\authorized_keys"), "cmd append: {log}");
+            assert!(
+                log.contains("%USERPROFILE%\\.ssh\\authorized_keys"),
+                "cmd append: {log}"
+            );
 
             // OS restriction narrows the probes: "windows" on a posix target
             // must fail detection instead of falling back to sh syntax.
@@ -2180,9 +2357,14 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
     #[ignore = "needs a real SSH host via TTERM_LIVE=user:password@host[:port]"]
     fn live_install_pubkey() {
         tauri::async_runtime::block_on(async {
-            let live = std::env::var("TTERM_LIVE").expect("set TTERM_LIVE=user:password@host[:port]");
-            let (creds, hostport) = live.rsplit_once('@').expect("TTERM_LIVE needs user:pass@host");
-            let (user, password) = creds.split_once(':').expect("TTERM_LIVE needs user:password@host");
+            let live =
+                std::env::var("TTERM_LIVE").expect("set TTERM_LIVE=user:password@host[:port]");
+            let (creds, hostport) = live
+                .rsplit_once('@')
+                .expect("TTERM_LIVE needs user:pass@host");
+            let (user, password) = creds
+                .split_once(':')
+                .expect("TTERM_LIVE needs user:password@host");
             let (hostname, port) = match hostport.rsplit_once(':') {
                 Some((h, p)) => (h.to_string(), p.parse().expect("bad port")),
                 None => (hostport.to_string(), 22),
@@ -2214,10 +2396,19 @@ AAAEC+hE271SLdVSnyiemya1rk9ceBu6KzuKm4kfmYrBc/Ck7+gGAziI5aeo6oZUyCeZlF\n\
             };
             let kh = temp_known_hosts("live");
             let _ = std::fs::remove_file(&kh);
-            let res = install_pubkey_with(&spec, &key.public_key, None, Arc::new(LivePrompter(password.to_string())), Some(kh))
-                .await
-                .expect("live install failed");
-            eprintln!("live install on {user}@{hostname}:{port}: shell={} outcome={}", res.shell, res.outcome);
+            let res = install_pubkey_with(
+                &spec,
+                &key.public_key,
+                None,
+                Arc::new(LivePrompter(password.to_string())),
+                Some(kh),
+            )
+            .await
+            .expect("live install failed");
+            eprintln!(
+                "live install on {user}@{hostname}:{port}: shell={} outcome={}",
+                res.shell, res.outcome
+            );
 
             let _ = std::fs::remove_dir_all(&dir);
         });

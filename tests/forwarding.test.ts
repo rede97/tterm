@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(() => Promise.resolve(null)) }));
 
@@ -8,8 +8,22 @@ import { showPortForwardingDialog } from "../src/terminal/forwarding";
 const mockInvoke = vi.mocked(invoke);
 
 const SAMPLE_FORWARDS = [
-  { forwardId: 7, kind: "local", listenHost: "127.0.0.1", listenPort: 8080, targetHost: "db.internal", targetPort: 5432 },
-  { forwardId: 9, kind: "remote", listenHost: "0.0.0.0", listenPort: 9000, targetHost: "127.0.0.1", targetPort: 3000 },
+  {
+    forwardId: 7,
+    kind: "local",
+    listenHost: "127.0.0.1",
+    listenPort: 8080,
+    targetHost: "db.internal",
+    targetPort: 5432,
+  },
+  {
+    forwardId: 9,
+    kind: "remote",
+    listenHost: "0.0.0.0",
+    listenPort: 9000,
+    targetHost: "127.0.0.1",
+    targetPort: 3000,
+  },
 ];
 
 // Drain pending microtask chains (dialog open/refresh are promise-only).
@@ -45,7 +59,9 @@ describe("port forwarding dialog", () => {
     const rows = document.querySelectorAll<HTMLElement>(".fwd-row");
     expect(rows).toHaveLength(2);
     expect(rows[0].querySelector(".fwd-badge")!.textContent).toBe("Local");
-    expect(rows[0].querySelector(".fwd-route")!.textContent).toBe("127.0.0.1:8080 → db.internal:5432");
+    expect(rows[0].querySelector(".fwd-route")!.textContent).toBe(
+      "127.0.0.1:8080 → db.internal:5432",
+    );
     expect(rows[1].querySelector(".fwd-badge")!.textContent).toBe("Remote");
     expect(rows[1].querySelector(".fwd-route")!.textContent).toBe("0.0.0.0:9000 → 127.0.0.1:3000");
   });
@@ -76,25 +92,28 @@ describe("port forwarding dialog", () => {
       targetPort: 3000,
     });
     // list refreshed after add: initial load + refresh
-    expect(mockInvoke.mock.calls.filter(c => c[0] === "ssh_forward_list")).toHaveLength(2);
+    expect(mockInvoke.mock.calls.filter((c) => c[0] === "ssh_forward_list")).toHaveLength(2);
   });
 
-  it.each(["0", "70000", "abc"])("rejects invalid port %s with a toast and no invoke", async (bad) => {
-    showPortForwardingDialog("tab-1");
-    await flush();
+  it.each(["0", "70000", "abc"])(
+    "rejects invalid port %s with a toast and no invoke",
+    async (bad) => {
+      showPortForwardingDialog("tab-1");
+      await flush();
 
-    const ports = document.querySelectorAll<HTMLInputElement>(".xfe-port");
-    ports[0].value = bad;
-    ports[1].value = "3000";
-    document.querySelector<HTMLButtonElement>(".fwd-add-btn")!.click();
-    await flush();
+      const ports = document.querySelectorAll<HTMLInputElement>(".xfe-port");
+      ports[0].value = bad;
+      ports[1].value = "3000";
+      document.querySelector<HTMLButtonElement>(".fwd-add-btn")!.click();
+      await flush();
 
-    expect(mockInvoke).not.toHaveBeenCalledWith("ssh_forward_add", expect.anything());
-    const toast = lastToast();
-    expect(toast).not.toBeNull();
-    expect(toast!.classList.contains("toast-error")).toBe(true);
-    expect(toast!.textContent).toContain("65535");
-  });
+      expect(mockInvoke).not.toHaveBeenCalledWith("ssh_forward_add", expect.anything());
+      const toast = lastToast();
+      expect(toast).not.toBeNull();
+      expect(toast!.classList.contains("toast-error")).toBe(true);
+      expect(toast!.textContent).toContain("65535");
+    },
+  );
 
   it("removes a forward via its forwardId and refreshes", async () => {
     mockInvoke.mockImplementation((cmd: unknown) => {
@@ -111,12 +130,13 @@ describe("port forwarding dialog", () => {
 
     expect(mockInvoke).toHaveBeenCalledWith("ssh_forward_remove", { id: "tab-1", forwardId: 9 });
     // refreshed: initial load + post-remove refresh
-    expect(mockInvoke.mock.calls.filter(c => c[0] === "ssh_forward_list")).toHaveLength(2);
+    expect(mockInvoke.mock.calls.filter((c) => c[0] === "ssh_forward_list")).toHaveLength(2);
   });
 
   it("shows a toast and no modal for non-embedded ssh sessions", async () => {
     mockInvoke.mockImplementation((cmd: unknown) => {
-      if (cmd === "ssh_forward_list") return Promise.reject(new Error("not an embedded ssh session"));
+      if (cmd === "ssh_forward_list")
+        return Promise.reject(new Error("not an embedded ssh session"));
       return Promise.resolve(null);
     });
     showPortForwardingDialog("tab-1");

@@ -31,7 +31,11 @@ export function parseOsc9Progress(data: string): Osc94Progress | null {
 
 // Render progress state onto a tab element. The bar element is created lazily
 // and hidden again when state is 0 (hidden).
-export function applyProgressToTabElement(tabEl: HTMLElement, state: number, progress: number): void {
+export function applyProgressToTabElement(
+  tabEl: HTMLElement,
+  state: number,
+  progress: number,
+): void {
   let bar = tabEl.querySelector(".tab-progress") as HTMLElement | null;
   if (state === 0) {
     bar?.remove();

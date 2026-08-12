@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { invokeMock } = vi.hoisted(() => ({
   invokeMock: vi.fn((cmd: string) => {
@@ -36,7 +36,7 @@ describe("loadAllWtData", () => {
     });
     const result = await loadAllWtData();
     expect(result.profiles).toHaveLength(3);
-    const names = result.profiles.map(p => p.name);
+    const names = result.profiles.map((p) => p.name);
     expect(names).toContain("PowerShell");
     expect(names).toContain("Command Prompt");
     expect(names).toContain("WSL Ubuntu");
@@ -51,7 +51,7 @@ describe("loadAllWtData", () => {
       return Promise.resolve(null);
     });
     const result = await loadAllWtData();
-    const ps = result.profiles.find(p => p.name === "PowerShell")!;
+    const ps = result.profiles.find((p) => p.name === "PowerShell")!;
     expect(ps.command).toBe("pwsh.exe");
   });
 
@@ -63,7 +63,7 @@ describe("loadAllWtData", () => {
       return Promise.resolve(null);
     });
     const result = await loadAllWtData();
-    const wsl = result.profiles.find(p => p.name === "WSL Ubuntu")!;
+    const wsl = result.profiles.find((p) => p.name === "WSL Ubuntu")!;
     expect(wsl.command).toContain("wsl.exe");
   });
 
@@ -75,15 +75,13 @@ describe("loadAllWtData", () => {
       return Promise.resolve(null);
     });
     const result = await loadAllWtData();
-    expect(result.profiles.find(p => p.name === "Hidden Profile")).toBeUndefined();
+    expect(result.profiles.find((p) => p.name === "Hidden Profile")).toBeUndefined();
   });
 
   it("merges profiles from fragments", async () => {
     const fragment = JSON.stringify({
       profiles: {
-        list: [
-          { name: "Git Bash", commandline: "\"C:\\Program Files\\Git\\bin\\bash.exe\"" },
-        ],
+        list: [{ name: "Git Bash", commandline: '"C:\\Program Files\\Git\\bin\\bash.exe"' }],
       },
     });
     invokeMock.mockImplementation((cmd: string) => {
@@ -93,7 +91,7 @@ describe("loadAllWtData", () => {
       return Promise.resolve(null);
     });
     const result = await loadAllWtData();
-    expect(result.profiles.some(p => p.name === "Git Bash")).toBe(true);
+    expect(result.profiles.some((p) => p.name === "Git Bash")).toBe(true);
   });
 
   it("deduplicates profiles with the same name", async () => {
@@ -109,7 +107,7 @@ describe("loadAllWtData", () => {
       return Promise.resolve(null);
     });
     const result = await loadAllWtData();
-    const ps = result.profiles.filter(p => p.name === "PowerShell");
+    const ps = result.profiles.filter((p) => p.name === "PowerShell");
     expect(ps).toHaveLength(1);
   });
 
@@ -127,7 +125,11 @@ describe("loadAllWtData", () => {
 
   it("returns VS installations", async () => {
     const vsInstalls = [
-      { path: "C:\\Program Files\\Microsoft Visual Studio\\2022", version: "17.0", instance_id: "123" },
+      {
+        path: "C:\\Program Files\\Microsoft Visual Studio\\2022",
+        version: "17.0",
+        instance_id: "123",
+      },
     ];
     invokeMock.mockImplementation((cmd: string) => {
       if (cmd === "read_wt_settings") return Promise.resolve(null);
@@ -147,7 +149,14 @@ describe("loadSerialPorts", () => {
 
   it("returns serial ports from IPC", async () => {
     const ports = [
-      { name: "COM3", driver: "usbser", manufacturer: "wch.cn", product: "CH340", vid: "1A86", pid: "7523" },
+      {
+        name: "COM3",
+        driver: "usbser",
+        manufacturer: "wch.cn",
+        product: "CH340",
+        vid: "1A86",
+        pid: "7523",
+      },
     ];
     invokeMock.mockImplementation((cmd: string) => {
       if (cmd === "serial_list_ports") return Promise.resolve(ports);

@@ -26,67 +26,88 @@
 // fake cursor and parks the real cursor at (0,19), far away.
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+
 const FIX = resolve("e2e", "fixtures"); // absolute path on THIS machine
-writeFileSync(`${FIX}\\ime-hide.txt`,
-  "\x1b[?1049h\x1b[?25l\x1b[2J\x1b[H\x1b[10;40H\x1b[7m \x1b[0m\x1b[20;1H", "latin1");
+writeFileSync(
+  `${FIX}\\ime-hide.txt`,
+  "\x1b[?1049h\x1b[?25l\x1b[2J\x1b[H\x1b[10;40H\x1b[7m \x1b[0m\x1b[20;1H",
+  "latin1",
+);
 writeFileSync(`${FIX}\\ime-show.txt`, "\x1b[?25h\x1b[?1049l", "latin1");
 
-const visibleInstance = () => browser.execute(() => {
-  const inst = [...document.querySelectorAll(".terminal-instance")].find((el) => el.style.display !== "none");
-  const tab = [...window.__tterm.tabs.values()].find((t) => t.element === inst);
-  if (!tab) return null;
-  const ta = inst.querySelector(".xterm-helper-textarea");
-  const cv = inst.querySelector(".composition-view");
-  const core = tab.terminal._core;
-  const dims = core._renderService.dimensions.css.cell;
-  const buf = tab.terminal.buffer.active;
-  const anchor = tab._imeAnchorCell();
-  return {
-    cursorHiddenClass: inst.classList.contains("cursor-hidden"),
-    mirrorOnClass: inst.classList.contains("ime-mirror-on"),
-    isCursorHidden: !!core.coreService?.isCursorHidden,
-    cell: { w: dims.width, h: dims.height },
-    anchorPx: { left: `${anchor.x * dims.width}px`, top: `${anchor.y * dims.height}px` },
-    realCursorPx: { left: `${buf.cursorX * dims.width}px`, top: `${buf.cursorY * dims.height}px` },
-    taInline: { left: ta.style.left, top: ta.style.top },
-    cvDisplay: getComputedStyle(cv).display,
-    cvText: cv.textContent,
-  };
-});
+const visibleInstance = () =>
+  browser.execute(() => {
+    const inst = [...document.querySelectorAll(".terminal-instance")].find(
+      (el) => el.style.display !== "none",
+    );
+    const tab = [...window.__tterm.tabs.values()].find((t) => t.element === inst);
+    if (!tab) return null;
+    const ta = inst.querySelector(".xterm-helper-textarea");
+    const cv = inst.querySelector(".composition-view");
+    const core = tab.terminal._core;
+    const dims = core._renderService.dimensions.css.cell;
+    const buf = tab.terminal.buffer.active;
+    const anchor = tab._imeAnchorCell();
+    return {
+      cursorHiddenClass: inst.classList.contains("cursor-hidden"),
+      mirrorOnClass: inst.classList.contains("ime-mirror-on"),
+      isCursorHidden: !!core.coreService?.isCursorHidden,
+      cell: { w: dims.width, h: dims.height },
+      anchorPx: { left: `${anchor.x * dims.width}px`, top: `${anchor.y * dims.height}px` },
+      realCursorPx: {
+        left: `${buf.cursorX * dims.width}px`,
+        top: `${buf.cursorY * dims.height}px`,
+      },
+      taInline: { left: ta.style.left, top: ta.style.top },
+      cvDisplay: getComputedStyle(cv).display,
+      cvText: cv.textContent,
+    };
+  });
 
-const mirrorState = () => browser.execute(() => {
-  const inst = [...document.querySelectorAll(".terminal-instance")].find((el) => el.style.display !== "none");
-  if (!inst) return null;
-  const box = inst.querySelector(".ime-box");
-  if (!box) return null;
-  const r = box.getBoundingClientRect();
-  const pr = inst.getBoundingClientRect();
-  return {
-    display: getComputedStyle(box).display,
-    text: box.textContent,
-    fading: box.classList.contains("fading"),
-    style: { left: box.style.left, top: box.style.top },
-    rect: { w: r.width, h: r.height },
-    inside: r.left >= pr.left - 1 && r.right <= pr.right + 1 &&
-            r.top >= pr.top - 1 && r.bottom <= pr.bottom + 1,
-  };
-});
+const mirrorState = () =>
+  browser.execute(() => {
+    const inst = [...document.querySelectorAll(".terminal-instance")].find(
+      (el) => el.style.display !== "none",
+    );
+    if (!inst) return null;
+    const box = inst.querySelector(".ime-box");
+    if (!box) return null;
+    const r = box.getBoundingClientRect();
+    const pr = inst.getBoundingClientRect();
+    return {
+      display: getComputedStyle(box).display,
+      text: box.textContent,
+      fading: box.classList.contains("fading"),
+      style: { left: box.style.left, top: box.style.top },
+      rect: { w: r.width, h: r.height },
+      inside:
+        r.left >= pr.left - 1 &&
+        r.right <= pr.right + 1 &&
+        r.top >= pr.top - 1 &&
+        r.bottom <= pr.bottom + 1,
+    };
+  });
 
 const setMode = (m) => browser.execute((mm) => window.__tterm.setImeMirrorMode(mm), m);
 
-const dumpBuffer = () => browser.execute(() => {
-  const visible = [...document.querySelectorAll(".terminal-instance")].find((el) => el.style.display !== "none");
-  const tab = [...window.__tterm.tabs.values()].find((t) => t.element === visible);
-  if (!tab) return "";
-  const buf = tab.terminal.buffer.active;
-  let out = "";
-  for (let i = 0; i < buf.length; i++) out += buf.getLine(i)?.translateToString(true) ?? "";
-  return out;
-});
+const dumpBuffer = () =>
+  browser.execute(() => {
+    const visible = [...document.querySelectorAll(".terminal-instance")].find(
+      (el) => el.style.display !== "none",
+    );
+    const tab = [...window.__tterm.tabs.values()].find((t) => t.element === visible);
+    if (!tab) return "";
+    const buf = tab.terminal.buffer.active;
+    let out = "";
+    for (let i = 0; i < buf.length; i++) out += buf.getLine(i)?.translateToString(true) ?? "";
+    return out;
+  });
 
 async function startComposition(text) {
   await browser.execute((t) => {
-    const inst = [...document.querySelectorAll(".terminal-instance")].find((el) => el.style.display !== "none");
+    const inst = [...document.querySelectorAll(".terminal-instance")].find(
+      (el) => el.style.display !== "none",
+    );
     const ta = inst.querySelector(".xterm-helper-textarea");
     ta.focus();
     ta.dispatchEvent(new CompositionEvent("compositionstart"));
@@ -96,7 +117,9 @@ async function startComposition(text) {
 
 async function updateComposition(text) {
   await browser.execute((t) => {
-    const inst = [...document.querySelectorAll(".terminal-instance")].find((el) => el.style.display !== "none");
+    const inst = [...document.querySelectorAll(".terminal-instance")].find(
+      (el) => el.style.display !== "none",
+    );
     const ta = inst.querySelector(".xterm-helper-textarea");
     ta.dispatchEvent(new CompositionEvent("compositionupdate", { data: t }));
   }, text);
@@ -104,7 +127,9 @@ async function updateComposition(text) {
 
 async function commitComposition(text) {
   await browser.execute((t) => {
-    const inst = [...document.querySelectorAll(".terminal-instance")].find((el) => el.style.display !== "none");
+    const inst = [...document.querySelectorAll(".terminal-instance")].find(
+      (el) => el.style.display !== "none",
+    );
     const ta = inst.querySelector(".xterm-helper-textarea");
     ta.dispatchEvent(new CompositionEvent("compositionend", { data: t }));
     // what the textarea looks like after a real IME commit
@@ -125,28 +150,37 @@ async function typeCommand(cmd) {
 
 async function enterHiddenCursorFixture() {
   await typeCommand(`type ${FIX}\\ime-hide.txt`);
-  await browser.waitUntil(async () => {
-    const s = await visibleInstance();
-    return s && s.isCursorHidden === true;
-  }, { timeout: 10000, timeoutMsg: "cursor-hidden state not detected in alt screen" });
+  await browser.waitUntil(
+    async () => {
+      const s = await visibleInstance();
+      return s && s.isCursorHidden === true;
+    },
+    { timeout: 10000, timeoutMsg: "cursor-hidden state not detected in alt screen" },
+  );
 }
 
 async function leaveHiddenCursorFixture() {
   await typeCommand(`type ${FIX}\\ime-show.txt`);
-  await browser.waitUntil(async () => {
-    const s = await visibleInstance();
-    return s && s.isCursorHidden === false;
-  }, { timeout: 10000, timeoutMsg: "cursor not restored after leaving alt screen" });
+  await browser.waitUntil(
+    async () => {
+      const s = await visibleInstance();
+      return s && s.isCursorHidden === false;
+    },
+    { timeout: 10000, timeoutMsg: "cursor not restored after leaving alt screen" },
+  );
 }
 
 describe("IME with cursor-hiding TUIs", () => {
   it("shows composition inline in a normal shell and commits CJK to the PTY", async () => {
     await setMode("auto"); // native xterm path; mirror must stay out of the way
     await startComposition("nihao");
-    await browser.waitUntil(async () => {
-      const s = await visibleInstance();
-      return s && !s.isCursorHidden && s.cvDisplay === "block" && s.cvText === "nihao";
-    }, { timeout: 5000, timeoutMsg: "inline composition not shown in normal shell" });
+    await browser.waitUntil(
+      async () => {
+        const s = await visibleInstance();
+        return s && !s.isCursorHidden && s.cvDisplay === "block" && s.cvText === "nihao";
+      },
+      { timeout: 5000, timeoutMsg: "inline composition not shown in normal shell" },
+    );
     const m = await mirrorState();
     expect(m.display).toBe("none"); // mirror inactive in auto+visible cursor
 
@@ -187,10 +221,13 @@ describe("IME with cursor-hiding TUIs", () => {
     await enterHiddenCursorFixture();
 
     await startComposition("nihao");
-    await browser.waitUntil(async () => {
-      const m = await mirrorState();
-      return m && m.display === "block" && m.text === "nihao";
-    }, { timeout: 5000, timeoutMsg: "mirror did not show the composition" });
+    await browser.waitUntil(
+      async () => {
+        const m = await mirrorState();
+        return m && m.display === "block" && m.text === "nihao";
+      },
+      { timeout: 5000, timeoutMsg: "mirror did not show the composition" },
+    );
 
     const s = await visibleInstance();
     const m = await mirrorState();
@@ -211,17 +248,23 @@ describe("IME with cursor-hiding TUIs", () => {
     // text grows → mirror wraps and re-clamps (deferred to rAF), never
     // leaves the terminal
     await updateComposition("a".repeat(160));
-    await browser.waitUntil(async () => {
-      const mm = await mirrorState();
-      return mm && mm.text === "a".repeat(160) && mm.inside;
-    }, { timeout: 3000, timeoutMsg: "mirror did not re-clamp inside the terminal" });
+    await browser.waitUntil(
+      async () => {
+        const mm = await mirrorState();
+        return mm && mm.text === "a".repeat(160) && mm.inside;
+      },
+      { timeout: 3000, timeoutMsg: "mirror did not re-clamp inside the terminal" },
+    );
 
     // commit → mirror disappears immediately (0ms linger + 0ms fade)
     await commitComposition("你好");
-    await browser.waitUntil(async () => {
-      const mm = await mirrorState();
-      return mm && mm.display === "none";
-    }, { timeout: 3000, timeoutMsg: "mirror did not disappear after commit" });
+    await browser.waitUntil(
+      async () => {
+        const mm = await mirrorState();
+        return mm && mm.display === "none";
+      },
+      { timeout: 3000, timeoutMsg: "mirror did not disappear after commit" },
+    );
 
     await leaveHiddenCursorFixture();
   });
@@ -229,10 +272,13 @@ describe("IME with cursor-hiding TUIs", () => {
   it("mirrors compositions in a normal shell when mode is 'always' (testing override)", async () => {
     await setMode("always");
     await startComposition("nihao");
-    await browser.waitUntil(async () => {
-      const m = await mirrorState();
-      return m && m.display === "block" && m.text === "nihao";
-    }, { timeout: 5000, timeoutMsg: "mirror did not show in always mode" });
+    await browser.waitUntil(
+      async () => {
+        const m = await mirrorState();
+        return m && m.display === "block" && m.text === "nihao";
+      },
+      { timeout: 5000, timeoutMsg: "mirror did not show in always mode" },
+    );
     const s = await visibleInstance();
     expect(s.isCursorHidden).toBe(false);
     expect(s.mirrorOnClass).toBe(true);
@@ -242,10 +288,12 @@ describe("IME with cursor-hiding TUIs", () => {
 
     await commitComposition("你好");
     await browser.waitUntil(async () => (await mirrorState()).display === "none", {
-      timeout: 3000, timeoutMsg: "mirror did not fade out after commit",
+      timeout: 3000,
+      timeoutMsg: "mirror did not fade out after commit",
     });
     await browser.waitUntil(async () => (await dumpBuffer()).includes("你好"), {
-      timeout: 5000, timeoutMsg: "committed CJK text did not reach the terminal buffer",
+      timeout: 5000,
+      timeoutMsg: "committed CJK text did not reach the terminal buffer",
     });
     await browser.keys(["Control", "c"]);
     await setMode("auto");

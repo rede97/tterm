@@ -1,8 +1,8 @@
 // Settings — Profile panel
 // Default profile selection, WT profile visibility toggles
 
-import { configStore, type ConfigState } from "../core/store";
 import { esc } from "../core/common";
+import { type ConfigState, configStore } from "../core/store";
 
 export function createProfilePanel(): HTMLElement {
   const panel = document.createElement("div");
@@ -38,7 +38,7 @@ function renderProfilePanel(container: HTMLElement) {
         </div>
         <div class="settings-item-control">
           <select id="set-default-profile" class="settings-select">
-            ${localProfiles.map(p => `<option value="${esc(p.name)}" ${p.name === defaultProfile ? "selected" : ""}>${esc(p.name)}</option>`).join("")}
+            ${localProfiles.map((p) => `<option value="${esc(p.name)}" ${p.name === defaultProfile ? "selected" : ""}>${esc(p.name)}</option>`).join("")}
           </select>
         </div>
       </div>
@@ -46,9 +46,10 @@ function renderProfilePanel(container: HTMLElement) {
     <div class="settings-section">
       <div class="settings-section-title">Imported from Windows Terminal</div>
       <div class="settings-item-desc" style="margin-bottom:10px">Toggle visibility of profiles imported from Windows Terminal. Uncheck to hide.</div>
-      ${localProfiles.map(p => {
-        const checked = !hiddenProfiles.includes(p.name);
-        return `<label class="settings-item settings-item-row" style="cursor:pointer;margin-bottom:4px;background:#2a2a2a;border-radius:4px;padding:6px 10px;">
+      ${localProfiles
+        .map((p) => {
+          const checked = !hiddenProfiles.includes(p.name);
+          return `<label class="settings-item settings-item-row" style="cursor:pointer;margin-bottom:4px;background:#2a2a2a;border-radius:4px;padding:6px 10px;">
           <div class="settings-item-info">
             <div class="settings-item-title" style="margin-bottom:0;">${esc(p.name)}</div>
             <div class="settings-item-desc" style="margin-bottom:0;">${esc(p.command)}</div>
@@ -59,7 +60,8 @@ function renderProfilePanel(container: HTMLElement) {
             </label>
           </div>
         </label>`;
-      }).join("")}
+        })
+        .join("")}
     </div>
   `;
 
@@ -78,8 +80,9 @@ export function collectProfileSettings(root: HTMLElement): Partial<ConfigState> 
     partial.defaultLocalProfile = profileEl.value;
   }
   const hidden: string[] = [];
-  checks.forEach(c => { if (!c.checked) hidden.push(c.value); });
+  checks.forEach((c) => {
+    if (!c.checked) hidden.push(c.value);
+  });
   partial.hiddenProfiles = hidden;
   return partial;
 }
-

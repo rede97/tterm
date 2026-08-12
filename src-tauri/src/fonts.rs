@@ -13,8 +13,18 @@ pub(crate) fn strip_font_suffix(name: &str) -> Option<String> {
 /// are also genuine family names on Windows (Black, Narrow, Condensed,
 /// Book) are deliberately NOT stripped: "Arial Black" must survive.
 const WEIGHT_TOKENS: [&str; 12] = [
-    "Regular", "Bold", "Italic", "Thin", "ExtraLight", "Light", "SemiLight",
-    "Medium", "SemiBold", "DemiBold", "ExtraBold", "Heavy",
+    "Regular",
+    "Bold",
+    "Italic",
+    "Thin",
+    "ExtraLight",
+    "Light",
+    "SemiLight",
+    "Medium",
+    "SemiBold",
+    "DemiBold",
+    "ExtraBold",
+    "Heavy",
 ];
 
 pub(crate) fn css_family(reg_value_name: &str) -> Option<String> {
@@ -38,8 +48,8 @@ pub fn list_system_fonts() -> Vec<String> {
     // what non-admin "Install" does on Windows 10/11. HKLM alone misses
     // every font installed without elevation.
     for hive in [HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER] {
-        if let Ok(key) = RegKey::predef(hive)
-            .open_subkey(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts")
+        if let Ok(key) =
+            RegKey::predef(hive).open_subkey(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts")
         {
             for v in key.enum_values().filter_map(|r| r.ok()) {
                 if let Some(family) = css_family(&v.0) {
@@ -53,7 +63,6 @@ pub fn list_system_fonts() -> Vec<String> {
     names
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -62,12 +71,18 @@ mod tests {
 
     #[test]
     fn strip_truetype_suffix() {
-        assert_eq!(strip_font_suffix("Consolas (TrueType)"), Some("Consolas".to_string()));
+        assert_eq!(
+            strip_font_suffix("Consolas (TrueType)"),
+            Some("Consolas".to_string())
+        );
     }
 
     #[test]
     fn strip_opentype_suffix() {
-        assert_eq!(strip_font_suffix("Segoe UI (OpenType)"), Some("Segoe UI".to_string()));
+        assert_eq!(
+            strip_font_suffix("Segoe UI (OpenType)"),
+            Some("Segoe UI".to_string())
+        );
     }
 
     #[test]
@@ -99,20 +114,31 @@ mod tests {
             css_family("JetBrainsMonoNL NFP Thin (TrueType)").as_deref(),
             Some("JetBrainsMonoNL NFP")
         );
-        assert_eq!(css_family("Consolas Bold (TrueType)").as_deref(), Some("Consolas"));
-        assert_eq!(css_family("Consolas (TrueType)").as_deref(), Some("Consolas"));
+        assert_eq!(
+            css_family("Consolas Bold (TrueType)").as_deref(),
+            Some("Consolas")
+        );
+        assert_eq!(
+            css_family("Consolas (TrueType)").as_deref(),
+            Some("Consolas")
+        );
     }
 
     #[test]
     fn keeps_weight_named_families() {
         // These are real family names, not faces of a shorter family.
-        assert_eq!(css_family("Arial Black (TrueType)").as_deref(), Some("Arial Black"));
-        assert_eq!(css_family("Arial Narrow (TrueType)").as_deref(), Some("Arial Narrow"));
+        assert_eq!(
+            css_family("Arial Black (TrueType)").as_deref(),
+            Some("Arial Black")
+        );
+        assert_eq!(
+            css_family("Arial Narrow (TrueType)").as_deref(),
+            Some("Arial Narrow")
+        );
     }
 
     #[test]
     fn rejects_unknown_suffix() {
         assert_eq!(css_family("Some Font (Raster)"), None);
     }
-
 }

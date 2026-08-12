@@ -5,8 +5,8 @@
 //   - pasteWarning: multi-line pastes ask first (confirmDialog); a
 //                   single-line command pastes straight through
 
-import { configStore } from "../core/store";
 import { trimPasteContent } from "../core/common";
+import { configStore } from "../core/store";
 import { confirmDialog } from "../ui/confirm";
 
 interface PasteTarget {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { invokeMock } = vi.hoisted(() => ({
   invokeMock: vi.fn(() => Promise.resolve(null)),
@@ -6,8 +6,8 @@ const { invokeMock } = vi.hoisted(() => ({
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 
 import { configStore } from "../src/core/store";
-import { tabManager } from "../src/terminal/tabmanager";
 import { launchDirectoryTab } from "../src/terminal/dirmenu";
+import { tabManager } from "../src/terminal/tabmanager";
 
 const PS = { name: "PowerShell", command: "powershell.exe" };
 const CMD = { name: "Command Prompt", command: "cmd.exe" };
@@ -23,12 +23,18 @@ beforeEach(() => {
 describe("TabManager.defaultLocalProfile", () => {
   it("returns the profile selected in settings", () => {
     configStore.set({ localProfiles: [CMD, PS], defaultLocalProfile: "PowerShell" });
-    expect(tabManager.defaultLocalProfile()).toEqual({ command: "powershell.exe", name: "PowerShell" });
+    expect(tabManager.defaultLocalProfile()).toEqual({
+      command: "powershell.exe",
+      name: "PowerShell",
+    });
   });
 
   it("falls back to the first profile when no default is set", () => {
     configStore.set({ localProfiles: [CMD, PS], defaultLocalProfile: null });
-    expect(tabManager.defaultLocalProfile()).toEqual({ command: "cmd.exe", name: "Command Prompt" });
+    expect(tabManager.defaultLocalProfile()).toEqual({
+      command: "cmd.exe",
+      name: "Command Prompt",
+    });
   });
 
   it("returns null when no profiles are loaded (backend shell fallback)", () => {
@@ -50,12 +56,20 @@ describe("launchDirectoryTab", () => {
   it("launches the default profile (not the backend fallback shell) in the picked directory", async () => {
     configStore.set({ localProfiles: [CMD, PS], defaultLocalProfile: "PowerShell" });
     await launchDirectoryTab("D:\\projects\\tterm");
-    expect(tabManager.createLocalTab).toHaveBeenCalledWith("powershell.exe", "tterm", "D:\\projects\\tterm");
+    expect(tabManager.createLocalTab).toHaveBeenCalledWith(
+      "powershell.exe",
+      "tterm",
+      "D:\\projects\\tterm",
+    );
   });
 
   it("passes no command when no profiles exist (backend fallback)", async () => {
     await launchDirectoryTab("D:\\projects\\tterm");
-    expect(tabManager.createLocalTab).toHaveBeenCalledWith(undefined, "tterm", "D:\\projects\\tterm");
+    expect(tabManager.createLocalTab).toHaveBeenCalledWith(
+      undefined,
+      "tterm",
+      "D:\\projects\\tterm",
+    );
   });
 
   it("remembers the directory in recentDirectories (most-recent first, deduped)", async () => {
@@ -66,6 +80,10 @@ describe("launchDirectoryTab", () => {
 
   it("uses the last path component as the tab label, tolerating trailing separators", async () => {
     await launchDirectoryTab("D:\\projects\\tterm\\");
-    expect(tabManager.createLocalTab).toHaveBeenCalledWith(undefined, "tterm", "D:\\projects\\tterm\\");
+    expect(tabManager.createLocalTab).toHaveBeenCalledWith(
+      undefined,
+      "tterm",
+      "D:\\projects\\tterm\\",
+    );
   });
 });

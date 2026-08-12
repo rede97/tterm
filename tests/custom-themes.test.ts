@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Fake themes.json backing store for read_themes/write_themes.
 const { file } = vi.hoisted(() => ({ file: { content: "[]" } }));
@@ -14,12 +14,12 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 import {
-  parseCustomThemes,
-  sanitizeTheme,
   dedupeThemeName,
-  saveCustomTheme,
   deleteCustomTheme,
   loadCustomThemes,
+  parseCustomThemes,
+  sanitizeTheme,
+  saveCustomTheme,
 } from "../src/config/custom-themes";
 import { allThemes, findTheme } from "../src/util/themes";
 
@@ -54,7 +54,7 @@ describe("parseCustomThemes", () => {
   it("parses valid entries and skips invalid ones", () => {
     file.content = JSON.stringify([
       { name: "Mine", theme: VALID },
-      { name: "", theme: VALID },            // empty name
+      { name: "", theme: VALID }, // empty name
       { name: "Broken", theme: { red: "#ff0000" } }, // no bg/fg
       "garbage",
     ]);
@@ -96,7 +96,9 @@ describe("saveCustomTheme / deleteCustomTheme", () => {
   it("renames via originalName", async () => {
     await saveCustomTheme("Mine", VALID);
     await saveCustomTheme("Renamed", VALID, "Mine");
-    const names = allThemes().filter((t) => t.source === "custom").map((t) => t.name);
+    const names = allThemes()
+      .filter((t) => t.source === "custom")
+      .map((t) => t.name);
     expect(names).toEqual(["Renamed"]);
   });
 
@@ -104,7 +106,9 @@ describe("saveCustomTheme / deleteCustomTheme", () => {
     await saveCustomTheme("A", VALID);
     await saveCustomTheme("B", VALID);
     await deleteCustomTheme("A");
-    const names = allThemes().filter((t) => t.source === "custom").map((t) => t.name);
+    const names = allThemes()
+      .filter((t) => t.source === "custom")
+      .map((t) => t.name);
     expect(names).toEqual(["B"]);
     expect(findTheme("A").name).toBe("TTerm Dark"); // falls back to default
   });

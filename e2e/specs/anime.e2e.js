@@ -2,32 +2,41 @@
 // binaries. Also serves as the deterministic fixture for hidden-cursor and
 // full-screen-repaint scenarios.
 
-const dumpBuffer = () => browser.execute(() => {
-  const visible = [...document.querySelectorAll(".terminal-instance")].find((el) => el.style.display !== "none");
-  const tab = [...window.__tterm.tabs.values()].find((t) => t.element === visible);
-  if (!tab) return "";
-  const buf = tab.terminal.buffer.active;
-  let out = "";
-  for (let i = 0; i < buf.length; i++) out += buf.getLine(i)?.translateToString(true) ?? "";
-  return out;
-});
+const dumpBuffer = () =>
+  browser.execute(() => {
+    const visible = [...document.querySelectorAll(".terminal-instance")].find(
+      (el) => el.style.display !== "none",
+    );
+    const tab = [...window.__tterm.tabs.values()].find((t) => t.element === visible);
+    if (!tab) return "";
+    const buf = tab.terminal.buffer.active;
+    let out = "";
+    for (let i = 0; i < buf.length; i++) out += buf.getLine(i)?.translateToString(true) ?? "";
+    return out;
+  });
 
-const cursorHidden = () => browser.execute(() => {
-  const visible = [...document.querySelectorAll(".terminal-instance")].find((el) => el.style.display !== "none");
-  const tab = [...window.__tterm.tabs.values()].find((t) => t.element === visible);
-  return tab ? !!tab.terminal._core.coreService?.isCursorHidden : null;
-});
+const cursorHidden = () =>
+  browser.execute(() => {
+    const visible = [...document.querySelectorAll(".terminal-instance")].find(
+      (el) => el.style.display !== "none",
+    );
+    const tab = [...window.__tterm.tabs.values()].find((t) => t.element === visible);
+    return tab ? !!tab.terminal._core.coreService?.isCursorHidden : null;
+  });
 
 async function openAnimeTab() {
   await $("#new-tab-menu-btn").click();
-  const item = await browser.waitUntil(async () => {
-    const items = await $$(".profile-menu .profile-item");
-    for (const it of items) {
-      const label = await it.$(".item-label").getText();
-      if (label === "Anime TTY") return it;
-    }
-    return false;
-  }, { timeout: 5000, timeoutMsg: "Anime TTY menu item not found (debug build?)" });
+  const item = await browser.waitUntil(
+    async () => {
+      const items = await $$(".profile-menu .profile-item");
+      for (const it of items) {
+        const label = await it.$(".item-label").getText();
+        if (label === "Anime TTY") return it;
+      }
+      return false;
+    },
+    { timeout: 5000, timeoutMsg: "Anime TTY menu item not found (debug build?)" },
+  );
   await item.click();
   await browser.waitUntil(async () => (await dumpBuffer()).length > 100, { timeout: 10000 });
 }
@@ -55,7 +64,9 @@ describe("Anime TTY (gostty port)", () => {
     // The gostty frames have their own internal left padding per row, so the
     // hpad shows up as the MINIMUM leading-space count across content lines.
     const pad = await browser.execute(() => {
-      const visible = [...document.querySelectorAll(".terminal-instance")].find((el) => el.style.display !== "none");
+      const visible = [...document.querySelectorAll(".terminal-instance")].find(
+        (el) => el.style.display !== "none",
+      );
       const tab = [...window.__tterm.tabs.values()].find((t) => t.element === visible);
       if (!tab) return null;
       const buf = tab.terminal.buffer.active;

@@ -3,14 +3,14 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import Sortable from "sortablejs";
-import { configStore, type ConfigState } from "../core/store";
-import { hostProp, esc} from "../core/common";
-import { loadSshHosts, generateSshConfig } from "../config/ssh-config";
+import { generateSshConfig, loadSshHosts } from "../config/ssh-config";
+import { esc, hostProp } from "../core/common";
 import { logError } from "../core/errorlog";
+import { type ConfigState, configStore } from "../core/store";
+import type { SshHost } from "../core/types";
+import { showToast } from "../ui/toast";
 import { showSshHostEditor } from "./sshhosteditor";
 import { listKeys, showInstallKeyModal, showKeygenModal } from "./sshkeys";
-import { showToast } from "../ui/toast";
-import type { SshHost } from "../core/types";
 
 export function createSshPanel(): HTMLElement {
   const panel = document.createElement("div");
@@ -46,17 +46,18 @@ function renderSshPanel(container: HTMLElement, opts?: { keepPending?: boolean }
       <div class="settings-item-desc">No SSH hosts found. Add hosts to your SSH config file to see them here.</div>
     </div>`;
   } else {
-    hostRows = allHosts.map(h => {
-      const visible = !hiddenSshHosts.includes(h.name);
-      const hostname = hostProp(h, "hostname") || h.name;
-      const user = hostProp(h, "user") || "root";
-      const port = hostProp(h, "port") || "22";
-      const skipKeys = new Set(["name", "hostname", "user", "port"]);
-      const extra = Object.entries(h)
-        .filter(([k]) => !skipKeys.has(k.toLowerCase()))
-        // Multi-line values (merged forward directives) read as a list.
-        .flatMap(([k, v]) => v.split("\n").map(line => `${k}: ${line}`));
-      return `<div class="ssh-host-card" data-name="${esc(h.name)}" style="margin-bottom:4px;background:#2a2a2a;border-radius:4px;overflow:hidden;">
+    hostRows = allHosts
+      .map((h) => {
+        const visible = !hiddenSshHosts.includes(h.name);
+        const hostname = hostProp(h, "hostname") || h.name;
+        const user = hostProp(h, "user") || "root";
+        const port = hostProp(h, "port") || "22";
+        const skipKeys = new Set(["name", "hostname", "user", "port"]);
+        const extra = Object.entries(h)
+          .filter(([k]) => !skipKeys.has(k.toLowerCase()))
+          // Multi-line values (merged forward directives) read as a list.
+          .flatMap(([k, v]) => v.split("\n").map((line) => `${k}: ${line}`));
+        return `<div class="ssh-host-card" data-name="${esc(h.name)}" style="margin-bottom:4px;background:#2a2a2a;border-radius:4px;overflow:hidden;">
         <div class="ssh-host-row" style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;cursor:pointer;">
           <div style="flex-shrink:0;padding-top:2px;" onclick="event.stopPropagation()">
             <label class="settings-toggle-row" style="padding:0;gap:0;">
@@ -73,14 +74,15 @@ function renderSshPanel(container: HTMLElement, opts?: { keepPending?: boolean }
           </div>
         </div>
         <div class="ssh-host-detail" style="display:none;padding:0 10px 8px 10px;">
-          ${extra.length > 0 ? `<div class="ssh-host-extra" style="font-size:12px;color:#888;margin-bottom:6px;padding-left:28px;display:flex;flex-direction:column;gap:2px;">${extra.map(e => `<div style="word-break:break-all;">${esc(e)}</div>`).join("")}</div>` : ""}
+          ${extra.length > 0 ? `<div class="ssh-host-extra" style="font-size:12px;color:#888;margin-bottom:6px;padding-left:28px;display:flex;flex-direction:column;gap:2px;">${extra.map((e) => `<div style="word-break:break-all;">${esc(e)}</div>`).join("")}</div>` : ""}
           <div style="display:flex;gap:6px;padding-left:28px;">
             <button class="ssh-btn-clear settings-link-btn" data-hostname="${esc(hostname)}" style="background:#4a4a4a;">Clear KnownHosts</button>
             <button class="ssh-btn-copy-id settings-link-btn" data-hostname="${esc(hostname)}" data-port="${esc(port)}" data-user="${esc(user)}" style="background:#4a4a4a;">Upload SSH Key</button>
           </div>
         </div>
       </div>`;
-    }).join("");
+      })
+      .join("");
   }
 
   container.innerHTML = `
@@ -135,9 +137,12 @@ function renderSshPanel(container: HTMLElement, opts?: { keepPending?: boolean }
   const keyList = container.querySelector<HTMLElement>(".ssh-key-list")!;
   listKeys().then((keys) => {
     if (!keyList.isConnected) return; // panel re-rendered meanwhile
-    keyList.innerHTML = keys.length === 0
-      ? `<div class="settings-item"><div class="settings-item-desc">No key pairs found. Generate one to enable passwordless logins.</div></div>`
-      : keys.map(k => `<div class="settings-item settings-item-row">
+    keyList.innerHTML =
+      keys.length === 0
+        ? `<div class="settings-item"><div class="settings-item-desc">No key pairs found. Generate one to enable passwordless logins.</div></div>`
+        : keys
+            .map(
+              (k) => `<div class="settings-item settings-item-row">
           <div class="settings-item-info">
             <div class="settings-item-title">${esc(k.name)}</div>
             <div class="settings-item-desc">${esc(k.fingerprint)}</div>
@@ -145,8 +150,10 @@ function renderSshPanel(container: HTMLElement, opts?: { keepPending?: boolean }
           <div class="settings-item-control">
             <button class="settings-link-btn ssh-key-copy" data-key="${esc(k.publicKey)}">Copy Public Key</button>
           </div>
-        </div>`).join("");
-    keyList.querySelectorAll<HTMLButtonElement>(".ssh-key-copy").forEach(btn => {
+        </div>`,
+            )
+            .join("");
+    keyList.querySelectorAll<HTMLButtonElement>(".ssh-key-copy").forEach((btn) => {
       btn.addEventListener("click", async () => {
         await navigator.clipboard.writeText(btn.dataset.key!);
         showToast("Public key copied to clipboard", "info");
@@ -184,13 +191,12 @@ function setSshConfigDirty(dirty: boolean, from: HTMLElement): void {
 /// Reorder the sshHosts working copy to match the card order in the DOM
 /// after a drag. Pending until Save SSH Config, like Add/Edit/Delete.
 export function syncSshHostOrder(list: HTMLElement): void {
-  const order = [...list.querySelectorAll<HTMLElement>(".ssh-host-card")]
-    .map(c => c.dataset.name ?? "");
+  const order = [...list.querySelectorAll<HTMLElement>(".ssh-host-card")].map(
+    (c) => c.dataset.name ?? "",
+  );
   const hosts = configStore.get("sshHosts");
-  const byName = new Map(hosts.map(h => [h.name, h]));
-  const reordered = order
-    .map(n => byName.get(n))
-    .filter((h): h is SshHost => !!h);
+  const byName = new Map(hosts.map((h) => [h.name, h]));
+  const reordered = order.map((n) => byName.get(n)).filter((h): h is SshHost => !!h);
   // Paranoia: if the DOM and the store disagree on membership, keep the
   // store's order rather than silently dropping hosts.
   if (reordered.length !== hosts.length) return;
@@ -202,27 +208,33 @@ function wireSshEvents(container: HTMLElement) {
   // The footer's feedback span, looked up via the settings page root.
   // Null-safe: closing the Settings tab mid-invoke must not throw.
   const showFeedback = (title: string, detail: string, ok: boolean) => {
-    const fb = container.closest(".settings-page")?.querySelector<HTMLElement>(".settings-feedback");
-    if (!fb || !fb.isConnected) return;
+    const fb = container
+      .closest(".settings-page")
+      ?.querySelector<HTMLElement>(".settings-feedback");
+    if (!fb?.isConnected) return;
     fb.innerHTML = `<div>${esc(title)}</div>
       <div style="font-size:12px;color:${ok ? "#888" : "#c44"};">${esc(detail)}</div>`;
     fb.className = `settings-feedback ${ok ? "settings-feedback-ok" : "settings-feedback-info"}`;
-    setTimeout(() => { fb.textContent = ""; }, 5000);
+    setTimeout(() => {
+      fb.textContent = "";
+    }, 5000);
   };
 
-  container.querySelector("#set-open-ssh-config")!.addEventListener("click", () => {
+  container.querySelector("#set-open-ssh-config")?.addEventListener("click", () => {
     invoke("open_ssh_config").catch(logError.bind(null, "ssh.openConfig"));
   });
 
-  container.querySelector("#set-reload-ssh")!.addEventListener("click", async () => {
+  container.querySelector("#set-reload-ssh")?.addEventListener("click", async () => {
     const hosts = await loadSshHosts();
     configStore.set({ sshHosts: hosts });
     setSshConfigDirty(false, container); // working copy matches the file
     renderSshPanel(container, { keepPending: true });
   });
 
-  container.querySelector("#set-save-ssh-config")!.addEventListener("click", async () => {
-    const confirmed = confirm("This will overwrite your SSH config file (~/.ssh/config).\n\nA backup will be saved to config.tt.bak.\n\nContinue?");
+  container.querySelector("#set-save-ssh-config")?.addEventListener("click", async () => {
+    const confirmed = confirm(
+      "This will overwrite your SSH config file (~/.ssh/config).\n\nA backup will be saved to config.tt.bak.\n\nContinue?",
+    );
     if (!confirmed) return;
     const allHosts = configStore.get("sshHosts");
     const content = generateSshConfig(allHosts);
@@ -240,12 +252,12 @@ function wireSshEvents(container: HTMLElement) {
   });
 
   // Visibility checkboxes — persist immediately
-  container.querySelectorAll<HTMLInputElement>(".ssh-vis-check").forEach(cb => {
+  container.querySelectorAll<HTMLInputElement>(".ssh-vis-check").forEach((cb) => {
     cb.addEventListener("change", async () => {
       const name = cb.value;
       let hidden = [...configStore.get("hiddenSshHosts")];
       if (cb.checked) {
-        hidden = hidden.filter(n => n !== name);
+        hidden = hidden.filter((n) => n !== name);
       } else if (!hidden.includes(name)) {
         hidden.push(name);
       }
@@ -255,7 +267,7 @@ function wireSshEvents(container: HTMLElement) {
 
   // Row click toggles expand/collapse. Expanded cards show their full
   // config one property per line — and are excluded from drag reorder.
-  container.querySelectorAll(".ssh-host-row").forEach(row => {
+  container.querySelectorAll(".ssh-host-row").forEach((row) => {
     row.addEventListener("click", () => {
       const card = row.closest(".ssh-host-card")!;
       const detail = card.querySelector(".ssh-host-detail") as HTMLElement;
@@ -284,7 +296,7 @@ function wireSshEvents(container: HTMLElement) {
   }
 
   // Clear KnownHosts
-  container.querySelectorAll(".ssh-btn-clear").forEach(btn => {
+  container.querySelectorAll(".ssh-btn-clear").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
       const hostname = (btn as HTMLElement).dataset.hostname!;
@@ -299,7 +311,7 @@ function wireSshEvents(container: HTMLElement) {
   });
 
   // Upload SSH Key: pick a local public key and install it on this host.
-  container.querySelectorAll<HTMLButtonElement>(".ssh-btn-copy-id").forEach(btn => {
+  container.querySelectorAll<HTMLButtonElement>(".ssh-btn-copy-id").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       showInstallKeyModal({
@@ -312,17 +324,16 @@ function wireSshEvents(container: HTMLElement) {
 
   // Generate Key: new pair lands in ~/.ssh; the list refreshes on the next
   // panel render, so trigger one after generation.
-  container.querySelector<HTMLButtonElement>("#set-gen-ssh-key")!
-    .addEventListener("click", () => {
-      showKeygenModal({ onSaved: () => renderSshPanel(container, { keepPending: true }) });
-    });
+  container.querySelector<HTMLButtonElement>("#set-gen-ssh-key")?.addEventListener("click", () => {
+    showKeygenModal({ onSaved: () => renderSshPanel(container, { keepPending: true }) });
+  });
 
   // Delete: remove from working copy (not saved until Save SSH Config)
-  container.querySelectorAll(".ssh-btn-delete").forEach(btn => {
+  container.querySelectorAll(".ssh-btn-delete").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       const hostname = (btn as HTMLElement).dataset.hostname!;
-      const hosts = configStore.get("sshHosts").filter(h => h.name !== hostname);
+      const hosts = configStore.get("sshHosts").filter((h) => h.name !== hostname);
       configStore.set({ sshHosts: hosts });
       setSshConfigDirty(true, container);
       renderSshPanel(container, { keepPending: true });
@@ -331,27 +342,25 @@ function wireSshEvents(container: HTMLElement) {
 
   // Add Host / Edit: both open the shared host editor modal. The result
   // lands in the working copy (pending until Save SSH Config).
-  const saveHost = (container2: HTMLElement) =>
-    (host: SshHost, originalName?: string) => {
-      const hosts = configStore.get("sshHosts");
-      const next = originalName
-        ? hosts.map(h => (h.name === originalName ? host : h))
-        : [...hosts, host];
-      configStore.set({ sshHosts: next });
-      setSshConfigDirty(true, container2);
-      renderSshPanel(container2, { keepPending: true });
-    };
+  const saveHost = (container2: HTMLElement) => (host: SshHost, originalName?: string) => {
+    const hosts = configStore.get("sshHosts");
+    const next = originalName
+      ? hosts.map((h) => (h.name === originalName ? host : h))
+      : [...hosts, host];
+    configStore.set({ sshHosts: next });
+    setSshConfigDirty(true, container2);
+    renderSshPanel(container2, { keepPending: true });
+  };
 
-  container.querySelector<HTMLButtonElement>("#set-add-ssh-host")!
-    .addEventListener("click", () => {
-      showSshHostEditor({ onSaved: saveHost(container) });
-    });
+  container.querySelector<HTMLButtonElement>("#set-add-ssh-host")?.addEventListener("click", () => {
+    showSshHostEditor({ onSaved: saveHost(container) });
+  });
 
-  container.querySelectorAll<HTMLButtonElement>(".ssh-btn-edit").forEach(btn => {
+  container.querySelectorAll<HTMLButtonElement>(".ssh-btn-edit").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       const name = btn.dataset.hostname!;
-      const base = configStore.get("sshHosts").find(h => h.name === name);
+      const base = configStore.get("sshHosts").find((h) => h.name === name);
       if (base) showSshHostEditor({ base, onSaved: saveHost(container) });
     });
   });
@@ -367,4 +376,3 @@ export function collectSshSettings(root: HTMLElement): Partial<ConfigState> {
   if (embeddedEl) partial.sshEmbedded = embeddedEl.checked;
   return partial;
 }
-

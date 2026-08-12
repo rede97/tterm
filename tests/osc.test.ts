@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { parseOsc9Progress, applyProgressToTabElement } from "../src/util/osc";
+import { describe, expect, it } from "vitest";
+import { applyProgressToTabElement, parseOsc9Progress } from "../src/util/osc";
 
 describe("parseOsc9Progress", () => {
   it("parses normal progress", () => {
@@ -28,9 +28,9 @@ describe("parseOsc9Progress", () => {
   });
 
   it("rejects malformed sequences", () => {
-    expect(parseOsc9Progress("4;9;50")).toBeNull();   // state out of range
-    expect(parseOsc9Progress("4;x;50")).toBeNull();   // non-numeric state
-    expect(parseOsc9Progress("4;1;abc")).toBeNull();  // non-numeric progress
+    expect(parseOsc9Progress("4;9;50")).toBeNull(); // state out of range
+    expect(parseOsc9Progress("4;x;50")).toBeNull(); // non-numeric state
+    expect(parseOsc9Progress("4;1;abc")).toBeNull(); // non-numeric progress
   });
 
   it("contract: parses every sequence the Rust demo TTY can emit", () => {

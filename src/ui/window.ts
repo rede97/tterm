@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { createElement, Minus, Square, Copy, X, Drama } from "lucide";
+import { Copy, createElement, Drama, Minus, Square, X } from "lucide";
 import { logCatch, swallow } from "../core/errorlog";
 
 const appWindow = getCurrentWindow();
@@ -76,7 +76,7 @@ function initWindowButtons() {
     }
   });
 
-  document.getElementById("tab-bar")!.addEventListener("dblclick", (e) => {
+  document.getElementById("tab-bar")?.addEventListener("dblclick", (e) => {
     const target = e.target instanceof Element ? e.target : (e.target as Node).parentElement;
     // Buttons have their own actions; a dblclick on a tab is rename/click
     // territory, not a window-maximize gesture (matches the drag guard).
@@ -183,22 +183,24 @@ export function initWindowControls() {
   updateMaximizeIcon();
 
   unlistenResized?.();
-  appWindow.onResized(() => {
-    updateMaximizeIcon();
-    // Drag-restore or the maximize button while in zen: drop the zen chrome
-    // but leave the window exactly where the user put it. The check follows
-    // the mode's window state (fullscreen windows are not "maximized").
-    if (zenKind && Date.now() > zenTransitionUntil) {
-      const kind = zenKind;
-      const settled = kind === "max" ? appWindow.isMaximized() : appWindow.isFullscreen();
-      settled.then((ok) => {
-        if (!ok && zenKind === kind) {
-          zenKind = null;
-          document.body.classList.remove("zen-mode");
-        }
-      });
-    }
-  }).then((fn) => { unlistenResized = fn; });
+  appWindow
+    .onResized(() => {
+      updateMaximizeIcon();
+      // Drag-restore or the maximize button while in zen: drop the zen chrome
+      // but leave the window exactly where the user put it. The check follows
+      // the mode's window state (fullscreen windows are not "maximized").
+      if (zenKind && Date.now() > zenTransitionUntil) {
+        const kind = zenKind;
+        const settled = kind === "max" ? appWindow.isMaximized() : appWindow.isFullscreen();
+        settled.then((ok) => {
+          if (!ok && zenKind === kind) {
+            zenKind = null;
+            document.body.classList.remove("zen-mode");
+          }
+        });
+      }
+    })
+    .then((fn) => {
+      unlistenResized = fn;
+    });
 }
-
-

@@ -1,10 +1,17 @@
-import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { Terminal } from "@xterm/xterm";
 import Sortable from "sortablejs";
-import { createModal } from "../ui/modal";
-import { BUILTIN_FONTS, NERDFONT_BUILTIN, FontDef, buildFontFamily, parseFontFamily, systemFontDefs } from "../util/fontconfig";
-import { configStore } from "../core/store";
 import { esc } from "../core/common";
+import { configStore } from "../core/store";
+import { createModal } from "../ui/modal";
+import {
+  BUILTIN_FONTS,
+  buildFontFamily,
+  type FontDef,
+  NERDFONT_BUILTIN,
+  parseFontFamily,
+  systemFontDefs,
+} from "../util/fontconfig";
 
 const NERDFONT_URL = "https://www.nerdfonts.com/";
 
@@ -25,9 +32,7 @@ const PREVIEW_CONTENT = [
   "       ← Nerd Font icons",
 ].join("\r\n");
 
-export function showFontPickerDialog(
-  onApply: (stack: string[]) => void
-): void {
+export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
   const modal = createModal({
     className: "font-picker-overlay",
     onClose: () => previewTerminal?.dispose(),
@@ -90,7 +95,7 @@ export function showFontPickerDialog(
   const previewContainer = overlay.querySelector<HTMLElement>("#fp-preview")!;
 
   function isInUse(family: string): boolean {
-    return selected.some(s => s.toLowerCase() === family.toLowerCase());
+    return selected.some((s) => s.toLowerCase() === family.toLowerCase());
   }
 
   function renderFontItem(f: FontDef, listEl: Element): HTMLElement {
@@ -123,10 +128,10 @@ export function showFontPickerDialog(
     });
 
     // + button → add/remove from used list
-    row.querySelector(".fp-font-add")!.addEventListener("click", (e) => {
+    row.querySelector(".fp-font-add")?.addEventListener("click", (e) => {
       e.stopPropagation();
       if (isInUse(f.family)) {
-        selected = selected.filter(s => s.toLowerCase() !== f.family.toLowerCase());
+        selected = selected.filter((s) => s.toLowerCase() !== f.family.toLowerCase());
       } else {
         selected = [...selected, f.family];
       }
@@ -142,8 +147,9 @@ export function showFontPickerDialog(
     row.className = "fp-selected-item";
     row.dataset.family = family;
 
-    const def = [...BUILTIN_FONTS, ...NERDFONT_BUILTIN, ...systemFontDefs()]
-      .find(f => f.family.toLowerCase() === family.toLowerCase());
+    const def = [...BUILTIN_FONTS, ...NERDFONT_BUILTIN, ...systemFontDefs()].find(
+      (f) => f.family.toLowerCase() === family.toLowerCase(),
+    );
 
     row.innerHTML = `
       <span class="fp-drag-grip" title="Drag to reorder">⠿</span>
@@ -151,9 +157,9 @@ export function showFontPickerDialog(
       <span class="fp-remove-btn" data-family="${esc(family)}">×</span>
     `;
 
-    row.querySelector(".fp-remove-btn")!.addEventListener("click", (e) => {
+    row.querySelector(".fp-remove-btn")?.addEventListener("click", (e) => {
       e.stopPropagation();
-      selected = selected.filter(s => s.toLowerCase() !== family.toLowerCase());
+      selected = selected.filter((s) => s.toLowerCase() !== family.toLowerCase());
       refreshAll();
     });
 
@@ -166,19 +172,23 @@ export function showFontPickerDialog(
     builtinList.innerHTML = "";
     let allBuiltin = [...BUILTIN_FONTS, ...NERDFONT_BUILTIN];
     if (query) {
-      allBuiltin = allBuiltin.filter(f =>
-        f.family.toLowerCase().includes(query) || f.label.toLowerCase().includes(query)
+      allBuiltin = allBuiltin.filter(
+        (f) => f.family.toLowerCase().includes(query) || f.label.toLowerCase().includes(query),
       );
     }
-    allBuiltin.forEach(f => renderFontItem(f, builtinList));
+    allBuiltin.forEach((f) => {
+      renderFontItem(f, builtinList);
+    });
 
     systemList.innerHTML = "";
     let sysFonts = systemFontDefs();
     systemCount.textContent = sysFonts.length > 0 ? `(${sysFonts.length})` : "(loading...)";
     if (query) {
-      sysFonts = sysFonts.filter(f => f.family.toLowerCase().includes(query));
+      sysFonts = sysFonts.filter((f) => f.family.toLowerCase().includes(query));
     }
-    sysFonts.forEach(f => renderFontItem(f, systemList));
+    sysFonts.forEach((f) => {
+      renderFontItem(f, systemList);
+    });
   }
 
   function refreshSelected() {
@@ -200,9 +210,7 @@ export function showFontPickerDialog(
     onEnd: () => {
       // Sortable already reordered the DOM; adopt it as the source of truth,
       // then re-render so rows keep their × wiring.
-      selected = [...selectedList.children].map(
-        (el) => (el as HTMLElement).dataset.family!,
-      );
+      selected = [...selectedList.children].map((el) => (el as HTMLElement).dataset.family!);
       refreshSelected();
       updatePreview();
     },
@@ -272,8 +280,8 @@ export function showFontPickerDialog(
   }
 
   // --- buttons --- (Escape/backdrop also close, via createModal)
-  overlay.querySelector(".fp-btn-cancel")!.addEventListener("click", modal.close);
-  overlay.querySelector(".fp-btn-apply")!.addEventListener("click", () => {
+  overlay.querySelector(".fp-btn-cancel")?.addEventListener("click", modal.close);
+  overlay.querySelector(".fp-btn-apply")?.addEventListener("click", () => {
     if (selected.length === 0) return;
     onApply(selected);
     modal.close();

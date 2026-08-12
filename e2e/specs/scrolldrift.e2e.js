@@ -8,7 +8,10 @@
 
 describe("horizontal scroll drift protection", () => {
   it("rejects programmatic horizontal scrolling on all terminal containers", async () => {
-    await browser.waitUntil(async () => (await $$(".terminal-instance .xterm-viewport")).length > 0, { timeout: 15000 });
+    await browser.waitUntil(
+      async () => (await $$(".terminal-instance .xterm-viewport")).length > 0,
+      { timeout: 15000 },
+    );
     const result = await browser.execute(() => {
       const inst = document.querySelector(".terminal-instance");
       const xterm = inst.querySelector(".xterm");
@@ -40,7 +43,8 @@ describe("horizontal scroll drift protection", () => {
 
   it("keeps vertical scrolling intact (overflow-y unaffected)", async () => {
     const overflowY = await browser.execute(() => {
-      return getComputedStyle(document.querySelector(".terminal-instance .xterm-viewport")).overflowY;
+      return getComputedStyle(document.querySelector(".terminal-instance .xterm-viewport"))
+        .overflowY;
     });
     expect(overflowY).toBe("scroll");
   });

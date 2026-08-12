@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { attachStepper } from "../src/ui/stepper";
 
@@ -53,7 +53,7 @@ describe("attachStepper", () => {
   });
 
   it("dispatches bubbling input and change events (dirty tracking)", () => {
-    const input = fixture();
+    const _input = fixture();
     const seen: string[] = [];
     for (const type of ["input", "change"]) {
       document.body.addEventListener(type, () => seen.push(type));

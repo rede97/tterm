@@ -9,7 +9,11 @@
  *   min       floor clamp (default 2)
  */
 export function hysteresis(
-  floatVal: number, current: number, th_low: number, th_high: number, min = 2
+  floatVal: number,
+  current: number,
+  th_low: number,
+  th_high: number,
+  min = 2,
 ): number {
   const lo = Math.max(min, Math.floor(floatVal + (1.0 - th_low)));
   const hi = Math.ceil(floatVal - th_high);

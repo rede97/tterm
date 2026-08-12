@@ -2,12 +2,29 @@
 // Action handlers are injected via setContextMenuHandlers() to break
 // the circular dependency: contextmenu ↔ tabmanager ↔ tab.
 
-import { openFind } from "./search";
-import { showPortForwardingDialog } from "./forwarding";
-import { createElement, Plus, ExternalLink, Palette, Pencil, Copy, Share2, Link, Unlink, X, ArrowRightToLine, CircleX, ArrowLeftRight } from "lucide";
-import { readText as clipboardReadText, writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
-import { showToast } from "../ui/toast";
+import {
+  readText as clipboardReadText,
+  writeText as clipboardWriteText,
+} from "@tauri-apps/plugin-clipboard-manager";
+import {
+  ArrowLeftRight,
+  ArrowRightToLine,
+  CircleX,
+  Copy,
+  createElement,
+  ExternalLink,
+  Link,
+  Palette,
+  Pencil,
+  Plus,
+  Share2,
+  Unlink,
+  X,
+} from "lucide";
 import { logCatch } from "../core/errorlog";
+import { showToast } from "../ui/toast";
+import { showPortForwardingDialog } from "./forwarding";
+import { openFind } from "./search";
 
 // ---- Injected handlers ----
 
@@ -44,8 +61,14 @@ export function setContextMenuHandlers(h: ContextMenuHandlers): void {
 // ---- DOM ----
 
 const TAB_COLORS = [
-  "#e06c75", "#d19a66", "#e5c07b", "#98c379",
-  "#56b6c2", "#61afef", "#c678dd", "#ffffff",
+  "#e06c75",
+  "#d19a66",
+  "#e5c07b",
+  "#98c379",
+  "#56b6c2",
+  "#61afef",
+  "#c678dd",
+  "#ffffff",
 ];
 
 const contextMenu = document.createElement("div");
@@ -60,8 +83,8 @@ function closeContextMenu() {
 }
 
 function showAt(x: number, y: number) {
-  contextMenu.style.left = x + "px";
-  contextMenu.style.top = y + "px";
+  contextMenu.style.left = `${x}px`;
+  contextMenu.style.top = `${y}px`;
   contextMenu.classList.add("open");
 
   requestAnimationFrame(() => {
@@ -71,12 +94,16 @@ function showAt(x: number, y: number) {
     let top = y;
     if (left + rect.width > window.innerWidth - pad) left = window.innerWidth - rect.width - pad;
     if (top + rect.height > window.innerHeight - pad) top = window.innerHeight - rect.height - pad;
-    contextMenu.style.left = Math.max(pad, left) + "px";
-    contextMenu.style.top = Math.max(pad, top) + "px";
+    contextMenu.style.left = `${Math.max(pad, left)}px`;
+    contextMenu.style.top = `${Math.max(pad, top)}px`;
   });
 }
 
-function mkItem(label: string, action: string, iconFn?: Parameters<typeof createElement>[0]): HTMLElement {
+function mkItem(
+  label: string,
+  action: string,
+  iconFn?: Parameters<typeof createElement>[0],
+): HTMLElement {
   const el = document.createElement("div");
   el.className = "menu-item";
   if (iconFn) {
@@ -256,16 +283,18 @@ function dispatch(action: string) {
         const html = `<pre style="font-family:'JetBrains Mono',Consolas,monospace;font-size:13px;color:#d4d4d4;background:#1e1e1e;padding:8px;margin:0;overflow:auto;white-space:pre-wrap;word-wrap:break-word;">${sel.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`;
         const blob = new Blob([html], { type: "text/html" });
         const plain = new Blob([sel], { type: "text/plain" });
-        navigator.clipboard.write([
-          new ClipboardItem({ "text/plain": plain, "text/html": blob }),
-        ]).catch(logCatch("clipboard.writeHtml"));
+        navigator.clipboard
+          .write([new ClipboardItem({ "text/plain": plain, "text/html": blob })])
+          .catch(logCatch("clipboard.writeHtml"));
       }
       break;
     }
     case "paste":
-      clipboardReadText().then(text => {
-        if (text) h.pasteToTab(tabId, text);
-      }).catch(logCatch("clipboard.read"));
+      clipboardReadText()
+        .then((text) => {
+          if (text) h.pasteToTab(tabId, text);
+        })
+        .catch(logCatch("clipboard.read"));
       break;
     case "clear":
       h.clearTab(tabId);

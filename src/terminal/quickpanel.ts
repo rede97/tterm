@@ -15,20 +15,26 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { createElement, Zap } from "lucide";
 import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
-import { SERIAL_BAUD_RATES, SERIAL_OUTPUT_NEWLINES, SERIAL_ENTER_NEWLINES, SERIAL_OUTPUT_NEWLINE_DESCS } from "../core/common";
-import type { SerialEnterNewline, SerialFlowControl, SerialInputMode, SerialOutputNewline } from "../core/types";
+import { createElement, Zap } from "lucide";
 import { allSerialProfiles, DEFAULT_SERIAL_PROFILE } from "../config/serial-profiles";
-import { showToast } from "../ui/toast";
-import { logCatch } from "../core/errorlog";
 import {
-  listForwards,
-  addForward,
-  removeForward,
-} from "./forwarding";
-import { createForwardTable } from "../ui/forwardtable";
+  SERIAL_BAUD_RATES,
+  SERIAL_ENTER_NEWLINES,
+  SERIAL_OUTPUT_NEWLINE_DESCS,
+  SERIAL_OUTPUT_NEWLINES,
+} from "../core/common";
+import { logCatch } from "../core/errorlog";
+import type {
+  SerialEnterNewline,
+  SerialFlowControl,
+  SerialInputMode,
+  SerialOutputNewline,
+} from "../core/types";
 import type { ForwardEditorValue, ForwardKind } from "../ui/forwardeditor";
+import { createForwardTable } from "../ui/forwardtable";
+import { showToast } from "../ui/toast";
+import { addForward, listForwards, removeForward } from "./forwarding";
 import type { TerminalTab } from "./tab";
 
 // ---- Injected handlers ----
@@ -153,17 +159,21 @@ function mkSelectRow(
 
 function shareSection(tab: TerminalTab): HTMLElement {
   const sec = mkSection("AI Share", "share");
-  sec.appendChild(mkToggle("Share this session", tab.shared, (on) => {
-    const t = _handlers?.getTab(tab.id);
-    if (!t) return;
-    const flip = t.shared !== on ? _handlers!.shareTab(tab.id) : Promise.resolve();
-    flip
-      .then(() => {
-        updateQuickButton();
-        if (panelTabId === tab.id) renderPanel(t);
-      })
-      .catch(logCatch("quickpanel.share"));
-  }));
+  sec.appendChild(
+    mkToggle("Share this session", tab.shared, (on) => {
+      const t = _handlers?.getTab(tab.id);
+      if (!t) return;
+      // _handlers?.shareTab is Promise|undefined (audit L1's optional-chain
+      // trap); Promise.resolve normalizes both branches into one chain.
+      const flip = t.shared !== on ? _handlers?.shareTab(tab.id) : undefined;
+      Promise.resolve(flip)
+        .then(() => {
+          updateQuickButton();
+          if (panelTabId === tab.id) renderPanel(t);
+        })
+        .catch(logCatch("quickpanel.share"));
+    }),
+  );
   if (tab.shared && tab.shareUrl) {
     const row = el("div", "qp-row qp-share-url-row");
     const url = el("span", "qp-share-url", tab.shareUrl);
@@ -189,12 +199,15 @@ function shareSection(tab: TerminalTab): HTMLElement {
 // a failed open simply means the device is still unplugged).
 function autoReconnectRow(tab: TerminalTab): ToggleRow {
   const row = mkToggle("Auto-reconnect", false, (on) => {
-    invoke("session_set_auto_reconnect", { id: tab.id, enabled: on })
-      .catch((e) => showToast(`Auto-reconnect: ${e}`, "error"));
+    invoke("session_set_auto_reconnect", { id: tab.id, enabled: on }).catch((e) =>
+      showToast(`Auto-reconnect: ${e}`, "error"),
+    );
   });
   invoke<boolean>("session_get_auto_reconnect", { id: tab.id })
     .then((v) => row.setOn(v))
-    .catch(() => { /* session without reconnect support: stays off */ });
+    .catch(() => {
+      /* session without reconnect support: stays off */
+    });
   return row;
 }
 
@@ -215,7 +228,9 @@ function forwardsBlock(tab: TerminalTab): HTMLElement {
 
   // Runtime rows carry their backend forwardId so Remove can address them;
   // the table hands the same object back to onRemove.
-  interface RuntimeRow extends ForwardEditorValue { forwardId: number }
+  interface RuntimeRow extends ForwardEditorValue {
+    forwardId: number;
+  }
 
   listForwards(tab.id).then((forwards) => {
     if (!forwards) return; // toast already shown by listForwards
@@ -268,7 +283,10 @@ function serialProfileRow(tab: TerminalTab): HTMLElement {
   sel.className = "qp-select";
   sel.setAttribute("aria-label", "Profile");
   const profiles = allSerialProfiles();
-  for (const [label, source] of [["Built-in", "builtin"], ["Custom", "custom"]] as const) {
+  for (const [label, source] of [
+    ["Built-in", "builtin"],
+    ["Custom", "custom"],
+  ] as const) {
     const group = profiles.filter((p) => p.source === source);
     if (group.length === 0) continue;
     const og = document.createElement("optgroup");
@@ -284,8 +302,11 @@ function serialProfileRow(tab: TerminalTab): HTMLElement {
   sel.value = tab.serialProfile ?? DEFAULT_SERIAL_PROFILE;
   sel.addEventListener("change", () => {
     if (!_handlers) return;
-    _handlers.setSerialProfile(tab.id, sel.value)
-      .then(() => { if (panelTabId === tab.id) renderPanel(tab); })
+    _handlers
+      .setSerialProfile(tab.id, sel.value)
+      .then(() => {
+        if (panelTabId === tab.id) renderPanel(tab);
+      })
       .catch(logCatch("serial.setProfile"));
   });
   row.appendChild(sel);
@@ -319,12 +340,10 @@ function serialFlowBlock(tab: TerminalTab): HTMLElement {
     ctsVal = dsrVal = null;
     if (!supported || (tab.flowControl ?? "none") === "none") return;
     rtsRow = mkToggle("RTS", true, (on) => {
-      invoke("serial_set_rts", { id: tab.id, on })
-        .catch((e) => showToast(`RTS: ${e}`, "error"));
+      invoke("serial_set_rts", { id: tab.id, on }).catch((e) => showToast(`RTS: ${e}`, "error"));
     });
     dtrRow = mkToggle("DTR", true, (on) => {
-      invoke("serial_set_dtr", { id: tab.id, on })
-        .catch((e) => showToast(`DTR: ${e}`, "error"));
+      invoke("serial_set_dtr", { id: tab.id, on }).catch((e) => showToast(`DTR: ${e}`, "error"));
     });
     signalWrap.appendChild(rtsRow);
     signalWrap.appendChild(dtrRow);
@@ -339,7 +358,10 @@ function serialFlowBlock(tab: TerminalTab): HTMLElement {
   const applyStatus = (s: SerialLineState): void => {
     rtsRow?.setOn(s.rts);
     dtrRow?.setOn(s.dtr);
-    for (const [val, on] of [[ctsVal, s.cts], [dsrVal, s.dsr]] as const) {
+    for (const [val, on] of [
+      [ctsVal, s.cts],
+      [dsrVal, s.dsr],
+    ] as const) {
       if (!val) continue;
       val.textContent = on ? "asserted" : "deasserted";
       val.classList.toggle("on", on);
@@ -373,7 +395,10 @@ function serialFlowBlock(tab: TerminalTab): HTMLElement {
 
   function queryStatus(): void {
     invoke<SerialLineState>("serial_line_status", { id: tab.id })
-      .then((s) => { setSupported(s.supported); applyStatus(s); })
+      .then((s) => {
+        setSupported(s.supported);
+        applyStatus(s);
+      })
       .catch(() => setSupported(false));
   }
 
@@ -400,7 +425,11 @@ function connectionRow(tab: TerminalTab): HTMLElement {
     const reconnecting = tab.disconnected;
     btn.disabled = true;
     invoke(reconnecting ? "serial_reconnect" : "serial_disconnect", { id: tab.id })
-      .then(() => setTimeout(() => { if (panelTabId === tab.id) renderPanel(tab); }, 600))
+      .then(() =>
+        setTimeout(() => {
+          if (panelTabId === tab.id) renderPanel(tab);
+        }, 600),
+      )
       .catch((e) => {
         btn.disabled = false;
         showToast(`${reconnecting ? "Reconnect" : "Disconnect"}: ${e}`, "error");
@@ -414,33 +443,40 @@ function serialSection(tab: TerminalTab): HTMLElement {
   const sec = mkSection("Serial", "serial");
   sec.appendChild(connectionRow(tab));
   sec.appendChild(serialProfileRow(tab));
-  sec.appendChild(mkSelectRow(
-    "Baud rate",
-    SERIAL_BAUD_RATES.map((b) => [String(b), String(b)] as const),
-    String(tab.serialBaud ?? 115200),
-    (v) => _handlers?.setSerialBaud(tab.id, parseInt(v, 10)).catch(logCatch("serial.setBaud")),
-  ));
+  sec.appendChild(
+    mkSelectRow(
+      "Baud rate",
+      SERIAL_BAUD_RATES.map((b) => [String(b), String(b)] as const),
+      String(tab.serialBaud ?? 115200),
+      (v) => _handlers?.setSerialBaud(tab.id, parseInt(v, 10)).catch(logCatch("serial.setBaud")),
+    ),
+  );
   sec.appendChild(autoReconnectRow(tab));
   // Live, session-only profile parameter tweaks (not persisted).
-  sec.appendChild(mkSelectRow(
-    "Input mode",
-    SERIAL_INPUT_MODES,
-    tab.inputMode ?? "normal",
-    (v) => _handlers?.setSerialInputMode(tab.id, v as SerialInputMode),
-  ));
-  sec.appendChild(mkSelectRow(
-    "Enter sends",
-    SERIAL_ENTER_NEWLINES,
-    tab.enterNewline ?? "cr",
-    (v) => _handlers?.setSerialEnterNewline(tab.id, v as SerialEnterNewline).catch(logCatch("serial.setEnterNewline")),
-  ));
-  sec.appendChild(mkSelectRow(
-    "Output newlines",
-    SERIAL_OUTPUT_NEWLINES,
-    tab.outputNewline ?? "keep",
-    (v) => _handlers?.setSerialOutputNewline(tab.id, v as SerialOutputNewline).catch(logCatch("serial.setOutputNewline")),
-    SERIAL_OUTPUT_NEWLINE_DESCS,
-  ));
+  sec.appendChild(
+    mkSelectRow("Input mode", SERIAL_INPUT_MODES, tab.inputMode ?? "normal", (v) =>
+      _handlers?.setSerialInputMode(tab.id, v as SerialInputMode),
+    ),
+  );
+  sec.appendChild(
+    mkSelectRow("Enter sends", SERIAL_ENTER_NEWLINES, tab.enterNewline ?? "cr", (v) =>
+      _handlers
+        ?.setSerialEnterNewline(tab.id, v as SerialEnterNewline)
+        .catch(logCatch("serial.setEnterNewline")),
+    ),
+  );
+  sec.appendChild(
+    mkSelectRow(
+      "Output newlines",
+      SERIAL_OUTPUT_NEWLINES,
+      tab.outputNewline ?? "keep",
+      (v) =>
+        _handlers
+          ?.setSerialOutputNewline(tab.id, v as SerialOutputNewline)
+          .catch(logCatch("serial.setOutputNewline")),
+      SERIAL_OUTPUT_NEWLINE_DESCS,
+    ),
+  );
   sec.appendChild(serialFlowBlock(tab));
   return sec;
 }
@@ -507,7 +543,9 @@ export function initQuickPanel(): void {
   if (!btn) return;
 
   // Solid-filled bolt (fill + stroke) — reads as one bold mark at 15px.
-  btn.appendChild(createElement(Zap, { stroke: "currentColor", fill: "currentColor", width: 15, height: 15 }));
+  btn.appendChild(
+    createElement(Zap, { stroke: "currentColor", fill: "currentColor", width: 15, height: 15 }),
+  );
   btn.appendChild(el("span", "qs-dot"));
 
   panel = document.createElement("div");
@@ -520,7 +558,12 @@ export function initQuickPanel(): void {
   });
 
   document.addEventListener("click", (e) => {
-    if (panelTabId !== null && panel && !panel.contains(e.target as Node) && !btn.contains(e.target as Node)) {
+    if (
+      panelTabId !== null &&
+      panel &&
+      !panel.contains(e.target as Node) &&
+      !btn.contains(e.target as Node)
+    ) {
       closeQuickPanel();
     }
   });
@@ -537,7 +580,7 @@ export function initQuickPanel(): void {
         const tab = _handlers?.getTab(e.payload.id);
         if (tab) renderPanel(tab);
       }
-    }).catch(() => { });
+    }).catch(() => {});
   }
 
   updateQuickButton();

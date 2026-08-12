@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Fake serial-profiles.json backing store.
 const { file } = vi.hoisted(() => ({ file: { content: "[]" } }));
@@ -15,13 +15,13 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 import {
   BUILTIN_SERIAL_PROFILES,
+  dedupeSerialProfileName,
+  deleteSerialProfile,
+  findSerialProfile,
+  loadSerialProfiles,
   parseSerialProfiles,
   sanitizeSerialProfile,
-  dedupeSerialProfileName,
-  findSerialProfile,
   saveSerialProfile,
-  deleteSerialProfile,
-  loadSerialProfiles,
 } from "../src/config/serial-profiles";
 
 beforeEach(() => {
@@ -32,7 +32,12 @@ beforeEach(() => {
 describe("built-in profiles", () => {
   it("Normal is the interactive TUI mode", () => {
     const p = BUILTIN_SERIAL_PROFILES.find((p) => p.name === "Normal")!;
-    expect(p).toMatchObject({ inputMode: "normal", enterNewline: "cr", outputNewline: "keep", flowControl: "none" });
+    expect(p).toMatchObject({
+      inputMode: "normal",
+      enterNewline: "cr",
+      outputNewline: "keep",
+      flowControl: "none",
+    });
   });
 
   it("Log converts bare LF to CRLF (no staircase)", () => {
@@ -62,7 +67,13 @@ describe("sanitizeSerialProfile", () => {
 describe("parse / dedupe / resolve", () => {
   it("skips invalid entries, keeps valid custom ones", () => {
     file.content = JSON.stringify([
-      { name: "Rig", inputMode: "echo", enterNewline: "crlf", outputNewline: "keep", flowControl: "hardware" },
+      {
+        name: "Rig",
+        inputMode: "echo",
+        enterNewline: "crlf",
+        outputNewline: "keep",
+        flowControl: "hardware",
+      },
       { name: "", inputMode: "echo" },
       42,
     ]);
@@ -78,7 +89,13 @@ describe("parse / dedupe / resolve", () => {
   it("dedupeSerialProfileName avoids builtin and custom collisions", async () => {
     expect(dedupeSerialProfileName("Fresh")).toBe("Fresh");
     expect(dedupeSerialProfileName("AT")).toBe("AT 2");
-    await saveSerialProfile({ name: "AT 2", inputMode: "echo", enterNewline: "crlf", outputNewline: "keep", flowControl: "none" });
+    await saveSerialProfile({
+      name: "AT 2",
+      inputMode: "echo",
+      enterNewline: "crlf",
+      outputNewline: "keep",
+      flowControl: "none",
+    });
     expect(dedupeSerialProfileName("AT")).toBe("AT 3");
   });
 
@@ -90,12 +107,27 @@ describe("parse / dedupe / resolve", () => {
 
 describe("save / delete", () => {
   it("saves, renames, and deletes custom profiles with persistence", async () => {
-    await saveSerialProfile({ name: "Mine", inputMode: "line", enterNewline: "lf", outputNewline: "strip", flowControl: "software" });
+    await saveSerialProfile({
+      name: "Mine",
+      inputMode: "line",
+      enterNewline: "lf",
+      outputNewline: "strip",
+      flowControl: "software",
+    });
     expect(findSerialProfile("Mine").inputMode).toBe("line");
     expect(JSON.parse(file.content)).toHaveLength(1);
 
     // rename
-    await saveSerialProfile({ name: "Yours", inputMode: "normal", enterNewline: "cr", outputNewline: "keep", flowControl: "none" }, "Mine");
+    await saveSerialProfile(
+      {
+        name: "Yours",
+        inputMode: "normal",
+        enterNewline: "cr",
+        outputNewline: "keep",
+        flowControl: "none",
+      },
+      "Mine",
+    );
     expect(findSerialProfile("Yours").name).toBe("Yours");
     expect(JSON.parse(file.content)).toHaveLength(1);
 

@@ -3,16 +3,16 @@
 // themes.json via config/custom-themes.ts, never in config.json.
 
 import type { ITheme } from "@xterm/xterm";
-import { allThemes, type ThemeDef } from "../util/themes";
 import {
-  THEME_COLOR_KEYS,
+  deleteCustomTheme,
   sanitizeTheme,
   saveCustomTheme,
-  deleteCustomTheme,
+  THEME_COLOR_KEYS,
 } from "../config/custom-themes";
-import { showToast } from "../ui/toast";
-import { createModal } from "../ui/modal";
 import { logCatch } from "../core/errorlog";
+import { createModal } from "../ui/modal";
+import { showToast } from "../ui/toast";
+import { allThemes, type ThemeDef } from "../util/themes";
 
 const COLOR_LABELS: Record<string, string> = {
   background: "Background",
@@ -63,7 +63,9 @@ export function showThemeEditor(opts: ThemeEditorOptions): void {
   const coreRows = ["background", "foreground", "cursor", "cursorAccent", "selectionBackground"]
     .map((k) => colorRow(k, working[k]))
     .join("");
-  const paletteRows = THEME_COLOR_KEYS.slice(5).map((k) => colorRow(k, working[k])).join("");
+  const paletteRows = THEME_COLOR_KEYS.slice(5)
+    .map((k) => colorRow(k, working[k]))
+    .join("");
 
   const modal = createModal({ className: "te-overlay" });
   const overlay = modal.overlay;
@@ -127,18 +129,16 @@ export function showThemeEditor(opts: ThemeEditorOptions): void {
   });
 
   const close = modal.close;
-  overlay.querySelector(".te-cancel")!.addEventListener("click", close);
+  overlay.querySelector(".te-cancel")?.addEventListener("click", close);
 
-  overlay.querySelector(".te-save")!.addEventListener("click", () => {
+  overlay.querySelector(".te-save")?.addEventListener("click", () => {
     const name = nameInput.value.trim();
     if (!name) {
       showToast("Theme name cannot be empty", "error");
       return;
     }
     // Name must not collide with a different theme.
-    const collision = allThemes().some(
-      (t) => t.name === name && t.name !== opts.editName,
-    );
+    const collision = allThemes().some((t) => t.name === name && t.name !== opts.editName);
     if (collision) {
       showToast(`A theme named "${name}" already exists`, "error");
       return;

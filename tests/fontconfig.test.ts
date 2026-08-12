@@ -1,13 +1,19 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  buildFontFamily, parseFontFamily, defaultFontStack,
-  updateFontStack, fontStack, BUILTIN_FONTS, NERDFONT_BUILTIN,
+  BUILTIN_FONTS,
+  buildFontFamily,
+  defaultFontStack,
+  fontStack,
+  NERDFONT_BUILTIN,
+  parseFontFamily,
+  updateFontStack,
 } from "../src/util/fontconfig";
 
 describe("buildFontFamily", () => {
   it("quotes families containing spaces", () => {
-    expect(buildFontFamily(["JetBrains Mono", "Consolas"]))
-      .toBe("'JetBrains Mono', Consolas, monospace");
+    expect(buildFontFamily(["JetBrains Mono", "Consolas"])).toBe(
+      "'JetBrains Mono', Consolas, monospace",
+    );
   });
 
   it("always appends monospace as final fallback", () => {
@@ -21,8 +27,10 @@ describe("buildFontFamily", () => {
 
 describe("parseFontFamily", () => {
   it("strips quotes and the monospace fallback", () => {
-    expect(parseFontFamily("'JetBrains Mono', Consolas, monospace"))
-      .toEqual(["JetBrains Mono", "Consolas"]);
+    expect(parseFontFamily("'JetBrains Mono', Consolas, monospace")).toEqual([
+      "JetBrains Mono",
+      "Consolas",
+    ]);
   });
 
   it("round-trips with buildFontFamily", () => {
@@ -55,7 +63,7 @@ describe("updateFontStack", () => {
 
 describe("built-in font definitions", () => {
   it("have unique family names across builtin and nerdfont sets", () => {
-    const all = [...BUILTIN_FONTS, ...NERDFONT_BUILTIN].map(f => f.family.toLowerCase());
+    const all = [...BUILTIN_FONTS, ...NERDFONT_BUILTIN].map((f) => f.family.toLowerCase());
     expect(new Set(all).size).toBe(all.length);
   });
 });

@@ -80,8 +80,6 @@ impl WsHub {
         Ok(())
     }
 
-
-
     // Bind the loopback listener, generate the auth token, spawn the accept
     // loop. Called exactly once at app startup.
     pub(crate) fn start() -> Result<Arc<WsHub>, String> {
@@ -183,7 +181,12 @@ async fn handle_connection(hub: Arc<WsHub>, stream: tokio::net::TcpStream) {
 #[allow(clippy::result_large_err)]
 async fn handle_ws(hub: Arc<WsHub>, stream: tokio::net::TcpStream) {
     // Claimed during the handshake callback: (id, downstream rx, writer, generation).
-    type Claimed = (String, mpsc::Receiver<Vec<u8>>, Arc<Mutex<Box<dyn Write + Send>>>, u64);
+    type Claimed = (
+        String,
+        mpsc::Receiver<Vec<u8>>,
+        Arc<Mutex<Box<dyn Write + Send>>>,
+        u64,
+    );
     let mut claimed: Option<Claimed> = None;
     // Fired by a LATER handshake that finds this connection still holding the
     // downstream receiver (stale half-open): tells our sender task to release it.
@@ -240,7 +243,9 @@ async fn handle_ws(hub: Arc<WsHub>, stream: tokio::net::TcpStream) {
             return;
         }
     };
-    let Some((id, mut rx, writer, generation)) = claimed.take() else { return };
+    let Some((id, mut rx, writer, generation)) = claimed.take() else {
+        return;
+    };
 
     let (mut ws_sink, mut ws_stream) = ws.split();
 
@@ -442,7 +447,10 @@ where
         // closes and the client gets its Close frame. The generation check
         // avoids removing a newer entry that reused the same id.
         if let Ok(mut entries) = hub2.entries.lock() {
-            if entries.get(&id2).is_some_and(|e| e.generation == generation) {
+            if entries
+                .get(&id2)
+                .is_some_and(|e| e.generation == generation)
+            {
                 entries.remove(&id2);
             }
         }
@@ -496,7 +504,10 @@ fn read_pump(
         'dead: loop {
             let (result_tx, result_rx) = std::sync::mpsc::channel::<RespawnOutcome>();
             {
-                let watcher = DeadWatcher { hooks: hooks.clone(), result_tx: Some(result_tx) };
+                let watcher = DeadWatcher {
+                    hooks: hooks.clone(),
+                    result_tx: Some(result_tx),
+                };
                 match writer.lock() {
                     Ok(mut guard) => {
                         *guard = Box::new(watcher);
@@ -563,7 +574,9 @@ fn read_pump(
 /// serial_reconnect uses this to press Enter at the dead-mode prompt.
 pub(crate) fn feed_upstream(hub: &Arc<WsHub>, id: &str, bytes: &[u8]) -> Result<(), String> {
     let entries = hub.entries.lock().map_err(|e| e.to_string())?;
-    let entry = entries.get(id).ok_or_else(|| format!("no relay session: {id}"))?;
+    let entry = entries
+        .get(id)
+        .ok_or_else(|| format!("no relay session: {id}"))?;
     let mut w = entry.writer.lock().map_err(|e| e.to_string())?;
     w.write_all(bytes).map_err(|e| e.to_string())
 }
@@ -596,7 +609,10 @@ pub fn session_set_auto_reconnect(
 }
 
 #[tauri::command]
-pub fn session_get_auto_reconnect(state: tauri::State<crate::state::AppState>, id: &str) -> Result<bool, String> {
+pub fn session_get_auto_reconnect(
+    state: tauri::State<crate::state::AppState>,
+    id: &str,
+) -> Result<bool, String> {
     let flag = state
         .auto_reconnect
         .lock()
@@ -629,7 +645,10 @@ mod tests {
     #[test]
     fn query_param_extracts_token() {
         assert_eq!(query_param(Some("token=abc123"), "token"), Some("abc123"));
-        assert_eq!(query_param(Some("x=1&token=deadbeef&y=2"), "token"), Some("deadbeef"));
+        assert_eq!(
+            query_param(Some("x=1&token=deadbeef&y=2"), "token"),
+            Some("deadbeef")
+        );
     }
 
     #[test]
@@ -695,16 +714,21 @@ mod tests {
         assert!(connect_ws(&format!("/other/tab-t?token={}", hub.token)).is_err());
 
         // Correct route + token: echo roundtrip through the relay.
-        let (mut ws, _resp) = connect_ws(&format!("/pty/tab-t?token={}", hub.token)).expect("handshake");
-        ws.get_mut().set_read_timeout(Some(Duration::from_secs(5))).unwrap();
-        ws.send(tungstenite::Message::Binary(b"ping".to_vec())).unwrap();
+        let (mut ws, _resp) =
+            connect_ws(&format!("/pty/tab-t?token={}", hub.token)).expect("handshake");
+        ws.get_mut()
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        ws.send(tungstenite::Message::Binary(b"ping".to_vec()))
+            .unwrap();
         let msg = ws.read().expect("echo reply");
         assert_eq!(msg.into_data(), b"ping".to_vec());
 
         // Shell exit: the echo thread drops its end -> read loop EOF ->
         // entry cleanup -> channel closes -> client receives a Close frame
         // (the frontend's disconnect signal).
-        ws.send(tungstenite::Message::Binary(b"quit".to_vec())).unwrap();
+        ws.send(tungstenite::Message::Binary(b"quit".to_vec()))
+            .unwrap();
         let close = ws.read().expect("close frame");
         assert!(close.is_close(), "expected Close, got {:?}", close);
 
@@ -733,7 +757,9 @@ mod tests {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let session_side = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
         let (mut shell_side, _) = listener.accept().unwrap();
-        shell_side.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        shell_side
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
         let session_reader = session_side.try_clone().unwrap();
 
         register_session(&hub, "tab-r", session_reader, session_side, None).unwrap();
@@ -743,15 +769,19 @@ mod tests {
             let (mut ws, _r) = tungstenite::client(
                 format!("ws://127.0.0.1:{}/pty/tab-r?token={}", hub.port, hub.token),
                 stream,
-            ).expect("handshake");
-            ws.get_mut().set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            )
+            .expect("handshake");
+            ws.get_mut()
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
             ws
         };
 
         // Client 1: sanity roundtrip, then an abnormal drop (no Close
         // handshake — dropping the socket mid-stream, like an OS sleep).
         let mut ws1 = connect();
-        ws1.send(tungstenite::Message::Binary(b"a".to_vec())).unwrap();
+        ws1.send(tungstenite::Message::Binary(b"a".to_vec()))
+            .unwrap();
         let mut buf = [0u8; 16];
         let n = shell_side.read(&mut buf).unwrap();
         assert_eq!(&buf[..n], b"a");
@@ -769,7 +799,8 @@ mod tests {
         assert_eq!(msg.into_data(), b"while-away".to_vec());
 
         // …and the upstream direction works again (keystrokes reach the shell).
-        ws2.send(tungstenite::Message::Binary(b"b".to_vec())).unwrap();
+        ws2.send(tungstenite::Message::Binary(b"b".to_vec()))
+            .unwrap();
         let n = shell_side.read(&mut buf).unwrap();
         assert_eq!(&buf[..n], b"b");
     }
@@ -801,7 +832,9 @@ mod tests {
         };
 
         let (mut ws1, _r) = connect(&url).expect("first attach");
-        ws1.get_mut().set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        ws1.get_mut()
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
 
         // Second concurrent attach: rejected, and the stale holder is kicked.
         assert!(connect(&url).is_err());
@@ -815,7 +848,9 @@ mod tests {
         // The slot is released: a retry attaches.
         std::thread::sleep(Duration::from_millis(300));
         let (mut ws2, _r) = connect(&url).expect("reattach after kick");
-        ws2.get_mut().set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        ws2.get_mut()
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
     }
 
     // After a client-initiated WS Close (tab teardown navigations etc.) the
@@ -865,7 +900,8 @@ mod tests {
         // "Shell" v1: echo server that exits on the magic "quit" frame.
         let mk_shell = || {
             let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-            let session_side = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+            let session_side =
+                std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
             let (mut echo_side, _) = listener.accept().unwrap();
             std::thread::spawn(move || {
                 let mut buf = [0u8; 1024];
@@ -904,7 +940,10 @@ mod tests {
                     respawns.fetch_add(1, Ordering::Relaxed);
                     let s = mk_shell();
                     let r = s.try_clone().unwrap();
-                    Ok((Box::new(r) as Box<dyn Read + Send>, Box::new(s) as Box<dyn Write + Send>))
+                    Ok((
+                        Box::new(r) as Box<dyn Read + Send>,
+                        Box::new(s) as Box<dyn Write + Send>,
+                    ))
                 })
             },
             auto_retry: None,
@@ -916,28 +955,35 @@ mod tests {
         let (mut ws, _r) = tungstenite::client(
             format!("ws://127.0.0.1:{}/pty/tab-d?token={}", hub.port, hub.token),
             stream,
-        ).expect("handshake");
-        ws.get_mut().set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        )
+        .expect("handshake");
+        ws.get_mut()
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
 
         // Kill the shell: EOF -> dead mode -> the notice arrives in-band…
-        ws.send(tungstenite::Message::Binary(b"quit".to_vec())).unwrap();
+        ws.send(tungstenite::Message::Binary(b"quit".to_vec()))
+            .unwrap();
         let notice = ws.read().expect("dead-mode notice");
         assert_eq!(notice.into_data(), b"\r\n[dead] press enter\r\n".to_vec());
         // …and the socket stays OPEN (no Close frame).
 
         // Non-Enter input is swallowed: no respawn, nothing downstream.
-        ws.send(tungstenite::Message::Binary(b"x".to_vec())).unwrap();
+        ws.send(tungstenite::Message::Binary(b"x".to_vec()))
+            .unwrap();
         std::thread::sleep(Duration::from_millis(300));
         assert_eq!(respawns.load(Ordering::Relaxed), 0);
 
         // Enter respawns in place; the same socket talks to the new shell.
-        ws.send(tungstenite::Message::Binary(b"\r".to_vec())).unwrap();
+        ws.send(tungstenite::Message::Binary(b"\r".to_vec()))
+            .unwrap();
         std::thread::sleep(Duration::from_millis(300));
         assert_eq!(respawns.load(Ordering::Relaxed), 1);
         // Pre-resume bytes arrive BEFORE the new stream's output.
         let scroll = ws.read().expect("pre-resume scroll");
         assert_eq!(scroll.into_data(), b"[scroll]".to_vec());
-        ws.send(tungstenite::Message::Binary(b"ping".to_vec())).unwrap();
+        ws.send(tungstenite::Message::Binary(b"ping".to_vec()))
+            .unwrap();
         let echo = ws.read().expect("echo from respawned shell");
         assert_eq!(echo.into_data(), b"ping".to_vec());
 
@@ -945,7 +991,8 @@ mod tests {
         assert_eq!(&*states.lock().unwrap(), &[false, true]);
 
         // Second death + failed respawn: failure line, still dead, retry works.
-        ws.send(tungstenite::Message::Binary(b"quit".to_vec())).unwrap();
+        ws.send(tungstenite::Message::Binary(b"quit".to_vec()))
+            .unwrap();
         let notice2 = ws.read().expect("second notice");
         assert_eq!(notice2.into_data(), b"\r\n[dead] press enter\r\n".to_vec());
 
@@ -980,8 +1027,11 @@ mod tests {
         let (mut ws, _r) = tungstenite::client(
             format!("ws://127.0.0.1:{}/pty/tab-x?token={}", hub.port, hub.token),
             stream,
-        ).expect("handshake");
-        ws.get_mut().set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        )
+        .expect("handshake");
+        ws.get_mut()
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
 
         // Shell dies -> dead mode (notice received).
         drop(shell_side);
@@ -1018,7 +1068,8 @@ mod tests {
 
         let mk_shell = || {
             let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-            let session_side = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+            let session_side =
+                std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
             let (mut echo_side, _) = listener.accept().unwrap();
             std::thread::spawn(move || {
                 let mut buf = [0u8; 1024];
@@ -1056,7 +1107,10 @@ mod tests {
                     }
                     let s = mk_shell();
                     let r = s.try_clone().unwrap();
-                    Ok((Box::new(r) as Box<dyn Read + Send>, Box::new(s) as Box<dyn Write + Send>))
+                    Ok((
+                        Box::new(r) as Box<dyn Read + Send>,
+                        Box::new(s) as Box<dyn Write + Send>,
+                    ))
                 })
             },
             auto_retry: Some(flag),
@@ -1065,10 +1119,16 @@ mod tests {
 
         let stream = std::net::TcpStream::connect(format!("127.0.0.1:{}", hub.port)).unwrap();
         let (mut ws, _r) = tungstenite::client(
-            format!("ws://127.0.0.1:{}/pty/tab-ar2?token={}", hub.port, hub.token),
+            format!(
+                "ws://127.0.0.1:{}/pty/tab-ar2?token={}",
+                hub.port, hub.token
+            ),
             stream,
-        ).expect("handshake");
-        ws.get_mut().set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+        )
+        .expect("handshake");
+        ws.get_mut()
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .unwrap();
 
         // Shell dies -> notice. No Enter pressed.
         drop(shell_side);
@@ -1077,7 +1137,8 @@ mod tests {
 
         // Within ~2 retry windows the pump must have retried silently
         // (attempt 1 failed without printing) and then respawned.
-        ws.send(tungstenite::Message::Binary(b"ping".to_vec())).unwrap();
+        ws.send(tungstenite::Message::Binary(b"ping".to_vec()))
+            .unwrap();
         let mut echoed = false;
         let deadline = std::time::Instant::now() + Duration::from_secs(10);
         while std::time::Instant::now() < deadline {
@@ -1093,7 +1154,13 @@ mod tests {
                 Err(_) => break,
             }
         }
-        assert!(echoed, "auto-reconnect should respawn the session without Enter");
-        assert!(attempts.load(Ordering::Relaxed) >= 2, "first attempt should have failed silently");
+        assert!(
+            echoed,
+            "auto-reconnect should respawn the session without Enter"
+        );
+        assert!(
+            attempts.load(Ordering::Relaxed) >= 2,
+            "first attempt should have failed silently"
+        );
     }
 }

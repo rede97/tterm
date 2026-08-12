@@ -4,18 +4,18 @@
 // pending map and only land in configStore via the footer's Apply button
 // (collectShortcutsSettings); Revert re-reads the store (refreshShortcutsPanel).
 
-import { configStore, type ConfigState } from "../core/store";
 import {
-  KEY_COMMANDS,
-  defaultKeybindings,
-  resolveKeybindings,
   comboFromEvent,
-  formatCombo,
-  findConflict,
   commandTitle,
-  suspendKeymap,
+  defaultKeybindings,
+  findConflict,
+  formatCombo,
+  KEY_COMMANDS,
+  resolveKeybindings,
   resumeKeymap,
+  suspendKeymap,
 } from "../core/keymap";
+import { type ConfigState, configStore } from "../core/store";
 
 // Pending user overrides (same shape as the stored config). Null until the
 // panel is first rendered; refresh() re-syncs from the store.
@@ -51,7 +51,8 @@ function setPending(panel: HTMLElement, commandId: string, combo: string): void 
 function renderRows(panel: HTMLElement): void {
   const tbody = panel.querySelector<HTMLElement>("#kb-rows");
   if (!tbody) return;
-  const query = panel.querySelector<HTMLInputElement>("#kb-search")?.value.trim().toLowerCase() ?? "";
+  const query =
+    panel.querySelector<HTMLInputElement>("#kb-search")?.value.trim().toLowerCase() ?? "";
   const bindings = effectiveBindings();
   const defaults = defaultKeybindings();
   tbody.textContent = "";
@@ -60,7 +61,7 @@ function renderRows(panel: HTMLElement): void {
     const combo = bindings[cmd.id] ?? "";
     const modified = combo !== defaults[cmd.id];
     const haystack = `${cmd.title} ${cmd.desc} ${cmd.id} ${formatCombo(combo)}`.toLowerCase();
-    if (query && !query.split(/\s+/).every(w => haystack.includes(w))) continue;
+    if (query && !query.split(/\s+/).every((w) => haystack.includes(w))) continue;
 
     const row = el("div", "kb-row");
     row.dataset.command = cmd.id;
@@ -72,7 +73,7 @@ function renderRows(panel: HTMLElement): void {
 
     const bindingCell = el("div", "kb-binding");
     const chip = document.createElement("button");
-    chip.className = "kb-chip" + (combo ? "" : " kb-chip-empty") + (modified ? " kb-chip-modified" : "");
+    chip.className = `kb-chip${combo ? "" : " kb-chip-empty"}${modified ? " kb-chip-modified" : ""}`;
     chip.type = "button";
     chip.title = "Click to change keybinding";
     chip.textContent = combo ? formatCombo(combo) : "Unbound";
@@ -125,14 +126,23 @@ function startCapture(panel: HTMLElement, cell: HTMLElement, commandId: string):
   input.addEventListener("keydown", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.key === "Escape") { finish(false); return; }
+    if (e.key === "Escape") {
+      finish(false);
+      return;
+    }
     if (e.key === "Enter") {
       if (combo !== null && !conflict) finish(true);
       else if (conflict) input.classList.add("kb-capture-shake");
       return;
     }
     // Backspace/Delete without modifiers = remove the binding.
-    if ((e.key === "Backspace" || e.key === "Delete") && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+    if (
+      (e.key === "Backspace" || e.key === "Delete") &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.shiftKey &&
+      !e.metaKey
+    ) {
       combo = "";
       conflict = null;
       input.value = "Unbound";
@@ -166,8 +176,11 @@ export function createShortcutsPanel(): HTMLElement {
   const section = el("div", "settings-section");
   section.appendChild(el("div", "settings-section-title", "Keyboard Shortcuts"));
 
-  const hint = el("div", "settings-item-desc",
-    "Click a keybinding to change it: press the new combination, Enter to confirm, Escape to cancel, Backspace to remove. Changes take effect with the Apply button below. Ctrl+D is deliberately not captured — it reaches the shell and ends the session (the tab then closes itself).");
+  const hint = el(
+    "div",
+    "settings-item-desc",
+    "Click a keybinding to change it: press the new combination, Enter to confirm, Escape to cancel, Backspace to remove. Changes take effect with the Apply button below. Ctrl+D is deliberately not captured — it reaches the shell and ends the session (the tab then closes itself).",
+  );
   hint.style.marginBottom = "12px";
   section.appendChild(hint);
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { invokeMock } = vi.hoisted(() => ({
   invokeMock: vi.fn((cmd: string) => {
@@ -12,9 +12,9 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 vi.mock("@tauri-apps/api/app", () => ({ getVersion: () => Promise.resolve("1.0.1") }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
 
+import { configStore } from "../src/core/store";
 import { createSettingsContent } from "../src/settings/index";
 import { refreshProfilePanel } from "../src/settings/profile";
-import { configStore } from "../src/core/store";
 
 const PROFILES = [
   { name: "PowerShell", command: "powershell.exe" },
@@ -25,7 +25,7 @@ beforeEach(() => {
   document.body.innerHTML = "";
   invokeMock.mockClear();
   configStore.set({
-    localProfiles: PROFILES.map(p => ({ ...p })),
+    localProfiles: PROFILES.map((p) => ({ ...p })),
     hiddenProfiles: [],
     defaultLocalProfile: "Ubuntu",
   });
@@ -63,7 +63,7 @@ describe("settings — profile panel", () => {
     expect(profileSelect(root).options).toHaveLength(2);
 
     configStore.set({
-      localProfiles: [...PROFILES.map(p => ({ ...p })), { name: "CMD", command: "cmd.exe" }],
+      localProfiles: [...PROFILES.map((p) => ({ ...p })), { name: "CMD", command: "cmd.exe" }],
       defaultLocalProfile: "CMD",
       hiddenProfiles: ["PowerShell"],
     });
@@ -74,7 +74,7 @@ describe("settings — profile panel", () => {
     expect(sel.value).toBe("CMD");
     const checks = root.querySelectorAll<HTMLInputElement>(".wt-profile-check");
     expect(checks).toHaveLength(3);
-    const ps = [...checks].find(c => c.value === "PowerShell")!;
+    const ps = [...checks].find((c) => c.value === "PowerShell")!;
     expect(ps.checked).toBe(false);
     // Panel-scoped: the settings page chrome survives the re-render.
     expect(root.querySelectorAll(".settings-nav-item")).toHaveLength(6);

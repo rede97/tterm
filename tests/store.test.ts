@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { invokeMock } = vi.hoisted(() => ({
   invokeMock: vi.fn((cmd: string) => {
@@ -15,11 +15,19 @@ describe("ConfigStore — set/get", () => {
     invokeMock.mockClear();
     // Reset to defaults by setting each key
     configStore.set({
-      fontSize: 14, fontFamily: "monospace", scrollback: 20000,
-      themeName: "Default", renderer: "webgl", terminalBell: false,
-      pasteWarning: true, pasteTrim: true, serialBaud: 115200,
-      serialProfile: "Normal", defaultLocalProfile: null,
-      hiddenProfiles: [], hiddenSshHosts: [],
+      fontSize: 14,
+      fontFamily: "monospace",
+      scrollback: 20000,
+      themeName: "Default",
+      renderer: "webgl",
+      terminalBell: false,
+      pasteWarning: true,
+      pasteTrim: true,
+      serialBaud: 115200,
+      serialProfile: "Normal",
+      defaultLocalProfile: null,
+      hiddenProfiles: [],
+      hiddenSshHosts: [],
     });
     configStore.flush();
     invokeMock.mockClear();
@@ -84,7 +92,8 @@ describe("ConfigStore — load", () => {
 
   it("load reads config and applies values", async () => {
     invokeMock.mockImplementation((cmd: string) => {
-      if (cmd === "read_config") return Promise.resolve(JSON.stringify({ fontSize: 20, themeName: "Nord" }));
+      if (cmd === "read_config")
+        return Promise.resolve(JSON.stringify({ fontSize: 20, themeName: "Nord" }));
       return Promise.resolve(null);
     });
     await configStore.load();
@@ -106,7 +115,7 @@ describe("ConfigStore — load", () => {
     await configStore.load();
     expect(configStore.get("loaded")).toBe(true);
     // Should have written defaults
-    const write = invokeMock.mock.calls.find(c => c[0] === "write_config");
+    const write = invokeMock.mock.calls.find((c) => c[0] === "write_config");
     expect(write).toBeTruthy();
     const written = JSON.parse((write![1] as any).content);
     expect(written.fontSize).toBe(14);
@@ -120,7 +129,8 @@ describe("ConfigStore — load", () => {
     invokeMock.mockClear();
 
     invokeMock.mockImplementation((cmd: string) => {
-      if (cmd === "read_config") return Promise.resolve(JSON.stringify({ fontSize: 5, scrollback: 10 }));
+      if (cmd === "read_config")
+        return Promise.resolve(JSON.stringify({ fontSize: 5, scrollback: 10 }));
       return Promise.resolve(null);
     });
     await configStore.load();
@@ -142,7 +152,9 @@ describe("ConfigStore — load", () => {
       // Subscribers (keymap lookup, terminal options) must re-apply
       // defaults too — Reset All / Revert must not silently keep old
       // values until restart.
-      expect(notified).toEqual(expect.arrayContaining(["fontSize", "keybindings", "scrollback", "themeName"]));
+      expect(notified).toEqual(
+        expect.arrayContaining(["fontSize", "keybindings", "scrollback", "themeName"]),
+      );
     } finally {
       unsub();
     }
@@ -180,7 +192,7 @@ describe("ConfigStore — load", () => {
       // Advance well past the 300ms debounce: the stale pending write (22)
       // must never reach disk after the load.
       await vi.advanceTimersByTimeAsync(1000);
-      expect(invokeMock.mock.calls.filter(c => c[0] === "write_config")).toHaveLength(0);
+      expect(invokeMock.mock.calls.filter((c) => c[0] === "write_config")).toHaveLength(0);
       expect(configStore.get("fontSize")).toBe(16);
     } finally {
       vi.useRealTimers();
@@ -201,9 +213,9 @@ describe("ConfigStore — flush & debounce", () => {
   it("set schedules a debounced save after 300ms", async () => {
     configStore.set({ fontSize: 20 });
     // No write yet
-    expect(invokeMock.mock.calls.find(c => c[0] === "write_config")).toBeUndefined();
+    expect(invokeMock.mock.calls.find((c) => c[0] === "write_config")).toBeUndefined();
     await vi.advanceTimersByTimeAsync(300);
-    const write = invokeMock.mock.calls.find(c => c[0] === "write_config");
+    const write = invokeMock.mock.calls.find((c) => c[0] === "write_config");
     expect(write).toBeTruthy();
     expect(JSON.parse((write![1] as any).content).fontSize).toBe(20);
   });
@@ -213,7 +225,7 @@ describe("ConfigStore — flush & debounce", () => {
     configStore.flush();
     // flush() calls _writeDisk which is async — flush microtasks
     await vi.advanceTimersByTimeAsync(0);
-    const write = invokeMock.mock.calls.find(c => c[0] === "write_config");
+    const write = invokeMock.mock.calls.find((c) => c[0] === "write_config");
     expect(write).toBeTruthy();
     expect(JSON.parse((write![1] as any).content).fontSize).toBe(22);
   });
@@ -222,7 +234,7 @@ describe("ConfigStore — flush & debounce", () => {
     configStore.set({ fontSize: 20 });
     configStore.set({ scrollback: 5000 });
     await vi.advanceTimersByTimeAsync(300);
-    const writes = invokeMock.mock.calls.filter(c => c[0] === "write_config");
+    const writes = invokeMock.mock.calls.filter((c) => c[0] === "write_config");
     expect(writes).toHaveLength(1);
     const written = JSON.parse((writes[0][1] as any).content);
     expect(written.fontSize).toBe(20);
@@ -233,7 +245,7 @@ describe("ConfigStore — flush & debounce", () => {
     configStore.set({ sshHosts: [{ name: "test" }], serialPorts: [{ name: "COM1" }] });
     await vi.advanceTimersByTimeAsync(300);
     // Runtime-only keys don't trigger a disk save
-    const write = invokeMock.mock.calls.find(c => c[0] === "write_config");
+    const write = invokeMock.mock.calls.find((c) => c[0] === "write_config");
     expect(write).toBeUndefined();
   });
 });

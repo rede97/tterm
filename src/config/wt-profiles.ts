@@ -2,10 +2,10 @@
 // Reads WT settings.json and fragment files via Tauri IPC.
 
 import { invoke } from "@tauri-apps/api/core";
-import type { LocalProfile, VsInstallation, SerialPort } from "../core/types";
+import { logError } from "../core/errorlog";
+import type { LocalProfile, SerialPort, VsInstallation } from "../core/types";
 import type { ThemeDef } from "../util/themes";
 import { parseWtSchemes } from "../util/themes";
-import { logError } from "../core/errorlog";
 
 export interface WtLoadResult {
   profiles: LocalProfile[];
@@ -17,9 +17,7 @@ function resolveVsProfile(name: string, vsInstalls: VsInstallation[]): string | 
   if (vsInstalls.length === 0) return null;
   const yearMatch = name.match(/\b(20\d\d)\b/);
   const year = yearMatch ? yearMatch[1] : null;
-  const vs = year
-    ? vsInstalls.find(v => v.path.includes(year)) || vsInstalls[0]
-    : vsInstalls[0];
+  const vs = year ? vsInstalls.find((v) => v.path.includes(year)) || vsInstalls[0] : vsInstalls[0];
   if (/developer command prompt/i.test(name)) {
     return `%comspec% /k "${vs.path}\\Common7\\Tools\\VsDevCmd.bat"`;
   }
@@ -49,12 +47,16 @@ function addProfile(item: any, localProfiles: LocalProfile[], vsInstalls: VsInst
   if (!command && !item.source) {
     command = name;
   }
-  if (command && !localProfiles.some(p => p.name === name)) {
+  if (command && !localProfiles.some((p) => p.name === name)) {
     localProfiles.push({ name, command });
   }
 }
 
-function parseProfilesFromJson(root: any, localProfiles: LocalProfile[], vsInstalls: VsInstallation[]): void {
+function parseProfilesFromJson(
+  root: any,
+  localProfiles: LocalProfile[],
+  vsInstalls: VsInstallation[],
+): void {
   const list: any[] = root?.profiles?.list;
   if (list) {
     for (const item of list) addProfile(item, localProfiles, vsInstalls);
@@ -75,7 +77,7 @@ export async function loadAllWtData(): Promise<WtLoadResult> {
     logError("vs.findInstances", e);
   }
 
-  let localProfiles: LocalProfile[] = [];
+  const localProfiles: LocalProfile[] = [];
   let themes: ThemeDef[] = [];
   let raw: string | null = null;
 
@@ -94,7 +96,9 @@ export async function loadAllWtData(): Promise<WtLoadResult> {
       for (const frag of fragments) {
         try {
           parseProfilesFromJson(JSON.parse(frag), localProfiles, vsInstalls);
-        } catch { /* skip malformed fragments */ }
+        } catch {
+          /* skip malformed fragments */
+        }
       }
     }
   } catch (e) {

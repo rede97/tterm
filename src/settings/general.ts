@@ -1,11 +1,11 @@
 // Settings — General panel
 // Renderer, scrollback, terminal bell, paste options, tab width, data management
 
-import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { configStore, type ConfigState } from "../core/store";
 import { logCatch, logError } from "../core/errorlog";
+import { type ConfigState, configStore } from "../core/store";
 import { attachStepper } from "../ui/stepper";
 
 export function createGeneralPanel(): HTMLElement {
@@ -127,32 +127,36 @@ export function createGeneralPanel(): HTMLElement {
   `;
 
   // populate version async
-  getVersion().then(v => {
-    const el = panel.querySelector("#set-version");
-    if (el) el.textContent = "TTerm " + v;
-  }).catch(() => {});
+  getVersion()
+    .then((v) => {
+      const el = panel.querySelector("#set-version");
+      if (el) el.textContent = `TTerm ${v}`;
+    })
+    .catch(() => {});
 
   // Scrollback gets the shared stepper (native spinners are hidden globally).
   attachStepper(panel.querySelector<HTMLInputElement>("#set-scrollback")!);
 
   // homepage link
-  panel.querySelector("#set-homepage")!.addEventListener("click", (e) => {
+  panel.querySelector("#set-homepage")?.addEventListener("click", (e) => {
     e.preventDefault();
     openUrl("https://github.com/rede97/tterm");
   });
 
   // manual update check
-  panel.querySelector("#set-check-update")!.addEventListener("click", () => {
-    import("../core/updater").then(m => m.checkForUpdates(true)).catch(logCatch("updater.manual"));
+  panel.querySelector("#set-check-update")?.addEventListener("click", () => {
+    import("../core/updater")
+      .then((m) => m.checkForUpdates(true))
+      .catch(logCatch("updater.manual"));
   });
 
   // open config directory
-  panel.querySelector("#set-open-config-dir")!.addEventListener("click", () => {
+  panel.querySelector("#set-open-config-dir")?.addEventListener("click", () => {
     invoke("open_config_dir").catch(logError.bind(null, "config.openDir"));
   });
 
   // reset all settings
-  panel.querySelector("#set-reset-all")!.addEventListener("click", async () => {
+  panel.querySelector("#set-reset-all")?.addEventListener("click", async () => {
     await invoke("delete_config");
     await configStore.load();
     // Notify parent to refresh
@@ -192,7 +196,8 @@ export function collectGeneralSettings(root: HTMLElement): Partial<ConfigState> 
   if (pasteTrimEl) partial.pasteTrim = pasteTrimEl.checked;
   if (bellEl) partial.terminalBell = bellEl.checked;
   if (rendererEl) partial.renderer = rendererEl.value;
-  if (scrollbackEl) partial.scrollback = Math.max(100, Math.min(100000, parseInt(scrollbackEl.value, 10) || 1000));
+  if (scrollbackEl)
+    partial.scrollback = Math.max(100, Math.min(100000, parseInt(scrollbackEl.value, 10) || 1000));
   const autoUpdateEl = root.querySelector("#set-auto-update") as HTMLInputElement;
   if (autoUpdateEl) partial.autoCheckUpdates = autoUpdateEl.checked;
   return partial;

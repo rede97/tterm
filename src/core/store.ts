@@ -8,9 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { buildFontFamily, defaultFontStack } from "../util/fontconfig";
 import { DEFAULT_THEME_NAME } from "../util/themes";
 import { logError } from "./errorlog";
-import type {
-  SshHost, LocalProfile, VsInstallation, SerialPort,
-} from "./types";
+import type { LocalProfile, SerialPort, SshHost, VsInstallation } from "./types";
 
 // ---- All config state in one interface ----
 
@@ -56,43 +54,56 @@ interface SchemaEntry<T> {
 
 const isString = (v: unknown): v is string => typeof v === "string";
 const isBoolean = (v: unknown): v is boolean => typeof v === "boolean";
-const isNumber = (min: number, max: number) => (v: unknown): v is number => typeof v === "number" && v >= min && v <= max;
+const isNumber =
+  (min: number, max: number) =>
+  (v: unknown): v is number =>
+    typeof v === "number" && v >= min && v <= max;
 const isArray = <T = unknown>(v: unknown): v is T[] => Array.isArray(v);
 const isStringRecord = (v: unknown): v is Record<string, string> =>
-  typeof v === "object" && v !== null && !Array.isArray(v) &&
-  Object.values(v).every(x => typeof x === "string");
-const isOrNull = <T>(guard: (v: unknown) => v is T) => (v: unknown): v is T | null => v === null || guard(v);
-
+  typeof v === "object" &&
+  v !== null &&
+  !Array.isArray(v) &&
+  Object.values(v).every((x) => typeof x === "string");
+const isOrNull =
+  <T>(guard: (v: unknown) => v is T) =>
+  (v: unknown): v is T | null =>
+    v === null || guard(v);
 
 const SCHEMA = {
-  sshHosts:           { default: [] as SshHost[],          validate: isArray<SshHost> },
-  localProfiles:      { default: [] as LocalProfile[],     validate: isArray<LocalProfile> },
-  vsInstalls:         { default: [] as VsInstallation[],   validate: isArray<VsInstallation> },
-  serialPorts:        { default: [] as SerialPort[],       validate: isArray<SerialPort> },
-  hiddenProfiles:     { default: [] as string[],           validate: isArray<string> },
-  hiddenSshHosts:     { default: [] as string[],           validate: isArray<string> },
-  fontFamily:         { default: buildFontFamily(defaultFontStack()), validate: isString },
-  fontSize:           { default: 14,                       validate: isNumber(10, 32) },
-  scrollback:         { default: 20000,                    validate: isNumber(100, 100000) },
-  themeName:          { default: DEFAULT_THEME_NAME,       validate: isString },
-  renderer:           { default: "webgl",                  validate: isString },
-  terminalBell:       { default: false,                    validate: isBoolean },
-  pasteWarning:       { default: true,                     validate: isBoolean },
-  pasteTrim:          { default: true,                     validate: isBoolean },
-  serialBaud:         { default: 115200,                   validate: isNumber(300, 921600) },
-  serialProfile:      { default: "Normal",                  validate: isString },
-  defaultLocalProfile: { default: null as string | null,    validate: isOrNull(isString) },
-  autoCheckUpdates:   { default: true,                     validate: isBoolean },
-  sshEmbedded:        { default: true,                     validate: isBoolean },
-  recentDirectories:  { default: [] as string[],           validate: isArray<string> },
-  keybindings:        { default: {} as Record<string, string>, validate: isStringRecord },
-  loaded:             { default: false,                    validate: isBoolean },
+  sshHosts: { default: [] as SshHost[], validate: isArray<SshHost> },
+  localProfiles: { default: [] as LocalProfile[], validate: isArray<LocalProfile> },
+  vsInstalls: { default: [] as VsInstallation[], validate: isArray<VsInstallation> },
+  serialPorts: { default: [] as SerialPort[], validate: isArray<SerialPort> },
+  hiddenProfiles: { default: [] as string[], validate: isArray<string> },
+  hiddenSshHosts: { default: [] as string[], validate: isArray<string> },
+  fontFamily: { default: buildFontFamily(defaultFontStack()), validate: isString },
+  fontSize: { default: 14, validate: isNumber(10, 32) },
+  scrollback: { default: 20000, validate: isNumber(100, 100000) },
+  themeName: { default: DEFAULT_THEME_NAME, validate: isString },
+  renderer: { default: "webgl", validate: isString },
+  terminalBell: { default: false, validate: isBoolean },
+  pasteWarning: { default: true, validate: isBoolean },
+  pasteTrim: { default: true, validate: isBoolean },
+  serialBaud: { default: 115200, validate: isNumber(300, 921600) },
+  serialProfile: { default: "Normal", validate: isString },
+  defaultLocalProfile: { default: null as string | null, validate: isOrNull(isString) },
+  autoCheckUpdates: { default: true, validate: isBoolean },
+  sshEmbedded: { default: true, validate: isBoolean },
+  recentDirectories: { default: [] as string[], validate: isArray<string> },
+  keybindings: { default: {} as Record<string, string>, validate: isStringRecord },
+  loaded: { default: false, validate: isBoolean },
 } satisfies Record<string, SchemaEntry<unknown>>;
 
 type SchemaKey = keyof typeof SCHEMA;
 
 // Keys that are NOT persisted to the config file (runtime-only data)
-const RUNTIME_KEYS = new Set<SchemaKey>(["loaded", "serialPorts", "vsInstalls", "sshHosts", "localProfiles"]);
+const RUNTIME_KEYS = new Set<SchemaKey>([
+  "loaded",
+  "serialPorts",
+  "vsInstalls",
+  "sshHosts",
+  "localProfiles",
+]);
 
 function defaultState(): ConfigState {
   const state = {} as ConfigState;
@@ -226,7 +237,9 @@ class ConfigStore {
       try {
         const raw = await invoke<string>("read_config");
         existing = JSON.parse(raw);
-      } catch { /* first write or read error — start fresh */ }
+      } catch {
+        /* first write or read error — start fresh */
+      }
       const merged = { ...existing, ...data };
       await invoke("write_config", { content: JSON.stringify(merged) });
     } catch (e) {

@@ -5,7 +5,11 @@ export class SizeHint {
   private el: HTMLElement;
   private timer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(parent: HTMLElement, private hideDelay = 1200, fontFamily = "") {
+  constructor(
+    parent: HTMLElement,
+    private hideDelay = 1200,
+    fontFamily = "",
+  ) {
     this.el = document.createElement("div");
     this.el.className = "size-hint";
     if (fontFamily) this.el.style.fontFamily = fontFamily;

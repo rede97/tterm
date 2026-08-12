@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Fake serial-profiles.json backing store.
 const { file } = vi.hoisted(() => ({ file: { content: "[]" } }));
@@ -14,12 +14,12 @@ vi.mock("@tauri-apps/api/core", () => ({
   }),
 }));
 
-import { configStore } from "../src/core/store";
 import { setCustomSerialProfiles } from "../src/config/serial-profiles";
+import { configStore } from "../src/core/store";
 import {
+  collectSerialSettings,
   createSerialPanel,
   refreshSerialPanel,
-  collectSerialSettings,
 } from "../src/settings/serial";
 
 function openPanel(): HTMLElement {
@@ -54,11 +54,15 @@ describe("settings — Serial panel defaults", () => {
   it("default profile select lists built-in profiles and is collected on Apply", () => {
     const panel = openPanel();
     const sel = panel.querySelector<HTMLSelectElement>("#set-serial-profile")!;
-    const options = [...sel.querySelectorAll("option")].map(o => o.value);
+    const options = [...sel.querySelectorAll("option")].map((o) => o.value);
     expect(options).toEqual(expect.arrayContaining(["Normal", "Log", "AT"]));
     // Built-in profiles live in their own optgroup
     const builtin = sel.querySelector('optgroup[label="Built-in"]')!;
-    expect([...builtin.querySelectorAll("option")].map(o => o.value)).toEqual(["Normal", "Log", "AT"]);
+    expect([...builtin.querySelectorAll("option")].map((o) => o.value)).toEqual([
+      "Normal",
+      "Log",
+      "AT",
+    ]);
     expect(sel.value).toBe("Normal");
 
     sel.value = "AT";
@@ -80,19 +84,24 @@ describe("settings — Serial panel defaults", () => {
 describe("settings — Serial profile gallery", () => {
   it("shows the Built-in section with Normal/Log/AT and their summaries", () => {
     const panel = openPanel();
-    const headers = [...panel.querySelectorAll(".theme-group-title")].map(h => h.textContent);
+    const headers = [...panel.querySelectorAll(".theme-group-title")].map((h) => h.textContent);
     expect(headers).toEqual(["Built-in", "Custom"]);
 
-    expect(card(panel, "Normal").querySelector(".sp-card-summary")!.textContent)
-      .toBe("normal · Enter→CR · out keep · flow none");
-    expect(card(panel, "Log").querySelector(".sp-card-summary")!.textContent)
-      .toBe("normal · Enter→CR · out cr-in-lf · flow none");
-    expect(card(panel, "AT").querySelector(".sp-card-summary")!.textContent)
-      .toBe("echo · Enter→CRLF · out keep · flow none");
+    expect(card(panel, "Normal").querySelector(".sp-card-summary")!.textContent).toBe(
+      "normal · Enter→CR · out keep · flow none",
+    );
+    expect(card(panel, "Log").querySelector(".sp-card-summary")!.textContent).toBe(
+      "normal · Enter→CR · out cr-in-lf · flow none",
+    );
+    expect(card(panel, "AT").querySelector(".sp-card-summary")!.textContent).toBe(
+      "echo · Enter→CRLF · out keep · flow none",
+    );
 
     // Every card has Duplicate; built-ins have no Edit.
     for (const name of ["Normal", "Log", "AT"]) {
-      const actions = [...card(panel, name).querySelectorAll(".theme-card-action")].map(b => b.textContent);
+      const actions = [...card(panel, name).querySelectorAll(".theme-card-action")].map(
+        (b) => b.textContent,
+      );
       expect(actions).toEqual(["Duplicate"]);
     }
     // The custom grid always offers the New Profile affordance.
@@ -106,8 +115,12 @@ describe("settings — Serial profile gallery", () => {
     const overlay = document.body.querySelector(".sp-overlay");
     expect(overlay, "profile editor modal").toBeTruthy();
     expect(overlay!.querySelector<HTMLInputElement>(".sp-name")!.value).toBe("AT Copy");
-    expect(overlay!.querySelector<HTMLSelectElement>('.sp-select[data-field="inputMode"]')!.value).toBe("echo");
-    expect(overlay!.querySelector<HTMLSelectElement>('.sp-select[data-field="enterNewline"]')!.value).toBe("crlf");
+    expect(
+      overlay!.querySelector<HTMLSelectElement>('.sp-select[data-field="inputMode"]')!.value,
+    ).toBe("echo");
+    expect(
+      overlay!.querySelector<HTMLSelectElement>('.sp-select[data-field="enterNewline"]')!.value,
+    ).toBe("crlf");
     // No summary preview in the editor (removed by design).
     expect(overlay!.querySelector(".sp-preview")).toBeNull();
   });
@@ -147,13 +160,21 @@ describe("settings — Serial profile gallery", () => {
     // Modal closed, persisted to serial-profiles.json, custom card has Edit.
     expect(document.body.querySelector(".sp-overlay")).toBeNull();
     expect(JSON.parse(file.content)).toEqual([
-      { name: "AT Copy", inputMode: "echo", enterNewline: "crlf", outputNewline: "keep", flowControl: "none" },
+      {
+        name: "AT Copy",
+        inputMode: "echo",
+        enterNewline: "crlf",
+        outputNewline: "keep",
+        flowControl: "none",
+      },
     ]);
-    const actions = [...card(panel, "AT Copy").querySelectorAll(".theme-card-action")].map(b => b.textContent);
+    const actions = [...card(panel, "AT Copy").querySelectorAll(".theme-card-action")].map(
+      (b) => b.textContent,
+    );
     expect(actions).toEqual(["Duplicate", "Edit"]);
     // The new profile is also selectable as the default.
     const sel = panel.querySelector<HTMLSelectElement>("#set-serial-profile")!;
-    expect([...sel.querySelectorAll("option")].map(o => o.value)).toContain("AT Copy");
+    expect([...sel.querySelectorAll("option")].map((o) => o.value)).toContain("AT Copy");
   });
 
   it("rejects a name that collides with an existing profile", async () => {
@@ -181,10 +202,15 @@ describe("settings — Serial profile gallery", () => {
     refreshSerialPanel(panel);
     expect(panel.querySelector<HTMLSelectElement>("#set-serial-profile")!.value).toBe("AT Copy");
 
-    vi.stubGlobal("confirm", vi.fn(() => true));
+    vi.stubGlobal(
+      "confirm",
+      vi.fn(() => true),
+    );
     try {
-      const actions = [...card(panel, "AT Copy").querySelectorAll<HTMLButtonElement>(".theme-card-action")];
-      actions.find(b => b.textContent === "Edit")!.click();
+      const actions = [
+        ...card(panel, "AT Copy").querySelectorAll<HTMLButtonElement>(".theme-card-action"),
+      ];
+      actions.find((b) => b.textContent === "Edit")!.click();
       const overlay = document.body.querySelector(".sp-overlay")!;
       expect(overlay.querySelector<HTMLInputElement>(".sp-name")!.value).toBe("AT Copy");
       overlay.querySelector<HTMLButtonElement>(".sp-delete")!.click();

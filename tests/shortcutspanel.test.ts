@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(() => Promise.resolve(null)) }));
 
-import {
-  createShortcutsPanel,
-  refreshShortcutsPanel,
-  collectShortcutsSettings,
-} from "../src/settings/shortcuts";
 import { KEY_COMMANDS } from "../src/core/keymap";
 import { configStore } from "../src/core/store";
+import {
+  collectShortcutsSettings,
+  createShortcutsPanel,
+  refreshShortcutsPanel,
+} from "../src/settings/shortcuts";
 
 function chip(panel: HTMLElement, commandId: string): HTMLButtonElement {
   const row = panel.querySelector<HTMLElement>(`.kb-row[data-command="${commandId}"]`)!;
@@ -46,7 +46,9 @@ describe("settings — Keyboard panel", () => {
     pressKey(capture, { key: "Enter" });
 
     expect(chip(panel, "workbench.action.terminal.clear").textContent).toBe("Ctrl+L");
-    expect(chip(panel, "workbench.action.terminal.clear").classList.contains("kb-chip-modified")).toBe(true);
+    expect(
+      chip(panel, "workbench.action.terminal.clear").classList.contains("kb-chip-modified"),
+    ).toBe(true);
     expect(collectShortcutsSettings(panel)).toEqual({
       keybindings: { "workbench.action.terminal.clear": "ctrl+l" },
     });
@@ -111,6 +113,6 @@ describe("settings — Keyboard panel", () => {
     search.dispatchEvent(new Event("input", { bubbles: true }));
     const visible = [...panel.querySelectorAll<HTMLElement>(".kb-row[data-command]")];
     expect(visible.length).toBeGreaterThanOrEqual(1);
-    expect(visible.every(r => r.dataset.command === "workbench.action.toggleZenMode")).toBe(true);
+    expect(visible.every((r) => r.dataset.command === "workbench.action.toggleZenMode")).toBe(true);
   });
 });

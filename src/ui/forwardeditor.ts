@@ -49,7 +49,11 @@ interface Endpoint {
   port: HTMLInputElement;
 }
 
-function mkEndpoint(colLabel: string, hostAria: string, portAria: string): Endpoint & { col: HTMLElement } {
+function mkEndpoint(
+  colLabel: string,
+  hostAria: string,
+  portAria: string,
+): Endpoint & { col: HTMLElement } {
   const col = el("div", "xfe-col");
   col.appendChild(el("div", "xfe-col-title", colLabel));
   const fields = el("div", "xfe-fields");
@@ -102,13 +106,18 @@ export function createForwardEditor(opts?: { stacked?: boolean }): ForwardEditor
     local.host.classList.toggle("xfe-locked", lockLocal);
     remote.host.classList.toggle("xfe-locked", !lockLocal);
     arrow.textContent = dir === "local" ? "→" : "←";
-    arrow.title = dir === "local"
-      ? "Local → Remote (-L): listen here, reach a remote target. Click to flip."
-      : "Remote → Local (-R): listen on the server, reach a target from here. Click to flip.";
+    arrow.title =
+      dir === "local"
+        ? "Local → Remote (-L): listen here, reach a remote target. Click to flip."
+        : "Remote → Local (-R): listen on the server, reach a target from here. Click to flip.";
   }
 
-  local.host.addEventListener("input", () => { if (!local.host.disabled) localHost = local.host.value; });
-  remote.host.addEventListener("input", () => { if (!remote.host.disabled) remoteHost = remote.host.value; });
+  local.host.addEventListener("input", () => {
+    if (!local.host.disabled) localHost = local.host.value;
+  });
+  remote.host.addEventListener("input", () => {
+    if (!remote.host.disabled) remoteHost = remote.host.value;
+  });
   arrow.addEventListener("click", () => {
     dir = dir === "local" ? "remote" : "local";
     apply();

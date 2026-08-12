@@ -3,21 +3,22 @@
 // serial-profiles.json via config/serial-profiles.ts, never in config.json.
 // Mirrors themeeditor.ts.
 
-import type {
-  SerialProfile,
-  SerialInputMode,
-  SerialFlowControl,
-} from "../core/types";
-import { SERIAL_ENTER_NEWLINES, SERIAL_OUTPUT_NEWLINES, SERIAL_OUTPUT_NEWLINE_DESCS, esc } from "../core/common";
 import {
   allSerialProfiles,
-  saveSerialProfile,
   deleteSerialProfile,
   type SerialProfileDef,
+  saveSerialProfile,
 } from "../config/serial-profiles";
-import { showToast } from "../ui/toast";
-import { createModal } from "../ui/modal";
+import {
+  esc,
+  SERIAL_ENTER_NEWLINES,
+  SERIAL_OUTPUT_NEWLINE_DESCS,
+  SERIAL_OUTPUT_NEWLINES,
+} from "../core/common";
 import { logCatch } from "../core/errorlog";
+import type { SerialFlowControl, SerialInputMode, SerialProfile } from "../core/types";
+import { createModal } from "../ui/modal";
+import { showToast } from "../ui/toast";
 
 const INPUT_MODE_LABELS: [SerialInputMode, string][] = [
   ["normal", "Normal"],
@@ -107,24 +108,23 @@ export function showSerialProfileEditor(opts: SerialProfileEditorOptions): void 
     el.addEventListener("change", () => {
       (working[field] as string) = el.value;
       if (field === "outputNewline") {
-        hintEl.textContent = SERIAL_OUTPUT_NEWLINE_DESCS[el.value as SerialProfile["outputNewline"]];
+        hintEl.textContent =
+          SERIAL_OUTPUT_NEWLINE_DESCS[el.value as SerialProfile["outputNewline"]];
       }
     });
   });
 
   const close = modal.close;
-  overlay.querySelector(".sp-cancel")!.addEventListener("click", close);
+  overlay.querySelector(".sp-cancel")?.addEventListener("click", close);
 
-  overlay.querySelector(".sp-save")!.addEventListener("click", () => {
+  overlay.querySelector(".sp-save")?.addEventListener("click", () => {
     const name = nameInput.value.trim();
     if (!name) {
       showToast("Profile name cannot be empty", "error");
       return;
     }
     // Name must not collide with a different profile.
-    const collision = allSerialProfiles().some(
-      (p) => p.name === name && p.name !== opts.editName,
-    );
+    const collision = allSerialProfiles().some((p) => p.name === name && p.name !== opts.editName);
     if (collision) {
       showToast(`A profile named "${name}" already exists`, "error");
       return;

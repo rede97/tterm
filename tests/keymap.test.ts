@@ -1,16 +1,16 @@
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   comboFromEvent,
-  parseCombo,
   comboMatches,
-  formatCombo,
   defaultKeybindings,
-  resolveKeybindings,
   findConflict,
+  formatCombo,
   initKeymap,
-  suspendKeymap,
-  resumeKeymap,
   KEY_COMMANDS,
+  parseCombo,
+  resolveKeybindings,
+  resumeKeymap,
+  suspendKeymap,
 } from "../src/core/keymap";
 import { configStore } from "../src/core/store";
 
@@ -27,7 +27,9 @@ function keyEvent(init: Partial<KeyboardEventInit> & { key: string }): KeyboardE
 describe("comboFromEvent", () => {
   it("builds canonical combos with modifiers in fixed order", () => {
     expect(comboFromEvent(keyEvent({ key: "p", ctrlKey: true }))).toBe("ctrl+p");
-    expect(comboFromEvent(keyEvent({ key: "P", ctrlKey: true, shiftKey: true }))).toBe("ctrl+shift+p");
+    expect(comboFromEvent(keyEvent({ key: "P", ctrlKey: true, shiftKey: true }))).toBe(
+      "ctrl+shift+p",
+    );
     expect(comboFromEvent(keyEvent({ key: "Tab", ctrlKey: true }))).toBe("ctrl+tab");
     expect(comboFromEvent(keyEvent({ key: "F11" }))).toBe("f11");
     expect(comboFromEvent(keyEvent({ key: " ", ctrlKey: true }))).toBe("ctrl+space");
@@ -42,8 +44,20 @@ describe("comboFromEvent", () => {
 
 describe("parseCombo / comboMatches", () => {
   it("round-trips canonical combos", () => {
-    expect(parseCombo("ctrl+shift+tab")).toEqual({ ctrl: true, alt: false, shift: true, meta: false, key: "tab" });
-    expect(parseCombo("f11")).toEqual({ ctrl: false, alt: false, shift: false, meta: false, key: "f11" });
+    expect(parseCombo("ctrl+shift+tab")).toEqual({
+      ctrl: true,
+      alt: false,
+      shift: true,
+      meta: false,
+      key: "tab",
+    });
+    expect(parseCombo("f11")).toEqual({
+      ctrl: false,
+      alt: false,
+      shift: false,
+      meta: false,
+      key: "f11",
+    });
   });
 
   it("rejects malformed combos", () => {
@@ -54,25 +68,49 @@ describe("parseCombo / comboMatches", () => {
   });
 
   it("the plus key itself round-trips (ctrl++)", () => {
-    expect(parseCombo("ctrl++")).toEqual({ ctrl: true, alt: false, shift: false, meta: false, key: "+" });
-    expect(parseCombo("+")).toEqual({ ctrl: false, alt: false, shift: false, meta: false, key: "+" });
+    expect(parseCombo("ctrl++")).toEqual({
+      ctrl: true,
+      alt: false,
+      shift: false,
+      meta: false,
+      key: "+",
+    });
+    expect(parseCombo("+")).toEqual({
+      ctrl: false,
+      alt: false,
+      shift: false,
+      meta: false,
+      key: "+",
+    });
     expect(comboFromEvent(keyEvent({ key: "+", ctrlKey: true }))).toBe("ctrl++");
     expect(comboMatches(keyEvent({ key: "+", ctrlKey: true }), "ctrl++")).toBe(true);
     expect(formatCombo("ctrl++")).toBe("Ctrl++");
   });
 
   it("numpad keys stay distinct from main-row twins", () => {
-    expect(comboFromEvent(keyEvent({ key: "1", ctrlKey: true, code: "Numpad1" }))).toBe("ctrl+num1");
+    expect(comboFromEvent(keyEvent({ key: "1", ctrlKey: true, code: "Numpad1" }))).toBe(
+      "ctrl+num1",
+    );
     expect(comboFromEvent(keyEvent({ key: "1", ctrlKey: true, code: "Digit1" }))).toBe("ctrl+1");
-    expect(parseCombo("ctrl+num1")).toEqual({ ctrl: true, alt: false, shift: false, meta: false, key: "num1" });
+    expect(parseCombo("ctrl+num1")).toEqual({
+      ctrl: true,
+      alt: false,
+      shift: false,
+      meta: false,
+      key: "num1",
+    });
   });
 
   it("matches only exact modifier state", () => {
     expect(comboMatches(keyEvent({ key: "Tab", ctrlKey: true }), "ctrl+tab")).toBe(true);
     // Ctrl+Shift+Tab must NOT match the plain Ctrl+Tab binding (this is what
     // keeps forward and reverse cycling distinct).
-    expect(comboMatches(keyEvent({ key: "Tab", ctrlKey: true, shiftKey: true }), "ctrl+tab")).toBe(false);
-    expect(comboMatches(keyEvent({ key: "Tab", ctrlKey: true, shiftKey: true }), "ctrl+shift+tab")).toBe(true);
+    expect(comboMatches(keyEvent({ key: "Tab", ctrlKey: true, shiftKey: true }), "ctrl+tab")).toBe(
+      false,
+    );
+    expect(
+      comboMatches(keyEvent({ key: "Tab", ctrlKey: true, shiftKey: true }), "ctrl+shift+tab"),
+    ).toBe(true);
     expect(comboMatches(keyEvent({ key: "w", ctrlKey: true }), "ctrl+w")).toBe(true);
     expect(comboMatches(keyEvent({ key: "w" }), "ctrl+w")).toBe(false);
   });
@@ -116,7 +154,9 @@ describe("resolveKeybindings", () => {
 describe("findConflict", () => {
   it("detects a combo already bound elsewhere", () => {
     const bindings = resolveKeybindings({});
-    expect(findConflict(bindings, "ctrl+p", "workbench.action.closeTab")).toBe("workbench.action.quickOpen");
+    expect(findConflict(bindings, "ctrl+p", "workbench.action.closeTab")).toBe(
+      "workbench.action.quickOpen",
+    );
     expect(findConflict(bindings, "ctrl+p", "workbench.action.quickOpen")).toBeNull();
     expect(findConflict(bindings, "ctrl+alt+9", "workbench.action.quickOpen")).toBeNull();
     // Empty combo (unbind) never conflicts.
@@ -185,7 +225,7 @@ describe("keymap dispatcher", () => {
 
 describe("command registry", () => {
   it("has unique ids and a default entry for every command", () => {
-    const ids = KEY_COMMANDS.map(c => c.id);
+    const ids = KEY_COMMANDS.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
     const defaults = defaultKeybindings();
     for (const id of ids) expect(id in defaults).toBe(true);

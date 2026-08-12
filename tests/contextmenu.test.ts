@@ -1,8 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(() => Promise.resolve(null)) }));
 
-import { showTerminalContextMenu, setContextMenuHandlers, type ContextMenuHandlers } from "../src/terminal/contextmenu";
+import {
+  type ContextMenuHandlers,
+  setContextMenuHandlers,
+  showTerminalContextMenu,
+} from "../src/terminal/contextmenu";
 
 const handlers: ContextMenuHandlers = {
   createLocalTab: vi.fn(),

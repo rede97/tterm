@@ -8,13 +8,15 @@ Use **Bun** (`bun run <script>`). Fall back to `npm run` if unavailable.
 
 ```sh
 bun run build        # tsc typecheck + vite build (always do this before committing)
+bun run lint         # Biome check — MUST pass with zero errors before committing
+bun run lint:fix     # Biome safe autofixes + formatting
 bun run tauri dev    # full Tauri app in dev mode
 bun run tauri build  # production binary
 ```
 
-Tests: `bun run test` (Vitest unit + happy-dom DOM tests in `tests/`), `bun run test:rust` (Rust unit tests, colocated in each `src-tauri/src/*.rs` module), `bun run test:e2e` (tauri-driver + WebdriverIO, see `docs/testing.md`). No linters configured.
+Tests: `bun run test` (Vitest unit + happy-dom DOM tests in `tests/`), `bun run test:rust` (Rust unit tests, colocated in each `src-tauri/src/*.rs` module), `bun run test:e2e` (tauri-driver + WebdriverIO, see `docs/testing.md`). Lint/format: **Biome** (`biome.json`; `bunx biome check .`).
 
-**Always run `bun run build` before committing.** Before creating a release tag, ensure the build output has zero warnings (including vite `[plugin vite:reporter]` warnings).
+**Always run `bun run lint` and `bun run build` before committing.** Before creating a release tag, ensure the build output has zero warnings (including vite `[plugin vite:reporter]` warnings). **Always run `cargo fmt --manifest-path src-tauri/Cargo.toml` after editing Rust code** — CI gates on `cargo fmt --check`.
 
 ## Project
 
@@ -88,8 +90,21 @@ src-tauri/src/
 
 ### Frontend discipline (TypeScript & DOM)
 
-Style rules every agent must follow without being told twice (lint rollout
-to machine-enforce them: `docs/frontend-governance.md` P1).
+Style rules every agent must follow without being told twice. **Biome
+enforces the mechanical ones** (`bun run lint`); the rest are review-duty
+until the custom-rule rollout (`docs/frontend-governance.md` P1).
+
+**Lint principles:**
+- Zero lint ERRORS before every commit — CI's `check` job gates on it.
+- Fix, don't suppress. An inline `biome-ignore` comment needs a one-line
+  reason; blanket rule-off in `biome.json` is a governance decision, not a
+  convenience.
+- Warnings are the ratchet: `noNonNullAssertion` / `noExplicitAny` /
+  `noDescendingSpecificity` are warn-level for legacy code — do NOT add
+  new ones. New violations in your diff get fixed, not waved through.
+- After `lint:fix` (esp. `--unsafe`), re-run the tests: unsafe fixes can
+  change semantics (`x!` → `x?.` swallowed a real bug once — caught by
+  tsc, not the test suite).
 
 - **Errors**: no silent swallows. Promise tails end in `.catch(logCatch("area.action"))`, catch blocks use `logError`, and `swallow()` (`core/errorlog.ts`) only when the error is truly irrelevant (say why in a comment). Bare `.catch(() => {})` is banned. When the caught value is unused, write bare `catch { }` — no `catch (_)`.
 - **Types**: `strict` is on. No `as any` — narrow with `in`/`typeof` guards at boundaries; type-only imports go top-level as `import type` (never inline `import("x").T` in annotations); no casting an object inline just to read one property.

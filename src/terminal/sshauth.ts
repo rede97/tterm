@@ -4,8 +4,8 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { showToast } from "../ui/toast";
 import { createModal } from "../ui/modal";
+import { showToast } from "../ui/toast";
 
 interface SshAuthRequest {
   reqId: number;
@@ -48,7 +48,11 @@ function showAuthDialog(payload: SshAuthRequest): void {
   };
   // Every dismissal path (Cancel, Escape, backdrop) answers null — an
   // unanswered prompt would wedge the backend connect.
-  const modal = createModal({ className: "sshauth-overlay", onClose: () => respond(null), singleton: false });
+  const modal = createModal({
+    className: "sshauth-overlay",
+    onClose: () => respond(null),
+    singleton: false,
+  });
   const overlay = modal.overlay;
   overlay.innerHTML = `
     <div class="sshauth-dialog">
@@ -73,8 +77,8 @@ function showAuthDialog(payload: SshAuthRequest): void {
       respond(input.value);
     }
   });
-  overlay.querySelector(".sshauth-btn-ok")!.addEventListener("click", () => respond(input.value));
-  overlay.querySelector(".sshauth-btn-cancel")!.addEventListener("click", () => respond(null));
+  overlay.querySelector(".sshauth-btn-ok")?.addEventListener("click", () => respond(input.value));
+  overlay.querySelector(".sshauth-btn-cancel")?.addEventListener("click", () => respond(null));
 
   input.focus();
 }
@@ -90,7 +94,11 @@ function showHostkeyDialog(payload: SshHostkeyRequest): void {
     modal.close();
   };
   // Escape/backdrop = Reject (never auto-trust).
-  const modal = createModal({ className: "sshauth-overlay", onClose: () => respond(false), singleton: false });
+  const modal = createModal({
+    className: "sshauth-overlay",
+    onClose: () => respond(false),
+    singleton: false,
+  });
   const overlay = modal.overlay;
 
   const dialog = document.createElement("div");
@@ -142,7 +150,9 @@ function showHostkeyDialog(payload: SshHostkeyRequest): void {
   rejectBtn.type = "button";
   rejectBtn.textContent = "Reject";
   const trustBtn = document.createElement("button");
-  trustBtn.className = payload.mismatch ? "sshauth-btn sshauth-btn-danger" : "sshauth-btn sshauth-btn-ok";
+  trustBtn.className = payload.mismatch
+    ? "sshauth-btn sshauth-btn-danger"
+    : "sshauth-btn sshauth-btn-ok";
   trustBtn.type = "button";
   trustBtn.textContent = "Trust & Connect";
   footer.appendChild(rejectBtn);

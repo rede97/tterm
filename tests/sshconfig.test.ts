@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { parseSshConfig, generateSshConfig } from "../src/config/ssh-config";
+import { describe, expect, it } from "vitest";
+import { generateSshConfig, parseSshConfig } from "../src/config/ssh-config";
 import type { SshHost } from "../src/core/types";
 
 describe("parseSshConfig", () => {
@@ -54,7 +54,7 @@ Host special
     const hosts = parseSshConfig(`Host web1 web2
     HostName web.example.com
 `);
-    expect(hosts.map(h => h.name)).toEqual(["web1", "web2"]);
+    expect(hosts.map((h) => h.name)).toEqual(["web1", "web2"]);
   });
 
   it("applies wildcard Host * properties to all hosts without emitting a host", () => {
@@ -149,23 +149,23 @@ describe("generateSshConfig", () => {
 
 describe("global sections round-trip (H1 regression)", () => {
   it("preserves pre-Host globals and Host * blocks on generate", () => {
-    parseSshConfig([
-      "ForwardAgent yes",
-      "AddKeysToAgent yes",
-      "",
-      "Host web",
-      "    HostName web.example.com",
-      "    User deploy",
-      "",
-      "Host *",
-      "    ServerAliveInterval 60",
-      "    ProxyJump bastion",
-      "",
-    ].join("\n"));
+    parseSshConfig(
+      [
+        "ForwardAgent yes",
+        "AddKeysToAgent yes",
+        "",
+        "Host web",
+        "    HostName web.example.com",
+        "    User deploy",
+        "",
+        "Host *",
+        "    ServerAliveInterval 60",
+        "    ProxyJump bastion",
+        "",
+      ].join("\n"),
+    );
 
-    const out = generateSshConfig([
-      { name: "web", HostName: "web.example.com", User: "deploy" },
-    ]);
+    const out = generateSshConfig([{ name: "web", HostName: "web.example.com", User: "deploy" }]);
     // Pre-Host globals stay at the top…
     expect(out).toContain("ForwardAgent yes\nAddKeysToAgent yes");
     expect(out.indexOf("ForwardAgent yes")).toBeLessThan(out.indexOf("Host web"));
@@ -176,16 +176,18 @@ describe("global sections round-trip (H1 regression)", () => {
   });
 
   it("multiple Host * blocks all survive", () => {
-    parseSshConfig([
-      "Host one",
-      "    HostName 1.example.com",
-      "Host *",
-      "    ServerAliveInterval 60",
-      "Host two",
-      "    HostName 2.example.com",
-      "Host *",
-      "    ServerAliveCountMax 3",
-    ].join("\n"));
+    parseSshConfig(
+      [
+        "Host one",
+        "    HostName 1.example.com",
+        "Host *",
+        "    ServerAliveInterval 60",
+        "Host two",
+        "    HostName 2.example.com",
+        "Host *",
+        "    ServerAliveCountMax 3",
+      ].join("\n"),
+    );
     const out = generateSshConfig([
       { name: "one", HostName: "1.example.com" },
       { name: "two", HostName: "2.example.com" },
@@ -203,25 +205,25 @@ describe("global sections round-trip (H1 regression)", () => {
 
 describe("case-insensitive keywords (regression)", () => {
   it("merges forward directives regardless of casing", () => {
-    const hosts = parseSshConfig([
-      "Host box",
-      "  HostName 10.0.0.1",
-      "  LocalForward 8080 localhost:80",
-      "  localforward 9090 localhost:90",
-    ].join("\n"));
+    const hosts = parseSshConfig(
+      [
+        "Host box",
+        "  HostName 10.0.0.1",
+        "  LocalForward 8080 localhost:80",
+        "  localforward 9090 localhost:90",
+      ].join("\n"),
+    );
     // One property, both rules preserved (was: second overwrote/split off)
-    const keys = Object.keys(hosts[0]).filter(k => k.toLowerCase() === "localforward");
+    const keys = Object.keys(hosts[0]).filter((k) => k.toLowerCase() === "localforward");
     expect(keys).toHaveLength(1);
     expect(hosts[0][keys[0]]).toBe("8080 localhost:80\n9090 localhost:90");
   });
 
   it("non-forward keywords keep last-wins regardless of casing", () => {
-    const hosts = parseSshConfig([
-      "Host box",
-      "  HostName 10.0.0.1",
-      "  hostname 10.0.0.2",
-    ].join("\n"));
-    const keys = Object.keys(hosts[0]).filter(k => k.toLowerCase() === "hostname");
+    const hosts = parseSshConfig(
+      ["Host box", "  HostName 10.0.0.1", "  hostname 10.0.0.2"].join("\n"),
+    );
+    const keys = Object.keys(hosts[0]).filter((k) => k.toLowerCase() === "hostname");
     expect(keys).toHaveLength(1);
     expect(hosts[0][keys[0]]).toBe("10.0.0.2");
   });

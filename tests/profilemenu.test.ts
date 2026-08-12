@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Spyable tabManager — avoids instantiating real xterm terminals in happy-dom.
 const { tabManagerMock } = vi.hoisted(() => ({
@@ -15,8 +15,22 @@ vi.mock("../src/terminal/tabmanager", () => ({ tabManager: tabManagerMock }));
 const defaultInvoke = (cmd: string) => {
   if (cmd === "serial_list_ports") {
     return Promise.resolve([
-      { name: "COM3", driver: "usbser", manufacturer: "wch.cn", product: "USB-SERIAL CH340", vid: "1A86", pid: "7523" },
-      { name: "COM5", driver: "FTDIBUS", manufacturer: "FTDI", product: "", vid: "0403", pid: "6001" },
+      {
+        name: "COM3",
+        driver: "usbser",
+        manufacturer: "wch.cn",
+        product: "USB-SERIAL CH340",
+        vid: "1A86",
+        pid: "7523",
+      },
+      {
+        name: "COM5",
+        driver: "FTDIBUS",
+        manufacturer: "FTDI",
+        product: "",
+        vid: "0403",
+        pid: "6001",
+      },
     ]);
   }
   return Promise.resolve(null);
@@ -40,17 +54,19 @@ describe("profile menu (serial enumeration)", () => {
   async function openMenu() {
     const m = await import("../src/terminal/profilemenu");
     m.initProfileMenu();
-    (document.getElementById("new-tab-menu-btn")!).click();
+    document.getElementById("new-tab-menu-btn")!.click();
     // allow the async re-enumeration + repopulate to complete
     await vi.waitFor(() => {
-      const titles = [...document.querySelectorAll(".profile-section-title")].map(e => e.textContent);
+      const titles = [...document.querySelectorAll(".profile-section-title")].map(
+        (e) => e.textContent,
+      );
       expect(titles).toContain("Serial");
     });
   }
 
   function serialItem(label: string): Element {
     const items = [...document.querySelectorAll(".profile-menu .profile-item")];
-    const hit = items.find(i => i.querySelector(".item-label")?.textContent === label);
+    const hit = items.find((i) => i.querySelector(".item-label")?.textContent === label);
     expect(hit, `menu item ${label}`).toBeTruthy();
     return hit!;
   }
@@ -84,18 +100,23 @@ describe("profile menu (serial enumeration)", () => {
 
   it("omits the Serial column when no ports are present", async () => {
     invokeMock.mockImplementation((cmd: string) =>
-      Promise.resolve(cmd === "serial_list_ports" ? [] : null));
+      Promise.resolve(cmd === "serial_list_ports" ? [] : null),
+    );
     const m = await import("../src/terminal/profilemenu");
     m.initProfileMenu();
-    (document.getElementById("new-tab-menu-btn")!).click();
-    await new Promise(r => setTimeout(r, 50));
-    const titles = [...document.querySelectorAll(".profile-section-title")].map(e => e.textContent);
+    document.getElementById("new-tab-menu-btn")!.click();
+    await new Promise((r) => setTimeout(r, 50));
+    const titles = [...document.querySelectorAll(".profile-section-title")].map(
+      (e) => e.textContent,
+    );
     expect(titles).not.toContain("Serial");
   });
 
   it("always shows the Local column with the default shell", async () => {
     await openMenu();
-    const titles = [...document.querySelectorAll(".profile-section-title")].map(e => e.textContent);
+    const titles = [...document.querySelectorAll(".profile-section-title")].map(
+      (e) => e.textContent,
+    );
     expect(titles[0]).toBe("Local");
   });
 
@@ -103,7 +124,7 @@ describe("profile menu (serial enumeration)", () => {
     await openMenu();
     // vitest runs with import.meta.env.DEV = true
     const items = [...document.querySelectorAll(".profile-menu .profile-item")];
-    const demo = items.find(i => i.querySelector(".item-label")?.textContent === "Demo TTY");
+    const demo = items.find((i) => i.querySelector(".item-label")?.textContent === "Demo TTY");
     expect(demo).toBeTruthy();
     (demo as HTMLElement).click();
     expect(tabManagerMock.createDemoTab).toHaveBeenCalledTimes(1);

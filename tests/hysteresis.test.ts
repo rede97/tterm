@@ -1,10 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { hysteresis } from "../src/util/hysteresis";
 
 // Column thresholds used by TerminalTab.fit(): th_low=0.8, th_high=0.9
-const COL_LO = 0.8, COL_HI = 0.9;
+const COL_LO = 0.8,
+  COL_HI = 0.9;
 // Row thresholds: th_low=0.98, th_high=1.0
-const ROW_LO = 0.98, ROW_HI = 1.0;
+const ROW_LO = 0.98,
+  ROW_HI = 1.0;
 
 describe("hysteresis (cols: 0.8/0.9)", () => {
   it("keeps current when fractional part is below the high threshold", () => {

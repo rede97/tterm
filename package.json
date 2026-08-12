@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
@@ -43,6 +45,7 @@
     "sortablejs": "^1.15.7"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.8",
     "@tauri-apps/cli": "^2",
     "@types/sortablejs": "^1.15.9",
     "@wdio/cli": "^9.30.0",

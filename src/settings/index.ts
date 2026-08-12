@@ -1,16 +1,21 @@
 // Settings shell — sidebar navigation, footer (Apply/Revert), panel routing.
 // Delegates panel content to settings-*.ts modules.
 
+import { loadAllWtData } from "../config/wt-profiles";
 import { configStore } from "../core/store";
 import { parseFontFamily, updateFontStack } from "../util/fontconfig";
-import { createGeneralPanel, refreshGeneralPanel, collectGeneralSettings } from "./general";
-import { createAppearancePanel, refreshAppearancePanel, collectAppearanceSettings, renderThemeGallery } from "./appearance";
-import { createProfilePanel, collectProfileSettings, refreshProfilePanel } from "./profile";
-import { createSshPanel, refreshSshPanel, collectSshSettings, isSshConfigDirty } from "./ssh";
-import { createSerialPanel, collectSerialSettings, refreshSerialPanel } from "./serial";
-import { createShortcutsPanel, refreshShortcutsPanel, collectShortcutsSettings } from "./shortcuts";
-import { loadAllWtData } from "../config/wt-profiles";
 import { setWtThemes } from "../util/themes";
+import {
+  collectAppearanceSettings,
+  createAppearancePanel,
+  refreshAppearancePanel,
+  renderThemeGallery,
+} from "./appearance";
+import { collectGeneralSettings, createGeneralPanel, refreshGeneralPanel } from "./general";
+import { collectProfileSettings, createProfilePanel, refreshProfilePanel } from "./profile";
+import { collectSerialSettings, createSerialPanel, refreshSerialPanel } from "./serial";
+import { collectShortcutsSettings, createShortcutsPanel, refreshShortcutsPanel } from "./shortcuts";
+import { collectSshSettings, createSshPanel, isSshConfigDirty, refreshSshPanel } from "./ssh";
 
 export function createSettingsContent(): HTMLElement {
   const root = document.createElement("div");
@@ -32,7 +37,7 @@ export function createSettingsContent(): HTMLElement {
   for (let i = 0; i < panels.length; i++) {
     const p = panels[i];
     const nav = document.createElement("button");
-    nav.className = "settings-nav-item" + (i === 0 ? " active" : "");
+    nav.className = `settings-nav-item${i === 0 ? " active" : ""}`;
     nav.textContent = p.label;
     nav.dataset.panel = p.id;
     sidebar.appendChild(nav);
@@ -97,7 +102,9 @@ export function createSettingsContent(): HTMLElement {
     refreshAll(root);
     feedback.textContent = "Reverted to saved config";
     feedback.className = "settings-feedback settings-feedback-info";
-    setTimeout(() => { feedback.textContent = ""; }, 2000);
+    setTimeout(() => {
+      feedback.textContent = "";
+    }, 2000);
   });
   footer.appendChild(revertBtn);
 
@@ -110,7 +117,9 @@ export function createSettingsContent(): HTMLElement {
     applyBtn.classList.add("applied");
     feedback.textContent = "Config saved";
     feedback.className = "settings-feedback settings-feedback-ok";
-    setTimeout(() => { feedback.textContent = ""; }, 2500);
+    setTimeout(() => {
+      feedback.textContent = "";
+    }, 2500);
   });
   footer.appendChild(applyBtn);
 
@@ -131,12 +140,14 @@ export function createSettingsContent(): HTMLElement {
 
   // Sidebar navigation
   const navItems = root.querySelectorAll(".settings-nav-item");
-  navItems.forEach(t => {
+  navItems.forEach((t) => {
     t.addEventListener("click", () => {
-      navItems.forEach(x => x.classList.remove("active"));
+      navItems.forEach((x) => {
+        x.classList.remove("active");
+      });
       t.classList.add("active");
       const name = (t as HTMLElement).dataset.panel!;
-      root.querySelectorAll(".settings-panel-content").forEach(p => {
+      root.querySelectorAll(".settings-panel-content").forEach((p) => {
         (p as HTMLElement).style.display = p.getAttribute("data-panel") === name ? "" : "none";
       });
     });
@@ -150,7 +161,9 @@ export function createSettingsContent(): HTMLElement {
     refreshAll(root);
     feedback.textContent = "All settings cleared";
     feedback.className = "settings-feedback settings-feedback-info";
-    setTimeout(() => { feedback.textContent = ""; }, 2000);
+    setTimeout(() => {
+      feedback.textContent = "";
+    }, 2000);
   });
 
   // Panels with non-native edits (font picker, keybinding capture) signal

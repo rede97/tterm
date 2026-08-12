@@ -47,9 +47,7 @@ describe("Quick-status button and panel", () => {
 
   it("is disabled while the settings page is showing, re-enabled on close", async () => {
     const isDisabled = () =>
-      browser.execute(
-        () => document.getElementById("quick-status").disabled
-      );
+      browser.execute(() => document.getElementById("quick-status").disabled);
     expect(await isDisabled()).toBe(false);
     await browser.execute(() => window.__tterm.mgr.toggleSettings());
     await browser.waitUntil(async () => (await isDisabled()) === true, {
@@ -78,9 +76,12 @@ describe("Quick-status button and panel", () => {
       const row = document.querySelector('.quick-panel [data-section="share"] .qp-toggle-row');
       row.querySelector(".qp-switch").click();
     });
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => !!document.querySelector(".quick-panel .qp-share-url"));
-    }, { timeout: 5000, timeoutMsg: "share URL row did not appear after toggle" });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => !!document.querySelector(".quick-panel .qp-share-url"));
+      },
+      { timeout: 5000, timeoutMsg: "share URL row did not appear after toggle" },
+    );
 
     const state = await browser.execute(() => {
       const mgr = window.__tterm.mgr;
@@ -100,12 +101,15 @@ describe("Quick-status button and panel", () => {
       const row = document.querySelector('.quick-panel [data-section="share"] .qp-toggle-row');
       row.querySelector(".qp-switch").click();
     });
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        const mgr = window.__tterm.mgr;
-        return !mgr.get(mgr.activeTabId).shared;
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          const mgr = window.__tterm.mgr;
+          return !mgr.get(mgr.activeTabId).shared;
+        });
+      },
+      { timeout: 5000 },
+    );
 
     await browser.execute(() => document.getElementById("quick-status").click()); // close
   });
@@ -116,8 +120,12 @@ describe("Quick-status button and panel", () => {
       (async () => {
         const mgr = window.__tterm.mgr;
         const tab = await mgr.createSerialTab({
-          name: "MOCK-LOOP", driver: "tterm-mock", manufacturer: "TTerm",
-          product: "Mock Loopback (echo)", vid: "", pid: "",
+          name: "MOCK-LOOP",
+          driver: "tterm-mock",
+          manufacturer: "TTerm",
+          product: "Mock Loopback (echo)",
+          vid: "",
+          pid: "",
         });
         done(!!tab);
       })();
@@ -133,7 +141,12 @@ describe("Quick-status button and panel", () => {
       return { selects, text: sec.textContent };
     });
     expect(info.selects).toEqual([
-      "Profile", "Baud rate", "Input mode", "Enter sends", "Output newlines", "Flow control",
+      "Profile",
+      "Baud rate",
+      "Input mode",
+      "Enter sends",
+      "Output newlines",
+      "Flow control",
     ]);
     expect(info.text).toContain("Auto-reconnect");
 
@@ -152,37 +165,55 @@ describe("Quick-status button and panel", () => {
     // Switch profile to AT: the section re-renders with its parameters
     // (echo input, CRLF enter) reflected in the live selects.
     await browser.execute(() => {
-      const sel = document.querySelector('.quick-panel [data-section="serial"] select[aria-label="Profile"]');
+      const sel = document.querySelector(
+        '.quick-panel [data-section="serial"] select[aria-label="Profile"]',
+      );
       sel.value = "AT";
       sel.dispatchEvent(new Event("change", { bubbles: true }));
     });
     await browser.waitUntil(
-      () => browser.execute(() => {
-        const mgr = window.__tterm.mgr;
-        const tab = mgr.get(mgr.activeTabId);
-        const inputSel = document.querySelector('.quick-panel [data-section="serial"] select[aria-label="Input mode"]');
-        return tab.serialProfile === "AT" && tab.inputMode === "echo" && inputSel && inputSel.value === "echo";
-      }),
-      { timeout: 5000, timeoutMsg: "AT profile did not apply to the live session" }
+      () =>
+        browser.execute(() => {
+          const mgr = window.__tterm.mgr;
+          const tab = mgr.get(mgr.activeTabId);
+          const inputSel = document.querySelector(
+            '.quick-panel [data-section="serial"] select[aria-label="Input mode"]',
+          );
+          return (
+            tab.serialProfile === "AT" &&
+            tab.inputMode === "echo" &&
+            inputSel &&
+            inputSel.value === "echo"
+          );
+        }),
+      { timeout: 5000, timeoutMsg: "AT profile did not apply to the live session" },
     );
 
     // Enable hardware flow control: the signal block expands with RTS/DTR
     // toggles and live CTS/DSR status (mock port reports asserted).
     await browser.execute(() => {
-      const sel = document.querySelector('.quick-panel [data-section="serial"] select[aria-label="Flow control"]');
+      const sel = document.querySelector(
+        '.quick-panel [data-section="serial"] select[aria-label="Flow control"]',
+      );
       sel.value = "hardware";
       sel.dispatchEvent(new Event("change", { bubbles: true }));
     });
     await browser.waitUntil(
-      () => browser.execute(() =>
-        document.querySelector('.quick-panel [data-section="serial"] .qp-line-val')?.textContent === "asserted"),
-      { timeout: 5000, timeoutMsg: "CTS status never resolved" }
+      () =>
+        browser.execute(
+          () =>
+            document.querySelector('.quick-panel [data-section="serial"] .qp-line-val')
+              ?.textContent === "asserted",
+        ),
+      { timeout: 5000, timeoutMsg: "CTS status never resolved" },
     );
     const signals = await browser.execute(() => {
       const sec = document.querySelector('.quick-panel [data-section="serial"]');
       return {
         text: sec.textContent,
-        toggleLabels: [...sec.querySelectorAll(".qp-signals .qp-toggle-row")].map((r) => r.textContent),
+        toggleLabels: [...sec.querySelectorAll(".qp-signals .qp-toggle-row")].map(
+          (r) => r.textContent,
+        ),
       };
     });
     expect(signals.toggleLabels).toEqual(["RTS", "DTR"]);
@@ -191,14 +222,22 @@ describe("Quick-status button and panel", () => {
 
     // RTS toggle round-trips through the backend without error.
     await browser.execute(() => {
-      const rows = [...document.querySelectorAll('.quick-panel .qp-signals .qp-toggle-row')];
-      rows.find((r) => r.textContent.includes("RTS")).querySelector(".qp-switch").click();
+      const rows = [...document.querySelectorAll(".quick-panel .qp-signals .qp-toggle-row")];
+      rows
+        .find((r) => r.textContent.includes("RTS"))
+        .querySelector(".qp-switch")
+        .click();
     });
 
     // Auto-reconnect toggle persists in the backend.
     await browser.execute(() => {
-      const rows = [...document.querySelectorAll('.quick-panel [data-section="serial"] .qp-toggle-row')];
-      rows.find((r) => r.textContent.includes("Auto-reconnect")).querySelector(".qp-switch").click();
+      const rows = [
+        ...document.querySelectorAll('.quick-panel [data-section="serial"] .qp-toggle-row'),
+      ];
+      rows
+        .find((r) => r.textContent.includes("Auto-reconnect"))
+        .querySelector(".qp-switch")
+        .click();
     });
     const autoOn = await browser.executeAsync((done) => {
       (async () => {
@@ -216,48 +255,61 @@ describe("Quick-status button and panel", () => {
       document.querySelector('.quick-panel [data-section="serial"] .qp-connect-btn').click();
     });
     await browser.waitUntil(
-      () => browser.execute(() => {
-        const mgr = window.__tterm.mgr;
-        return mgr.get(mgr.activeTabId)?.disconnected === true;
-      }),
-      { timeout: 8000, timeoutMsg: "disconnect did not dead the session" }
+      () =>
+        browser.execute(() => {
+          const mgr = window.__tterm.mgr;
+          return mgr.get(mgr.activeTabId)?.disconnected === true;
+        }),
+      { timeout: 8000, timeoutMsg: "disconnect did not dead the session" },
     );
     await browser.waitUntil(
-      () => browser.execute(() =>
-        document.querySelector('.quick-panel [data-section="serial"] .qp-connect-btn')?.textContent === "Reconnect"),
-      { timeout: 5000, timeoutMsg: "panel did not flip to Reconnect" }
+      () =>
+        browser.execute(
+          () =>
+            document.querySelector('.quick-panel [data-section="serial"] .qp-connect-btn')
+              ?.textContent === "Reconnect",
+        ),
+      { timeout: 5000, timeoutMsg: "panel did not flip to Reconnect" },
     );
     await browser.execute(() => {
       document.querySelector('.quick-panel [data-section="serial"] .qp-connect-btn').click();
     });
     await browser.waitUntil(
-      () => browser.execute(() => {
-        const mgr = window.__tterm.mgr;
-        return mgr.get(mgr.activeTabId)?.disconnected === false;
-      }),
-      { timeout: 8000, timeoutMsg: "reconnect did not revive the session" }
+      () =>
+        browser.execute(() => {
+          const mgr = window.__tterm.mgr;
+          return mgr.get(mgr.activeTabId)?.disconnected === false;
+        }),
+      { timeout: 8000, timeoutMsg: "reconnect did not revive the session" },
     );
 
     // Baud select switches the live session and renames the tab.
     await browser.execute(() => {
       const sec = document.querySelector('.quick-panel [data-section="serial"]');
-      const sel = [...sec.querySelectorAll("select")].find((s) => s.getAttribute("aria-label") === "Baud rate");
+      const sel = [...sec.querySelectorAll("select")].find(
+        (s) => s.getAttribute("aria-label") === "Baud rate",
+      );
       sel.value = "9600";
       sel.dispatchEvent(new Event("change"));
     });
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        const mgr = window.__tterm.mgr;
-        return mgr.get(mgr.activeTabId)?.serialBaud === 9600;
-      });
-    }, { timeout: 5000, timeoutMsg: "baud switch did not apply" });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          const mgr = window.__tterm.mgr;
+          return mgr.get(mgr.activeTabId)?.serialBaud === 9600;
+        });
+      },
+      { timeout: 5000, timeoutMsg: "baud switch did not apply" },
+    );
 
     // Leave the window as we found it: close the serial tab and the panel.
     await browser.execute(() => document.getElementById("quick-status").click());
     await browser.executeAsync((done) => {
       (async () => {
         const mgr = window.__tterm.mgr;
-        const serialIds = [...mgr.tabs.values()].filter((t) => t.type === "serial").map((t) => t.id);
+        const serialIds = [...mgr.tabs.values()]
+          .filter((t) => t.type === "serial")
+          .map((t) => t.id);
         for (const id of serialIds) await mgr.closeTab(id);
         done(true);
       })();

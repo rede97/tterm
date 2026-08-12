@@ -7,9 +7,9 @@
 // same operations and must give identical feedback.
 
 import { invoke } from "@tauri-apps/api/core";
-import { showToast } from "../ui/toast";
-import { createModal } from "../ui/modal";
 import { createForwardEditor } from "../ui/forwardeditor";
+import { createModal } from "../ui/modal";
+import { showToast } from "../ui/toast";
 
 export interface ForwardInfo {
   forwardId: number;
@@ -105,7 +105,7 @@ function openDialog(tabId: string, initial: ForwardInfo[]): void {
 
   const listEl = overlay.querySelector<HTMLElement>(".fwd-list")!;
   const editor = createForwardEditor();
-  overlay.querySelector(".fwd-editor-slot")!.replaceWith(editor.el);
+  overlay.querySelector(".fwd-editor-slot")?.replaceWith(editor.el);
 
   function renderList(forwards: ForwardInfo[]) {
     listEl.innerHTML = "";
@@ -134,7 +134,9 @@ function openDialog(tabId: string, initial: ForwardInfo[]): void {
       removeBtn.type = "button";
       removeBtn.textContent = "Remove";
       removeBtn.addEventListener("click", () => {
-        removeForward(tabId, f.forwardId).then((ok) => { if (ok) refresh(); });
+        removeForward(tabId, f.forwardId).then((ok) => {
+          if (ok) refresh();
+        });
       });
 
       row.appendChild(badge);
@@ -150,18 +152,20 @@ function openDialog(tabId: string, initial: ForwardInfo[]): void {
     });
   }
 
-  overlay.querySelector<HTMLButtonElement>(".fwd-add-btn")!.addEventListener("click", () => {
+  overlay.querySelector<HTMLButtonElement>(".fwd-add-btn")?.addEventListener("click", () => {
     const spec = editor.read();
-    if (!spec) { toastInvalidPorts(); return; }
-    addForward(tabId, spec)
-      .then((id) => {
-        if (id === null) return;
-        editor.reset();
-        refresh();
-      });
+    if (!spec) {
+      toastInvalidPorts();
+      return;
+    }
+    addForward(tabId, spec).then((id) => {
+      if (id === null) return;
+      editor.reset();
+      refresh();
+    });
   });
 
-  overlay.querySelector(".fwd-close")!.addEventListener("click", modal.close);
+  overlay.querySelector(".fwd-close")?.addEventListener("click", modal.close);
 
   renderList(initial);
 }

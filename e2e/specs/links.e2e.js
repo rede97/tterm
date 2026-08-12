@@ -32,8 +32,8 @@ async function textGeometry(marker) {
           len: m.length,
           cellW: cell.width,
           cellH: cell.height,
-          originX: rect.left + (parseInt(cs.paddingLeft) || 0),
-          originY: rect.top + (parseInt(cs.paddingTop) || 0),
+          originX: rect.left + (parseInt(cs.paddingLeft, 10) || 0),
+          originY: rect.top + (parseInt(cs.paddingTop, 10) || 0),
         };
       }
     }
@@ -49,7 +49,7 @@ async function hoveredLink() {
     const tab = mgr.get(mgr.activeTabId);
     if (!tab) return null;
     const linkifier = tab.terminal._core._linkifier?.value ?? tab.terminal._core._linkifier;
-    const current = linkifier && linkifier.currentLink;
+    const current = linkifier?.currentLink;
     return current ? current.link.text : null;
   });
 }
@@ -60,7 +60,10 @@ async function hoverOver(marker) {
   const x = Math.round(g.originX + (g.col + Math.min(g.len, 8)) * g.cellW + 2);
   const y = Math.round(g.originY + g.row * g.cellH + g.cellH / 2);
   // Nudge in two steps so the linkifier definitely sees a cell change.
-  await browser.action("pointer").move({ x: x - 1, y }).perform();
+  await browser
+    .action("pointer")
+    .move({ x: x - 1, y })
+    .perform();
   await browser.action("pointer").move({ x, y }).perform();
   await browser.waitUntil(async () => (await hoveredLink()) !== null, {
     timeout: 5000,
@@ -84,13 +87,12 @@ describe("terminal clickable links", () => {
         const mgr = window.__tterm.mgr;
         const tab = mgr.get(mgr.activeTabId);
         tab.terminal.write(
-          `${plain}\r\n` +
-            `\x1b]8;;${osc8url}\x1b\\${osc8text}\x1b]8;;\x1b\\\r\n`
+          `${plain}\r\n` + `\x1b]8;;${osc8url}\x1b\\${osc8text}\x1b]8;;\x1b\\\r\n`,
         );
       },
       PLAIN_URL,
       OSC8_URL,
-      OSC8_TEXT
+      OSC8_TEXT,
     );
 
     // Auto-detected plain URL.
