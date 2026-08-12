@@ -69,14 +69,12 @@ export class TabManager {
 
   readonly tabsContainer: HTMLElement;
   readonly terminalContainer: HTMLElement;
-  private readonly _welcomeEl: HTMLElement;
 
   private _resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(tabsContainer: HTMLElement, terminalContainer: HTMLElement, welcomeEl: HTMLElement) {
+  constructor(tabsContainer: HTMLElement, terminalContainer: HTMLElement) {
     this.tabsContainer = tabsContainer;
     this.terminalContainer = terminalContainer;
-    this._welcomeEl = welcomeEl;
 
     window.addEventListener("resize", () => this._onResize());
 
@@ -438,7 +436,6 @@ export class TabManager {
   private async _finalizeTab(tab: TerminalTab, result: WsConnectResult): Promise<TerminalTab> {
     this._register(tab, result.port, result.token);
     await this._ensureFontsReady(tab);
-    this._hideWelcome();
     this.switchTo(result.id);
     tab.fitDeferred();
     this.refreshBadges();
@@ -535,10 +532,8 @@ export class TabManager {
           this.switchTo(remaining[remaining.length - 1]);
         } else {
           this.activeTabId = null;
-          // The settings page may be what's on screen — it is not a real
-          // tab in `tabs`, so "no terminal tabs left" must not blank it
-          // with the welcome screen. Welcome appears when settings closes.
-          if (!this.settingsOpen) this._showWelcome();
+          // Nothing to switch to: the permanent #welcome backdrop shows
+          // through (settings, if open, covers it via z-index).
         }
       }
       this.refreshBadges();
@@ -635,16 +630,15 @@ export class TabManager {
     this._settings = new SettingsShell(this.tabsContainer, this.terminalContainer, {
       hideActiveView: () => {
         for (const tab of this.tabs.values()) tab.hide();
-        this._hideWelcome();
       },
       restoreActiveView: () => {
         const tab = this.activeTabId ? this.tabs.get(this.activeTabId) : undefined;
         if (tab) {
           tab.show();
           if (tab.needsResize) tab.fitDeferred();
-        } else if (!this.activeTabId) {
-          this._showWelcome();
         }
+        // No tabs left: nothing to restore — the #welcome backdrop is
+        // already showing through (no state to manage).
       },
       syncStrip: () => this._syncTabsOverflow(),
     });
@@ -740,27 +734,17 @@ export class TabManager {
       import("./dirmenu").then((m) => m.showDirectoryMenu(btn));
     });
   }
-
-  // -- helpers ---
-
-  private _hideWelcome(): void {
-    this._welcomeEl.style.display = "none";
-  }
-  private _showWelcome(): void {
-    this._welcomeEl.style.display = "flex";
-  }
 }
 
 // -- singleton ---
 
-export const tabManager = new TabManager(null!, null!, null!);
+export const tabManager = new TabManager(null!, null!);
 
 export function initTabManager(
   tabsContainer: HTMLElement,
   terminalContainer: HTMLElement,
-  welcomeEl: HTMLElement,
 ): TabManager {
-  Object.assign(tabManager, { tabsContainer, terminalContainer, _welcomeEl: welcomeEl });
+  Object.assign(tabManager, { tabsContainer, terminalContainer });
   tabManager.initSortable();
   tabManager.initSettingsShell();
   setTrayTabsProvider(() => ({

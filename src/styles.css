@@ -957,6 +957,7 @@ body {
   width: 100%;
   height: 100%;
   position: relative;
+  z-index: 1; /* above the #welcome backdrop */
   background: var(--term-bg);
   /* isolate paint: prevent layout recalc from cascading into xterm canvas */
   contain: layout style paint;
@@ -1356,6 +1357,9 @@ body {
 
 /* -- welcome screen (no tabs) -- */
 
+/* The welcome watermark is a PERMANENT backdrop (absolute, non-interactive,
+   near-invisible): terminal instances and the settings page cover it with
+   their opaque backgrounds. There is deliberately no show/hide state. */
 #welcome {
   position: absolute;
   inset: 0;
@@ -1364,7 +1368,7 @@ body {
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  z-index: 5;
+  z-index: 0;
 }
 
 #welcome .welcome-title {
@@ -1416,6 +1420,8 @@ body {
   height: 100%;
   display: flex;
   flex-direction: row;
+  position: relative;
+  z-index: 1; /* above the #welcome backdrop */
   background: #1e1e1e;
   overflow: hidden;
 }

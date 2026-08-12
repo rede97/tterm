@@ -316,15 +316,35 @@ describe("Quick-status button and panel", () => {
     });
   });
 
-  it("closing the last terminal tab while settings is open keeps the settings page", async () => {
-    // Regression: the settings pseudo-tab is not in `tabs` — "no terminal
-    // tabs left" must not blank it with the welcome screen.
-    await browser.execute(() => window.__tterm.mgr.toggleSettings());
-    await browser.waitUntil(
-      async () => await browser.execute(() => !!document.querySelector(".settings-page")),
-      { timeout: 10000, timeoutMsg: "settings page did not open" },
-    );
+  it("settings and terminals occlude the permanent welcome backdrop correctly", async () => {
+    // The welcome watermark is a permanent backdrop: which LAYER is on top
+    // is decided by DOM visibility + z-index, never by show/hide state.
+    const visibleLayer = () =>
+      browser.execute(() => {
+        if (document.querySelector(".settings-page")) return "settings";
+        const inst = [...document.querySelectorAll(".terminal-instance")].find(
+          (el) => el.style.display !== "none",
+        );
+        return inst ? "terminal" : "welcome";
+      });
 
+    // Backdrop invariant: always rendered, always bottom layer.
+    const backdrop = await browser.execute(() => {
+      const cs = getComputedStyle(document.getElementById("welcome"));
+      return { display: cs.display, zIndex: cs.zIndex, pointerEvents: cs.pointerEvents };
+    });
+    expect(backdrop.display).toBe("flex");
+    expect(backdrop.zIndex).toBe("0");
+    expect(backdrop.pointerEvents).toBe("none");
+
+    await browser.execute(() => window.__tterm.mgr.toggleSettings());
+    await browser.waitUntil(async () => (await visibleLayer()) === "settings", {
+      timeout: 10000,
+      timeoutMsg: "settings page did not open",
+    });
+
+    // Closing every terminal tab while settings is open: settings stays on
+    // top (regression: welcome used to blank it).
     await browser.executeAsync((done) => {
       (async () => {
         const mgr = window.__tterm.mgr;
@@ -332,43 +352,25 @@ describe("Quick-status button and panel", () => {
         done(true);
       })();
     });
-    await browser.pause(500);
+    await browser.pause(400);
+    expect(await visibleLayer()).toBe("settings");
 
-    const state = await browser.execute(() => ({
-      settingsVisible: !!document.querySelector(".settings-page"),
-      welcomeShown: document.getElementById("welcome").style.display !== "none",
-    }));
-    expect(state.settingsVisible).toBe(true);
-    expect(state.welcomeShown).toBe(false);
-
-    // Closing settings with no terminal tabs left shows the welcome screen.
+    // Closing settings uncovers the backdrop; reopening covers it again —
+    // the two pages must never stack.
     await browser.execute(() => window.__tterm.mgr.closeSettings(true));
-    await browser.waitUntil(
-      async () =>
-        await browser.execute(() => document.getElementById("welcome").style.display !== "none"),
-      { timeout: 5000, timeoutMsg: "welcome screen did not appear after closing settings" },
-    );
-
-    // Reopening settings from the welcome screen hides it again — the two
-    // pages must never stack in the terminal container.
+    await browser.waitUntil(async () => (await visibleLayer()) === "welcome", {
+      timeout: 5000,
+      timeoutMsg: "welcome backdrop not uncovered after closing settings",
+    });
     await browser.execute(() => window.__tterm.mgr.toggleSettings());
-    await browser.waitUntil(
-      async () => await browser.execute(() => !!document.querySelector(".settings-page")),
-      { timeout: 10000, timeoutMsg: "settings page did not reopen" },
-    );
-    const reopened = await browser.execute(() => ({
-      settingsVisible: !!document.querySelector(".settings-page"),
-      welcomeShown: document.getElementById("welcome").style.display !== "none",
-    }));
-    expect(reopened.settingsVisible).toBe(true);
-    expect(reopened.welcomeShown).toBe(false);
-
-    // Restore the welcome screen for any later specs sharing this window.
+    await browser.waitUntil(async () => (await visibleLayer()) === "settings", {
+      timeout: 10000,
+      timeoutMsg: "settings page did not reopen over the backdrop",
+    });
     await browser.execute(() => window.__tterm.mgr.closeSettings(true));
-    await browser.waitUntil(
-      async () =>
-        await browser.execute(() => document.getElementById("welcome").style.display !== "none"),
-      { timeout: 5000, timeoutMsg: "welcome screen did not reappear" },
-    );
+    await browser.waitUntil(async () => (await visibleLayer()) === "welcome", {
+      timeout: 5000,
+      timeoutMsg: "welcome backdrop not uncovered at the end",
+    });
   });
 });

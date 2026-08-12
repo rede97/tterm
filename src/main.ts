@@ -47,11 +47,13 @@ tabsContainer.addEventListener(
 // block all browser native context menus
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-// -- welcome screen --
+// -- welcome backdrop --
+// Permanent background layer: terminal instances and the settings page
+// cover it with opaque backgrounds (z-index, see styles.css). No show/hide
+// state exists anywhere — "no tabs" simply uncovers it.
 
 const welcomeEl = document.createElement("div");
 welcomeEl.id = "welcome";
-welcomeEl.style.display = "none";
 terminalContainer.appendChild(welcomeEl);
 
 const welcomeTitle = document.createElement("div");
@@ -65,7 +67,7 @@ welcomeEl.appendChild(welcomeVersion);
 
 // -- init TabManager ---
 
-initTabManager(tabsContainer, terminalContainer, welcomeEl);
+initTabManager(tabsContainer, terminalContainer);
 
 // -- settings --
 

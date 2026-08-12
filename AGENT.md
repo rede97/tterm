@@ -28,7 +28,7 @@ Headline differentiators: serial-port sessions done right, in-band disconnect/re
 
 ```
 src/
-  main.ts               app entry: init TabManager, WS bridge, settings button, welcome screen
+  main.ts               app entry: init TabManager, WS bridge, settings button, welcome backdrop
   terminal/
     tab.ts              TerminalTab class (one per tab: terminal, xterm, DOM, IME wiring)
     tabmanager.ts       TabManager singleton (tab Map, active tab, settings tab, sortable)
@@ -190,6 +190,7 @@ Backend-managed and in-band (`deadmode.rs` + relay dead mode): on byte-stream en
 - Tab titles track OSC title sequences. A user rename (inline edit in the tab label — no native prompt) sets `titleLocked` and OSC updates stop; committing an empty name clears the lock and restores the last OSC title. Internal label refreshes (e.g. serial baud display) call `rename(name, false)` so they never lock.
 - Window resize: all tabs marked dirty; only the active tab is fitted immediately (debounced).
 - MRU order (`TabManager._mru`, updated on switch/pruned on close) drives the Ctrl+Tab switcher.
+- The welcome watermark is a **permanent backdrop** (`#welcome`: absolute, `pointer-events:none`, z-index 0, ~8% opacity) — terminal instances and the settings page cover it with opaque backgrounds (z-index 1). There is NO show/hide state anywhere; "no tabs left" simply uncovers it. Do not reintroduce `_showWelcome`-style toggles (they caused the settings/welcome stacking bugs).
 
 ## Keyboard shortcuts
 

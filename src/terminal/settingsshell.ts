@@ -15,12 +15,11 @@ import { el } from "../ui/dom";
 import { closeQuickPanel, updateQuickButton } from "./quickpanel";
 
 export interface SettingsShellHooks {
-  // Hide everything the terminal container could be showing: all terminal
-  // tabs AND the zero-tab welcome screen (leaving it visible would stack
-  // the welcome page above the settings page).
+  // Hide every terminal tab (the #welcome backdrop needs no handling — it
+  // stays behind everything via z-index and reappears on its own).
   hideActiveView(): void;
-  // Re-show the active terminal tab (fit if dirty), or the welcome screen
-  // when no tabs remain.
+  // Re-show the active terminal tab (fit if dirty); with no tabs left there
+  // is nothing to restore — the welcome backdrop is already visible.
   restoreActiveView(): void;
   // Strip layout changed (settings tab added/removed) — re-sync overflow.
   syncStrip(): void;
