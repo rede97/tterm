@@ -1,3 +1,17 @@
+## v2.2.0
+
+Fixes
+
+- **Serial Reconnect responds reliably** — after disconnecting a serial
+  device, the Reconnect button in the quick panel no longer intermittently
+  ignores the click.
+
+Internal
+
+- Terminal internals split into focused modules; lint warnings cleared with
+  the strictest type checks now enforced; terminal handshake parsing moved
+  to a hardened parser.
+
 ## v2.1.0
 
 Changes
