@@ -315,4 +315,38 @@ describe("Quick-status button and panel", () => {
       })();
     });
   });
+
+  it("closing the last terminal tab while settings is open keeps the settings page", async () => {
+    // Regression: the settings pseudo-tab is not in `tabs` — "no terminal
+    // tabs left" must not blank it with the welcome screen.
+    await browser.execute(() => window.__tterm.mgr.toggleSettings());
+    await browser.waitUntil(
+      async () => await browser.execute(() => !!document.querySelector(".settings-page")),
+      { timeout: 10000, timeoutMsg: "settings page did not open" },
+    );
+
+    await browser.executeAsync((done) => {
+      (async () => {
+        const mgr = window.__tterm.mgr;
+        for (const id of [...mgr.tabs.keys()]) await mgr.closeTab(id);
+        done(true);
+      })();
+    });
+    await browser.pause(500);
+
+    const state = await browser.execute(() => ({
+      settingsVisible: !!document.querySelector(".settings-page"),
+      welcomeShown: document.getElementById("welcome").style.display !== "none",
+    }));
+    expect(state.settingsVisible).toBe(true);
+    expect(state.welcomeShown).toBe(false);
+
+    // Closing settings with no terminal tabs left shows the welcome screen.
+    await browser.execute(() => window.__tterm.mgr.closeSettings(true));
+    await browser.waitUntil(
+      async () =>
+        await browser.execute(() => document.getElementById("welcome").style.display !== "none"),
+      { timeout: 5000, timeoutMsg: "welcome screen did not appear after closing settings" },
+    );
+  });
 });

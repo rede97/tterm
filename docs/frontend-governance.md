@@ -107,6 +107,8 @@
 
 ## P2 — god object 吸积
 
+> **追加（2026-08，Settings 伪 tab 抽象评估）**：Settings 以 `data-tab-id="#settings"` 伪 tab 存在、不进 `tabs` Map，特殊分支已积到 8 处：badge 计数排除、托盘列表排除、quickpanel 排除、switcher 排除、Ctrl+W 特判、switchTo 副作用关设置、closeTab 兄弟扫描跳过，以及第 8 处——**Settings 页关闭最后一个终端时 welcome 空白页盖上来**（已修：`_showWelcome` 仅在 settings 未打开时执行，附 e2e 回归）。结论：抽象已漏。拆分时把 Settings 升格为**一等 tab**（`tabs` Map 里的非会话视图，实现 show/hide/destroy），switcher/Ctrl+W/MRU/关闭回退全部自然成立，托盘/badge/quickpanel 按类型过滤；e2e 的 tab 计数断言需同步调整。
+
 **现状**：`tabmanager.ts` 882 行 8+ 职责（本轮 MRU/session-exited 也只能塞进去）；`tab.ts` 671 行。后端同类：`sshclient.rs` 2226 行五职责域；`lib.rs` debug/release **双份 `generate_handler!` 列表**——本轮各加 3 个 `window_*` 命令，双份维护成本当场兑现。
 
 **方法**：

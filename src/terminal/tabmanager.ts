@@ -542,7 +542,10 @@ export class TabManager {
           this.switchTo(remaining[remaining.length - 1]);
         } else {
           this.activeTabId = null;
-          this._showWelcome();
+          // The settings page may be what's on screen — it is not a real
+          // tab in `tabs`, so "no terminal tabs left" must not blank it
+          // with the welcome screen. Welcome appears when settings closes.
+          if (!this.settingsOpen) this._showWelcome();
         }
       }
       this.refreshBadges();
