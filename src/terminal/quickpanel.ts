@@ -24,6 +24,7 @@ import {
   SERIAL_OUTPUT_NEWLINE_DESCS,
   SERIAL_OUTPUT_NEWLINES,
 } from "../core/common";
+import { DOM_ID } from "../core/dom-ids";
 import { logCatch } from "../core/errorlog";
 import type {
   SerialEnterNewline,
@@ -77,7 +78,7 @@ let panel: HTMLElement | null = null;
 let panelTabId: string | null = null;
 
 function qsButton(): HTMLButtonElement | null {
-  return document.getElementById("quick-status") as HTMLButtonElement | null;
+  return document.getElementById(DOM_ID.quickStatus) as HTMLButtonElement | null;
 }
 
 function mkSection(title: string, key: string): HTMLElement {

@@ -1,13 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Copy, createElement, Drama, Minus, Square, X } from "lucide";
+import { DOM_ID } from "../core/dom-ids";
 import { logCatch, swallow } from "../core/errorlog";
 
 const appWindow = getCurrentWindow();
 
 // -- maximize icon ----
 
-const btnMaximize = document.getElementById("btn-maximize")!;
+const btnMaximize = document.getElementById(DOM_ID.btnMaximize)!;
 
 async function updateMaximizeIcon() {
   try {
@@ -24,7 +25,7 @@ async function updateMaximizeIcon() {
 // -- drag ----
 
 function initDrag() {
-  const tabBar = document.getElementById("tab-bar")!;
+  const tabBar = document.getElementById(DOM_ID.tabBar)!;
   tabBar.addEventListener("mousedown", (e) => {
     const target = e.target as HTMLElement;
     if (target.tagName === "BUTTON" || target.closest("button")) return;
@@ -51,7 +52,7 @@ function initDrag() {
 // -- window control buttons ----
 
 function initWindowButtons() {
-  const tabBar = document.getElementById("tab-bar")!;
+  const tabBar = document.getElementById(DOM_ID.tabBar)!;
 
   tabBar.addEventListener("click", (e) => {
     const target = e.target instanceof Element ? e.target : (e.target as Node).parentElement;
@@ -76,7 +77,7 @@ function initWindowButtons() {
     }
   });
 
-  document.getElementById("tab-bar")?.addEventListener("dblclick", (e) => {
+  document.getElementById(DOM_ID.tabBar)?.addEventListener("dblclick", (e) => {
     const target = e.target instanceof Element ? e.target : (e.target as Node).parentElement;
     // Buttons have their own actions; a dblclick on a tab is rename/click
     // territory, not a window-maximize gesture (matches the drag guard).
@@ -88,9 +89,9 @@ function initWindowButtons() {
 // -- icons ---
 
 function injectIcons() {
-  const btnMinimize = document.getElementById("btn-minimize")!;
-  const btnClose = document.getElementById("btn-close")!;
-  const btnPark = document.getElementById("btn-park-tray")!;
+  const btnMinimize = document.getElementById(DOM_ID.btnMinimize)!;
+  const btnClose = document.getElementById(DOM_ID.btnClose)!;
+  const btnPark = document.getElementById(DOM_ID.btnParkTray)!;
 
   btnPark.title = "Park to tray — sessions keep running; restore from the tray icon";
   // Mask icon: the window "disappears" into the tray while sessions run on.

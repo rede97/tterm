@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronUp, createElement, X } from "lucide";
+import { DOM_ID } from "../core/dom-ids";
 import { tabManager } from "./tabmanager";
 
 // -- DOM --
@@ -84,7 +85,7 @@ export function openFind(tabId: string) {
 // -- init --
 
 export function initSearchBar() {
-  const container = document.getElementById("terminal-container")!;
+  const container = document.getElementById(DOM_ID.terminalContainer)!;
   container.appendChild(searchBar);
 
   searchInput.addEventListener("input", () => {

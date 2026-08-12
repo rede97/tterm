@@ -111,7 +111,7 @@ until the custom-rule rollout (`docs/frontend-governance.md` P1).
 - **Types**: `strict` is on. No `as any` — narrow with `in`/`typeof` guards at boundaries; type-only imports go top-level as `import type` (never inline `import("x").T` in annotations); no casting an object inline just to read one property.
 - **Style**: no one-line wrapper functions — inline the expression unless the name is a stable domain concept used 3+ times. Static lookup tables are `Record<string, …>`; runtime collections (insert/delete/iterate) are `Set`/`Map`.
 - **Async**: `Promise.withResolvers()` over the `new Promise((resolve) => …)` executor form.
-- **DOM**: never hand-roll one-off UI — use the shared components (toast / createModal / confirmDialog / attachStepper). No native `alert`/`confirm`/`prompt`. Don't add another `el()` helper copy (5 exist; consolidation is planned — reuse the one in the module you're editing).
+- **DOM**: never hand-roll one-off UI — use the shared components (toast / createModal / confirmDialog / attachStepper). No native `alert`/`confirm`/`prompt`. Element helpers live in `ui/dom.ts`: `el()` (the ONE copy — no new duplicates) and the `html`` tagged template: interpolations auto-escape, `setHtml()` is the only sanctioned innerHTML writer, raw markup requires the explicit `raw()` hatch. App-chrome ids (index.html) are referenced via `core/dom-ids.ts`, never string literals.
 - **Settings panels**: follow the create / refresh / collect contract; every panel except General starts hidden (`panel.style.display = "none"`) — forgetting this stacks the new panel over the General page (shipped once as a bug). Enable the footer Apply via the settings shell's dirty mechanism, not synthetic DOM events.
 - **Tests**: one module per test file; assert observable contracts, not element counts. Time is driven by `vi.useFakeTimers()` — never real `setTimeout`/`sleep` waits in tests.
 
@@ -192,6 +192,10 @@ Backend-managed and in-band (`deadmode.rs` + relay dead mode): on byte-stream en
 - Window resize: all tabs marked dirty; only the active tab is fitted immediately (debounced).
 - MRU order (`TabManager._mru`, updated on switch/pruned on close) drives the Ctrl+Tab switcher.
 - The welcome watermark is a **permanent backdrop** (`#welcome`: absolute, `pointer-events:none`, z-index 0, ~8% opacity) — terminal instances and the settings page cover it with opaque backgrounds (z-index 1). There is NO show/hide state anywhere; "no tabs left" simply uncovers it. Do not reintroduce `_showWelcome`-style toggles (they caused the settings/welcome stacking bugs).
+
+## Known limitations
+
+- **Multi-window config writes are last-write-wins**: each window owns a configStore and writes per-topic JSON files with debounced read-modify-write; two windows saving settings concurrently can lose one side's change (impact: one settings item). Accepted — no cross-process config coordination exists (tray coordination is file-based, config is not).
 
 ## Keyboard shortcuts
 

@@ -5,6 +5,7 @@ import { createElement, FolderOpen } from "lucide";
 import Sortable from "sortablejs";
 import { findSerialProfile } from "../config/serial-profiles";
 import { hostProp } from "../core/common";
+import { DOM_ID } from "../core/dom-ids";
 import { logCatch, swallow } from "../core/errorlog";
 import { configStore } from "../core/store";
 import { notifyTrayTabs, setTrayTabsProvider } from "../core/traytabs";
@@ -199,7 +200,7 @@ export class TabManager {
     const tabEl = this._createTabElement(tab);
     // Keep the + button group as the last child of #tabs (flush after the
     // last tab).
-    this.tabsContainer.insertBefore(tabEl, document.getElementById("new-tab-group"));
+    this.tabsContainer.insertBefore(tabEl, document.getElementById(DOM_ID.newTabGroup));
 
     tab.onSocketClosed = () => this._onSessionClosed(tab.id);
     tab.attachSocket(port, token);
@@ -698,7 +699,7 @@ export class TabManager {
   // -- new-tab button --
 
   initNewTabButton(): void {
-    const btn = document.getElementById("new-tab")!;
+    const btn = document.getElementById(DOM_ID.newTab)!;
     btn.title = "New tab (Shift+click: open in folder, right-click: recent folders)";
 
     // Same lucide icon as the recent-dirs menu's "Browse…" entry; shown in

@@ -4,11 +4,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import Sortable from "sortablejs";
 import { generateSshConfig, loadSshHosts } from "../config/ssh-config";
-import { esc, hostProp } from "../core/common";
+import { hostProp } from "../core/common";
 import { logError } from "../core/errorlog";
 import { type ConfigState, configStore } from "../core/store";
 import type { SshHost } from "../core/types";
 import { confirmDialog } from "../ui/confirm";
+import { html, type SafeHtml, setHtml } from "../ui/dom";
 import { showToast } from "../ui/toast";
 import { showSshHostEditor } from "./sshhosteditor";
 import { listKeys, showInstallKeyModal, showKeygenModal } from "./sshkeys";
@@ -41,52 +42,52 @@ function renderSshPanel(container: HTMLElement, opts?: { keepPending?: boolean }
   const allHosts = configStore.get("sshHosts");
   const hiddenSshHosts = configStore.get("hiddenSshHosts");
 
-  let hostRows = "";
+  let hostRows: SafeHtml;
   if (allHosts.length === 0) {
-    hostRows = `<div class="settings-item">
+    hostRows = html`<div class="settings-item">
       <div class="settings-item-desc">No SSH hosts found. Add hosts to your SSH config file to see them here.</div>
     </div>`;
   } else {
-    hostRows = allHosts
-      .map((h) => {
-        const visible = !hiddenSshHosts.includes(h.name);
-        const hostname = hostProp(h, "hostname") || h.name;
-        const user = hostProp(h, "user") || "root";
-        const port = hostProp(h, "port") || "22";
-        const skipKeys = new Set(["name", "hostname", "user", "port"]);
-        const extra = Object.entries(h)
-          .filter(([k]) => !skipKeys.has(k.toLowerCase()))
-          // Multi-line values (merged forward directives) read as a list.
-          .flatMap(([k, v]) => v.split("\n").map((line) => `${k}: ${line}`));
-        return `<div class="ssh-host-card" data-name="${esc(h.name)}" style="margin-bottom:4px;background:#2a2a2a;border-radius:4px;overflow:hidden;">
+    hostRows = html`${allHosts.map((h) => {
+      const visible = !hiddenSshHosts.includes(h.name);
+      const hostname = hostProp(h, "hostname") || h.name;
+      const user = hostProp(h, "user") || "root";
+      const port = hostProp(h, "port") || "22";
+      const skipKeys = new Set(["name", "hostname", "user", "port"]);
+      const extra = Object.entries(h)
+        .filter(([k]) => !skipKeys.has(k.toLowerCase()))
+        // Multi-line values (merged forward directives) read as a list.
+        .flatMap(([k, v]) => v.split("\n").map((line) => `${k}: ${line}`));
+      return html`<div class="ssh-host-card" data-name="${h.name}" style="margin-bottom:4px;background:#2a2a2a;border-radius:4px;overflow:hidden;">
         <div class="ssh-host-row" style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;cursor:pointer;">
           <div style="flex-shrink:0;padding-top:2px;">
             <label class="settings-toggle-row" style="padding:0;gap:0;">
-              <input type="checkbox" class="ssh-vis-check" value="${esc(h.name)}" ${visible ? "checked" : ""} />
+              <input type="checkbox" class="ssh-vis-check" value="${h.name}" ${visible ? "checked" : ""} />
             </label>
           </div>
           <div style="min-width:0;flex:1;">
-            <div class="settings-item-title" style="margin-bottom:2px;">${esc(h.name)}</div>
-            <div class="settings-item-desc" style="margin-bottom:0;">${esc(user)}@${esc(hostname)}:${esc(port)}</div>
+            <div class="settings-item-title" style="margin-bottom:2px;">${h.name}</div>
+            <div class="settings-item-desc" style="margin-bottom:0;">${user}@${hostname}:${port}</div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
-            <button class="ssh-btn-edit settings-link-btn" data-hostname="${esc(h.name)}">Edit</button>
-            <button class="ssh-btn-delete settings-link-btn" data-hostname="${esc(h.name)}" style="color:#f44747;border-color:#f44747;">Delete</button>
+            <button class="ssh-btn-edit settings-link-btn" data-hostname="${h.name}">Edit</button>
+            <button class="ssh-btn-delete settings-link-btn" data-hostname="${h.name}" style="color:#f44747;border-color:#f44747;">Delete</button>
           </div>
         </div>
         <div class="ssh-host-detail" style="display:none;padding:0 10px 8px 10px;">
-          ${extra.length > 0 ? `<div class="ssh-host-extra" style="font-size:12px;color:#888;margin-bottom:6px;padding-left:28px;display:flex;flex-direction:column;gap:2px;">${extra.map((e) => `<div style="word-break:break-all;">${esc(e)}</div>`).join("")}</div>` : ""}
+          ${extra.length > 0 ? html`<div class="ssh-host-extra" style="font-size:12px;color:#888;margin-bottom:6px;padding-left:28px;display:flex;flex-direction:column;gap:2px;">${extra.map((e) => html`<div style="word-break:break-all;">${e}</div>`)}</div>` : ""}
           <div style="display:flex;gap:6px;padding-left:28px;">
-            <button class="ssh-btn-clear settings-link-btn" data-hostname="${esc(hostname)}" style="background:#4a4a4a;">Clear KnownHosts</button>
-            <button class="ssh-btn-copy-id settings-link-btn" data-hostname="${esc(hostname)}" data-port="${esc(port)}" data-user="${esc(user)}" style="background:#4a4a4a;">Upload SSH Key</button>
+            <button class="ssh-btn-clear settings-link-btn" data-hostname="${hostname}" style="background:#4a4a4a;">Clear KnownHosts</button>
+            <button class="ssh-btn-copy-id settings-link-btn" data-hostname="${hostname}" data-port="${port}" data-user="${user}" style="background:#4a4a4a;">Upload SSH Key</button>
           </div>
         </div>
       </div>`;
-      })
-      .join("");
+    })}`;
   }
 
-  container.innerHTML = `
+  setHtml(
+    container,
+    html`
     <div class="settings-section">
       <div class="settings-section-title">SSH Configuration</div>
       <div class="settings-item settings-item-row">
@@ -130,7 +131,8 @@ function renderSshPanel(container: HTMLElement, opts?: { keepPending?: boolean }
       <div class="settings-item-desc" style="margin:0;">Saving will overwrite ~/.ssh/config. A backup is saved to config.tt.bak.</div>
       <button id="set-save-ssh-config" class="settings-btn">Save SSH Config</button>
     </div>
-  `;
+  `,
+  );
 
   wireSshEvents(container);
 
@@ -138,22 +140,22 @@ function renderSshPanel(container: HTMLElement, opts?: { keepPending?: boolean }
   const keyList = container.querySelector<HTMLElement>(".ssh-key-list")!;
   listKeys().then((keys) => {
     if (!keyList.isConnected) return; // panel re-rendered meanwhile
-    keyList.innerHTML =
+    setHtml(
+      keyList,
       keys.length === 0
-        ? `<div class="settings-item"><div class="settings-item-desc">No key pairs found. Generate one to enable passwordless logins.</div></div>`
-        : keys
-            .map(
-              (k) => `<div class="settings-item settings-item-row">
+        ? html`<div class="settings-item"><div class="settings-item-desc">No key pairs found. Generate one to enable passwordless logins.</div></div>`
+        : html`${keys.map(
+            (k) => html`<div class="settings-item settings-item-row">
           <div class="settings-item-info">
-            <div class="settings-item-title">${esc(k.name)}</div>
-            <div class="settings-item-desc">${esc(k.fingerprint)}</div>
+            <div class="settings-item-title">${k.name}</div>
+            <div class="settings-item-desc">${k.fingerprint}</div>
           </div>
           <div class="settings-item-control">
-            <button class="settings-link-btn ssh-key-copy" data-key="${esc(k.publicKey)}">Copy Public Key</button>
+            <button class="settings-link-btn ssh-key-copy" data-key="${k.publicKey}">Copy Public Key</button>
           </div>
         </div>`,
-            )
-            .join("");
+          )}`,
+    );
     keyList.querySelectorAll<HTMLButtonElement>(".ssh-key-copy").forEach((btn) => {
       btn.addEventListener("click", async () => {
         await navigator.clipboard.writeText(btn.dataset.key!);
@@ -213,8 +215,11 @@ function wireSshEvents(container: HTMLElement) {
       .closest(".settings-page")
       ?.querySelector<HTMLElement>(".settings-feedback");
     if (!fb?.isConnected) return;
-    fb.innerHTML = `<div>${esc(title)}</div>
-      <div style="font-size:12px;color:${ok ? "#888" : "#c44"};">${esc(detail)}</div>`;
+    setHtml(
+      fb,
+      html`<div>${title}</div>
+      <div style="font-size:12px;color:${ok ? "#888" : "#c44"};">${detail}</div>`,
+    );
     fb.className = `settings-feedback ${ok ? "settings-feedback-ok" : "settings-feedback-info"}`;
     setTimeout(() => {
       fb.textContent = "";

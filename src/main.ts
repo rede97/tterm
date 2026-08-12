@@ -2,6 +2,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Cog, createElement } from "lucide";
+import { DOM_ID } from "./core/dom-ids";
 import "@xterm/xterm/css/xterm.css";
 import "@fontsource/jetbrains-mono";
 import "@fontsource/fira-mono";
@@ -30,8 +31,8 @@ import { initContextMenuWiring, initQuickPanelWiring, initShortcutsWiring } from
 
 // -- DOM refs ---
 
-const terminalContainer = document.getElementById("terminal-container")!;
-const tabsContainer = document.getElementById("tabs")!;
+const terminalContainer = document.getElementById(DOM_ID.terminalContainer)!;
+const tabsContainer = document.getElementById(DOM_ID.tabs)!;
 
 // scroll wheel on tab bar ->horizontal scroll
 tabsContainer.addEventListener(
@@ -76,7 +77,7 @@ tabManager.setSettingsFactory(async () => {
   return m.createSettingsContent();
 });
 
-const settingsBtn = document.getElementById("settings-btn")!;
+const settingsBtn = document.getElementById(DOM_ID.settingsBtn)!;
 settingsBtn.appendChild(createElement(Cog, { stroke: "currentColor", width: 16, height: 16 }));
 settingsBtn.addEventListener("click", () => {
   tabManager.toggleSettings();
