@@ -52,7 +52,9 @@ async function clickApply() {
 
 async function selectThemeCard(name) {
   const found = await browser.execute((n) => {
-    const card = [...document.querySelectorAll(".theme-card")].find((c) => c.dataset.theme === n);
+    const card = [...document.querySelectorAll("#set-theme-gallery .theme-card")].find(
+      (c) => c.dataset.theme === n,
+    );
     if (card) card.click();
     return !!card;
   }, name);
@@ -67,14 +69,24 @@ describe("custom themes", () => {
       await selectThemeCard("TTerm Dark");
       await clickApply();
       await browser.execute(() => {
-        const card = [...document.querySelectorAll(".theme-card")].find(
+        const card = [...document.querySelectorAll("#set-theme-gallery .theme-card")].find(
           (c) => c.dataset.theme === "E2E Custom",
         );
         if (card) {
           [...card.querySelectorAll(".theme-card-action")]
             .find((b) => b.textContent === "Edit")
             .click();
-          setTimeout(() => document.querySelector(".te-delete")?.click(), 200);
+          // te-delete opens a confirmDialog — the cleanup must also click
+          // its OK button or the theme is never actually deleted (leftover
+          // then collides with the next run's duplicate-and-save).
+          setTimeout(() => {
+            document.querySelector(".te-delete")?.click();
+            setTimeout(() => {
+              document
+                .querySelector(".confirm-overlay .sshauth-footer .sshauth-btn:last-child")
+                ?.click();
+            }, 200);
+          }, 200);
         }
       });
       await browser.pause(500);
@@ -127,13 +139,15 @@ describe("custom themes", () => {
 
     // Gallery is split into Built-in / Custom sections.
     const groupTitles = await browser.execute(() =>
-      [...document.querySelectorAll(".theme-group-title")].map((el) => el.textContent),
+      [...document.querySelectorAll("#set-theme-gallery .theme-group-title")].map(
+        (el) => el.textContent,
+      ),
     );
     expect(groupTitles).toEqual(["Built-in", "Custom"]);
 
     // Duplicate Solarized Light into a custom copy.
     await browser.execute(() => {
-      const card = [...document.querySelectorAll(".theme-card")].find(
+      const card = [...document.querySelectorAll("#set-theme-gallery .theme-card")].find(
         (c) => c.dataset.theme === "Solarized Light",
       );
       card.querySelector(".theme-card-action").click(); // Duplicate
@@ -154,7 +168,7 @@ describe("custom themes", () => {
 
     // The custom theme shows in the Custom section with an Edit action.
     const customCard = await browser.execute(() => {
-      const card = [...document.querySelectorAll(".theme-card")].find(
+      const card = [...document.querySelectorAll("#set-theme-gallery .theme-card")].find(
         (c) => c.dataset.theme === "E2E Custom",
       );
       if (!card) return null;
@@ -187,7 +201,7 @@ describe("custom themes", () => {
     await selectThemeCard("TTerm Dark");
     await clickApply();
     await browser.execute(() => {
-      const card = [...document.querySelectorAll(".theme-card")].find(
+      const card = [...document.querySelectorAll("#set-theme-gallery .theme-card")].find(
         (c) => c.dataset.theme === "E2E Custom",
       );
       [...card.querySelectorAll(".theme-card-action")]
@@ -195,12 +209,21 @@ describe("custom themes", () => {
         .click();
     });
     await $(".te-overlay").waitForExist({ timeout: 5000 });
-    await $(".te-delete").click(); // confirm() auto-accepted by the driver
+    await $(".te-delete").click();
+    // te-delete opens the app's confirmDialog (custom modal, not native
+    // confirm) — approve the deletion.
+    await browser.waitUntil(async () => await $(".confirm-overlay").isExisting(), {
+      timeout: 3000,
+      timeoutMsg: "delete confirmation did not appear",
+    });
+    await browser.execute(() => {
+      document.querySelector(".confirm-overlay .sshauth-footer .sshauth-btn:last-child")?.click();
+    });
     await browser.waitUntil(
       async () =>
         browser.execute(
           () =>
-            ![...document.querySelectorAll(".theme-card")].some(
+            ![...document.querySelectorAll("#set-theme-gallery .theme-card")].some(
               (c) => c.dataset.theme === "E2E Custom",
             ),
         ),

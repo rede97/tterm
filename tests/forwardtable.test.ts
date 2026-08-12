@@ -211,3 +211,45 @@ describe("forward config line helpers", () => {
     expect(parseForwardLine("127.0.0.1:1080 extra:1", "dynamic")).toBeNull();
   });
 });
+
+describe("forward table — lit rendering (migration acceptance)", () => {
+  it("half-typed add-row in one group survives a commit in another", () => {
+    const t = createForwardTable();
+    document.body.appendChild(t.el);
+
+    // Type into the Remote add-row (no commit, no blur).
+    const remote = addRowIn(group(t.el, "remote"));
+    remote.listenPort.value = "9090";
+    remote.listenPort.dispatchEvent(new Event("input"));
+    const remoteListenNode = remote.listenPort;
+
+    // Commit a row in the Local group — old rebuild wiped Remote's input.
+    const local = addRowIn(group(t.el, "local"));
+    local.listenPort.value = "8080";
+    local.targetHost!.value = "db";
+    local.targetPort!.value = "5432";
+    local.add.click();
+
+    // Remote's pending input is intact, on the SAME input node.
+    const remoteAfter = addRowIn(group(t.el, "remote"));
+    expect(remoteAfter.listenPort).toBe(remoteListenNode);
+    expect(remoteAfter.listenPort.value).toBe("9090");
+  });
+
+  it("committed display rows keep node identity across re-renders (keyed repeat)", () => {
+    const t = createForwardTable([
+      { kind: "local", listenHost: "127.0.0.1", listenPort: 8080, targetHost: "a", targetPort: 80 },
+    ]);
+    document.body.appendChild(t.el);
+    const rowBefore = displayRowsIn(group(t.el, "local"))[0];
+
+    const a = addRowIn(group(t.el, "local"));
+    a.listenPort.value = "8081";
+    a.targetHost!.value = "b";
+    a.targetPort!.value = "81";
+    a.add.click();
+
+    expect(displayRowsIn(group(t.el, "local"))[0]).toBe(rowBefore);
+    expect(t.rows()).toHaveLength(2);
+  });
+});

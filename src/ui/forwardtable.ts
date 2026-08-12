@@ -2,14 +2,20 @@
 // Dynamic. The group IS the direction indicator (no per-row arrows).
 // Columns and validation rules are declared once as data; the engine
 // renders rows, enforces rules on commit, and manages add/edit/delete.
-// Used by the SSH host editor (Settings → SSH).
+// Used by the SSH host editor (Settings → SSH) and the quick panel.
 //
 // Rows are ForwardEditorValue (ui/forwardeditor.ts). The listen host is
 // pinned to 127.0.0.1 by design: only its port is editable. Dynamic
 // forwards are SOCKS5 listeners and have no target endpoint.
+//
+// Renders through lit-html (docs/frontend-governance.md P3): commits diff
+// the table instead of rebuilding it, so a half-typed add-row in one group
+// survives a commit in another — the innerHTML rebuild this replaced used
+// to wipe pending input across ALL groups on every change.
 
 import { el } from "./dom";
 import type { ForwardEditorValue, ForwardKind } from "./forwardeditor";
+import { html, render, repeat, type TemplateResult } from "./lit";
 import { showToast } from "./toast";
 
 export interface ForwardTableOptions {
@@ -159,39 +165,18 @@ export function parseForwardLine(line: string, kind: ForwardKind): ForwardEditor
 // -- Engine --------------------------------------------------------------
 
 // Lucide-style inline icons (same stroke style as the GitHub icon in
-// settings/general.ts) — crisper than text glyphs at small sizes.
-const ICON_X = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
-const ICON_PLUS = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`;
+// settings/general.ts) — crisper than text glyphs at small sizes. Inline
+// templates, not innerHTML strings: lit stamps them per render.
+const iconX = html`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
+const iconPlus = html`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`;
 
-function mkBtn(className: string, text: string, title: string): HTMLButtonElement {
-  const b = document.createElement("button");
-  b.type = "button";
-  b.className = className;
-  b.innerHTML = text;
-  b.title = title;
-  return b;
+function blankDraft(kind: ForwardKind): Draft {
+  return { kind, listenPort: "", targetHost: "", targetPort: "" };
 }
 
-function mkInput(
-  aria: string,
-  placeholder: string,
-  port: boolean,
-  value: string,
-  rule: Rule,
-): HTMLInputElement {
-  const input = document.createElement("input");
-  input.className = port ? "ft-port" : "ft-host";
-  input.type = "text";
-  input.spellcheck = false;
-  input.placeholder = placeholder;
-  input.setAttribute("aria-label", aria);
-  input.value = value;
-  input.addEventListener("input", () => {
-    const err = rule.check(input.value);
-    input.classList.toggle("ft-invalid", err !== null);
-    input.title = err ?? "";
-  });
-  return input;
+interface EditState {
+  row: ForwardEditorValue;
+  draft: Draft;
 }
 
 export function createForwardTable(
@@ -201,194 +186,273 @@ export function createForwardTable(
   const data: ForwardEditorValue[] = initial.map((r) => ({ ...r }));
   const root = el("div", opts.compact ? "ft ft-compact" : "ft");
 
-  /** Edit-mode row inside a group: pinned listen host + port, target
-   *  fields when the group has one, then commit/cancel. */
-  function editRow(
-    group: GroupDef,
-    draft: Draft,
-    commit: (d: Draft) => void,
-    cancel: (() => void) | null,
-    commitLabel: string,
-  ): HTMLElement {
-    const row = el("div", "ft-row ft-editing");
+  // Pending add-row input per group — this is the state the old rebuild
+  // destroyed on every commit anywhere in the table.
+  const addDrafts: Record<ForwardKind, Draft> = {
+    local: blankDraft("local"),
+    remote: blankDraft("remote"),
+    dynamic: blankDraft("dynamic"),
+  };
+  let editing: EditState | null = null;
 
-    const listen = el("span", "ft-cell ft-listen");
-    // Compact rows are one line ([Port] [Host]:[Port] +); the pinned
-    // loopback prefix is noise there — the listen port stands alone.
-    if (!opts.compact) listen.appendChild(el("span", "ft-pin", "127.0.0.1 :"));
-    const listenPort = mkInput("Listen port", "Port", true, draft.listenPort, portRule);
-    listen.appendChild(listenPort);
-    row.appendChild(listen);
+  function rerender(): void {
+    render(tableTemplate(), root);
+  }
 
-    const inputs: { input: HTMLInputElement; rule: Rule; apply(): void }[] = [
-      {
-        input: listenPort,
-        rule: portRule,
-        apply: () => {
-          draft.listenPort = listenPort.value;
-        },
-      },
+  /** Validate an edit/add row's inputs against the rules, reading the
+   *  live DOM (tests and users can set .value without firing input).
+   *  Returns the inputs in commit order, or null after flagging the
+   *  first offending field. */
+  function validateRow(rowEl: HTMLElement, hasTarget: boolean) {
+    const listenPort = rowEl.querySelector<HTMLInputElement>('input[aria-label="Listen port"]')!;
+    const fields: { input: HTMLInputElement; rule: Rule }[] = [
+      { input: listenPort, rule: portRule },
     ];
-
-    if (group.hasTarget) {
-      const target = el("span", "ft-cell ft-target");
-      const host = mkInput("Target host", group.targetHostPh, false, draft.targetHost, hostRule);
-      const port = mkInput("Target port", "Port", true, draft.targetPort, portRule);
-      target.appendChild(host);
-      target.appendChild(el("span", "ft-pin", ":"));
-      target.appendChild(port);
-      row.appendChild(target);
-      inputs.push(
+    if (hasTarget) {
+      fields.push(
         {
-          input: host,
+          input: rowEl.querySelector<HTMLInputElement>('input[aria-label="Target host"]')!,
           rule: hostRule,
-          apply: () => {
-            draft.targetHost = host.value;
-          },
         },
         {
-          input: port,
+          input: rowEl.querySelector<HTMLInputElement>('input[aria-label="Target port"]')!,
           rule: portRule,
-          apply: () => {
-            draft.targetPort = port.value;
-          },
         },
       );
-    } else {
-      row.appendChild(el("span", "ft-cell ft-target ft-socks", "any destination (SOCKS5)"));
     }
-
-    const actions = el("span", "ft-cell ft-actions");
-    // Compact rows save button area with a bare plus icon; the title keeps
-    // the full action name discoverable.
-    const label = opts.compact && commitLabel === "Add" ? ICON_PLUS : commitLabel;
-    const ok = mkBtn(
-      `ft-btn ft-ok${commitLabel === "Add" ? " ft-add" : ""}`,
-      label,
-      commitLabel === "Add" ? `Add ${group.kind} forward` : "Apply",
-    );
-    ok.addEventListener("click", () => {
-      for (const f of inputs) {
-        const err = f.rule.check(f.input.value);
-        if (err) {
-          showToast(err, "error");
-          f.input.classList.add("ft-invalid");
-          f.input.focus();
-          return;
-        }
+    for (const f of fields) {
+      const err = f.rule.check(f.input.value);
+      if (err) {
+        showToast(err, "error");
+        f.input.classList.add("ft-invalid");
+        f.input.focus();
+        return null;
       }
-      for (const f of inputs) f.apply();
-      commit(draft);
-    });
-    actions.appendChild(ok);
-    if (cancel) {
-      const no = mkBtn("ft-btn ft-cancel", ICON_X, "Cancel");
-      no.addEventListener("click", cancel);
-      actions.appendChild(no);
     }
-    row.appendChild(actions);
-    return row;
+    return fields;
+  }
+
+  /** Edit-mode row inside a group: pinned listen host + port, target
+   *  fields when the group has one, then commit/cancel. `rowClass` is
+   *  "ft-row ft-editing" for row edits and "ft-row ft-add-row" for the
+   *  per-group add-row (CSS and tests key off both). */
+  function editRowTemplate(
+    group: GroupDef,
+    draft: Draft,
+    commitLabel: string,
+    rowClass: string,
+    onCommit: (fields: { input: HTMLInputElement; rule: Rule }[]) => void,
+    onCancel: (() => void) | null,
+  ): TemplateResult {
+    return html`<div class=${rowClass}>
+      <span class="ft-cell ft-listen">
+        ${opts.compact ? "" : html`<span class="ft-pin">127.0.0.1 :</span>`}
+        <input
+          class="ft-port"
+          type="text"
+          spellcheck="false"
+          placeholder="Port"
+          aria-label="Listen port"
+          .value=${draft.listenPort}
+          @input=${(e: Event) => liveCheck(e, portRule, (v) => (draft.listenPort = v))}
+        />
+      </span>
+      ${
+        group.hasTarget
+          ? html`<span class="ft-cell ft-target">
+            <input
+              class="ft-host"
+              type="text"
+              spellcheck="false"
+              placeholder=${group.targetHostPh}
+              aria-label="Target host"
+              .value=${draft.targetHost}
+              @input=${(e: Event) => liveCheck(e, hostRule, (v) => (draft.targetHost = v))}
+            />
+            <span class="ft-pin">:</span>
+            <input
+              class="ft-port"
+              type="text"
+              spellcheck="false"
+              placeholder="Port"
+              aria-label="Target port"
+              .value=${draft.targetPort}
+              @input=${(e: Event) => liveCheck(e, portRule, (v) => (draft.targetPort = v))}
+            />
+          </span>`
+          : html`<span class="ft-cell ft-target ft-socks">any destination (SOCKS5)</span>`
+      }
+      <span class="ft-cell ft-actions">
+        <button
+          type="button"
+          class="ft-btn ft-ok${commitLabel === "Add" ? " ft-add" : ""}"
+          title=${commitLabel === "Add" ? `Add ${group.kind} forward` : "Apply"}
+          @click=${(e: MouseEvent) => {
+            const rowEl = (e.currentTarget as HTMLElement).closest(".ft-row") as HTMLElement;
+            const fields = validateRow(rowEl, group.hasTarget);
+            if (fields) onCommit(fields);
+          }}
+        >
+          ${opts.compact && commitLabel === "Add" ? iconPlus : commitLabel}
+        </button>
+        ${
+          onCancel
+            ? html`<button
+              type="button"
+              class="ft-btn ft-cancel"
+              title="Cancel"
+              @click=${onCancel}
+            >
+              ${iconX}
+            </button>`
+            : ""
+        }
+      </span>
+    </div>`;
+  }
+
+  /** Live validation on input: flag the field and mirror the value into
+   *  the draft (commit re-reads the DOM anyway; the draft is the
+   *  re-render survival kit). */
+  function liveCheck(e: Event, rule: Rule, apply: (v: string) => void): void {
+    const input = e.target as HTMLInputElement;
+    apply(input.value);
+    const err = rule.check(input.value);
+    input.classList.toggle("ft-invalid", err !== null);
+    input.title = err ?? "";
   }
 
   /** A committed row in display mode. */
-  function displayRow(r: ForwardEditorValue, render: () => void): HTMLElement {
-    const row = el("div", "ft-row");
-    const listenCell = el(
-      "span",
-      "ft-cell ft-listen",
-      opts.compact ? String(r.listenPort) : `${r.listenHost}:${r.listenPort}`,
-    );
-    listenCell.title = `${r.listenHost}:${r.listenPort}`;
-    row.appendChild(listenCell);
-    row.appendChild(
-      el(
-        "span",
-        `ft-cell ft-target${r.kind === "dynamic" ? " ft-socks" : ""}`,
-        r.kind === "dynamic" ? "any destination (SOCKS5)" : `${r.targetHost}:${r.targetPort}`,
-      ),
-    );
-    const actions = el("span", "ft-cell ft-actions");
-    if (opts.editable !== false) {
-      const edit = mkBtn("ft-btn ft-edit", "✎", "Edit forward");
-      edit.addEventListener("click", () => {
-        const group = GROUPS.find((g) => g.kind === r.kind)!;
-        const editor = editRow(
-          group,
-          fromRow(r),
-          (d) => {
+  function displayRowTemplate(r: ForwardEditorValue): TemplateResult {
+    return html`<div class="ft-row">
+      <span class="ft-cell ft-listen" title="${r.listenHost}:${r.listenPort}"
+        >${opts.compact ? String(r.listenPort) : `${r.listenHost}:${r.listenPort}`}</span
+      >
+      <span class="ft-cell ft-target${r.kind === "dynamic" ? " ft-socks" : ""}"
+        >${r.kind === "dynamic" ? "any destination (SOCKS5)" : `${r.targetHost}:${r.targetPort}`}</span
+      >
+      <span class="ft-cell ft-actions">
+        ${
+          opts.editable !== false
+            ? html`<button
+              type="button"
+              class="ft-btn ft-edit"
+              title="Edit forward"
+              @click=${() => {
+                editing = { row: r, draft: fromRow(r) };
+                rerender();
+              }}
+            >
+              ✎
+            </button>`
+            : ""
+        }
+        <button
+          type="button"
+          class="ft-btn ft-del"
+          title="Delete forward"
+          @click=${(e: MouseEvent) => {
             const idx = data.indexOf(r);
-            if (idx >= 0) data[idx] = toRow(d);
-            render();
-          },
-          render,
-          "✓",
-        );
-        row.replaceWith(editor);
-      });
-      actions.appendChild(edit);
-    }
-    const del = mkBtn("ft-btn ft-del", ICON_X, "Delete forward");
-    del.addEventListener("click", () => {
-      if (opts.onRemove) {
-        del.disabled = true;
-        opts.onRemove(r).then((ok) => {
-          if (!ok) {
-            del.disabled = false;
-            return;
-          }
-          const idx = data.indexOf(r);
-          if (idx >= 0) data.splice(idx, 1);
-          render();
-        });
-        return;
-      }
-      const idx = data.indexOf(r);
-      if (idx >= 0) data.splice(idx, 1);
-      render();
-    });
-    actions.appendChild(del);
-    row.appendChild(actions);
-    return row;
-  }
-
-  function render(): void {
-    root.innerHTML = "";
-    for (const group of GROUPS) {
-      const rows = data.filter((r) => r.kind === group.kind);
-      // Empty groups with nothing to show collapse to just their add-row.
-      const sec = el("div", "ft-group");
-      const head = el("div", "ft-group-head");
-      head.appendChild(el("span", `ft-group-title ${group.accent}`, group.title));
-      head.appendChild(el("span", "ft-group-desc", group.desc));
-      sec.appendChild(head);
-      for (const r of rows) sec.appendChild(displayRow(r, render));
-      const draft: Draft = { kind: group.kind, listenPort: "", targetHost: "", targetPort: "" };
-      const addRow = editRow(
-        group,
-        draft,
-        (d) => {
-          const row = toRow(d);
-          if (opts.onAdd) {
-            opts.onAdd(row).then((ok) => {
-              if (!ok) return;
-              data.push(row);
-              render();
+            if (!opts.onRemove) {
+              if (idx >= 0) data.splice(idx, 1);
+              rerender();
+              return;
+            }
+            const del = e.currentTarget as HTMLButtonElement;
+            del.disabled = true;
+            opts.onRemove(r).then((ok) => {
+              if (!ok) {
+                del.disabled = false;
+                return;
+              }
+              if (idx >= 0) data.splice(idx, 1);
+              rerender();
             });
-            return;
-          }
-          data.push(row);
-          render();
-        },
-        null,
-        "Add",
-      );
-      addRow.classList.add("ft-add-row");
-      addRow.classList.remove("ft-editing");
-      sec.appendChild(addRow);
-      root.appendChild(sec);
-    }
+          }}
+        >
+          ${iconX}
+        </button>
+      </span>
+    </div>`;
   }
 
-  render();
+  function groupTemplate(group: GroupDef): TemplateResult {
+    const rows = data.filter((r) => r.kind === group.kind);
+    return html`<div class="ft-group">
+      <div class="ft-group-head">
+        <span class="ft-group-title ${group.accent}">${group.title}</span>
+        <span class="ft-group-desc">${group.desc}</span>
+      </div>
+      ${repeat(
+        rows,
+        (r) => r,
+        (r) => {
+          if (editing?.row !== r) return displayRowTemplate(r);
+          // Capture in a local: TS can't narrow the module-level `editing`
+          // through the repeat callback boundary.
+          const edit = editing;
+          return editRowTemplate(
+            group,
+            edit.draft,
+            "✓",
+            "ft-row ft-editing",
+            (fields) => {
+              edit.draft.listenPort = fields[0].input.value;
+              if (group.hasTarget) {
+                edit.draft.targetHost = fields[1].input.value;
+                edit.draft.targetPort = fields[2].input.value;
+              }
+              const idx = data.indexOf(edit.row);
+              if (idx >= 0) data[idx] = toRow(edit.draft);
+              editing = null;
+              rerender();
+            },
+            () => {
+              editing = null;
+              rerender();
+            },
+          );
+        },
+      )}
+      ${addRowTemplate(group)}
+    </div>`;
+  }
+
+  function addRowTemplate(group: GroupDef): TemplateResult {
+    const draft = addDrafts[group.kind];
+    return editRowTemplate(
+      group,
+      draft,
+      "Add",
+      "ft-row ft-add-row",
+      (fields) => {
+        draft.listenPort = fields[0].input.value;
+        if (group.hasTarget) {
+          draft.targetHost = fields[1].input.value;
+          draft.targetPort = fields[2].input.value;
+        }
+        const row = toRow(draft);
+        if (!opts.onAdd) {
+          data.push(row);
+          addDrafts[group.kind] = blankDraft(group.kind);
+          rerender();
+          return;
+        }
+        opts.onAdd(row).then((ok) => {
+          if (!ok) return; // inputs stay, the caller toasts why
+          data.push(row);
+          addDrafts[group.kind] = blankDraft(group.kind);
+          rerender();
+        });
+      },
+      null,
+    );
+  }
+
+  function tableTemplate(): TemplateResult {
+    return html`${GROUPS.map(groupTemplate)}`;
+  }
+
+  rerender();
   return { el: root, rows: () => data.map((r) => ({ ...r })) };
 }
