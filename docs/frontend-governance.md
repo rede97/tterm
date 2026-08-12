@@ -74,7 +74,9 @@
 
 ## D. 低严重度摘要（审计 L 级，排期随缘）
 
-> **清账（2026-08）**：✅ 已修——L1（quickpanel Promise.resolve 归一）、L2（串口复制退化）、L3（pty_resize 双份 IPC，onResize 统一负责、三处手动 invoke 已删）、L4（scheduleFitActive 加存活 guard）、L6（A1 顺带）、L7（死代码删除）；已核实无需修——L5（share_screen_response 早有 logCatch，审计后已被修）。归入后端专项（M3 同期清算）——L8/L9/L10/L11/L12/L13。
+> **清账（2026-08）**：✅ 已修——L1（quickpanel Promise.resolve 归一）、L2（串口复制退化）、L3（pty_resize 双份 IPC，onResize 统一负责、三处手动 invoke 已删）、L4（scheduleFitActive 加存活 guard）、L6（A1 顺带）、L7（死代码删除）；已核实无需修——L5（share_screen_response 早有 logCatch，审计后已被修）。
+>
+> **后端专项清算（2026-08，随 sshclient 拆分完成）**：✅ 全部落地——L8（exec_capture 改为收齐字节末尾一次解码，测试 server 新增跨 chunk 多字节字符用例 `exec_capture_decodes_split_utf8`）、L9（serial_reconnect 300ms 固定 sleep → `wait_for_reconnect_prompt` 自适应轮询：25ms 节奏/2s 预算，以写路径 BrokenPipe 为 watcher 就绪信号 + 逐轮活性探测，4 个新单测；残余启发式已在代码注释记录）、L10（托盘 Quit  terminate 前经 `owns_tterm_window`（hwnd 类名校验）+ `pid_alive` 双重验证，纯函数 `quit_partition` 注入探针可测，陈旧条目走 unmark 清理）、L11（relay WS token 改手写常量时间比较 `token_eq`，无新依赖；share.rs 经核实是 HashMap 查找无此模式）、L12（remove_known_host 支持 hashed `|1|salt|hash` 条目，HMAC-SHA1 与 OpenSSH/russh 同构，新增直接依赖 hmac+sha1 均为 russh 传递依赖零增量成本，hostkey.rs 内单测覆盖明文/方括号/哈希三种形态与端口语义）、L13（上行 pump 发送期间 `select!` 竞争 close_notify，kill 可中断窗口满阻塞的发送；`Notified::enable()` 先注册再查 cancel 消除丢唤醒竞态）。
 
 | # | 问题 | 位置 |
 |---|---|---|
@@ -84,12 +86,12 @@
 | L4 | `_onResize` 10ms 定时器闭包持旧 active，已销毁 tab 上 fit 抛错 | tabmanager.ts |
 | L5 | 分享截图 promise 无 catch | main.ts |
 | L7 | fontconfig `_resolveSystemFonts` 死代码；profile.ts `<label>` 嵌套；sshkeys clipboard 无 catch | 各文件 |
-| L8 | `exec_capture` 按 chunk 解码 UTF-8，跨包边界产生 U+FFFD（后端） | sshclient.rs |
-| L9 | `serial_reconnect` 300ms 固定 sleep 代替握手（后端） | serial.rs |
-| L10 | 托盘 Quit PID 重用竞态 + TerminateProcess（后端） | tray.rs |
-| L11 | WS token 非常量时间比较（loopback 实际不可利用） | relay.rs |
-| L12 | `remove_known_host` 不支持 hashed known_hosts（后端） | sshclient.rs |
-| L13 | SSH 上行 pump cancel 仅空闲时生效（后端） | sshclient.rs |
+| L8 | ~~`exec_capture` 按 chunk 解码 UTF-8，跨包边界产生 U+FFFD（后端）~~ ✅ 已修 | sshclient/install.rs |
+| L9 | ~~`serial_reconnect` 300ms 固定 sleep 代替握手（后端）~~ ✅ 已修（自适应轮询，残余启发式见 serial.rs 注释） | serial.rs |
+| L10 | ~~托盘 Quit PID 重用竞态 + TerminateProcess（后端）~~ ✅ 已修（terminate 前 hwnd 类名校验） | tray.rs |
+| L11 | ~~WS token 非常量时间比较（loopback 实际不可利用）~~ ✅ 已修（`token_eq` 常量时间比较） | relay.rs |
+| L12 | ~~`remove_known_host` 不支持 hashed known_hosts（后端）~~ ✅ 已修 | sshclient/hostkey.rs |
+| L13 | ~~SSH 上行 pump cancel 仅空闲时生效（后端）~~ ✅ 已修（发送期间 select close_notify） | sshclient/session.rs |
 
 ---
 
@@ -97,7 +99,9 @@
 
 ## P1 — 纪律没有工具固化（最高优先级）
 
-> **进度（2026-08）**：✅ Biome 2.5.8 已落地（`biome.json`，formatter + recommended linter，`bun run lint` / `lint:fix`）；全库一次性 format + 修复清零 error（存量 `!`/`any`/CSS specificity 降级为 warn 作棘轮）；`ci.yml` 新增 `check` job（biome → tsc+vite → vitest → cargo fmt --check → cargo test，与 build 并行）；`cargo fmt` 原本即干净，已纳入同一门禁；检查纪律已写入 AGENT.md（修而不压、unsafe fix 后必跑测试——本次 unsafe `x!`→`x?.` 转换就吞出两个 tsc 错误，实证该原则）。待办：自定义规则（裸 catch / 原生对话框 / no-cycle）需 Biome 插件或 eslint 补充，P1 长尾。
+> **进度（2026-08）**：✅ Biome 2.5.8 已落地（`biome.json`，formatter + recommended linter，`bun run lint` / `lint:fix`）；全库一次性 format + 修复清零 error（存量 `!`/`any`/CSS specificity 降级为 warn 作棘轮）；`ci.yml` 新增 `check` job（biome → tsc+vite → vitest → cargo fmt --check → cargo test，与 build 并行）；`cargo fmt` 原本即干净，已纳入同一门禁；检查纪律已写入 AGENT.md（修而不压、unsafe fix 后必跑测试——本次 unsafe `x!`→`x?.` 转换就吞出两个 tsc 错误，实证该原则）。
+>
+> **清账（2026-08，自定义规则长尾）**：✅ 三条硬规则已全部机器化，无需 eslint——①禁裸 catch、②禁原生对话框（alert/confirm/prompt）用 GritQL 插件落地（`plugins/no-empty-catch.grit` / `no-native-dialogs.grit`，biome.json `plugins` 注册；插件诊断支持 `// biome-ignore lint/plugin: 理由` 豁免，已实证）；存量 6 处"只有注释的空 catch"按 window.ts 惯例 `swallow()` 化。③import/no-cycle 用 Biome 2.x 内置 `suspicious/noImportCycles`（error 级）——首次试跑揪出 9 处真实环路，根因是 `search→tabmanager`、`dirmenu→tabmanager` 两条反向边，已按 wiring.ts 注入范式切断（search/dirmenu 改 handler 注入，新增 `initSearchWiring`/`initDirMenuWiring`）。验收：lint 0 error、345 单测 + e2e 全绿。已知边界：GritQL 为单文件语法匹配、无类型信息，语义级规则（如"handler 必须经 wiring 注入"）仍需 review 自觉。
 
 **现状**：无 linter/formatter；`tsconfig` 有 strict 底线，但风格、`!` 断言（tabmanager 39 处）、AGENT.md 硬规则全靠 review 自觉。**`ci.yml` 只跑 build——不跑 vitest、不跑 cargo test、不跑 lint**，测试靠本地自觉。
 
@@ -109,7 +113,7 @@
 
 ## P2 — god object 吸积
 
-> **进度（2026-08，第一步拆分）**：✅ serialctl.ts（5 个串口 live setter，纯 tab+IPC 函数）、tabactions.ts（rename/share/clear/duplicate/export/closeRight/closeOther，manager 类型仅 type-only 引入）、settingsshell.ts（SettingsShell 类 + hooks，manager 保留 settingsOpen getter）已抽出，tabmanager 921→770 行；`src/wiring.ts` 成为 handler 注入的组合根，main.ts 326→231 行。生命周期（create*Tab 族）与标签条状态经评估**留在管理器内核**——拆它需要发明不自然的 context 接口，等 Settings 升格一等 tab（见下）后再评估。✅ 第一步验收：342 单测 + 27 e2e 全绿。
+> **进度（2026-08，第一步拆分）**：✅ serialctl.ts（5 个串口 live setter，纯 tab+IPC 函数）、tabactions.ts（rename/share/clear/duplicate/export/closeRight/closeOther，manager 类型仅 type-only 引入）、settingsshell.ts（SettingsShell 类 + hooks，manager 保留 settingsOpen getter）已抽出，tabmanager 921→754 行；`src/wiring.ts` 成为 handler 注入的组合根，main.ts 326→231 行。生命周期（create*Tab 族）与标签条状态经评估**留在管理器内核**——拆它需要发明不自然的 context 接口，等 Settings 升格一等 tab（见下）后再评估。✅ 第一步验收：342 单测 + 27 e2e 全绿。
 
 > **追加（2026-08，Settings 伪 tab 抽象评估）**：~~8 处特判~~ → SettingsShell 抽取 + welcome 背景化后，残留特判仅 4 处且全部小而集中（wiring Ctrl+W 检查、switcher/quickpanel 天然排除、switchTo 关 settings、closeTab 兄弟扫描）。**E2（Settings 升格一等 tab）于 2026-08 撤销**：病灶已根治，而升格需要给全应用依赖最重的 `tabs` Map 引入 TabView 接口并对每处 `.terminal`/`.type` 访问收窄类型，成本超过收益。伪 tab + SettingsShell 即最终形态。
 
@@ -118,7 +122,7 @@
 **方法**：
 - tabmanager 按既有切缝拆分（tablifecycle / tabactions / settingsshell / serialctl），目标 <400 行，纯移动代码，e2e 即安全网；tab.ts 暂缓（IME 耦合深，单独立项）。
 - `lib.rs` 双份 handler 合并：基础列表 + `#[cfg]` 局部拼接 debug-only 命令。
-- sshclient.rs 按 Prompter/hostkey/转发/SOCKS5/keygen 拆分（后端排期项）。
+- sshclient.rs 按 Prompter/hostkey/转发/SOCKS5/keygen 拆分（✅ 2026-08 落地：`sshclient.rs` 2426 行 → `sshclient/` 目录模块——prompter / hostkey / session / forward / keys / install + tests，mod.rs 持共享类型与 re-export，外部 `crate::sshclient::` 路径不变；cargo test 110 全绿）。
 
 ## P3 — UI 构建双范式 + 字符串契约
 
@@ -163,7 +167,7 @@
 
 # 分期计划（缺陷修复优先于范式治理）
 
-> **总账（2026-08 收尾）**：阶段 -1/0/1/2 全部完成，阶段 3 以"卫星模块拆分 + wiring 组合根"落地（tabmanager 921→770，生命周期与标签条留内核属有意决策）。**剩余挂账仅四项**：① sshclient.rs 拆分后端专项（含 L8–L13 清算）；② lit-html 试点（settings UX 主题，已立项）；③ Biome 自定义规则长尾（等插件生态）；④ 其余面板 html`` 迁移（棘轮，不设专项）。**关闭项**：E2（一等 tab，已撤销）、B4（文档化接受）、C7（观感竞态，风险收益倒挂）、DOM id 全量常量化（chrome 已收编，面板内 id 维持模块私有）。
+> **总账（2026-08 收尾）**：阶段 -1/0/1/2 全部完成，阶段 3 以"卫星模块拆分 + wiring 组合根"落地（tabmanager 921→754，生命周期与标签条留内核属有意决策）。**剩余挂账仅两项**：② lit-html 试点（settings UX 主题，已立项）；④ 其余面板 html`` 迁移（棘轮，不设专项）。**关闭项**：①（sshclient 拆分 + L8–L13 清算，2026-08 完成，验收 cargo test 110 全绿）、③（Biome 自定义规则，2026-08 落地，见 P1 清账）、E2（一等 tab，已撤销）、B4（文档化接受）、C7（观感竞态，风险收益倒挂）、DOM id 全量常量化（chrome 已收编，面板内 id 维持模块私有）。
 
 | 阶段 | 内容 | 验收 | 风险 |
 |---|---|---|---|
@@ -172,7 +176,7 @@
 | **1. 资源与并发**（1–2 天） | B1 tab.ts 清理、B2/B3 后端超时与锁、lib.rs handler 合并 | 新增回归单测/e2e | 中：死锁排查需 Rust 测试 |
 | **2. UI 收敛**（2–3 天，可拆小 PR） | html 助手 + el() 收编 + id 常量表 + confirmDialog 替换 | grep 无裸插值/原生 confirm | 低 |
 | **3. 结构拆分**（2–3 天） | tabmanager 截肢 + main 收口 + 状态登记 | e2e 全绿；tabmanager <400 行 | 中 |
-| **4. 后端排期**（独立） | sshclient.rs 拆分、L8-L13 择项 | cargo test 全绿 | 中 |
+| **4. 后端排期**（独立） | ~~sshclient.rs 拆分、L8-L13 择项~~ ✅ 2026-08 完成 | cargo test 全绿（110） | 中 |
 
 ---
 

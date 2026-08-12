@@ -25,7 +25,7 @@
 | `tray.rs` | 4 | 托盘注册表增删改、owner 选举与死主顶替、进程存活检测、配置解析 |
 | `fonts.rs` | 4 | 系统字体 TrueType/OpenType 后缀剥离 |
 | `demo.rs` | 15 | demo 会话脚本 |
-| `sshclient.rs` | 1 | 内嵌 SSH 端到端：密码认证、shell echo、window_change、动态 -L 端口映射 |
+| `sshclient/` | 多数 | 内嵌 SSH 端到端：密码认证、shell echo、window_change、动态 -L 端口映射、keygen/install、hashed known_hosts、split-UTF8 解码（计数以 `cargo test` 输出为准） |
 
 `relay.rs` 的用例是对真实 `WsHub` 的 `tokio::test` 异步集成测试，无需手动起进程即覆盖休眠重连、半开槽位释放等关键路径。
 

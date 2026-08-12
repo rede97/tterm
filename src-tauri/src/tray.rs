@@ -424,6 +424,21 @@ fn window_visible(_pid: u32) -> bool {
     false
 }
 
+// Quit guard: is this pid verifiably still a TTerm window? A stale registry
+// pid may have been reused by an unrelated process, so liveness alone is not
+// enough to aim TerminateProcess at it — the "Tauri Window" class check is.
+// Other platforms have no window class to check; terminate_pid is a no-op
+// there anyway, so the probe always passes.
+#[cfg(windows)]
+fn owns_tterm_window(pid: u32) -> bool {
+    hwnd_of_pid(pid).is_some()
+}
+
+#[cfg(not(windows))]
+fn owns_tterm_window(_pid: u32) -> bool {
+    true
+}
+
 // ---- tray icon (owner side) ----
 
 const ITEM_SHOW_PREFIX: &str = "show:";
@@ -486,6 +501,27 @@ fn build_menu(
     builder.item(&quit).build().expect("tray menu")
 }
 
+// Split parked registry entries for Quit into (kill, prune). Only a pid
+// that is alive AND still verifiably a TTerm window is a kill target; a
+// dead pid, or one reused by an unrelated process, is a stale entry that
+// gets pruned from the registry — never terminated. Pure decision logic:
+// the probe is injected so tests can fake liveness/window checks.
+fn quit_partition(
+    entries: &[TrayWindowEntry],
+    is_parked_tterm: impl Fn(u32) -> bool,
+) -> (Vec<u32>, Vec<u32>) {
+    let mut kill = Vec::new();
+    let mut prune = Vec::new();
+    for e in entries {
+        if is_parked_tterm(e.pid) {
+            kill.push(e.pid);
+        } else {
+            prune.push(e.pid);
+        }
+    }
+    (kill, prune)
+}
+
 fn on_menu_event(app: &tauri::AppHandle, id: &str) {
     let Some(base) = config_base(app) else { return };
     if let Some(rest) = id.strip_prefix(ITEM_SHOW_PREFIX) {
@@ -499,10 +535,20 @@ fn on_menu_event(app: &tauri::AppHandle, id: &str) {
     } else if id == ITEM_QUIT {
         // Quit = terminate every process currently parked in the tray
         // (shells inside them die — same as closing the app normally).
-        for e in list_hidden(&base) {
-            if e.pid != std::process::id() {
-                terminate_pid(e.pid);
-            }
+        // Guard against pid reuse: a stale registry entry may now point at
+        // an unrelated process, so only live pids that still own a "Tauri
+        // Window" get terminated; dead/foreign entries are pruned instead.
+        let entries: Vec<_> = list_hidden(&base)
+            .into_iter()
+            .filter(|e| e.pid != std::process::id())
+            .collect();
+        let (kill, prune) =
+            quit_partition(&entries, |pid| pid_alive(pid) && owns_tterm_window(pid));
+        for pid in kill {
+            terminate_pid(pid);
+        }
+        for pid in prune {
+            unmark(&base, pid);
         }
         app.exit(0);
     }
@@ -865,5 +911,27 @@ mod tests {
         assert_eq!(take_pending_tab(&base, 43), None);
         assert_eq!(take_pending_tab(&base, 42), Some(1));
         let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn quit_never_kills_stale_or_reused_pids() {
+        let e = |pid: u32| TrayWindowEntry {
+            pid,
+            name: String::new(),
+            tabs: vec![],
+            since: 0,
+        };
+        // Fake probe: 1 and 4 pass (alive + TTerm window), 2 is a dead pid,
+        // 3 is alive but the window-class check failed (pid reused by an
+        // unrelated process).
+        let (kill, prune) = quit_partition(&[e(1), e(2), e(3), e(4)], |pid| pid == 1 || pid == 4);
+        // Only verified TTerm processes are terminated…
+        assert_eq!(kill, vec![1, 4]);
+        // …dead and foreign pids are pruned, never killed.
+        assert_eq!(prune, vec![2, 3]);
+        // An all-stale registry kills nothing.
+        let (kill, prune) = quit_partition(&[e(7), e(8)], |_| false);
+        assert!(kill.is_empty());
+        assert_eq!(prune, vec![7, 8]);
     }
 }

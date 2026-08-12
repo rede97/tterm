@@ -174,6 +174,11 @@ impl Read for SerialIoReader {
     }
 }
 
+// BrokenPipe message SerialIoWriter reports once the I/O pump thread has
+// exited. serial_reconnect matches on it to detect "dead-mode Enter watcher
+// not installed yet" (the write hit the dead session's orphaned writer).
+const PUMP_GONE: &str = "serial I/O pump gone";
+
 // Write adapter: relay write path -> device input channel.
 struct SerialIoWriter {
     tx: std::sync::mpsc::Sender<Vec<u8>>,
@@ -181,9 +186,9 @@ struct SerialIoWriter {
 
 impl Write for SerialIoWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.tx.send(buf.to_vec()).map_err(|_| {
-            std::io::Error::new(std::io::ErrorKind::BrokenPipe, "serial I/O pump gone")
-        })?;
+        self.tx
+            .send(buf.to_vec())
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::BrokenPipe, PUMP_GONE))?;
         Ok(buf.len())
     }
     fn flush(&mut self) -> std::io::Result<()> {
@@ -625,19 +630,14 @@ pub fn serial_disconnect(state: tauri::State<AppState>, id: &str) -> Result<(), 
 // (feeding Enter would send a stray CR to the device instead of respawning).
 #[tauri::command]
 pub async fn serial_reconnect(state: tauri::State<'_, AppState>, id: String) -> Result<(), String> {
-    let (ctl, restore) = {
+    let restore = {
         let sessions = state.serial_sessions.lock().map_err(|e| e.to_string())?;
-        let s = sessions
+        sessions
             .get(id.as_str())
-            .ok_or_else(|| format!("No serial session: {}", id))?;
-        (s.ctl.clone(), s.auto_hold_restore)
+            .ok_or_else(|| format!("No serial session: {}", id))?
+            .auto_hold_restore
     };
-    // Liveness probe: a live pump answers QueryLines; a dead one's sender is
-    // dropped (or never replies) once the thread exited.
-    let (tx, rx) = std::sync::mpsc::channel();
-    let alive = ctl.send(SerialCtl::QueryLines(tx)).is_ok()
-        && rx.recv_timeout(Duration::from_millis(300)).is_ok();
-    if alive {
+    if serial_pump_alive(&state, &id) {
         return Err("Session is still connected".into());
     }
     if let Ok(map) = state.auto_reconnect.lock() {
@@ -645,10 +645,86 @@ pub async fn serial_reconnect(state: tauri::State<'_, AppState>, id: String) -> 
             flag.store(restore, Ordering::Relaxed);
         }
     }
-    // Let the relay notice the EOF and install the dead-mode Enter watcher,
-    // then press Enter — the exact same respawn path as the user's keyboard.
-    tokio::time::sleep(Duration::from_millis(300)).await;
-    crate::relay::feed_upstream(&state.hub, &id, b"\r")
+    // Press Enter at the dead-mode prompt — the exact same respawn path as
+    // the user's keyboard. The relay exposes no output/scrollback-seq signal
+    // to wait on, and its Enter watcher is installed asynchronously once the
+    // read pump notices the cancelled pump's EOF, so poll instead of holding
+    // a fixed sleep: see wait_for_reconnect_prompt.
+    wait_for_reconnect_prompt(&state, &id).await
+}
+
+// Liveness probe: a live pump answers QueryLines; a dead one's sender is
+// dropped (or never replies) once the thread exited. Re-fetches the ctl
+// handle on every call because a respawn replaces the session entry.
+fn serial_pump_alive(state: &AppState, id: &str) -> bool {
+    let ctl = {
+        let Ok(sessions) = state.serial_sessions.lock() else {
+            return false;
+        };
+        match sessions.get(id) {
+            Some(s) => s.ctl.clone(),
+            None => return false,
+        }
+    };
+    let (tx, rx) = std::sync::mpsc::channel();
+    ctl.send(SerialCtl::QueryLines(tx)).is_ok()
+        && rx.recv_timeout(Duration::from_millis(300)).is_ok()
+}
+
+// How long serial_reconnect waits for the relay's dead-mode Enter watcher
+// before giving up, and the poll cadence between attempts.
+const RECONNECT_WAIT_TIMEOUT: Duration = Duration::from_secs(2);
+const RECONNECT_POLL_INTERVAL: Duration = Duration::from_millis(25);
+
+// Feed Enter at the dead-mode prompt, waiting adaptively for the relay to
+// install its Enter watcher: a feed failing with PUMP_GONE means the write
+// hit the dead session's orphaned writer (watcher not installed yet) and is
+// retried; a successful feed delivers exactly one Enter (failed feeds never
+// reached the single-fire watcher, so no double respawn). The liveness
+// re-check stops the wait if auto-reconnect respawned the session
+// concurrently — feeding Enter then would send a stray CR to the device.
+async fn wait_for_reconnect_prompt(state: &AppState, id: &str) -> Result<(), String> {
+    retry_until_ready(
+        RECONNECT_WAIT_TIMEOUT,
+        RECONNECT_POLL_INTERVAL,
+        "session did not reach the reconnect prompt",
+        || {
+            if serial_pump_alive(state, id) {
+                // Respawned concurrently (auto-reconnect): nothing to press.
+                return Ok(true);
+            }
+            match crate::relay::feed_upstream(&state.hub, id, b"\r") {
+                Ok(()) => Ok(true),
+                Err(e) if e == PUMP_GONE => Ok(false),
+                Err(e) => Err(e),
+            }
+        },
+    )
+    .await
+}
+
+// Poll `attempt` until it reports ready, fails hard, or `timeout` elapses
+// (waiting `interval` between retries). `attempt` returns Ok(true) when
+// done, Ok(false) to retry, Err to abort. Generic so the timing loop is
+// unit-testable without serial hardware or a relay hub.
+async fn retry_until_ready<F>(
+    timeout: Duration,
+    interval: Duration,
+    timeout_err: &str,
+    mut attempt: F,
+) -> Result<(), String>
+where
+    F: FnMut() -> Result<bool, String>,
+{
+    let start = std::time::Instant::now();
+    loop {
+        match attempt() {
+            Ok(true) => return Ok(()),
+            Ok(false) if start.elapsed() < timeout => tokio::time::sleep(interval).await,
+            Ok(false) => return Err(timeout_err.to_string()),
+            Err(e) => return Err(e),
+        }
+    }
 }
 
 // Sample the modem lines for the quick panel (RTS tracked, CTS read live).
@@ -850,5 +926,73 @@ mod tests {
         let n = reader.read(&mut buf).unwrap();
         assert_eq!(&buf[..n], b"device-data");
         assert_eq!(reader.read(&mut buf).unwrap(), 0);
+    }
+
+    // -- reconnect wait (retry_until_ready) --
+
+    #[test]
+    fn pump_gone_const_matches_writer_error() {
+        // serial_reconnect retries feeds whose error equals PUMP_GONE; this
+        // pins the contract between the writer and that match.
+        let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+        drop(rx);
+        let mut writer = SerialIoWriter { tx };
+        assert_eq!(writer.write(b"x").unwrap_err().to_string(), PUMP_GONE);
+    }
+
+    #[test]
+    fn retry_until_ready_stops_once_signal_observed() {
+        tauri::async_runtime::block_on(async {
+            let attempts = std::cell::Cell::new(0);
+            let result = retry_until_ready(
+                Duration::from_secs(2),
+                Duration::from_millis(1),
+                "timeout",
+                || {
+                    attempts.set(attempts.get() + 1);
+                    Ok(attempts.get() >= 3)
+                },
+            )
+            .await;
+            assert!(result.is_ok());
+            // No polling past the ready signal.
+            assert_eq!(attempts.get(), 3);
+        });
+    }
+
+    #[test]
+    fn retry_until_ready_times_out_when_signal_never_comes() {
+        tauri::async_runtime::block_on(async {
+            let start = std::time::Instant::now();
+            let result = retry_until_ready(
+                Duration::from_millis(30),
+                Duration::from_millis(5),
+                "not ready",
+                || Ok(false),
+            )
+            .await;
+            assert_eq!(result.unwrap_err(), "not ready");
+            assert!(start.elapsed() >= Duration::from_millis(30));
+        });
+    }
+
+    #[test]
+    fn retry_until_ready_aborts_on_hard_error() {
+        tauri::async_runtime::block_on(async {
+            let attempts = std::cell::Cell::new(0);
+            let result = retry_until_ready(
+                Duration::from_secs(2),
+                Duration::from_millis(1),
+                "timeout",
+                || {
+                    attempts.set(attempts.get() + 1);
+                    Err("boom".to_string())
+                },
+            )
+            .await;
+            assert_eq!(result.unwrap_err(), "boom");
+            // Hard errors are not retried.
+            assert_eq!(attempts.get(), 1);
+        });
     }
 }

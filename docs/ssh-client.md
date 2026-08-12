@@ -1,6 +1,6 @@
 # Embedded SSH client — design
 
-Final-state design of the built-in SSH client (`src-tauri/src/sshclient.rs`,
+Final-state design of the built-in SSH client (`src-tauri/src/sshclient/`,
 russh). Replaces spawning the system `ssh.exe` via ConPTY for SSH tabs; the
 spawned-binary path stays as a fallback (Settings → SSH → "Built-in SSH
 client" toggle, default on).

@@ -52,4 +52,7 @@ russh = { version = "0.62", default-features = false, features = ["ring", "rsa",
 # OS RNG for keygen, adapted to ssh-key's rand_core 0.10 traits below.
 getrandom = "0.4"
 rand_core = "0.10"
-
+# Hashed known_hosts (`|1|salt|hash`) matching for key re-learn — same
+# HMAC-SHA1 construction OpenSSH uses (and russh already pulls in).
+hmac = "0.13"
+sha1 = "0.11"

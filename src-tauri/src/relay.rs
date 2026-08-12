@@ -134,6 +134,23 @@ fn generate_token() -> String {
     bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
+// Constant-time token comparison for the WS handshake auth check. The hub is
+// loopback-only, so a timing side channel is theoretical — this is defense in
+// depth against a local attacker guessing the token byte by byte. No early
+// exit: the length difference is folded into the accumulator up front, then
+// every byte pair is XOR-folded, so the running time depends only on the
+// lengths, never on where (or whether) the bytes differ.
+fn token_eq(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    let mut acc = a.len() ^ b.len();
+    for i in 0..a.len().max(b.len()) {
+        let x = a.get(i).copied().unwrap_or(0);
+        let y = b.get(i).copied().unwrap_or(0);
+        acc |= (x ^ y) as usize;
+    }
+    acc == 0
+}
+
 // Extract the session id from "/pty/<id>".
 fn parse_route(path: &str) -> Option<String> {
     let id = path.strip_prefix("/pty/")?;
@@ -197,7 +214,7 @@ async fn handle_ws(hub: Arc<WsHub>, stream: tokio::net::TcpStream) {
             .ok_or_else(|| reject(StatusCode::NOT_FOUND, "unknown route"))?;
         let token = query_param(req.uri().query(), "token")
             .ok_or_else(|| reject(StatusCode::FORBIDDEN, "missing token"))?;
-        if token != hub.token {
+        if !token_eq(token, &hub.token) {
             return Err(reject(StatusCode::FORBIDDEN, "invalid token"));
         }
         let mut entries = hub
@@ -665,6 +682,27 @@ mod tests {
         assert_eq!(query_param(Some("token="), "token"), None);
         assert_eq!(query_param(Some("tokenx=abc"), "token"), None);
         assert_eq!(query_param(Some("other=abc"), "token"), None);
+    }
+
+    #[test]
+    fn token_eq_accepts_equal_tokens() {
+        assert!(token_eq("deadbeef", "deadbeef"));
+        assert!(token_eq("", ""));
+        let real = generate_token();
+        assert!(token_eq(&real, &real.clone()));
+    }
+
+    #[test]
+    fn token_eq_rejects_mismatches() {
+        // Same length, one byte differs.
+        assert!(!token_eq("deadbeef", "deadbee0"));
+        assert!(!token_eq("deadbeef", "0eadbeef"));
+        // Different lengths (prefix included).
+        assert!(!token_eq("deadbeef", "deadbeef00"));
+        assert!(!token_eq("deadbeef00", "deadbeef"));
+        // Empty vs non-empty.
+        assert!(!token_eq("", "deadbeef"));
+        assert!(!token_eq("deadbeef", ""));
     }
 
     // Full relay path against a real hub: loopback TCP pair stands in for the
