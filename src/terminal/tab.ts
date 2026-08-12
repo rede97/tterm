@@ -621,9 +621,10 @@ export class TerminalTab {
         // on a disposed terminal throws (render service is gone).
         if (this._destroyed) return;
         if (this.element.style.display === "none") return;
-        const { cols, rows } = this.fit();
+        // fit() resizes the grid; the onResize handler above ships the new
+        // size to the backend (manual invokes here would double-fire).
+        this.fit();
         this.needsResize = false;
-        invoke("pty_resize", { id: this.id, cols, rows }).catch(swallow);
       });
     });
   }

@@ -22,8 +22,8 @@ import {
   X,
 } from "lucide";
 import { logCatch } from "../core/errorlog";
+import { showPortForwardingDialog } from "../ui/forwarding";
 import { showToast } from "../ui/toast";
-import { showPortForwardingDialog } from "./forwarding";
 import { openFind } from "./search";
 
 // ---- Injected handlers ----

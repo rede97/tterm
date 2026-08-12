@@ -46,9 +46,8 @@ src/
     common.ts           shared constants/helpers
     errorlog.ts         logCatch / logError
   config/
-    ssh-config.ts       ~/.ssh/config parse + generate (frontend-owned)
+    ssh-config.ts       ~/.ssh/config parse + generate (frontend-owned; Host * and pre-Host globals round-trip)
     wt-profiles.ts      Windows Terminal settings.json + fragment import
-    serial-memory.ts    per-device serial params (VID:PID keyed)
   settings/
     index.ts            settings shell (sidebar nav, footer Apply/Revert, panel routing)
     general|appearance|profile|ssh|serial|shortcuts.ts   the six panels
@@ -135,7 +134,7 @@ Key facts:
 - `PtySession` stores the PTY `master` (`None` after child exit), a per-spawn `nonce` guarding the watchdog against respawn races, and the last known `size` (respawns keep it). A watchdog thread waits on `child.wait()`; on exit it sets `master = None`, closing ConPTY so the relay read pump unblocks (ConPTY never signals EOF on child death).
 - All sessions share one WebSocket relay hub bound once at startup: `ws://127.0.0.1:{port}/pty/{id}?token={token}`, per-process random token, 403/404 on bad auth/route. Session death does NOT close the socket (dead mode); only `pty_kill` tears a slot down (WS Close frame). The same port also serves plain HTTP: the accept loop peeks (non-consuming) — `Upgrade: websocket` goes to tungstenite, anything else to the share API in `share.rs` (see "AI session sharing" below).
 
-Frontend → backend commands (invoke): `pty_spawn`, `pty_spawn_ssh`, `pty_resize`, `pty_kill`, `window_minimize/toggle_maximize/close/start_drag`, `open_new_window`, `pick_directory`, `save_text_file`, `read_wt_settings`, `read_wt_fragments`, `find_vs_instances`, `read_config`, `write_config`, `delete_config`, `open_config_dir`, `ssh_read_config_raw`, `ssh_save_config`, `ssh_clear_known_hosts`, `open_ssh_config`, `list_system_fonts`, `serial_list_ports`, `serial_spawn`, `serial_set_baud`, `serial_set_output_newline`, `share_create`, `share_revoke`, `share_screen_response`, `share_screen_changed` (debug builds add `demo_spawn`, `anime_spawn`).
+Frontend → backend commands (invoke): the single source of truth is the `tterm_commands!` macro in `src-tauri/src/lib.rs` (one list for both build profiles; debug builds append `demo_spawn`/`anime_spawn`). Notable families: `pty_*` (spawn/resize/kill), `window_*` (controls + maximize/fullscreen for zen), `read/write/delete_config_file` (per-topic JSON: config / themes / serial-profiles / keybindings), `ssh_*` + `sshclient::ssh_*` (config file, embedded client, forwards, keygen), `serial_*`, `share_*`, `tray_*`, and `open_new_window` / `pick_directory` / `save_text_file`.
 
 Backend → frontend: WebSocket binary frames → `BatchAttachAddon`, which coalesces messages within a 6 ms window before `terminal.write()`: ConPTY splits a full-screen frame into a bare `ESC[2J` + content ~1–3 ms apart, and unbatched writes present the erase as a blank frame (flicker). Full postmortem: `docs/bugfix-fullscreen-flicker.md` — **do not remove the batching in refactors.**
 

@@ -7,9 +7,9 @@
 // same operations and must give identical feedback.
 
 import { invoke } from "@tauri-apps/api/core";
-import { createForwardEditor } from "../ui/forwardeditor";
-import { createModal } from "../ui/modal";
-import { showToast } from "../ui/toast";
+import { createForwardEditor } from "./forwardeditor";
+import { createModal } from "./modal";
+import { showToast } from "./toast";
 
 export interface ForwardInfo {
   forwardId: number;

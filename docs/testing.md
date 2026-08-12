@@ -11,7 +11,7 @@
 
 ## L0 — Rust 后端单元测试
 
-测试以 colocated `#[cfg(test)] mod tests` 形式分布在各功能模块内（共 91 个用例 / 11 模块），与实现同文件、随实现演进：
+测试以 colocated `#[cfg(test)] mod tests` 形式分布在各功能模块内（100+ 用例 / 12 模块，以 `cargo test` 输出为准），与实现同文件、随实现演进：
 
 | 模块 | 用例数 | 覆盖 |
 |---|---|---|
@@ -57,7 +57,7 @@ wdio (WebdriverIO) ──WebDriver──> tauri-driver ──> msedgedriver ─�
 ```
 
 - `tauri-driver`：Tauri 官方 WebDriver 桥梁（已安装至 `~/.cargo/bin`，`cargo install tauri-driver --locked`）
-- `msedgedriver`：必须与 WebView2 运行时版本匹配，钉定在 `e2e/drivers/`（当前 150.0.4078.83，**不入库**，见 .gitignore）
+- `msedgedriver`：必须与 WebView2 运行时版本匹配，钉定在 `e2e/drivers/`（**不入库**，见 .gitignore；当前文件的版本以 `e2e/drivers/Driver_Notes` 为准——150.0.4078.83 已在 151.x 运行时上验证可用，升级运行时后需重新核对）
 - `e2e/wdio.conf.js` 自动完成：启动 vite dev server → 等待 1420 端口 → 启动 tauri-driver → 等待 4444 端口 → 执行 `e2e/specs/*.e2e.js` → 清理全部子进程
 
 ### 首次设置

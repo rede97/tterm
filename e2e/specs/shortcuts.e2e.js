@@ -89,11 +89,9 @@ describe("TTerm keyboard shortcuts", () => {
     // the class flip — wait for it, but ALWAYS exit before asserting so a
     // failure can't strand the window in fullscreen for later tests.
     const covered = await browser
-      .waitUntil(
-        async () =>
-          await browser.execute(() => window.outerHeight > screen.availHeight),
-        { timeout: 5000 },
-      )
+      .waitUntil(async () => await browser.execute(() => window.outerHeight > screen.availHeight), {
+        timeout: 5000,
+      })
       .then(() => true)
       .catch(() => false);
 

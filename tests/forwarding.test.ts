@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(() => Promise.resolve(null)) }));
 
 import { invoke } from "@tauri-apps/api/core";
-import { showPortForwardingDialog } from "../src/terminal/forwarding";
+import { showPortForwardingDialog } from "../src/ui/forwarding";
 
 const mockInvoke = vi.mocked(invoke);
 

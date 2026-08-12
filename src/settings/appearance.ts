@@ -48,7 +48,7 @@ export function createAppearancePanel(): HTMLElement {
 
   // Font config button — opens font picker
   panel.querySelector("#set-font-config")?.addEventListener("click", () => {
-    import("../terminal/fontpicker").then((m) => {
+    import("../ui/fontpicker").then((m) => {
       m.showFontPickerDialog((stack) => {
         updateFontStack(stack);
         configStore.set({ fontFamily: buildFontFamily(stack) });

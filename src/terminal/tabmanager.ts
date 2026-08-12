@@ -18,8 +18,8 @@ import type {
   TabType,
   WsConnectResult,
 } from "../core/types";
+import { addForward, type NewForward } from "../ui/forwarding";
 import { showToast } from "../ui/toast";
-import { addForward, type NewForward } from "./forwarding";
 import { closeQuickPanel, closeQuickPanelForTab, updateQuickButton } from "./quickpanel";
 import { closeFindForTab } from "./search";
 import {
@@ -487,9 +487,9 @@ export class TabManager {
     notifyTrayTabs();
 
     if (next.needsResize) {
-      const { cols, rows } = next.fit();
+      // fit() resizes the grid; terminal.onResize ships the size to the backend.
+      next.fit();
       next.needsResize = false;
-      invoke("pty_resize", { id: next.id, cols, rows });
     }
   }
 
@@ -664,16 +664,20 @@ export class TabManager {
   // pass — needed after FONT/config changes (cell metrics drift: xterm
   // re-measures, the WebGL renderer rounds cell dims by dpr), pointless
   // for window resizes where metrics are unchanged.
+  // Backend size tracking rides terminal.onResize (tab.ts) — no manual
+  // pty_resize here or it fires twice per change.
   private _scheduleFitActive(settle: boolean): void {
     const active = this.activeTab;
     if (!active) return;
     if (this._resizeTimer) clearTimeout(this._resizeTimer);
     this._resizeTimer = setTimeout(() => {
       this._resizeTimer = null;
+      // The tab may have been closed within the 10ms window (Ctrl+W,
+      // clean-exit auto-close): fit() on a disposed terminal throws.
+      if (!this.tabs.has(active.id)) return;
       if (active.element.style.display === "none") return;
-      const { cols, rows } = active.fit();
+      active.fit();
       active.needsResize = false;
-      invoke("pty_resize", { id: active.id, cols, rows });
       if (settle) active.fitDeferred();
     }, 10);
   }

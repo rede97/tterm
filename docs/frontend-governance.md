@@ -74,6 +74,8 @@
 
 ## D. 低严重度摘要（审计 L 级，排期随缘）
 
+> **清账（2026-08）**：✅ 已修——L1（quickpanel Promise.resolve 归一）、L2（串口复制退化）、L3（pty_resize 双份 IPC，onResize 统一负责、三处手动 invoke 已删）、L4（scheduleFitActive 加存活 guard）、L6（A1 顺带）、L7（死代码删除）；已核实无需修——L5（share_screen_response 早有 logCatch，审计后已被修）。归入后端专项（M3 同期清算）——L8/L9/L10/L11/L12/L13。
+
 | # | 问题 | 位置 |
 |---|---|---|
 | L1 | quickpanel 可选链 `.catch` 三式并存（当前不炸，误导） | quickpanel.ts L421/435/441 |
@@ -131,11 +133,15 @@
 
 ## P4 — main.ts 接线堆 + 通知机制三套并存
 
+> **清账（2026-08）**：✅ wiring.ts 组合根落地（main.ts 326→231）；✅ 模块归位完成（fontpicker.ts、forwarding.ts 均移至 ui/，与 forwardeditor/forwardtable 同层）；通知机制定型已写入本条目"方法"，settings 壳事件已泛化为全面板可用。剩余：无。
+
 **现状**：main.ts 284 行内联块堆叠；通知机制三套——configStore.subscribe（仅 2 处）/ settings 壳 CustomEvent / handler 注入——仅注入有成文设计。模块放错层：fontpicker.ts（纯 UI 浮层）在 terminal/，forwarding 特性横跨 terminal/ 与 ui/。
 
 **方法**：每 feature 一个 init 模块，main <150 行；通知机制定型为"配置走 store.subscribe、feature 间走注入"，settings 壳 CustomEvent 视为壳内私有；fontpicker 挪 ui/，forwarding 收拢一层。
 
 ## P5 — 状态分裂与复制体
+
+> **清账（2026-08）**：✅ `__tterm` 已类型化（core/devhooks.ts）；✅ `_onResize`/`triggerResize` 已合并为 `scheduleFitActive(settle)`；模块级状态（themes/serial-profiles/fontconfig/ssh）经评估**不统一收编**——各自有文件持久化且语义自洽，登记为"启动期加载的运行时数据"即可，见 AGENT.md 配置章节。
 
 **现状**（审计 2.1 补充）：ConfigStore 自称唯一事实源，但 `themes.ts`/`serial-profiles.ts`/`fontconfig.ts`/`settings/ssh.ts` 各自维护模块级可变状态，无订阅通知，一致性靠调用纪律；`_onResize`/`triggerResize` 复制体（settle 修复只落一份）；`(window as any).__tterm`。
 
@@ -144,6 +150,8 @@
 ---
 
 # 第三部分：文档同步
+
+> **清账（2026-08）**：✅ 全部完成——D1（README VID:PID 失实描述已随 A4 移除）、D2（AGENT.md 幽灵文件 serial-memory.ts 已删，invoke 命令清单改为以 `tterm_commands!` 宏为准）、D3（testing.md 测试计数改为动态表述，msedgedriver 版本指引更新）。
 
 | # | 问题 | 修法 |
 |---|---|---|
@@ -154,6 +162,8 @@
 ---
 
 # 分期计划（缺陷修复优先于范式治理）
+
+> **总账（2026-08 收尾）**：阶段 -1/0/1/2 全部完成，阶段 3 以"卫星模块拆分 + wiring 组合根"落地（tabmanager 921→770，生命周期与标签条留内核属有意决策）。**剩余挂账仅四项**：① sshclient.rs 拆分后端专项（含 L8–L13 清算）；② lit-html 试点（settings UX 主题，已立项）；③ Biome 自定义规则长尾（等插件生态）；④ 其余面板 html`` 迁移（棘轮，不设专项）。**关闭项**：E2（一等 tab，已撤销）、B4（文档化接受）、C7（观感竞态，风险收益倒挂）、DOM id 全量常量化（chrome 已收编，面板内 id 维持模块私有）。
 
 | 阶段 | 内容 | 验收 | 风险 |
 |---|---|---|---|

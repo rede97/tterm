@@ -34,9 +34,9 @@ import type {
 } from "../core/types";
 import { el } from "../ui/dom";
 import type { ForwardEditorValue, ForwardKind } from "../ui/forwardeditor";
+import { addForward, listForwards, removeForward } from "../ui/forwarding";
 import { createForwardTable } from "../ui/forwardtable";
 import { showToast } from "../ui/toast";
-import { addForward, listForwards, removeForward } from "./forwarding";
 import type { TerminalTab } from "./tab";
 
 // ---- Injected handlers ----
