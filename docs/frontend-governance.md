@@ -40,6 +40,8 @@
 
 ## B. 尽快修 — 资源泄漏 / 并发
 
+> **进度（2026-08）**：✅ 全部完成。B1：destroy() 现收编 socket 关闭、attachAddon/serialInputDisposable dispose、IME 重锚 interval 停止（M2/M3）；TabManager 新增 `_makeTab` 构造兜底，WebGL 加载抛错即 kill 已 spawn 会话（M4）。B2：`FrontendPrompter::park` 加 300s `PROMPT_TIMEOUT`，超时按认证取消处理。B3：`DeadWatcher::write` 的 respawn 移到独立线程，writer 锁即刻释放。lib.rs 双份 handler 列表合并为 `tterm_commands!` 宏（debug 追加 demo 命令）。顺手清理 tab.ts/tabmanager.ts 全部裸 catch（swallow 化）。剩余：B4（多窗口写竞态，评估为记录限制或写前重读）、C7、D 级。
+
 ### B1. tab.ts 资源清理不完整（M2/M3/M4）
 - M2：IME 重定位 `refreshTimer` 在组词中关 tab 时无清理路径（tab.ts L495-504），持续访问已 dispose 的终端。
 - M3：`destroy()` 不关 WebSocket、不 dispose attachAddon；`pty_kill` 失败被吞时会话与定时器残留。

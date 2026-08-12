@@ -7,7 +7,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { type IBufferCell, type IDisposable, Terminal } from "@xterm/xterm";
-import { logCatch } from "../core/errorlog";
+import { logCatch, swallow } from "../core/errorlog";
 import { configStore } from "../core/store";
 import { notifyTrayTabs } from "../core/traytabs";
 import type { SerialEnterNewline, SerialInputMode, SshHost, TabType } from "../core/types";
@@ -81,6 +81,8 @@ export class TerminalTab {
   // document-level IME listeners (capture phase) — removed in destroy().
   private _imeCompStart?: (e: CompositionEvent) => void;
   private _imeCompEnd?: (e: CompositionEvent) => void;
+  // Stops the composition re-anchor interval (set up with the freeze proxy).
+  private _imeStopRefresh?: () => void;
 
   constructor(id: string, type: TabType, label: string, container: HTMLElement) {
     this.id = id;
@@ -125,7 +127,7 @@ export class TerminalTab {
     // fitDeferred's explicit invoke alone misses font-race refits, which left
     // size-dependent sessions (Anime TTY) rendering for a stale grid.
     this.terminal.onResize(({ cols, rows }) => {
-      invoke("pty_resize", { id: this.id, cols, rows }).catch(() => {});
+      invoke("pty_resize", { id: this.id, cols, rows }).catch(swallow);
     });
 
     this.terminal.onTitleChange((title: string) => {
@@ -197,7 +199,7 @@ export class TerminalTab {
         const now = Date.now();
         if (now - this.lastShareSeqSent > 200) {
           this.lastShareSeqSent = now;
-          invoke("share_screen_changed", { id: this.id, seq: this.shareSeq }).catch(() => {});
+          invoke("share_screen_changed", { id: this.id, seq: this.shareSeq }).catch(swallow);
         }
       }
     });
@@ -328,6 +330,7 @@ export class TerminalTab {
     const socket = new WebSocket(
       `ws://127.0.0.1:${this.socketPort}/pty/${encodeURIComponent(this.id)}?token=${this.socketToken}`,
     );
+    this.socket = socket;
 
     socket.addEventListener("open", () => {
       if (gen !== this.socketGen) {
@@ -368,6 +371,10 @@ export class TerminalTab {
 
   private serialSocket?: WebSocket;
   private serialInputDisposable?: { dispose(): void };
+  // The currently attached session socket (serialSocket mirrors it for
+  // serial input). Tracked so destroy() can close it — an unclosed socket
+  // keeps the relay slot and its event listeners alive.
+  private socket?: WebSocket;
 
   private _hookSerialInput(): void {
     this.serialInputDisposable?.dispose();
@@ -498,6 +505,9 @@ export class TerminalTab {
         refreshTimer = null;
       }
     };
+    // Reachable from destroy(): mid-composition tab close must not leave the
+    // 200ms interval poking a disposed terminal (and holding this tab alive).
+    this._imeStopRefresh = stopRefresh;
 
     // compositionstart/end: capture the frozen anchor position.
     // These fire on the hidden textarea and bubble through document.
@@ -605,7 +615,7 @@ export class TerminalTab {
         if (this.element.style.display === "none") return;
         const { cols, rows } = this.fit();
         this.needsResize = false;
-        invoke("pty_resize", { id: this.id, cols, rows }).catch(() => {});
+        invoke("pty_resize", { id: this.id, cols, rows }).catch(swallow);
       });
     });
   }
@@ -674,6 +684,17 @@ export class TerminalTab {
     // Stop pending re-attach retries and stale socket callbacks.
     this.socketGen++;
     this._clearReattachTimer();
+    // Tear down the transport: dispose the attach addon (detaches its
+    // socket listeners) and close the socket itself — otherwise the relay
+    // slot and a live WebSocket outlive the tab. The close event handler
+    // sees the bumped socketGen and bails, so no onSocketClosed fires.
+    this.attachAddon?.dispose();
+    this.attachAddon = undefined;
+    this.serialInputDisposable?.dispose();
+    this.serialSocket = undefined;
+    this.socket?.close();
+    this.socket = undefined;
+    this._imeStopRefresh?.();
     if (this._imeCompStart)
       document.removeEventListener("compositionstart", this._imeCompStart, true);
     if (this._imeCompEnd) document.removeEventListener("compositionend", this._imeCompEnd, true);

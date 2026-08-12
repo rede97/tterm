@@ -59,6 +59,11 @@ pub type PendingPrompts = Arc<Mutex<HashMap<u64, tokio::sync::oneshot::Sender<Pr
 
 static NEXT_PROMPT: AtomicU64 = AtomicU64::new(1);
 
+// How long a frontend prompt may go unanswered before the handshake gives
+// up: if the frontend dies, parking forever would wedge auth (and in the
+// dead-mode auto-retry path pin a blocking thread permanently).
+const PROMPT_TIMEOUT: Duration = Duration::from_secs(300);
+
 /// Production prompter: emits a Tauri event and parks until the matching
 /// `ssh_auth_response` / `ssh_hostkey_response` command arrives.
 pub struct FrontendPrompter {
@@ -90,7 +95,12 @@ impl FrontendPrompter {
             if !sent {
                 return None;
             }
-            let answer = rx.await.ok();
+            let answer = match tokio::time::timeout(PROMPT_TIMEOUT, rx).await {
+                Ok(answer) => answer.ok(),
+                // Frontend gone or never answered: treat as cancel (flows
+                // into the auth-failure path) instead of parking forever.
+                Err(_) => None,
+            };
             if let Ok(mut map) = pending.lock() {
                 map.remove(&req_id);
             }

@@ -385,7 +385,14 @@ impl Write for DeadWatcher {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         if crate::deadmode::contains_enter(buf) {
             if let Some(tx) = self.result_tx.take() {
-                let _ = tx.send((self.hooks.respawn)());
+                // Respawn can block for seconds (SSH reconnect), and this
+                // watcher lives behind the session's shared writer lock —
+                // blocking here would stall every upstream writer. Run it
+                // on its own thread and return immediately.
+                let hooks = self.hooks.clone();
+                std::thread::spawn(move || {
+                    let _ = tx.send((hooks.respawn)());
+                });
             }
         }
         Ok(buf.len())

@@ -6,7 +6,7 @@ import { createElement, FolderOpen } from "lucide";
 import Sortable from "sortablejs";
 import { findSerialProfile } from "../config/serial-profiles";
 import { hostProp } from "../core/common";
-import { logCatch } from "../core/errorlog";
+import { logCatch, swallow } from "../core/errorlog";
 import { configStore } from "../core/store";
 import { notifyTrayTabs, setTrayTabsProvider } from "../core/traytabs";
 import type {
@@ -15,6 +15,7 @@ import type {
   SerialOutputNewline,
   SerialPort,
   SshHost,
+  TabType,
   WsConnectResult,
 } from "../core/types";
 import { showToast } from "../ui/toast";
@@ -88,7 +89,7 @@ export class TabManager {
           .then((idx) => {
             if (typeof idx === "number") this.activateTabAt(idx);
           })
-          .catch(() => {});
+          .catch(swallow);
       });
     }
   }
@@ -222,7 +223,8 @@ export class TabManager {
       showToast(`Failed to start shell: ${e}`, "error");
       return null;
     }
-    const tab = new TerminalTab(result.id, "local", label || "Terminal", this.terminalContainer);
+    const tab = this._makeTab(result, "local", label || "Terminal");
+    if (!tab) return null;
     if (command) {
       tab.command = command;
     }
@@ -266,7 +268,8 @@ export class TabManager {
     } finally {
       pending?.dismiss();
     }
-    const tab = new TerminalTab(result.id, "ssh", host.name, this.terminalContainer);
+    const tab = this._makeTab(result, "ssh", host.name);
+    if (!tab) return null;
     tab.sshHost = host;
     tab.sshEmbedded = configStore.get("sshEmbedded");
     const finalized = await this._finalizeTab(tab, result);
@@ -338,12 +341,8 @@ export class TabManager {
       showToast(String(e), "error");
       return null;
     }
-    const tab = new TerminalTab(
-      result.id,
-      "serial",
-      `${port.name} · ${baud}`,
-      this.terminalContainer,
-    );
+    const tab = this._makeTab(result, "serial", `${port.name} · ${baud}`);
+    if (!tab) return null;
     tab.serialPortName = port.name;
     tab.serialBaud = baud;
     tab.serialProfile = profile.name;
@@ -411,7 +410,8 @@ export class TabManager {
       showToast(String(e), "error");
       return null;
     }
-    const tab = new TerminalTab(result.id, "local", "Demo TTY", this.terminalContainer);
+    const tab = this._makeTab(result, "local", "Demo TTY");
+    if (!tab) return null;
     return this._finalizeTab(tab, result);
   }
 
@@ -423,8 +423,21 @@ export class TabManager {
       showToast(String(e), "error");
       return null;
     }
-    const tab = new TerminalTab(result.id, "local", "Anime TTY", this.terminalContainer);
+    const tab = this._makeTab(result, "local", "Anime TTY");
+    if (!tab) return null;
     return this._finalizeTab(tab, result);
+  }
+
+  // Wrap TerminalTab construction: it loads the WebGL renderer, and a throw
+  // there would orphan the already-spawned backend session — kill it.
+  private _makeTab(result: WsConnectResult, type: TabType, label: string): TerminalTab | null {
+    try {
+      return new TerminalTab(result.id, type, label, this.terminalContainer);
+    } catch (e) {
+      invoke("pty_kill", { id: result.id }).catch(logCatch("session.killOrphan"));
+      showToast(`Failed to start terminal: ${e}`, "error");
+      return null;
+    }
   }
 
   // Shared tail of every create*Tab: register with the hub, wait out the
@@ -498,9 +511,9 @@ export class TabManager {
     if (!tab || this._closing.has(id)) return;
     this._closing.add(id);
     try {
-      if (tab.shared) invoke("share_revoke", { id }).catch(() => {});
+      if (tab.shared) invoke("share_revoke", { id }).catch(swallow);
       // UI close must not depend on the backend ack.
-      await invoke("pty_kill", { id }).catch(() => {});
+      await invoke("pty_kill", { id }).catch(swallow);
 
       // Panels bound to the dying tab must not outlive it.
       closeQuickPanelForTab(id);
