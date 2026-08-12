@@ -633,8 +633,9 @@ export class TabManager {
   // Called once real containers exist (same timing as initSortable).
   initSettingsShell(): void {
     this._settings = new SettingsShell(this.tabsContainer, this.terminalContainer, {
-      hideAllTabs: () => {
+      hideActiveView: () => {
         for (const tab of this.tabs.values()) tab.hide();
+        this._hideWelcome();
       },
       restoreActiveView: () => {
         const tab = this.activeTabId ? this.tabs.get(this.activeTabId) : undefined;

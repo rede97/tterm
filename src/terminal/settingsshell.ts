@@ -15,7 +15,10 @@ import { el } from "../ui/dom";
 import { closeQuickPanel, updateQuickButton } from "./quickpanel";
 
 export interface SettingsShellHooks {
-  hideAllTabs(): void;
+  // Hide everything the terminal container could be showing: all terminal
+  // tabs AND the zero-tab welcome screen (leaving it visible would stack
+  // the welcome page above the settings page).
+  hideActiveView(): void;
   // Re-show the active terminal tab (fit if dirty), or the welcome screen
   // when no tabs remain.
   restoreActiveView(): void;
@@ -52,7 +55,7 @@ export class SettingsShell {
     closeQuickPanel();
     updateQuickButton();
 
-    this.hooks.hideAllTabs();
+    this.hooks.hideActiveView();
 
     if (!this.tabEl) {
       this.tabEl = el("div", "tab");

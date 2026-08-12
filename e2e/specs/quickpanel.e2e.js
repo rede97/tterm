@@ -348,5 +348,27 @@ describe("Quick-status button and panel", () => {
         await browser.execute(() => document.getElementById("welcome").style.display !== "none"),
       { timeout: 5000, timeoutMsg: "welcome screen did not appear after closing settings" },
     );
+
+    // Reopening settings from the welcome screen hides it again — the two
+    // pages must never stack in the terminal container.
+    await browser.execute(() => window.__tterm.mgr.toggleSettings());
+    await browser.waitUntil(
+      async () => await browser.execute(() => !!document.querySelector(".settings-page")),
+      { timeout: 10000, timeoutMsg: "settings page did not reopen" },
+    );
+    const reopened = await browser.execute(() => ({
+      settingsVisible: !!document.querySelector(".settings-page"),
+      welcomeShown: document.getElementById("welcome").style.display !== "none",
+    }));
+    expect(reopened.settingsVisible).toBe(true);
+    expect(reopened.welcomeShown).toBe(false);
+
+    // Restore the welcome screen for any later specs sharing this window.
+    await browser.execute(() => window.__tterm.mgr.closeSettings(true));
+    await browser.waitUntil(
+      async () =>
+        await browser.execute(() => document.getElementById("welcome").style.display !== "none"),
+      { timeout: 5000, timeoutMsg: "welcome screen did not reappear" },
+    );
   });
 });
