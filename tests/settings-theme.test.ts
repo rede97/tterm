@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { invokeMock } = vi.hoisted(() => ({
   invokeMock: vi.fn((cmd: string) => {
-    if (cmd === "read_config") return Promise.resolve("{}");
+    if (cmd === "read_config_file") return Promise.resolve("{}");
     if (cmd === "ssh_read_config_raw") return Promise.resolve("");
     if (cmd === "serial_list_ports") return Promise.resolve([]);
     return Promise.resolve(null);
@@ -66,7 +66,7 @@ describe("settings — theme gallery", () => {
     )!;
     applyBtn.click();
     await vi.waitFor(() => {
-      const write = invokeMock.mock.calls.find((c) => c[0] === "write_config");
+      const write = invokeMock.mock.calls.find((c) => c[0] === "write_config_file");
       expect(write).toBeTruthy();
       expect(JSON.parse((write![1] as any).content).themeName).toBe("Nord");
     });

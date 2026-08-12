@@ -157,7 +157,8 @@ export function createGeneralPanel(): HTMLElement {
 
   // reset all settings
   panel.querySelector("#set-reset-all")?.addEventListener("click", async () => {
-    await invoke("delete_config");
+    await invoke("delete_config_file", { name: "config" });
+    await invoke("delete_config_file", { name: "keybindings" });
     await configStore.load();
     // Notify parent to refresh
     const evt = new CustomEvent("tterm-settings-reset");

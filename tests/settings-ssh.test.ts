@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn((cmd: string) => {
     if (cmd === "ssh_read_config_raw") return Promise.resolve("");
-    if (cmd === "read_config") return Promise.resolve("{}");
+    if (cmd === "read_config_file") return Promise.resolve("{}");
     return Promise.resolve(null);
   }),
 }));
@@ -169,7 +169,7 @@ describe("settings — SSH key management", () => {
   function mockKeyInvoke(installResult?: { outcome: string; shell: string }) {
     invokeMock.mockImplementation((cmd: string) => {
       if (cmd === "ssh_read_config_raw") return Promise.resolve("");
-      if (cmd === "read_config") return Promise.resolve("{}");
+      if (cmd === "read_config_file") return Promise.resolve("{}");
       if (cmd === "ssh_list_keys") return Promise.resolve([KEY]);
       if (cmd === "ssh_keygen") return Promise.resolve(KEY);
       if (cmd === "ssh_install_pubkey") {
@@ -248,7 +248,7 @@ describe("settings — SSH key management", () => {
       if (cmd === "ssh_list_keys") return Promise.resolve([]);
       if (cmd === "ssh_keygen") return Promise.resolve(KEY);
       if (cmd === "ssh_read_config_raw") return Promise.resolve("");
-      if (cmd === "read_config") return Promise.resolve("{}");
+      if (cmd === "read_config_file") return Promise.resolve("{}");
       return Promise.resolve(null);
     });
     configStore.set({ sshHosts: [{ name: "ROS2", HostName: "122.51.226.5", User: "mxq" }] });
@@ -322,7 +322,7 @@ describe("settings — SSH config dirty state", () => {
     invokeMock.mockImplementation((cmd: string) => {
       if (cmd === "ssh_save_config") return Promise.resolve("Saved to ~/.ssh/config");
       if (cmd === "ssh_read_config_raw") return Promise.resolve("");
-      if (cmd === "read_config") return Promise.resolve("{}");
+      if (cmd === "read_config_file") return Promise.resolve("{}");
       return Promise.resolve(null);
     });
     configStore.set({ sshHosts: [{ name: "a", HostName: "10.0.0.1" }] });

@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Fake themes.json backing store for read_themes/write_themes.
 const { file } = vi.hoisted(() => ({ file: { content: "[]" } }));
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn((cmd: string, args?: { content?: string }) => {
-    if (cmd === "read_themes") return Promise.resolve(file.content);
-    if (cmd === "write_themes") {
+  invoke: vi.fn((cmd: string, args?: { name?: string; content?: string }) => {
+    if (cmd === "read_config_file" && args?.name === "themes") return Promise.resolve(file.content);
+    if (cmd === "write_config_file" && args?.name === "themes") {
       file.content = args?.content ?? "[]";
       return Promise.resolve(null);
     }

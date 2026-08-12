@@ -166,9 +166,37 @@ class ConfigStore {
       }
       this._pendingMerge = null;
 
-      const raw = await invoke<string>("read_config");
+      // keybindings live in their OWN file (keybindings.json — VS Code
+      // parity); everything else in config.json. Raw I/O only in Rust;
+      // parsing/merging/migration happen here.
+      const [raw, kbRaw] = await Promise.all([
+        invoke<string>("read_config_file", { name: "config" }),
+        invoke<string>("read_config_file", { name: "keybindings" }),
+      ]);
       const cfg = JSON.parse(raw);
       const isEmpty = Object.keys(cfg).length === 0;
+
+      let kb: unknown = {};
+      try {
+        kb = JSON.parse(kbRaw);
+      } catch {
+        // broken keybindings.json — defaults, never take the config down.
+      }
+      const kbValid: Record<string, string> = SCHEMA.keybindings.validate(kb) ? kb : {};
+
+      // Migration: keybindings used to live inside config.json. Adopt them
+      // into keybindings.json and strip the key from config.json — one
+      // rewrite, every other key untouched.
+      let migratedKb: Record<string, string> | null = null;
+      if (SCHEMA.keybindings.validate(cfg.keybindings)) {
+        if (Object.keys(kbValid).length === 0 && Object.keys(cfg.keybindings).length > 0) {
+          migratedKb = cfg.keybindings;
+        }
+        delete cfg.keybindings;
+      }
+      const configWithoutKb = { ...cfg };
+      cfg.keybindings = migratedKb ?? kbValid;
+
       // Keys ABSENT from the file (old config from before a key existed,
       // or a deleted config) must fall back to defaults, not to whatever
       // stale value memory currently holds. Runtime keys are untouched.
@@ -181,6 +209,16 @@ class ConfigStore {
         const defaults = this._persistableSnapshot();
         this._applyConfig(defaults);
         await this._writeDisk(defaults);
+      }
+      if (migratedKb) {
+        await invoke("write_config_file", {
+          name: "keybindings",
+          content: JSON.stringify(migratedKb),
+        });
+        await invoke("write_config_file", {
+          name: "config",
+          content: JSON.stringify(configWithoutKb),
+        });
       }
       this._state.loaded = true;
       // Notify ALL schema keys, not just the ones the file mentioned:
@@ -232,16 +270,36 @@ class ConfigStore {
 
   private async _writeDisk(data: Record<string, unknown>): Promise<void> {
     try {
-      // Merge with existing on-disk config before writing
-      let existing: any = {};
-      try {
-        const raw = await invoke<string>("read_config");
-        existing = JSON.parse(raw);
-      } catch {
-        /* first write or read error — start fresh */
+      const { keybindings, ...rest } = data;
+      const jobs: Promise<unknown>[] = [];
+      if (keybindings !== undefined) {
+        jobs.push(
+          invoke("write_config_file", {
+            name: "keybindings",
+            content: JSON.stringify(keybindings),
+          }),
+        );
       }
-      const merged = { ...existing, ...data };
-      await invoke("write_config", { content: JSON.stringify(merged) });
+      if (Object.keys(rest).length > 0) {
+        // Merge with existing on-disk config before writing
+        let existing: Record<string, unknown> = {};
+        try {
+          const raw = await invoke<string>("read_config_file", { name: "config" });
+          existing = JSON.parse(raw);
+        } catch {
+          /* first write or read error — start fresh */
+        }
+        // keybindings never lands in config.json, even if a stale copy
+        // survived the migration (hand-edited file).
+        delete existing.keybindings;
+        jobs.push(
+          invoke("write_config_file", {
+            name: "config",
+            content: JSON.stringify({ ...existing, ...rest }),
+          }),
+        );
+      }
+      await Promise.all(jobs);
     } catch (e) {
       logError("config.write", e);
     }
@@ -250,7 +308,8 @@ class ConfigStore {
   private _persistableSnapshot(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(this._state)) {
-      if (!RUNTIME_KEYS.has(k as SchemaKey)) result[k] = v;
+      // keybindings persist to their own file, never config.json.
+      if (!RUNTIME_KEYS.has(k as SchemaKey) && k !== "keybindings") result[k] = v;
     }
     return result;
   }

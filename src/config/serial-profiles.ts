@@ -137,7 +137,7 @@ export function findSerialProfile(name: string | null | undefined): SerialProfil
 
 /** Load serial-profiles.json into the registry. Call once at startup. */
 export async function loadSerialProfiles(): Promise<SerialProfileDef[]> {
-  const raw = await invoke<string>("read_serial_profiles");
+  const raw = await invoke<string>("read_config_file", { name: "serial-profiles" });
   const profiles = parseSerialProfiles(raw);
   setCustomSerialProfiles(profiles);
   return profiles;
@@ -157,21 +157,29 @@ export async function saveSerialProfile(
   profile: SerialProfile,
   originalName?: string,
 ): Promise<SerialProfileDef[]> {
-  const current = parseSerialProfiles(await invoke<string>("read_serial_profiles"));
+  const current = parseSerialProfiles(
+    await invoke<string>("read_config_file", { name: "serial-profiles" }),
+  );
   const def: SerialProfileDef = { ...profile, source: "custom" };
   const idx = current.findIndex((t) => t.name === (originalName ?? profile.name));
   if (idx >= 0) current.splice(idx, 1, def);
   else current.push(def);
-  await invoke("write_serial_profiles", { content: serializeSerialProfiles(current) });
+  await invoke("write_config_file", {
+    name: "serial-profiles",
+    content: serializeSerialProfiles(current),
+  });
   setCustomSerialProfiles(current);
   return current;
 }
 
 export async function deleteSerialProfile(name: string): Promise<SerialProfileDef[]> {
-  const current = parseSerialProfiles(await invoke<string>("read_serial_profiles")).filter(
-    (t) => t.name !== name,
-  );
-  await invoke("write_serial_profiles", { content: serializeSerialProfiles(current) });
+  const current = parseSerialProfiles(
+    await invoke<string>("read_config_file", { name: "serial-profiles" }),
+  ).filter((t) => t.name !== name);
+  await invoke("write_config_file", {
+    name: "serial-profiles",
+    content: serializeSerialProfiles(current),
+  });
   setCustomSerialProfiles(current);
   return current;
 }

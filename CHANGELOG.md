@@ -1,5 +1,11 @@
 ## Unreleased
 
+Improvements
+
+- **Keybindings now live in their own file** — `keybindings.json` in the
+  config directory (VS Code parity), easy to hand-edit or share; existing
+  bindings are migrated out of `config.json` automatically
+
 Fixes
 
 - **Saving SSH config no longer deletes your global settings** — the

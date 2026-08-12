@@ -3,9 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Fake serial-profiles.json backing store.
 const { file } = vi.hoisted(() => ({ file: { content: "[]" } }));
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn((cmd: string, args?: { content?: string }) => {
-    if (cmd === "read_serial_profiles") return Promise.resolve(file.content);
-    if (cmd === "write_serial_profiles") {
+  invoke: vi.fn((cmd: string, args?: { name?: string; content?: string }) => {
+    if (cmd === "read_config_file" && args?.name === "serial-profiles")
+      return Promise.resolve(file.content);
+    if (cmd === "write_config_file" && args?.name === "serial-profiles") {
       file.content = args?.content ?? "[]";
       return Promise.resolve(null);
     }

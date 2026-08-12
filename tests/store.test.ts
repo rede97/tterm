@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { invokeMock } = vi.hoisted(() => ({
   invokeMock: vi.fn((cmd: string) => {
-    if (cmd === "read_config") return Promise.resolve("{}");
+    if (cmd === "read_config_file") return Promise.resolve("{}");
     return Promise.resolve(null);
   }),
 }));
@@ -92,7 +92,7 @@ describe("ConfigStore — load", () => {
 
   it("load reads config and applies values", async () => {
     invokeMock.mockImplementation((cmd: string) => {
-      if (cmd === "read_config")
+      if (cmd === "read_config_file")
         return Promise.resolve(JSON.stringify({ fontSize: 20, themeName: "Nord" }));
       return Promise.resolve(null);
     });
@@ -109,13 +109,13 @@ describe("ConfigStore — load", () => {
     invokeMock.mockClear();
 
     invokeMock.mockImplementation((cmd: string) => {
-      if (cmd === "read_config") return Promise.resolve("{}");
+      if (cmd === "read_config_file") return Promise.resolve("{}");
       return Promise.resolve(null);
     });
     await configStore.load();
     expect(configStore.get("loaded")).toBe(true);
     // Should have written defaults
-    const write = invokeMock.mock.calls.find((c) => c[0] === "write_config");
+    const write = invokeMock.mock.calls.find((c) => c[0] === "write_config_file");
     expect(write).toBeTruthy();
     const written = JSON.parse((write![1] as any).content);
     expect(written.fontSize).toBe(14);
@@ -129,7 +129,7 @@ describe("ConfigStore — load", () => {
     invokeMock.mockClear();
 
     invokeMock.mockImplementation((cmd: string) => {
-      if (cmd === "read_config")
+      if (cmd === "read_config_file")
         return Promise.resolve(JSON.stringify({ fontSize: 5, scrollback: 10 }));
       return Promise.resolve(null);
     });
@@ -144,7 +144,7 @@ describe("ConfigStore — load", () => {
     const unsub = configStore.subscribe(fn);
     try {
       invokeMock.mockImplementation((cmd: string) => {
-        if (cmd === "read_config") return Promise.resolve(JSON.stringify({ fontSize: 20 }));
+        if (cmd === "read_config_file") return Promise.resolve(JSON.stringify({ fontSize: 20 }));
         return Promise.resolve(null);
       });
       await configStore.load();
@@ -165,9 +165,13 @@ describe("ConfigStore — load", () => {
     configStore.set({ sshHosts: [{ name: "KeepMe" }] });
     configStore.flush();
     invokeMock.mockClear();
-    // File from an older version: no fontSize, no keybindings.
-    invokeMock.mockImplementation((cmd: string) => {
-      if (cmd === "read_config") return Promise.resolve(JSON.stringify({ themeName: "Nord" }));
+    // File from an older version: no fontSize, and keybindings.json empty.
+    invokeMock.mockImplementation((cmd: string, args?: { name?: string }) => {
+      if (cmd === "read_config_file") {
+        return Promise.resolve(
+          args?.name === "keybindings" ? "{}" : JSON.stringify({ themeName: "Nord" }),
+        );
+      }
       return Promise.resolve(null);
     });
     await configStore.load();
@@ -178,13 +182,44 @@ describe("ConfigStore — load", () => {
     expect(configStore.get("sshHosts")).toEqual([{ name: "KeepMe" }]);
   });
 
+  it("load migrates keybindings out of config.json into keybindings.json", async () => {
+    // Legacy layout: keybindings inside config.json, no keybindings.json.
+    invokeMock.mockImplementation((cmd: string, args?: { name?: string }) => {
+      if (cmd === "read_config_file") {
+        return Promise.resolve(
+          args?.name === "keybindings"
+            ? "{}"
+            : JSON.stringify({
+                fontSize: 18,
+                keybindings: { "workbench.action.terminal.clear": "ctrl+l" },
+              }),
+        );
+      }
+      return Promise.resolve(null);
+    });
+    await configStore.load();
+    expect(configStore.get("keybindings")).toEqual({ "workbench.action.terminal.clear": "ctrl+l" });
+    expect(configStore.get("fontSize")).toBe(18);
+
+    const writes = invokeMock.mock.calls.filter((c) => c[0] === "write_config_file");
+    const kbWrite = writes.find((c) => (c[1] as { name?: string }).name === "keybindings");
+    const cfgWrite = writes.find((c) => (c[1] as { name?: string }).name === "config");
+    expect(JSON.parse((kbWrite![1] as { content: string }).content)).toEqual({
+      "workbench.action.terminal.clear": "ctrl+l",
+    });
+    // The stripped config keeps every other key but loses keybindings.
+    const stripped = JSON.parse((cfgWrite![1] as { content: string }).content);
+    expect(stripped.fontSize).toBe(18);
+    expect("keybindings" in stripped).toBe(false);
+  });
+
   it("load cancels a pending debounced write (Revert race)", async () => {
     vi.useFakeTimers();
     try {
       configStore.set({ fontSize: 22 }); // pending, deliberately not flushed
       invokeMock.mockClear();
       invokeMock.mockImplementation((cmd: string) => {
-        if (cmd === "read_config") return Promise.resolve(JSON.stringify({ fontSize: 16 }));
+        if (cmd === "read_config_file") return Promise.resolve(JSON.stringify({ fontSize: 16 }));
         return Promise.resolve(null);
       });
       await configStore.load();
@@ -192,7 +227,7 @@ describe("ConfigStore — load", () => {
       // Advance well past the 300ms debounce: the stale pending write (22)
       // must never reach disk after the load.
       await vi.advanceTimersByTimeAsync(1000);
-      expect(invokeMock.mock.calls.filter((c) => c[0] === "write_config")).toHaveLength(0);
+      expect(invokeMock.mock.calls.filter((c) => c[0] === "write_config_file")).toHaveLength(0);
       expect(configStore.get("fontSize")).toBe(16);
     } finally {
       vi.useRealTimers();
@@ -213,9 +248,9 @@ describe("ConfigStore — flush & debounce", () => {
   it("set schedules a debounced save after 300ms", async () => {
     configStore.set({ fontSize: 20 });
     // No write yet
-    expect(invokeMock.mock.calls.find((c) => c[0] === "write_config")).toBeUndefined();
+    expect(invokeMock.mock.calls.find((c) => c[0] === "write_config_file")).toBeUndefined();
     await vi.advanceTimersByTimeAsync(300);
-    const write = invokeMock.mock.calls.find((c) => c[0] === "write_config");
+    const write = invokeMock.mock.calls.find((c) => c[0] === "write_config_file");
     expect(write).toBeTruthy();
     expect(JSON.parse((write![1] as any).content).fontSize).toBe(20);
   });
@@ -225,7 +260,7 @@ describe("ConfigStore — flush & debounce", () => {
     configStore.flush();
     // flush() calls _writeDisk which is async — flush microtasks
     await vi.advanceTimersByTimeAsync(0);
-    const write = invokeMock.mock.calls.find((c) => c[0] === "write_config");
+    const write = invokeMock.mock.calls.find((c) => c[0] === "write_config_file");
     expect(write).toBeTruthy();
     expect(JSON.parse((write![1] as any).content).fontSize).toBe(22);
   });
@@ -234,18 +269,35 @@ describe("ConfigStore — flush & debounce", () => {
     configStore.set({ fontSize: 20 });
     configStore.set({ scrollback: 5000 });
     await vi.advanceTimersByTimeAsync(300);
-    const writes = invokeMock.mock.calls.filter((c) => c[0] === "write_config");
+    const writes = invokeMock.mock.calls.filter((c) => c[0] === "write_config_file");
     expect(writes).toHaveLength(1);
     const written = JSON.parse((writes[0][1] as any).content);
     expect(written.fontSize).toBe(20);
     expect(written.scrollback).toBe(5000);
   });
 
+  it("keybindings persist to keybindings.json, never config.json", async () => {
+    configStore.set({ keybindings: { "workbench.action.closeTab": "ctrl+q" } });
+    await vi.advanceTimersByTimeAsync(300);
+    const kbWrite = invokeMock.mock.calls.find(
+      (c) => c[0] === "write_config_file" && (c[1] as { name?: string }).name === "keybindings",
+    );
+    expect(kbWrite).toBeTruthy();
+    expect(JSON.parse((kbWrite![1] as { content: string }).content)).toEqual({
+      "workbench.action.closeTab": "ctrl+q",
+    });
+    // Only keybindings changed — config.json is not written at all.
+    const cfgWrite = invokeMock.mock.calls.find(
+      (c) => c[0] === "write_config_file" && (c[1] as { name?: string }).name === "config",
+    );
+    expect(cfgWrite).toBeUndefined();
+  });
+
   it("runtime keys are not persisted", async () => {
     configStore.set({ sshHosts: [{ name: "test" }], serialPorts: [{ name: "COM1" }] });
     await vi.advanceTimersByTimeAsync(300);
     // Runtime-only keys don't trigger a disk save
-    const write = invokeMock.mock.calls.find((c) => c[0] === "write_config");
+    const write = invokeMock.mock.calls.find((c) => c[0] === "write_config_file");
     expect(write).toBeUndefined();
   });
 });

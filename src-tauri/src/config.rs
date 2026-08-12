@@ -1,25 +1,42 @@
 use tauri::Manager;
 
-#[tauri::command]
-pub fn read_config(app: tauri::AppHandle) -> String {
-    let config_dir = app.path().app_config_dir().unwrap_or_default();
-    let file = config_dir.join("config.json");
-    std::fs::read_to_string(file).unwrap_or_else(|_| "{}".into())
+// All app config lives in per-topic JSON files under the app config dir
+// (config.json / themes.json / serial-profiles.json / keybindings.json —
+// the last is VS Code's keybindings.json parity).
+//
+// Rust does RAW I/O only — parsing, merging, validation, and migration are
+// all frontend concerns. The whitelist keeps this from becoming an
+// arbitrary-file read/write primitive.
+const CONFIG_FILES: [&str; 4] = ["config", "themes", "serial-profiles", "keybindings"];
+
+fn config_path(app: &tauri::AppHandle, name: &str) -> Result<std::path::PathBuf, String> {
+    if !CONFIG_FILES.contains(&name) {
+        return Err(format!("unknown config file: {name}"));
+    }
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    Ok(dir.join(format!("{name}.json")))
 }
 
 #[tauri::command]
-pub fn write_config(app: tauri::AppHandle, content: String) -> Result<(), String> {
-    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
-    std::fs::write(config_dir.join("config.json"), &content).map_err(|e| e.to_string())
+pub fn read_config_file(app: tauri::AppHandle, name: &str) -> Result<String, String> {
+    let file = config_path(&app, name)?;
+    Ok(std::fs::read_to_string(file).unwrap_or_else(|_| "{}".into()))
 }
 
 #[tauri::command]
-pub fn delete_config(app: tauri::AppHandle) -> Result<(), String> {
-    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    let file = config_dir.join("config.json");
+pub fn write_config_file(app: tauri::AppHandle, name: &str, content: String) -> Result<(), String> {
+    let file = config_path(&app, name)?;
+    if let Some(dir) = file.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(file, content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_config_file(app: tauri::AppHandle, name: &str) -> Result<(), String> {
+    let file = config_path(&app, name)?;
     if file.exists() {
-        std::fs::remove_file(&file).map_err(|e| e.to_string())?;
+        std::fs::remove_file(file).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -42,35 +59,4 @@ pub fn open_config_dir(app: tauri::AppHandle) -> Result<(), String> {
             .map_err(|e| e.to_string())?;
     }
     Ok(())
-}
-
-// Custom color themes live in their OWN file (themes.json), not config.json —
-// users hand-edit/share theme files, and a broken theme file must never take
-// the main config down with it. Rust does raw I/O only; the frontend parses.
-#[tauri::command]
-pub fn read_themes(app: tauri::AppHandle) -> String {
-    let config_dir = app.path().app_config_dir().unwrap_or_default();
-    std::fs::read_to_string(config_dir.join("themes.json")).unwrap_or_else(|_| "[]".into())
-}
-
-#[tauri::command]
-pub fn write_themes(app: tauri::AppHandle, content: String) -> Result<(), String> {
-    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
-    std::fs::write(config_dir.join("themes.json"), content).map_err(|e| e.to_string())
-}
-
-// Serial profiles also get their own file (serial-profiles.json) — same
-// rationale as themes.json. Raw I/O only; the frontend parses.
-#[tauri::command]
-pub fn read_serial_profiles(app: tauri::AppHandle) -> String {
-    let config_dir = app.path().app_config_dir().unwrap_or_default();
-    std::fs::read_to_string(config_dir.join("serial-profiles.json")).unwrap_or_else(|_| "[]".into())
-}
-
-#[tauri::command]
-pub fn write_serial_profiles(app: tauri::AppHandle, content: String) -> Result<(), String> {
-    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
-    std::fs::write(config_dir.join("serial-profiles.json"), content).map_err(|e| e.to_string())
 }

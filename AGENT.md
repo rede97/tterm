@@ -39,7 +39,8 @@ src/
     dirmenu.ts          "+" button folder picker + recent-folders menu (Shift+click / right-click)
     fontpicker.ts       font picker modal (dynamically imported by settings)
   core/
-    store.ts            configStore — reactive config, single source of truth (schema + defaults)
+    store.ts            configStore — reactive config, single source of truth (schema + defaults);
+                        per-topic JSON files: config.json + keybindings.json (keybindings route)
     keymap.ts           keyboard shortcuts: command registry, combo parsing, global dispatcher
     types.ts            shared TS types (TabType, PtyOutputPayload, ...)
     common.ts           shared constants/helpers
@@ -195,7 +196,7 @@ Backend-managed and in-band (`deadmode.rs` + relay dead mode): on byte-stream en
 ## Keyboard shortcuts
 
 - Command registry + combo parsing + global dispatcher: `core/keymap.ts`. One window-level **capture-phase** keydown listener intercepts bound combos before xterm's textarea eats them (Ctrl+W, Ctrl+Tab are terminal input otherwise). Handlers are injected from `main.ts` (`initKeymap`) — keymap never imports TabManager.
-- User overrides persist in configStore `keybindings` (`{commandId: combo}`, `""` = unbind); effective = registry defaults merged with overrides (`resolveKeybindings`). Combo grammar: lowercase, `ctrl+alt+shift+meta` order, e.g. `ctrl+shift+tab`.
+- User overrides persist to **keybindings.json** (VS Code parity) via configStore's `keybindings` key (`{commandId: combo}`, `""` = unbind); effective = registry defaults merged with overrides (`resolveKeybindings`). Combo grammar: lowercase, `ctrl+alt+shift+meta` order, e.g. `ctrl+shift+tab`. Legacy `keybindings` inside config.json is migrated to the file on first load.
 - Defaults: Ctrl+P quick open, Ctrl+Tab / Ctrl+Shift+Tab MRU switching, Ctrl+W close tab, F11 browser-style fullscreen (covers the taskbar), Shift+F11 zen mode (maximized); **Terminal: Clear ships unbound**. Ctrl+D is deliberately NOT captured — it reaches the shell and ends the session (see clean-exit auto-close above).
 - Tab switcher overlay: `ui/tabswitcher.ts`. Ctrl+P = input + numbered list (digit query = tab number, else label substring); MRU mode = no input, each keydown steps, commit on release of the LAST binding modifier (derived from the next/prev-tab bindings, not hardcoded Ctrl), Escape cancels, window blur commits.
 - Zen/fullscreen (`ui/window.ts`): one chrome-hiding state machine (`body.zen-mode` hides `#tab-bar`), two window modes — `toggleFullscreenMode()` (fullscreen via the custom `window_set_fullscreen` command) and `toggleZenMode()` (maximize via `window_maximize`). The JS Window API maximize/fullscreen is NOT in our capabilities — always use the window.rs commands. A manual unmaximize/fullscreen-exit drops the mode (onResized check, per-mode `isMaximized`/`isFullscreen`, 600 ms transition grace). FULLSCREEN is excluded from window-state persistence so the app never relaunches into a chrome-less fullscreen.
@@ -297,7 +298,7 @@ One tray icon is shared by ALL windows, but TTerm windows are separate PROCESSES
 
 ## Settings page
 
-Lazy-loaded via `import("./settings")` on first open. Sidebar layout, six panels (General / Appearance / Profile / SSH / Serial / Keyboard). Footer: feedback text + Revert + Apply (Apply grays out after save, re-enables on change). Settings tab uses `data-tab-id="#settings"`, excluded from badge counting. All settings reads/writes go through `configStore` (`src/core/store.ts`) — schema + defaults live there in one declarative table.
+Lazy-loaded via `import("./settings")` on first open. Sidebar layout, six panels (General / Appearance / Profile / SSH / Serial / Keyboard). Footer: feedback text + Revert + Apply (Apply grays out after save, re-enables on change). Settings tab uses `data-tab-id="#settings"`, excluded from badge counting. All settings reads/writes go through `configStore` (`src/core/store.ts`) — schema + defaults live there in one declarative table. Persistence is per-topic JSON files via the generic `read_config_file`/`write_config_file` commands (whitelist: config / themes / serial-profiles / keybindings); **Rust does raw I/O only — parsing, merging, and migration are frontend concerns**.
 
 ## Profile loading flow
 

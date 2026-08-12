@@ -1,6 +1,6 @@
 // Custom color themes — persisted in their OWN file (themes.json in the app
 // config dir), NOT the main config.json. Rust does raw file I/O
-// (read_themes/write_themes); parsing/validation lives here.
+// via the generic read_config_file/write_config_file commands); parsing/validation lives here.
 
 import { invoke } from "@tauri-apps/api/core";
 import type { ITheme } from "@xterm/xterm";
@@ -80,7 +80,7 @@ export function serializeCustomThemes(themes: ThemeDef[]): string {
 
 /** Load themes.json into the theme registry. Call once at startup. */
 export async function loadCustomThemes(): Promise<ThemeDef[]> {
-  const raw = await invoke<string>("read_themes");
+  const raw = await invoke<string>("read_config_file", { name: "themes" });
   const themes = parseCustomThemes(raw);
   setCustomThemes(themes);
   return themes;
@@ -105,21 +105,21 @@ export async function saveCustomTheme(
   theme: ITheme,
   originalName?: string,
 ): Promise<ThemeDef[]> {
-  const current = parseCustomThemes(await invoke<string>("read_themes"));
+  const current = parseCustomThemes(await invoke<string>("read_config_file", { name: "themes" }));
   const def: ThemeDef = { name, label: name, theme, source: "custom" };
   const idx = current.findIndex((t) => t.name === (originalName ?? name));
   if (idx >= 0) current.splice(idx, 1, def);
   else current.push(def);
-  await invoke("write_themes", { content: serializeCustomThemes(current) });
+  await invoke("write_config_file", { name: "themes", content: serializeCustomThemes(current) });
   setCustomThemes(current);
   return current;
 }
 
 export async function deleteCustomTheme(name: string): Promise<ThemeDef[]> {
-  const current = parseCustomThemes(await invoke<string>("read_themes")).filter(
-    (t) => t.name !== name,
-  );
-  await invoke("write_themes", { content: serializeCustomThemes(current) });
+  const current = parseCustomThemes(
+    await invoke<string>("read_config_file", { name: "themes" }),
+  ).filter((t) => t.name !== name);
+  await invoke("write_config_file", { name: "themes", content: serializeCustomThemes(current) });
   setCustomThemes(current);
   return current;
 }

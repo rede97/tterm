@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { invokeMock } = vi.hoisted(() => ({
   invokeMock: vi.fn((cmd: string) => {
-    if (cmd === "read_config") return Promise.resolve("{}");
+    if (cmd === "read_config_file") return Promise.resolve("{}");
     if (cmd === "serial_list_ports") return Promise.resolve([]);
     if (cmd === "ssh_list_keys") return Promise.resolve([]);
     return Promise.resolve(null);
