@@ -31,6 +31,7 @@ import type {
   SerialInputMode,
   SerialOutputNewline,
 } from "../core/types";
+import { el } from "../ui/dom";
 import type { ForwardEditorValue, ForwardKind } from "../ui/forwardeditor";
 import { createForwardTable } from "../ui/forwardtable";
 import { showToast } from "../ui/toast";
@@ -77,13 +78,6 @@ let panelTabId: string | null = null;
 
 function qsButton(): HTMLButtonElement | null {
   return document.getElementById("quick-status") as HTMLButtonElement | null;
-}
-
-function el(tag: string, className: string, text?: string): HTMLElement {
-  const e = document.createElement(tag);
-  e.className = className;
-  if (text !== undefined) e.textContent = text;
-  return e;
 }
 
 function mkSection(title: string, key: string): HTMLElement {

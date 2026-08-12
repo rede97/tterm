@@ -10,6 +10,7 @@ import {
   THEME_COLOR_KEYS,
 } from "../config/custom-themes";
 import { logCatch } from "../core/errorlog";
+import { confirmDialog } from "../ui/confirm";
 import { createModal } from "../ui/modal";
 import { showToast } from "../ui/toast";
 import { allThemes, type ThemeDef } from "../util/themes";
@@ -156,9 +157,15 @@ export function showThemeEditor(opts: ThemeEditorOptions): void {
       .catch((e) => showToast(`Failed to save theme: ${e}`, "error"));
   });
 
-  overlay.querySelector(".te-delete")?.addEventListener("click", () => {
+  overlay.querySelector(".te-delete")?.addEventListener("click", async () => {
     if (!opts.editName) return;
-    if (!confirm(`Delete theme "${opts.editName}"?`)) return;
+    const confirmed = await confirmDialog({
+      title: "Delete theme?",
+      message: `Delete theme "${opts.editName}"? This cannot be undone.`,
+      okLabel: "Delete",
+      danger: true,
+    });
+    if (!confirmed) return;
     deleteCustomTheme(opts.editName)
       .then(() => {
         opts.onDeleted?.(opts.editName!);

@@ -333,6 +333,13 @@ describe("settings — SSH config dirty state", () => {
     expect(isSshConfigDirty()).toBe(true);
 
     panel.querySelector<HTMLButtonElement>("#set-save-ssh-config")!.click();
+    // Save now goes through confirmDialog — approve the overwrite.
+    await vi.waitFor(() => {
+      expect(document.body.querySelector(".confirm-overlay")).toBeTruthy();
+    });
+    document.body
+      .querySelector<HTMLButtonElement>(".confirm-overlay .sshauth-footer .sshauth-btn:last-child")!
+      .click();
     await vi.waitFor(() => expect(isSshConfigDirty()).toBe(false));
   });
 

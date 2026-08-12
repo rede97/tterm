@@ -8,6 +8,7 @@
 // pinned to 127.0.0.1 by design: only its port is editable. Dynamic
 // forwards are SOCKS5 listeners and have no target endpoint.
 
+import { el } from "./dom";
 import type { ForwardEditorValue, ForwardKind } from "./forwardeditor";
 import { showToast } from "./toast";
 
@@ -156,13 +157,6 @@ export function parseForwardLine(line: string, kind: ForwardKind): ForwardEditor
 }
 
 // -- Engine --------------------------------------------------------------
-
-function el(tag: string, className: string, text = ""): HTMLElement {
-  const d = document.createElement(tag);
-  d.className = className;
-  if (text) d.textContent = text;
-  return d;
-}
 
 // Lucide-style inline icons (same stroke style as the GitHub icon in
 // settings/general.ts) — crisper than text glyphs at small sizes.

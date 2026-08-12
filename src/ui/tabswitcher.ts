@@ -11,6 +11,7 @@
 
 import { parseCombo, resolveKeybindings } from "../core/keymap";
 import { configStore } from "../core/store";
+import { el } from "./dom";
 
 export interface SwitcherItem {
   id: string;
@@ -86,13 +87,6 @@ function currentCommitMods(): string[] {
 
 export function tabSwitcherOpen(): boolean {
   return overlay !== null;
-}
-
-function el(tag: string, className: string, text?: string): HTMLElement {
-  const e = document.createElement(tag);
-  e.className = className;
-  if (text !== undefined) e.textContent = text;
-  return e;
 }
 
 function renderList(): void {

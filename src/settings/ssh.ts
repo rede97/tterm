@@ -8,6 +8,7 @@ import { esc, hostProp } from "../core/common";
 import { logError } from "../core/errorlog";
 import { type ConfigState, configStore } from "../core/store";
 import type { SshHost } from "../core/types";
+import { confirmDialog } from "../ui/confirm";
 import { showToast } from "../ui/toast";
 import { showSshHostEditor } from "./sshhosteditor";
 import { listKeys, showInstallKeyModal, showKeygenModal } from "./sshkeys";
@@ -59,7 +60,7 @@ function renderSshPanel(container: HTMLElement, opts?: { keepPending?: boolean }
           .flatMap(([k, v]) => v.split("\n").map((line) => `${k}: ${line}`));
         return `<div class="ssh-host-card" data-name="${esc(h.name)}" style="margin-bottom:4px;background:#2a2a2a;border-radius:4px;overflow:hidden;">
         <div class="ssh-host-row" style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;cursor:pointer;">
-          <div style="flex-shrink:0;padding-top:2px;" onclick="event.stopPropagation()">
+          <div style="flex-shrink:0;padding-top:2px;">
             <label class="settings-toggle-row" style="padding:0;gap:0;">
               <input type="checkbox" class="ssh-vis-check" value="${esc(h.name)}" ${visible ? "checked" : ""} />
             </label>
@@ -69,8 +70,8 @@ function renderSshPanel(container: HTMLElement, opts?: { keepPending?: boolean }
             <div class="settings-item-desc" style="margin-bottom:0;">${esc(user)}@${esc(hostname)}:${esc(port)}</div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
-            <button class="ssh-btn-edit settings-link-btn" data-hostname="${esc(h.name)}" onclick="event.stopPropagation()">Edit</button>
-            <button class="ssh-btn-delete settings-link-btn" data-hostname="${esc(h.name)}" style="color:#f44747;border-color:#f44747;" onclick="event.stopPropagation()">Delete</button>
+            <button class="ssh-btn-edit settings-link-btn" data-hostname="${esc(h.name)}">Edit</button>
+            <button class="ssh-btn-delete settings-link-btn" data-hostname="${esc(h.name)}" style="color:#f44747;border-color:#f44747;">Delete</button>
           </div>
         </div>
         <div class="ssh-host-detail" style="display:none;padding:0 10px 8px 10px;">
@@ -232,9 +233,12 @@ function wireSshEvents(container: HTMLElement) {
   });
 
   container.querySelector("#set-save-ssh-config")?.addEventListener("click", async () => {
-    const confirmed = confirm(
-      "This will overwrite your SSH config file (~/.ssh/config).\n\nA backup will be saved to config.tt.bak.\n\nContinue?",
-    );
+    const confirmed = await confirmDialog({
+      title: "Overwrite SSH config?",
+      message: "This will overwrite ~/.ssh/config. A backup will be saved to config.tt.bak.",
+      okLabel: "Overwrite",
+      danger: true,
+    });
     if (!confirmed) return;
     const allHosts = configStore.get("sshHosts");
     const content = generateSshConfig(allHosts);
@@ -253,6 +257,10 @@ function wireSshEvents(container: HTMLElement) {
 
   // Visibility checkboxes — persist immediately
   container.querySelectorAll<HTMLInputElement>(".ssh-vis-check").forEach((cb) => {
+    // Inline onclick is CSP-blocked: stop row-expand bubbling in JS instead.
+    cb.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
     cb.addEventListener("change", async () => {
       const name = cb.value;
       let hidden = [...configStore.get("hiddenSshHosts")];

@@ -214,6 +214,15 @@ describe("settings — Serial profile gallery", () => {
       const overlay = document.body.querySelector(".sp-overlay")!;
       expect(overlay.querySelector<HTMLInputElement>(".sp-name")!.value).toBe("AT Copy");
       overlay.querySelector<HTMLButtonElement>(".sp-delete")!.click();
+      // Delete now goes through confirmDialog — approve it.
+      await vi.waitFor(() => {
+        expect(document.body.querySelector(".confirm-overlay")).toBeTruthy();
+      });
+      document.body
+        .querySelector<HTMLButtonElement>(
+          ".confirm-overlay .sshauth-footer .sshauth-btn:last-child",
+        )!
+        .click();
 
       await vi.waitFor(() => {
         expect(configStore.get("serialProfile")).toBe("Normal");

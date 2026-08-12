@@ -16,6 +16,7 @@ import {
   suspendKeymap,
 } from "../core/keymap";
 import { type ConfigState, configStore } from "../core/store";
+import { el } from "../ui/dom";
 
 // Pending user overrides (same shape as the stored config). Null until the
 // panel is first rendered; refresh() re-syncs from the store.
@@ -23,13 +24,6 @@ let _pending: Record<string, string> | null = null;
 
 function effectiveBindings(): Record<string, string> {
   return resolveKeybindings(_pending ?? configStore.get("keybindings"));
-}
-
-function el(tag: string, className: string, text?: string): HTMLElement {
-  const e = document.createElement(tag);
-  e.className = className;
-  if (text !== undefined) e.textContent = text;
-  return e;
 }
 
 function markDirty(panel: HTMLElement): void {

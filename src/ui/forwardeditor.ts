@@ -12,6 +12,8 @@
 
 export type ForwardKind = "local" | "remote" | "dynamic";
 
+import { el } from "./dom";
+
 export interface ForwardEditorValue {
   kind: ForwardKind;
   listenHost: string;
@@ -35,13 +37,6 @@ function parsePort(raw: string): number | null {
   const n = parseInt(raw, 10);
   if (!Number.isFinite(n) || n < 1 || n > 65535) return null;
   return n;
-}
-
-function el(tag: string, className: string, text = ""): HTMLElement {
-  const d = document.createElement(tag);
-  d.className = className;
-  if (text) d.textContent = text;
-  return d;
 }
 
 interface Endpoint {

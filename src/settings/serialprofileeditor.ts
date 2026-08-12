@@ -17,6 +17,7 @@ import {
 } from "../core/common";
 import { logCatch } from "../core/errorlog";
 import type { SerialFlowControl, SerialInputMode, SerialProfile } from "../core/types";
+import { confirmDialog } from "../ui/confirm";
 import { createModal } from "../ui/modal";
 import { showToast } from "../ui/toast";
 
@@ -137,9 +138,15 @@ export function showSerialProfileEditor(opts: SerialProfileEditorOptions): void 
       .catch((e) => showToast(`Failed to save profile: ${e}`, "error"));
   });
 
-  overlay.querySelector(".sp-delete")?.addEventListener("click", () => {
+  overlay.querySelector(".sp-delete")?.addEventListener("click", async () => {
     if (!opts.editName) return;
-    if (!confirm(`Delete profile "${opts.editName}"?`)) return;
+    const confirmed = await confirmDialog({
+      title: "Delete profile?",
+      message: `Delete profile "${opts.editName}"? This cannot be undone.`,
+      okLabel: "Delete",
+      danger: true,
+    });
+    if (!confirmed) return;
     deleteSerialProfile(opts.editName)
       .then(() => {
         opts.onDeleted?.(opts.editName!);
