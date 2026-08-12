@@ -10,7 +10,13 @@ import { type IBufferCell, type IDisposable, Terminal } from "@xterm/xterm";
 import { logCatch, swallow } from "../core/errorlog";
 import { configStore } from "../core/store";
 import { notifyTrayTabs } from "../core/traytabs";
-import type { SerialEnterNewline, SerialInputMode, SshHost, TabType } from "../core/types";
+import type {
+  SerialEnterNewline,
+  SerialInputMode,
+  SerialPort,
+  SshHost,
+  TabType,
+} from "../core/types";
 import { reattachDelayForAttempt, shouldAutoReattach } from "../util/disconnect";
 import { hysteresis } from "../util/hysteresis";
 import { getImeDebugFlags, ImeBox, imeMirrorActiveFor } from "../util/imebox";
@@ -40,6 +46,8 @@ export class TerminalTab {
   // available); false/undefined for the spawned-ssh-binary path.
   sshEmbedded = false;
   serialPortName?: string;
+  // Full port descriptor for "Duplicate Tab" (name alone can't respawn).
+  serialPort?: SerialPort;
   // Active serial profile name + its live-adjustable fields.
   serialProfile?: string;
   flowControl?: string;

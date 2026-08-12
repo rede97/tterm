@@ -8,7 +8,6 @@ import {
   BUILTIN_FONTS,
   buildFontFamily,
   type FontDef,
-  NERDFONT_BUILTIN,
   parseFontFamily,
   systemFontDefs,
 } from "../util/fontconfig";
@@ -106,9 +105,7 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
     const isPreview = previewFont?.toLowerCase() === f.family.toLowerCase();
     if (isPreview) row.classList.add("preview-selected");
 
-    let badge = "";
-    if (f.source === "nerdfont") badge = `<span class="fp-badge nf">NF</span>`;
-    else if (f.source === "builtin") badge = `<span class="fp-badge builtin">in</span>`;
+    const badge = f.source === "builtin" ? `<span class="fp-badge builtin">in</span>` : "";
 
     row.innerHTML = `
       <span class="fp-font-name">${esc(f.label)}</span>${badge}
@@ -147,7 +144,7 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
     row.className = "fp-selected-item";
     row.dataset.family = family;
 
-    const def = [...BUILTIN_FONTS, ...NERDFONT_BUILTIN, ...systemFontDefs()].find(
+    const def = [...BUILTIN_FONTS, ...systemFontDefs()].find(
       (f) => f.family.toLowerCase() === family.toLowerCase(),
     );
 
@@ -170,7 +167,7 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
     const query = searchInput.value.trim().toLowerCase();
 
     builtinList.innerHTML = "";
-    let allBuiltin = [...BUILTIN_FONTS, ...NERDFONT_BUILTIN];
+    let allBuiltin = BUILTIN_FONTS;
     if (query) {
       allBuiltin = allBuiltin.filter(
         (f) => f.family.toLowerCase().includes(query) || f.label.toLowerCase().includes(query),

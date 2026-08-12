@@ -1,11 +1,14 @@
 export interface FontDef {
   family: string; // CSS font-family name
   label: string; // display name
-  source: "builtin" | "nerdfont" | "system";
+  source: "builtin" | "system";
   importPath?: string; // Vite import path for builtin fonts
 }
 
-// Built-in fonts from @fontsource (no ligatures where possible)
+// Built-in fonts from @fontsource (no ligatures where possible).
+// Nerd Fonts are deliberately NOT embedded: the patched builds age badly
+// and ship incomplete glyph sets. Users install NF at the OS level — the
+// system-font enumeration already lists them in the picker.
 export const BUILTIN_FONTS: FontDef[] = [
   { family: "JetBrains Mono", label: "JetBrains Mono", source: "builtin" },
   { family: "Fira Mono", label: "Fira Mono", source: "builtin" },
@@ -16,14 +19,8 @@ export const BUILTIN_FONTS: FontDef[] = [
   { family: "Ubuntu Mono", label: "Ubuntu Mono", source: "builtin" },
 ];
 
-// Built-in Nerd Font patched fonts
-export const NERDFONT_BUILTIN: FontDef[] = [
-  { family: "DroidSansMono NF", label: "DroidSansMono NF", source: "nerdfont" },
-  { family: "UbuntuMono NF", label: "UbuntuMono NF", source: "nerdfont" },
-];
-
 export function allBuiltinFonts(): FontDef[] {
-  return [...BUILTIN_FONTS, ...NERDFONT_BUILTIN];
+  return BUILTIN_FONTS;
 }
 
 // Current font stack (ordered fallback list).
@@ -77,20 +74,13 @@ export function defaultFontStack(): string[] {
 // -- System font enumeration ---
 
 let _systemFonts: string[] = [];
-let _resolveSystemFonts: ((fonts: string[]) => void) | null = null;
 
 export function setSystemFonts(fonts: string[]) {
   _systemFonts = fonts;
-  if (_resolveSystemFonts) {
-    _resolveSystemFonts(fonts);
-    _resolveSystemFonts = null;
-  }
 }
 
 export function systemFontDefs(): FontDef[] {
-  const builtinFamilies = new Set(
-    [...BUILTIN_FONTS, ...NERDFONT_BUILTIN].map((f) => f.family.toLowerCase()),
-  );
+  const builtinFamilies = new Set(BUILTIN_FONTS.map((f) => f.family.toLowerCase()));
   return _systemFonts
     .filter((name) => !builtinFamilies.has(name.toLowerCase()))
     .map((name) => ({ family: name, label: name, source: "system" as const }));

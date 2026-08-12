@@ -117,7 +117,7 @@ function defaultState(): ConfigState {
 
 type Listener = (changedKeys: string[]) => void;
 
-class ConfigStore {
+export class ConfigStore {
   private _state: ConfigState = defaultState();
   private _listeners = new Set<Listener>();
   private _saveTimer: ReturnType<typeof setTimeout> | null = null;

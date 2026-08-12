@@ -109,7 +109,7 @@
 
 > **进度（2026-08，第一步拆分）**：✅ serialctl.ts（5 个串口 live setter，纯 tab+IPC 函数）、tabactions.ts（rename/share/clear/duplicate/export/closeRight/closeOther，manager 类型仅 type-only 引入）、settingsshell.ts（SettingsShell 类 + hooks，manager 保留 settingsOpen getter）已抽出，tabmanager 921→770 行；`src/wiring.ts` 成为 handler 注入的组合根，main.ts 326→231 行。生命周期（create*Tab 族）与标签条状态经评估**留在管理器内核**——拆它需要发明不自然的 context 接口，等 Settings 升格一等 tab（见下）后再评估。✅ 第一步验收：342 单测 + 27 e2e 全绿。
 
-> **追加（2026-08，Settings 伪 tab 抽象评估）**：Settings 以 `data-tab-id="#settings"` 伪 tab 存在、不进 `tabs` Map，特殊分支已积到 8 处：badge 计数排除、托盘列表排除、quickpanel 排除、switcher 排除、Ctrl+W 特判、switchTo 副作用关设置、closeTab 兄弟扫描跳过，以及第 8 处——**Settings 页关闭最后一个终端时 welcome 空白页盖上来**（已修：`_showWelcome` 仅在 settings 未打开时执行，附 e2e 回归）。结论：抽象已漏。拆分时把 Settings 升格为**一等 tab**（`tabs` Map 里的非会话视图，实现 show/hide/destroy），switcher/Ctrl+W/MRU/关闭回退全部自然成立，托盘/badge/quickpanel 按类型过滤；e2e 的 tab 计数断言需同步调整。
+> **追加（2026-08，Settings 伪 tab 抽象评估）**：~~8 处特判~~ → SettingsShell 抽取 + welcome 背景化后，残留特判仅 4 处且全部小而集中（wiring Ctrl+W 检查、switcher/quickpanel 天然排除、switchTo 关 settings、closeTab 兄弟扫描）。**E2（Settings 升格一等 tab）于 2026-08 撤销**：病灶已根治，而升格需要给全应用依赖最重的 `tabs` Map 引入 TabView 接口并对每处 `.terminal`/`.type` 访问收窄类型，成本超过收益。伪 tab + SettingsShell 即最终形态。
 
 **现状**：`tabmanager.ts` 882 行 8+ 职责（本轮 MRU/session-exited 也只能塞进去）；`tab.ts` 671 行。后端同类：`sshclient.rs` 2226 行五职责域；`lib.rs` debug/release **双份 `generate_handler!` 列表**——本轮各加 3 个 `window_*` 命令，双份维护成本当场兑现。
 
@@ -125,7 +125,9 @@
 - `querySelector/getElementById` 共 **156 处、24 个文件**，零常量化；index.html 15 个静态 id 被字符串直接引用；跨语言隐式契约（`tab-{n}` 格式呼应 TS 与 pty.rs）。
 - ssh.ts 覆盖 `~/.ssh/config` 用原生 `confirm()`（且内联 `onclick` 被 CSP 拦截报违规），与项目自建 confirmDialog 矛盾（themeeditor/serialprofileeditor 同有原生 confirm）。
 
-**方法**：~30 行自动转义 `html` 标签模板助手收敛模板写法；公共 `el()` 收进 `ui/dom.ts`；DOM id 常量表（`core/dom-ids.ts`）；原生 confirm 全部替换为 confirmDialog。
+**方法**：~30 行自动转义 `html` 标签模板助手收敛模板写法（✅ 已落地 `ui/dom.ts`，ssh.ts 示范迁移完成）；公共 `el()` 收进 `ui/dom.ts`（✅）；DOM id 常量表（✅ `core/dom-ids.ts`，chrome id 已收编）；原生 confirm 全部替换为 confirmDialog（✅）。
+
+> **后续路径（2026-08 决策）**：settings 交互打磨（重渲染丢焦点/滚动/展开状态，`keepPending` 系列 workaround 的根源）计划引入 **lit-html**（~5kb，tagged template + 默认转义 + 部件级 diff 渲染，与本项目模型兼容）——以 SSH 面板为试点验证"编辑不丢焦点、展开不收起"，成立再推广；一次性渲染场景继续用 `ui/dom.ts` 的 `html`` 助手。不引入 htm+preact 及以上量级方案。
 
 ## P4 — main.ts 接线堆 + 通知机制三套并存
 

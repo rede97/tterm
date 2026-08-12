@@ -97,6 +97,9 @@ export async function duplicateTab(mgr: TabManager, id: string): Promise<void> {
   if (!tab) return;
   if (tab.type === "ssh" && tab.sshHost) {
     await mgr.createSshTab(tab.sshHost);
+  } else if (tab.type === "serial" && tab.serialPort) {
+    // Same device; profile/baud re-read from the current defaults.
+    await mgr.createSerialTab(tab.serialPort);
   } else if (tab.command) {
     await mgr.createLocalTab(tab.command, tab.label);
   } else {

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  allBuiltinFonts,
   BUILTIN_FONTS,
   buildFontFamily,
   defaultFontStack,
   fontStack,
-  NERDFONT_BUILTIN,
   parseFontFamily,
   updateFontStack,
 } from "../src/util/fontconfig";
@@ -62,9 +62,13 @@ describe("updateFontStack", () => {
 });
 
 describe("built-in font definitions", () => {
-  it("have unique family names across builtin and nerdfont sets", () => {
-    const all = [...BUILTIN_FONTS, ...NERDFONT_BUILTIN].map((f) => f.family.toLowerCase());
+  it("have unique family names", () => {
+    const all = BUILTIN_FONTS.map((f) => f.family.toLowerCase());
     expect(new Set(all).size).toBe(all.length);
+  });
+
+  it("embed no Nerd Fonts (users install NF at OS level)", () => {
+    expect(allBuiltinFonts().every((f) => !/\bNF\b|nerd/i.test(f.family))).toBe(true);
   });
 });
 

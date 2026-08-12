@@ -363,6 +363,7 @@ export class TabManager {
     const tab = this._makeTab(result, "serial", `${port.name} · ${baud}`);
     if (!tab) return null;
     tab.serialPortName = port.name;
+    tab.serialPort = port;
     tab.serialBaud = baud;
     tab.serialProfile = profile.name;
     tab.outputNewline = profile.outputNewline;
@@ -659,13 +660,13 @@ export class TabManager {
 
   // -- resize --
 
-  private _onResize(): void {
-    for (const t of this.tabs.values()) t.needsResize = true;
-    this._syncTabsOverflow();
-
+  // One fit pipeline for both callers. `settle` adds a double-rAF second
+  // pass — needed after FONT/config changes (cell metrics drift: xterm
+  // re-measures, the WebGL renderer rounds cell dims by dpr), pointless
+  // for window resizes where metrics are unchanged.
+  private _scheduleFitActive(settle: boolean): void {
     const active = this.activeTab;
     if (!active) return;
-
     if (this._resizeTimer) clearTimeout(this._resizeTimer);
     this._resizeTimer = setTimeout(() => {
       this._resizeTimer = null;
@@ -673,27 +674,20 @@ export class TabManager {
       const { cols, rows } = active.fit();
       active.needsResize = false;
       invoke("pty_resize", { id: active.id, cols, rows });
+      if (settle) active.fitDeferred();
     }, 10);
+  }
+
+  private _onResize(): void {
+    for (const t of this.tabs.values()) t.needsResize = true;
+    this._syncTabsOverflow();
+    this._scheduleFitActive(false);
   }
 
   // Public resize trigger — called after font/config changes that affect cell metrics.
   triggerResize(): void {
     for (const t of this.tabs.values()) t.needsResize = true;
-    const active = this.activeTab;
-    if (!active) return;
-    if (this._resizeTimer) clearTimeout(this._resizeTimer);
-    this._resizeTimer = setTimeout(() => {
-      this._resizeTimer = null;
-      if (active.element.style.display === "none") return;
-      const { cols, rows } = active.fit();
-      active.needsResize = false;
-      invoke("pty_resize", { id: active.id, cols, rows });
-      // Cell metrics drift AFTER a font change (xterm re-measures, the
-      // WebGL renderer rounds cell dims by dpr): the fit above can compute
-      // one row too many with stale metrics, clipping the bottom line.
-      // fitDeferred's double-rAF second pass re-fits with settled metrics.
-      active.fitDeferred();
-    }, 10);
+    this._scheduleFitActive(true);
   }
 
   // -- new-tab button --

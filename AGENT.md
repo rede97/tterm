@@ -215,6 +215,7 @@ Backend-managed and in-band (`deadmode.rs` + relay dead mode): on byte-stream en
 
 - `util/fontconfig.ts` holds `fontStack: string[]` (no CSS quoting). `buildFontFamily()` quotes names with spaces and appends `monospace` at the CSS boundary; `parseFontFamily()` reverses. `monospace` is never stored in config.
 - Default stack: `["JetBrains Mono", "Noto Sans SC", "Noto Sans JP", "Noto Sans KR", "Consolas"]` (per-script CJK fallback).
+- **Nerd Fonts are NOT embedded** (the patched builds aged badly with incomplete glyph sets). Only standard fonts ship via @fontsource; users install NF at the OS level and the picker's system-font enumeration lists them — per-user installs included (Windows' default non-admin install). Do not re-embed NF files.
 - **Web font loading race**: xterm measures cell metrics during `terminal.open()`; if web fonts aren't loaded yet, metrics are cached wrong. `TabManager` waits for `document.fonts.ready` and re-toggles `fontFamily` before showing the first tab. Do not remove.
 
 ## Terminal rendering gotchas

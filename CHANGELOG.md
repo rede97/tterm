@@ -1,5 +1,12 @@
 ## Unreleased
 
+Changes
+
+- **Embedded Nerd Fonts removed** — the bundled patched fonts were
+  outdated with incomplete glyph sets. Install Nerd Fonts at the OS
+  level instead; the font picker lists user-installed fonts (including
+  per-user installs) and links to nerdfonts.com
+
 Improvements
 
 - **Keybindings now live in their own file** — `keybindings.json` in the

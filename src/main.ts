@@ -11,12 +11,12 @@ import "@fontsource/source-code-pro";
 import "@fontsource/ibm-plex-mono";
 import "@fontsource/roboto-mono";
 import "@fontsource/ubuntu-mono";
-import "./assets/fonts/nerd-fonts.css";
 import { loadCustomThemes } from "./config/custom-themes";
 import { loadSerialProfiles } from "./config/serial-profiles";
 import { loadSshHosts } from "./config/ssh-config";
 import { loadAllWtData } from "./config/wt-profiles";
 import { logCatch, logError, swallow } from "./core/errorlog";
+import "./core/devhooks";
 import { configStore } from "./core/store";
 import { scheduleAutoUpdateCheck } from "./core/updater";
 import { initProfileMenu } from "./terminal/profilemenu";
@@ -116,11 +116,9 @@ configStore.subscribe((keys) => {
 
 // -- init feature modules --
 
-// Debug/E2E introspection hook (dev builds only).
-// NOTE: tabs must be a getter — _syncTabOrderFromDom reassigns the Map on
-// drag reorder, a captured reference would go stale.
+// Debug/E2E introspection hook (dev builds only). Typed in core/devhooks.ts.
 if (import.meta.env.DEV) {
-  (window as any).__tterm = {
+  window.__tterm = {
     get tabs() {
       return tabManager.tabs;
     },
@@ -128,14 +126,15 @@ if (import.meta.env.DEV) {
     config: configStore,
   };
   import("./util/imebox").then((m) => {
-    (window as any).__tterm.setImeMirrorMode = (mode: "auto" | "always" | "off") => {
+    if (!window.__tterm) return;
+    window.__tterm.setImeMirrorMode = (mode: "auto" | "always" | "off") => {
       m.setImeMirrorMode(mode);
       for (const t of tabManager.tabs.values()) t.refreshImeClasses();
     };
-    (window as any).__tterm.getImeMirrorMode = m.getImeMirrorMode;
+    window.__tterm.getImeMirrorMode = m.getImeMirrorMode;
     // M2 diagnostics: composition lifecycle tracer + bisection flags
-    (window as any).__tterm.imeTrace = (on: boolean) => m.setImeTrace(on);
-    (window as any).__tterm.imeDebug = (f: { suppress?: boolean; reanchor?: boolean }) => {
+    window.__tterm.imeTrace = (on: boolean) => m.setImeTrace(on);
+    window.__tterm.imeDebug = (f: { suppress?: boolean; reanchor?: boolean }) => {
       m.setImeDebugFlags(f);
       for (const t of tabManager.tabs.values()) t.refreshImeClasses();
     };
