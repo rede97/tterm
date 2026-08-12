@@ -193,16 +193,21 @@ pub(crate) async fn is_plain_http(stream: &tokio::net::TcpStream) -> bool {
         match stream.peek(&mut buf).await {
             Ok(0) => return false, // peer went away; let the WS path handle it
             Ok(n) => {
-                let mut headers = [httparse::EMPTY_HEADER; 64];
+                let mut headers = [httparse::EMPTY_HEADER; 128];
                 let mut req = httparse::Request::new(&mut headers);
                 match req.parse(&buf[..n]) {
                     Ok(httparse::Status::Complete(_)) => {
-                        // A WS handshake is still a valid HTTP GET — only the
-                        // Upgrade header separates it from the share API.
-                        let is_ws = req
-                            .headers
-                            .iter()
-                            .any(|h| h.name.eq_ignore_ascii_case("upgrade"));
+                        // A WS handshake is still a valid HTTP GET — only an
+                        // `Upgrade: websocket` header separates it from the
+                        // share API. Check the VALUE, not just the header
+                        // name: an h2c-style upgrade token must stay on the
+                        // plain-HTTP path (parity with the old substring scan).
+                        let is_ws = req.headers.iter().any(|h| {
+                            h.name.eq_ignore_ascii_case("upgrade")
+                                && h.value
+                                    .split(|&b| b == b',')
+                                    .any(|t| t.trim_ascii().eq_ignore_ascii_case(b"websocket"))
+                        });
                         return !is_ws;
                     }
                     Ok(httparse::Status::Partial) => {}
@@ -258,7 +263,7 @@ async fn read_request(stream: &mut tokio::net::TcpStream) -> Option<HttpRequest>
         if buf.len() > MAX_HEADER_BYTES {
             return None;
         }
-        let mut headers = [httparse::EMPTY_HEADER; 64];
+        let mut headers = [httparse::EMPTY_HEADER; 128];
         let mut req = httparse::Request::new(&mut headers);
         match req.parse(&buf) {
             Ok(httparse::Status::Complete(len)) => {

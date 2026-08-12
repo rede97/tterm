@@ -723,7 +723,12 @@ fn spawn_tray(app: &tauri::AppHandle) {
                     // No builder-level visible flag in this Tauri version —
                     // hide immediately; reconcile shows it when warranted.
                     let _ = icon.set_visible(false);
-                    *LAST_MENU.lock() = menu_order(&entries);
+                    // Only mark the menu current when it was actually
+                    // installed — otherwise reconcile's change check never
+                    // retries a failed build and the icon stays menu-less.
+                    if menu.is_some() {
+                        *LAST_MENU.lock() = menu_order(&entries);
+                    }
                     *slot = Some(icon);
                 }
                 Err(_) => return,
