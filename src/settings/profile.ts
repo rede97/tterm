@@ -55,9 +55,9 @@ function renderProfilePanel(container: HTMLElement) {
             <div class="settings-item-desc" style="margin-bottom:0;">${esc(p.command)}</div>
           </div>
           <div class="settings-item-control">
-            <label class="settings-toggle-row" style="padding:0;gap:0;">
+            <span class="settings-toggle-row" style="padding:0;gap:0;">
               <input type="checkbox" class="wt-profile-check" value="${esc(p.name)}" ${checked ? "checked" : ""} />
-            </label>
+            </span>
           </div>
         </label>`;
         })

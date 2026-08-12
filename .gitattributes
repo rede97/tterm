@@ -1,0 +1,14 @@
+# LF line endings everywhere: CI (Windows runners, core.autocrlf=true)
+# must not check out CRLF — Biome's formatter check expects LF.
+* text=auto eol=lf
+
+# Binary files — never line-ending-convert these.
+*.png binary
+*.ico binary
+*.icns binary
+*.exe binary
+*.dll binary
+*.otf binary
+*.ttf binary
+*.woff2 binary
+*.zip binary

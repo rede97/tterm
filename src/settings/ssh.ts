@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import Sortable from "sortablejs";
 import { generateSshConfig, loadSshHosts } from "../config/ssh-config";
 import { hostProp } from "../core/common";
-import { logError } from "../core/errorlog";
+import { logCatch, logError } from "../core/errorlog";
 import { type ConfigState, configStore } from "../core/store";
 import type { SshHost } from "../core/types";
 import { confirmDialog } from "../ui/confirm";
@@ -158,8 +158,10 @@ function renderSshPanel(container: HTMLElement, opts?: { keepPending?: boolean }
     );
     keyList.querySelectorAll<HTMLButtonElement>(".ssh-key-copy").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        await navigator.clipboard.writeText(btn.dataset.key!);
-        showToast("Public key copied to clipboard", "info");
+        await navigator.clipboard
+          .writeText(btn.dataset.key!)
+          .then(() => showToast("Public key copied to clipboard", "info"))
+          .catch(logCatch("clipboard.write"));
       });
     });
   });
