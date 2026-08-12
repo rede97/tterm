@@ -63,6 +63,7 @@ src/
     imebox.ts           floating IME composition mirror + enable modes + debug flags
     imefilter.ts        CursorPositionFilter (stable-run cursor estimate for IME anchoring)
     imeanchor.ts        imeAnchorCell / cursorPixelPos (fake-cursor inverse-cell scan)
+    imefreeze.ts        patchImeFreeze — textarea style Proxy (IME candidate window freeze)
     hysteresis.ts       fit hysteresis (see below)
     disconnect.ts       re-attach backoff helpers
     fontconfig.ts       font stack model, system font enumeration glue

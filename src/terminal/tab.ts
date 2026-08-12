@@ -20,10 +20,11 @@ import { reattachDelayForAttempt, shouldAutoReattach } from "../util/disconnect"
 import { cursorPixelPos, imeAnchorCell } from "../util/imeanchor";
 import { getImeDebugFlags, ImeBox, imeMirrorActiveFor } from "../util/imebox";
 import { CursorPositionFilter } from "../util/imefilter";
+import { type FreezeHandle, patchImeFreeze } from "../util/imefreeze";
 import { applyProgressToTabElement, parseOsc9Progress } from "../util/osc";
 import { createSerialInputHandler } from "../util/serialinput";
 import { SizeHint } from "../util/sizehint";
-import { cellDimensions, cursorIsHidden, terminalTextarea } from "../util/xterm-internals";
+import { cursorIsHidden } from "../util/xterm-internals";
 import { BatchAttachAddon } from "./batchattach";
 import { computeGrid } from "./fit";
 import { pasteIntoTerminal } from "./paste";
@@ -88,11 +89,8 @@ export class TerminalTab {
   private cursorFilter = new CursorPositionFilter();
   private onRenderDisposable?: IDisposable;
   private attachAddon?: BatchAttachAddon;
-  // document-level IME listeners (capture phase) — removed in destroy().
-  private _imeCompStart?: (e: CompositionEvent) => void;
-  private _imeCompEnd?: (e: CompositionEvent) => void;
-  // Stops the composition re-anchor interval (set up with the freeze proxy).
-  private _imeStopRefresh?: () => void;
+  // IME freeze proxy handle (see util/imefreeze.ts) — disposed on destroy.
+  private _imeFreeze?: FreezeHandle;
 
   constructor(id: string, type: TabType, label: string, container: HTMLElement) {
     this.id = id;
@@ -202,7 +200,7 @@ export class TerminalTab {
     this.refreshImeClasses();
 
     // Drive the native IME candidate window with the filtered cursor position.
-    this._patchImeFreeze();
+    this._imeFreeze = patchImeFreeze(this.terminal, this.element, this.cursorFilter);
 
     // Floating IME composition mirror (Plan C): pure display, never touches
     // the input path. shouldMirror gates activation per composition so a
@@ -364,146 +362,6 @@ export class TerminalTab {
     if (this.tabElement) applyProgressToTabElement(this.tabElement, state, progress);
   }
 
-  private _patchImeFreeze(): void {
-    // Replace xterm.js's own IME textarea positioning with a filtered anchor:
-    //  - anchor = dwell-filter mode position (robust against animation frames,
-    //    where the instantaneous cursor cell at compositionstart is unreliable)
-    //  - during composition the textarea style is frozen via a Proxy, and a
-    //    200ms timer re-anchors from the filter so the native candidate window
-    //    follows once the cursor settles.
-    let left: number | null = null;
-    let top: number | null = null;
-    let refreshTimer: number | null = null;
-
-    // Need to wait for xterm.open() to complete before the textarea exists.
-    // open() runs synchronously in the constructor above, so it's safe here.
-    const ta = terminalTextarea(this.terminal);
-    if (!ta) return;
-
-    // Filtered cursor position in pixels, relative to the terminal element.
-    // Right edge clamped into a safe area: if the frozen textarea sits at
-    // the window's right edge (where cursor-hiding TUIs like btop park the
-    // fake cursor), the OS candidate window overflows sideways — and
-    // Chromium's IME avoidance mechanism shifts the whole frame to make
-    // room for it (compositor-level, not a DOM scroll, so clip can't block
-    // it). Keeping the caret clear of the right edge removes the trigger.
-    //
-    // The BOTTOM edge is deliberately NOT clamped: the candidate window is
-    // a top-level OS window and can draw below the app window. Clamping it
-    // upward placed it right on top of the floating composition mirror
-    // whenever the cursor sat on the bottom row.
-    const SAFE_RIGHT = 220; // typical single-row candidate window width
-    const pxPos = (): { x: number; y: number } | null => {
-      const cellDims = cellDimensions(this.terminal);
-      if (!cellDims) return null;
-      const cell = imeAnchorCell(this.terminal, this.cursorFilter);
-      const maxX = Math.max(0, this.element.clientWidth - cellDims.width - SAFE_RIGHT);
-      const maxY = Math.max(0, this.element.clientHeight - cellDims.height);
-      return {
-        x: Math.min(cell.x * cellDims.width, maxX),
-        y: Math.min(cell.y * cellDims.height, maxY),
-      };
-    };
-
-    // Replace `ta.style` with a Proxy whose setters for left/top/width are
-    // clamped during IME composition.
-    const origStyle = ta.style;
-    const terminal = this.terminal; // handler `this` is the ProxyHandler
-    const proxyHandler: ProxyHandler<CSSStyleDeclaration> = {
-      set(target, prop, value, receiver) {
-        if (left !== null && top !== null) {
-          if (prop === "left") {
-            return Reflect.set(target, prop, `${left}px`, receiver);
-          }
-          if (prop === "top") {
-            return Reflect.set(target, prop, `${top}px`, receiver);
-          }
-          // Prevent xterm.js from setting width to a huge value (screen width).
-          // Clamp to one cell width so IME candidate window stays at correct position.
-          if (prop === "width") {
-            const cellW = cellDimensions(terminal)?.width ?? 8;
-            return Reflect.set(target, prop, `${Math.max(cellW, 1)}px`, receiver);
-          }
-          // With the composition-view suppressed (display:none), xterm measures
-          // its bounds as 0 and would shrink the textarea to 1px x 1px —
-          // xterm's own comment warns "certain IMEs may break" below 1x1.
-          // Keep the textarea a full cell so the TSF composition stays alive.
-          if (prop === "height" || prop === "lineHeight") {
-            const cellH = cellDimensions(terminal)?.height ?? 16;
-            return Reflect.set(target, prop, `${Math.max(cellH, 1)}px`, receiver);
-          }
-        }
-        return Reflect.set(target, prop, value, receiver);
-      },
-    };
-
-    // Override the textarea's style property descriptor so that every
-    // `this._textarea.style.left = ...` call in xterm.js goes through our proxy.
-    Object.defineProperty(ta, "style", {
-      get() {
-        return new Proxy(origStyle, proxyHandler);
-      },
-      set(_v: CSSStyleDeclaration) {
-        /* ignore */
-      },
-      configurable: true,
-    });
-
-    const stopRefresh = () => {
-      if (refreshTimer !== null) {
-        clearInterval(refreshTimer);
-        refreshTimer = null;
-      }
-    };
-    // Reachable from destroy(): mid-composition tab close must not leave the
-    // 200ms interval poking a disposed terminal (and holding this tab alive).
-    this._imeStopRefresh = stopRefresh;
-
-    // compositionstart/end: capture the frozen anchor position.
-    // These fire on the hidden textarea and bubble through document.
-    // Handlers live on fields so destroy() can remove them — an anonymous
-    // listener would leak the whole tab via its closure.
-    this._imeCompStart = (e: CompositionEvent) => {
-      if (e.target !== ta) return; // only this tab's textarea
-      const p = pxPos();
-      if (p) {
-        left = p.x;
-        top = p.y;
-      }
-      // Periodically re-anchor from the filter while composing. Writes go to
-      // origStyle directly, bypassing the freeze Proxy.
-      stopRefresh();
-      if (getImeDebugFlags().reanchor) {
-        refreshTimer = window.setInterval(() => {
-          const q = pxPos();
-          if (!q || (q.x === left && q.y === top)) return;
-          left = q.x;
-          top = q.y;
-          origStyle.left = `${q.x}px`;
-          origStyle.top = `${q.y}px`;
-        }, 200);
-      }
-    };
-
-    this._imeCompEnd = (e: CompositionEvent) => {
-      if (e.target !== ta) return;
-      left = null;
-      top = null;
-      stopRefresh();
-      // Reset horizontal scroll drift: in cursor-hidden TUI apps (htop/btop)
-      // the cursor is parked at a fixed position, often the end of a line.
-      // IME composition positions the textarea there, which can trigger
-      // xterm.js to scroll the viewport right. On compositionend the scroll
-      // should reset, but cursor-hidden mode + the frozen-textarea Proxy
-      // can prevent xterm.js's own reset from firing — leaving scrollLeft
-      // > 0 and clipping the leftmost column.
-      const vp = this.element.querySelector(".xterm-viewport") as HTMLElement | null;
-      if (vp && vp.scrollLeft !== 0) vp.scrollLeft = 0;
-    };
-    document.addEventListener("compositionstart", this._imeCompStart, true);
-    document.addEventListener("compositionend", this._imeCompEnd, true);
-  }
-
   show(): void {
     this.element.style.display = "";
     this.tabElement.classList.add("active");
@@ -627,10 +485,7 @@ export class TerminalTab {
     this.serialSocket = undefined;
     this.socket?.close();
     this.socket = undefined;
-    this._imeStopRefresh?.();
-    if (this._imeCompStart)
-      document.removeEventListener("compositionstart", this._imeCompStart, true);
-    if (this._imeCompEnd) document.removeEventListener("compositionend", this._imeCompEnd, true);
+    this._imeFreeze?.dispose();
     this.sizeHint.destroy();
     this.imeBox.destroy();
     this.onRenderDisposable?.dispose();
