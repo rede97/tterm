@@ -1,4 +1,4 @@
-## Unreleased
+## v2.0.0
 
 Changes
 
@@ -6,12 +6,9 @@ Changes
   outdated with incomplete glyph sets. Install Nerd Fonts at the OS
   level instead; the font picker lists user-installed fonts (including
   per-user installs) and links to nerdfonts.com
-
-Improvements
-
-- **Keybindings now live in their own file** — `keybindings.json` in the
-  config directory (VS Code parity), easy to hand-edit or share; existing
-  bindings are migrated out of `config.json` automatically
+- **Keybindings moved to their own file** — `keybindings.json` in the
+  config directory (VS Code parity), easy to hand-edit or share;
+  existing bindings migrate out of `config.json` automatically
 
 Fixes
 
@@ -25,22 +22,29 @@ Fixes
 - **Multi-line paste warning works** — the setting existed but was never
   enforced; pasting multiple lines now asks first (single commands still
   paste straight through)
+- **F11 full screen did nothing on a maximized window** (a platform
+  quirk: fullscreen only engages from a normal window) — it now drops
+  out of maximize first and restores it on exit
+- **Settings page no longer blanked** — closing the last terminal tab
+  while in Settings used to show the empty welcome screen over it
+- **Duplicating a serial tab now opens a serial session** on the same
+  device (it used to open a plain shell with the port's name)
 - **Rebinding a key to its default or unbinding a default could be
   silently ignored** in Settings → Keyboard
 - **Ctrl+= / Ctrl++ and numpad keys can now be bound** — the `+` key
   itself and numpad variants were rejected by the combo parser
 - **Quick open / tab switcher no longer stalls** when a tab closes while
   the overlay is open
-
-Fixes
-
-- **F11 full screen did nothing on a maximized window** (a platform quirk:
-  fullscreen only engages from a normal window) — it now drops out of
-  maximize first and restores it on exit
 - **Dev builds no longer share config with the installed app** — debug
-  builds (tauri dev / e2e) now keep all app state in a separate `dev/`
+  builds (tauri dev / e2e) keep all app state in a separate `dev/`
   subdirectory of the config dir, so testing can't mutate your real
   settings, keybindings, or tray state
+
+Internal
+
+- Full repository hardening pass: CI now gates on lint (Biome), typecheck,
+  frontend and backend tests, and rustfmt; resource cleanup for tab
+  close paths; backend prompt timeout and lock-free session respawn
 
 ## v1.0.3
 
