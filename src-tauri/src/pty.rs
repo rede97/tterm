@@ -8,7 +8,7 @@ use tauri::{Emitter, Manager};
 
 use crate::cmdparse::parse_command;
 use crate::relay::{register_session, unregister_session, ReconnectHooks};
-use crate::state::{AppState, PtySession, SessionState, SpawnSpec, WsConnectResult};
+use crate::state::{AppState, PtySession, SessionExited, SessionState, SpawnSpec, WsConnectResult};
 
 pub(crate) fn get_shell() -> String {
     #[cfg(target_os = "windows")]
@@ -32,6 +32,7 @@ fn spawn_pty_child(
     id: &str,
     cmd: CommandBuilder,
     size: PtySize,
+    app: &tauri::AppHandle,
 ) -> Result<crate::relay::SessionIo, String> {
     let pty_sys = native_pty_system();
     let pty_pair = pty_sys.openpty(size).map_err(|e| e.to_string())?;
@@ -57,10 +58,17 @@ fn spawn_pty_child(
     // ConPTY does NOT signal EOF on the output pipe when the child dies, so
     // the relay's read pump would block forever otherwise. Dropping the master
     // closes the PseudoConsole, the read fails, and the relay enters dead mode.
+    //
+    // The exit code is also reported to the frontend ("session-exited"): a
+    // clean exit (0 — Ctrl+D, `exit`, ssh logout) makes the tab close itself
+    // instead of showing the dead-mode reconnect prompt; an abnormal exit
+    // keeps the prompt so the session can be respawned in place.
     let sessions_arc = sessions.clone();
     let id2 = id.to_string();
+    let app2 = app.clone();
     std::thread::spawn(move || {
-        let _ = child.wait();
+        let code = child.wait().map(|s| s.exit_code()).unwrap_or(1);
+        let mut ours = false;
         if let Ok(mut m) = sessions_arc.lock() {
             // Only touch OUR spawn (not a respawn replacement).
             // Drop the master (closes ConPTY, unblocks the relay read pump)
@@ -68,8 +76,12 @@ fn spawn_pty_child(
             if m.get(&id2).is_some_and(|s| s.nonce == nonce) {
                 if let Some(s) = m.get_mut(&id2) {
                     s.master = None;
+                    ours = true;
                 }
             }
+        }
+        if ours {
+            let _ = app2.emit("session-exited", SessionExited { id: id2, code });
         }
     });
 
@@ -83,6 +95,7 @@ fn pty_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec, auto_retry: Arc
     let state = app.state::<AppState>();
     let sessions = state.sessions.clone();
     let initial_cwd = state.initial_cwd.clone();
+    let app_respawn = app.clone();
     ReconnectHooks {
         auto_retry: Some(auto_retry),
         notice: Box::new(crate::deadmode::disconnect_notice),
@@ -131,7 +144,7 @@ fn pty_hooks(app: tauri::AppHandle, id: String, spec: SpawnSpec, auto_retry: Arc
                     pixel_height: 0,
                 })
             };
-            spawn_pty_child(&sessions, &id, builder, size)
+            spawn_pty_child(&sessions, &id, builder, size, &app_respawn)
         }),
     }
 }
@@ -145,6 +158,7 @@ pub(crate) fn spawn_pty(app_handle: tauri::AppHandle, id: String, cmd: CommandBu
         &id,
         cmd,
         PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 },
+        &app_handle,
     )?;
     let hub = app_handle.state::<AppState>().hub.clone();
     register_session(&hub, &id, reader, writer, Some(pty_hooks(app_handle, id.clone(), spec, auto)))?;

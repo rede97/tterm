@@ -1,3 +1,34 @@
+## v1.0.3
+
+New Features
+
+- **Keyboard shortcuts, rebindable** — Settings → Keyboard lists every
+  command VS Code-style: click a keybinding, press the new combination,
+  Enter to confirm (conflicts are refused), Backspace to unbind, ↺ to
+  restore the default. Ships with:
+  - **Ctrl+P** — quick-open panel over all tabs; type a tab number or
+    name, Enter to jump
+  - **Ctrl+Tab / Ctrl+Shift+Tab** — hold Ctrl to step through tabs in
+    most-recently-used order (backward with Shift), release to switch
+  - **Ctrl+W** — close the active tab
+  - **F11** — full screen, browser-style: covers the taskbar, tab bar
+    hidden; F11 again restores
+  - **Shift+F11** — zen mode: maximized window with the tab bar hidden
+    (stays above the taskbar)
+  - **Terminal: Clear** — clears screen and scrollback; unbound by
+    default, bind it (e.g. Ctrl+L) in Settings → Keyboard
+- **Clean shell exit closes the tab** — Ctrl+D, `exit`, or an SSH logout
+  (exit code 0) now closes the tab directly instead of showing the
+  "Press Enter to reconnect" prompt. Abnormal exits (crash, SSH network
+  drop) still offer in-place reconnect as before
+
+Fixes
+
+- **Switching the font family while maximized left the terminal
+  clipped** — newly chosen fonts load lazily, so the first size
+  calculation used fallback metrics and the oversized grid cut off the
+  bottom of the screen once the real glyphs arrived
+
 ## v1.0.2
 
 New Features

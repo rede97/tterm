@@ -40,6 +40,9 @@ export interface ConfigState {
   // Built-in SSH client (russh) instead of spawning the system ssh binary.
   sshEmbedded: boolean;
   recentDirectories: string[];
+  // User keybinding overrides: command id → combo ("ctrl+shift+p"), "" = unbound.
+  // Merged over the defaults in core/keymap.ts; ids not in the registry are ignored.
+  keybindings: Record<string, string>;
   // Runtime flag
   loaded: boolean;
 }
@@ -55,6 +58,9 @@ const isString = (v: unknown): v is string => typeof v === "string";
 const isBoolean = (v: unknown): v is boolean => typeof v === "boolean";
 const isNumber = (min: number, max: number) => (v: unknown): v is number => typeof v === "number" && v >= min && v <= max;
 const isArray = <T = unknown>(v: unknown): v is T[] => Array.isArray(v);
+const isStringRecord = (v: unknown): v is Record<string, string> =>
+  typeof v === "object" && v !== null && !Array.isArray(v) &&
+  Object.values(v).every(x => typeof x === "string");
 const isOrNull = <T>(guard: (v: unknown) => v is T) => (v: unknown): v is T | null => v === null || guard(v);
 
 
@@ -79,6 +85,7 @@ const SCHEMA = {
   autoCheckUpdates:   { default: true,                     validate: isBoolean },
   sshEmbedded:        { default: true,                     validate: isBoolean },
   recentDirectories:  { default: [] as string[],           validate: isArray<string> },
+  keybindings:        { default: {} as Record<string, string>, validate: isStringRecord },
   loaded:             { default: false,                    validate: isBoolean },
 } satisfies Record<string, SchemaEntry<unknown>>;
 

@@ -14,6 +14,26 @@ pub fn window_toggle_maximize(window: tauri::Window) {
     }
 }
 
+// Explicit variants for zen mode (F11): a toggle would fight the frontend's
+// saved pre-zen maximized state when the user resizes mid-gesture.
+#[tauri::command]
+pub fn window_maximize(window: tauri::Window) {
+    let _ = window.maximize();
+}
+
+#[tauri::command]
+pub fn window_unmaximize(window: tauri::Window) {
+    let _ = window.unmaximize();
+}
+
+// Browser-style fullscreen (covers the taskbar) for the F11 shortcut. The
+// JS Window API's set_fullscreen is not in our capabilities either, so the
+// frontend goes through this command like the maximize path.
+#[tauri::command]
+pub fn window_set_fullscreen(window: tauri::Window, on: bool) {
+    let _ = window.set_fullscreen(on);
+}
+
 #[tauri::command]
 pub fn window_close(window: tauri::Window) {
     let _ = window.close();

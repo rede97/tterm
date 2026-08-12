@@ -27,7 +27,13 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // Don't persist FULLSCREEN: F11 fullscreen is a per-session viewing
+        // mode, and relaunching into a chrome-ful but fullscreen window
+        // would strand the zen state machine. Browsers behave the same way.
+        .plugin(tauri_plugin_window_state::Builder::default()
+            .with_state_flags(tauri_plugin_window_state::StateFlags::all()
+                & !tauri_plugin_window_state::StateFlags::FULLSCREEN)
+            .build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
@@ -65,7 +71,7 @@ pub fn run() {
             #[cfg(debug_assertions)]
             { tauri::generate_handler![
                 pty::pty_spawn, pty::pty_spawn_ssh, pty::pty_resize, pty::pty_kill,
-                window::window_minimize, window::window_toggle_maximize, window::window_close,
+                window::window_minimize, window::window_toggle_maximize, window::window_maximize, window::window_unmaximize, window::window_set_fullscreen, window::window_close,
                 window::window_start_drag, window::open_new_window, window::pick_directory, window::save_text_file,
                 ssh::ssh_read_config_raw, ssh::open_ssh_config, ssh::ssh_clear_known_hosts,
                 sshclient::ssh_spawn_embedded, sshclient::ssh_auth_response, sshclient::ssh_hostkey_response,
@@ -88,7 +94,7 @@ pub fn run() {
             #[cfg(not(debug_assertions))]
             { tauri::generate_handler![
                 pty::pty_spawn, pty::pty_spawn_ssh, pty::pty_resize, pty::pty_kill,
-                window::window_minimize, window::window_toggle_maximize, window::window_close,
+                window::window_minimize, window::window_toggle_maximize, window::window_maximize, window::window_unmaximize, window::window_set_fullscreen, window::window_close,
                 window::window_start_drag, window::open_new_window, window::pick_directory, window::save_text_file,
                 ssh::ssh_read_config_raw, ssh::open_ssh_config, ssh::ssh_clear_known_hosts,
                 sshclient::ssh_spawn_embedded, sshclient::ssh_auth_response, sshclient::ssh_hostkey_response,

@@ -99,20 +99,29 @@ describe("TTerm application", () => {
     }, { timeout: 10000, timeoutMsg: "no .tab-progress appeared on demo tab" });
   });
 
-  it("prints in-band disconnect prompt on session exit and respawns on Enter", async () => {
-    // Backend dead-mode: killing the shell prints a reset+notice INTO the
-    // terminal stream (no overlay), the tab label gets a strikethrough, and
-    // pressing Enter — a normal keystroke over the socket — respawns.
-    const firstTab = await $("#tabs .tab");
-    await firstTab.click();
-    await browser.pause(500);
-    // click the terminal viewport to guarantee xterm's textarea has focus
-    const viewport = await $(".terminal-instance .xterm");
-    await viewport.click();
+  it("abnormal shell exit shows the in-band reconnect prompt; clean exit auto-closes the tab", async () => {
+    // Backend dead-mode survives only for ABNORMAL exits (crash, network
+    // drop): killing the shell with a non-zero code prints a reset+notice
+    // INTO the terminal stream, the tab label gets a strikethrough, and
+    // pressing Enter respawns. A clean exit (code 0 — Ctrl+D, `exit`, ssh
+    // logout) instead closes the tab outright via the session-exited event.
+    // Run on a DEDICATED tab: the clean-exit assertion closes it, and other
+    // tests keep their shared first tab.
+    await browser.execute(async () => { await window.__tterm.mgr.createLocalTab(); });
+    await browser.pause(800);
+    // Focus the fresh tab's terminal (a DOM-order xterm query can land on a
+    // hidden tab's element, which WebDriver refuses to click).
+    const focusVisible = () => browser.execute(() => {
+      const visible = [...document.querySelectorAll(".terminal-instance")]
+        .find(el => el.style.display !== "none");
+      const tab = [...(window).__tterm.tabs.values()].find(t => t.element === visible);
+      tab?.terminal.focus();
+    });
+    await focusVisible();
     await browser.pause(300);
-    await browser.keys(["e", "x", "i", "t", "Enter"]);
+    await browser.keys(["e", "x", "i", "t", " ", "7", "Enter"]);
 
-    // shell exits -> backend prints the prompt into the terminal buffer…
+    // shell exits abnormally -> backend prints the prompt into the terminal buffer…
     const dumpBuffer = () => browser.execute(() => {
       const visible = [...document.querySelectorAll(".terminal-instance")]
         .find(el => el.style.display !== "none");
@@ -150,12 +159,23 @@ describe("TTerm application", () => {
 
     // The respawned shell actually works.
     await browser.pause(500);
-    await viewport.click();
+    await focusVisible();
     await browser.pause(200);
     await browser.keys(["e", "c", "h", "o", " ", "R", "E", "S", "P", "A", "W", "N", "O", "K", "Enter"]);
     await browser.waitUntil(async () => {
       return (await dumpBuffer()).includes("RESPAWNOK");
     }, { timeout: 10000, timeoutMsg: "respawned shell did not answer" });
+
+    // Clean exit (code 0): the tab closes itself — no reconnect prompt,
+    // no strikethrough, the session slot is torn down.
+    const tabsBefore = (await $$("#tabs .tab")).length;
+    await browser.keys(["e", "x", "i", "t", "Enter"]);
+    await browser.waitUntil(async () => {
+      return (await $$("#tabs .tab")).length === tabsBefore - 1;
+    }, { timeout: 10000, timeoutMsg: "clean shell exit did not auto-close the tab" });
+    expect(await browser.execute(() =>
+      [...document.querySelectorAll("#tabs .tab")].some(t => t.classList.contains("disconnected"))
+    )).toBe(false);
   });
 
   it("reorders tabs via drag (SortableJS)", async () => {

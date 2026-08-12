@@ -34,6 +34,10 @@ export class TabManager {
   activeTabId: string | null = null;
   settingsOpen = false;
 
+  // Most-recently-used tab ids, front = current. Drives the Ctrl+Tab
+  // switcher order. Updated on switch, pruned on close.
+  private _mru: string[] = [];
+
   private settingsEl: HTMLElement | null = null;
   private settingsTabEl: HTMLElement | null = null;
   private _createSettingsContent: (() => Promise<HTMLElement>) | null = null;
@@ -64,6 +68,15 @@ export class TabManager {
       listen<{ id: string; alive: boolean }>("session-state", (e) => {
         this.tabs.get(e.payload.id)?.setDisconnected(!e.payload.alive);
         updateQuickButton();
+      });
+      // PTY child exit (shell quit via Ctrl+D / `exit`, external ssh
+      // logout): a deliberate exit closes the tab outright — no dead-mode
+      // reconnect prompt. Non-zero exits (crash, ssh network drop) keep
+      // the dead-mode prompt so the session can be respawned in place.
+      listen<{ id: string; code: number }>("session-exited", (e) => {
+        if (e.payload.code === 0 && this.tabs.has(e.payload.id)) {
+          this.closeTab(e.payload.id);
+        }
       });
       // Tray restore with a picked tab: same-process restores emit this
       // event directly; cross-process restores park a request file that we
@@ -441,6 +454,7 @@ export class TabManager {
     if (prev) prev.hide();
     next.show();
     this.activeTabId = id;
+    this._mru = [id, ...this._mru.filter(x => x !== id)];
     // The quick panel tracks the active tab; switching closes it.
     closeQuickPanel();
     updateQuickButton();
@@ -487,6 +501,7 @@ export class TabManager {
 
     tab.destroy();
     this.tabs.delete(id);
+    this._mru = this._mru.filter(x => x !== id);
 
     if (wasActive) {
       if (nextEl) {
@@ -519,6 +534,11 @@ export class TabManager {
 
   get activeTab(): TerminalTab | undefined {
     return this.activeTabId ? this.tabs.get(this.activeTabId) : undefined;
+  }
+
+  // MRU-ordered live tab ids (front = most recently active) for the Ctrl+Tab switcher.
+  mruTabIds(): string[] {
+    return this._mru.filter(id => this.tabs.has(id));
   }
 
   getTabIndex(id: string): number {
@@ -787,6 +807,11 @@ export class TabManager {
       const { cols, rows } = active.fit();
       active.needsResize = false;
       invoke("pty_resize", { id: active.id, cols, rows });
+      // Cell metrics drift AFTER a font change (xterm re-measures, the
+      // WebGL renderer rounds cell dims by dpr): the fit above can compute
+      // one row too many with stale metrics, clipping the bottom line.
+      // fitDeferred's double-rAF second pass re-fits with settled metrics.
+      active.fitDeferred();
     }, 10);
   }
 

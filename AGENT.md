@@ -38,6 +38,7 @@ src/
     fontpicker.ts       font picker modal (dynamically imported by settings)
   core/
     store.ts            configStore — reactive config, single source of truth (schema + defaults)
+    keymap.ts           keyboard shortcuts: command registry, combo parsing, global dispatcher
     types.ts            shared TS types (TabType, PtyOutputPayload, ...)
     common.ts           shared constants/helpers
     errorlog.ts         logCatch / logError
@@ -47,10 +48,11 @@ src/
     serial-memory.ts    per-device serial params (VID:PID keyed)
   settings/
     index.ts            settings shell (sidebar nav, footer Apply/Revert, panel routing)
-    general|appearance|profile|ssh|serial.ts   the five panels
+    general|appearance|profile|ssh|serial|shortcuts.ts   the six panels
     sshhosteditor.ts    host Add/Edit modal; sshkeys.ts  key generate/install modals
   ui/
-    window.ts           window controls, drag handling, maximize icon toggle
+    window.ts           window controls, drag handling, maximize icon toggle, zen mode (F11)
+    tabswitcher.ts      Ctrl+P quick-open + Ctrl+Tab MRU switcher overlay
     toast.ts            showToast — all user-facing errors
   util/
     imebox.ts           floating IME composition mirror + enable modes + debug flags
@@ -147,6 +149,8 @@ gotchas that bite during changes:
 
 Backend-managed and in-band (`deadmode.rs` + relay dead mode): on byte-stream end the relay keeps the socket alive, resets terminal modes (wrapped in save/restore cursor because `ESC[?1049l`/`ESC[?6l`/`ESC[r` home the cursor), prints a timed "Press Enter to reconnect" notice into the scrollback, and a `DeadWatcher` respawns on Enter. PTY respawn injects `resume_scroll` bytes first because a fresh ConPTY always opens with `ESC[2J`. A `session-state` event drives the tab-label strikethrough — the only frontend involvement. Transport-level drops (1006) trigger silent re-attach with backoff (`util/disconnect.ts`).
 
+**Clean exit auto-closes the tab** (exception to the above): the PTY watchdog reports the child's exit code on a `session-exited` event; on code 0 (Ctrl+D, `exit`, ssh logout) TabManager closes the tab instead of leaving the dead-mode prompt. Non-zero exits (crash, external-ssh network drop) keep the prompt and Enter-respawn path. Serial/embedded-SSH sessions have no child process, so they always stay on the dead-mode path.
+
 **Auto-reconnect** (quick panel toggle): `AppState.auto_reconnect` holds a per-session `Arc<AtomicBool>` shared with `ReconnectHooks.auto_retry`; while set, the dead-mode pump also retries `respawn` every 3 s WITHOUT Enter, and failed attempts print nothing (for serial sessions the failed open IS the unplug detection). The flag survives respawns and is removed only on tab kill. Serial `serial_set_baud` keeps the respawn spec in sync so a reconnect uses the current baud.
 
 ## Tab system
@@ -157,6 +161,17 @@ Backend-managed and in-band (`deadmode.rs` + relay dead mode): on byte-stream en
 - Tab drag reorder: SortableJS on `#tabs` (`forceFallback: true` — native HTML5 DnD is unreliable in WebView2), `onEnd` rebuilds the tabs Map from DOM order.
 - Tab titles track OSC title sequences. A user rename (inline edit in the tab label — no native prompt) sets `titleLocked` and OSC updates stop; committing an empty name clears the lock and restores the last OSC title. Internal label refreshes (e.g. serial baud display) call `rename(name, false)` so they never lock.
 - Window resize: all tabs marked dirty; only the active tab is fitted immediately (debounced).
+- MRU order (`TabManager._mru`, updated on switch/pruned on close) drives the Ctrl+Tab switcher.
+
+## Keyboard shortcuts
+
+- Command registry + combo parsing + global dispatcher: `core/keymap.ts`. One window-level **capture-phase** keydown listener intercepts bound combos before xterm's textarea eats them (Ctrl+W, Ctrl+Tab are terminal input otherwise). Handlers are injected from `main.ts` (`initKeymap`) — keymap never imports TabManager.
+- User overrides persist in configStore `keybindings` (`{commandId: combo}`, `""` = unbind); effective = registry defaults merged with overrides (`resolveKeybindings`). Combo grammar: lowercase, `ctrl+alt+shift+meta` order, e.g. `ctrl+shift+tab`.
+- Defaults: Ctrl+P quick open, Ctrl+Tab / Ctrl+Shift+Tab MRU switching, Ctrl+W close tab, F11 browser-style fullscreen (covers the taskbar), Shift+F11 zen mode (maximized); **Terminal: Clear ships unbound**. Ctrl+D is deliberately NOT captured — it reaches the shell and ends the session (see clean-exit auto-close above).
+- Tab switcher overlay: `ui/tabswitcher.ts`. Ctrl+P = input + numbered list (digit query = tab number, else label substring); MRU mode = no input, each keydown steps, commit on release of the LAST binding modifier (derived from the next/prev-tab bindings, not hardcoded Ctrl), Escape cancels, window blur commits.
+- Zen/fullscreen (`ui/window.ts`): one chrome-hiding state machine (`body.zen-mode` hides `#tab-bar`), two window modes — `toggleFullscreenMode()` (fullscreen via the custom `window_set_fullscreen` command) and `toggleZenMode()` (maximize via `window_maximize`). The JS Window API maximize/fullscreen is NOT in our capabilities — always use the window.rs commands. A manual unmaximize/fullscreen-exit drops the mode (onResized check, per-mode `isMaximized`/`isFullscreen`, 600 ms transition grace). FULLSCREEN is excluded from window-state persistence so the app never relaunches into a chrome-less fullscreen.
+- **Font-change refit**: a newly chosen webfont family loads lazily — the first fit after a font change can measure FALLBACK metrics and leave the grid oversized (bottom clipped, worst when maximized). Two guards: `triggerResize()` runs a double-rAF settle re-fit (`fitDeferred`), and the config subscriber in `main.ts` re-fits after `document.fonts.load(primary)` resolves.
+- Settings panel: `settings/shortcuts.ts` (VS Code-style table, click-to-record capture, conflict refusal, per-row reset). The capture input calls `suspendKeymap()` so recorded combos don't fire commands; edits collect into the footer Apply like every other panel.
 
 ## Fit & hysteresis
 
@@ -253,7 +268,7 @@ One tray icon is shared by ALL windows, but TTerm windows are separate PROCESSES
 
 ## Settings page
 
-Lazy-loaded via `import("./settings")` on first open. Sidebar layout, five panels (General / Appearance / Profile / SSH / Serial). Footer: feedback text + Revert + Apply (Apply grays out after save, re-enables on change). Settings tab uses `data-tab-id="#settings"`, excluded from badge counting. All settings reads/writes go through `configStore` (`src/core/store.ts`) — schema + defaults live there in one declarative table.
+Lazy-loaded via `import("./settings")` on first open. Sidebar layout, six panels (General / Appearance / Profile / SSH / Serial / Keyboard). Footer: feedback text + Revert + Apply (Apply grays out after save, re-enables on change). Settings tab uses `data-tab-id="#settings"`, excluded from badge counting. All settings reads/writes go through `configStore` (`src/core/store.ts`) — schema + defaults live there in one declarative table.
 
 ## Profile loading flow
 

@@ -77,6 +77,6 @@ describe("settings — profile panel", () => {
     const ps = [...checks].find(c => c.value === "PowerShell")!;
     expect(ps.checked).toBe(false);
     // Panel-scoped: the settings page chrome survives the re-render.
-    expect(root.querySelectorAll(".settings-nav-item")).toHaveLength(5);
+    expect(root.querySelectorAll(".settings-nav-item")).toHaveLength(6);
   });
 });

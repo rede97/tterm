@@ -8,6 +8,7 @@ import { createAppearancePanel, refreshAppearancePanel, collectAppearanceSetting
 import { createProfilePanel, collectProfileSettings, refreshProfilePanel } from "./profile";
 import { createSshPanel, refreshSshPanel, collectSshSettings, isSshConfigDirty } from "./ssh";
 import { createSerialPanel, collectSerialSettings, refreshSerialPanel } from "./serial";
+import { createShortcutsPanel, refreshShortcutsPanel, collectShortcutsSettings } from "./shortcuts";
 import { loadAllWtData } from "../config/wt-profiles";
 import { setWtThemes } from "../util/themes";
 
@@ -25,6 +26,7 @@ export function createSettingsContent(): HTMLElement {
     { id: "profile", label: "Profile" },
     { id: "ssh", label: "SSH" },
     { id: "serial", label: "Serial" },
+    { id: "keyboard", label: "Keyboard" },
   ];
 
   for (let i = 0; i < panels.length; i++) {
@@ -56,6 +58,9 @@ export function createSettingsContent(): HTMLElement {
 
   const panelSerial = createSerialPanel();
   body.appendChild(panelSerial);
+
+  const panelShortcuts = createShortcutsPanel();
+  body.appendChild(panelShortcuts);
 
   // -- Footer --
   const footer = document.createElement("div");
@@ -168,6 +173,7 @@ function refreshAll(root: HTMLElement) {
   refreshProfilePanel(root);
   refreshSshPanel(root);
   refreshSerialPanel(root);
+  refreshShortcutsPanel(root);
   renderThemeGallery(root);
 }
 
@@ -178,6 +184,7 @@ async function applySettings(root: HTMLElement) {
     ...collectProfileSettings(root),
     ...collectSshSettings(root),
     ...collectSerialSettings(root),
+    ...collectShortcutsSettings(root),
   };
   configStore.set(partial);
   updateFontStack(parseFontFamily(configStore.get("fontFamily")));

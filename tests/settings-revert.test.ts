@@ -32,6 +32,33 @@ function revertButton(root: HTMLElement): HTMLButtonElement {
   return btn!;
 }
 
+describe("settings — panel visibility", () => {
+  it("opens on General with all other panels hidden; sidebar switches", () => {
+    const root = createSettingsContent();
+    document.body.appendChild(root);
+
+    const panels = [...root.querySelectorAll<HTMLElement>(".settings-panel-content")];
+    expect(panels.map(p => p.dataset.panel)).toEqual(
+      ["general", "appearance", "profile", "ssh", "serial", "keyboard"],
+    );
+    // Only General shows on open — a panel that forgets display:none
+    // renders stacked over the General page.
+    for (const p of panels) {
+      expect(p.style.display, `${p.dataset.panel} initial visibility`)
+        .toBe(p.dataset.panel === "general" ? "" : "none");
+    }
+
+    // Sidebar navigation flips visibility.
+    root.querySelectorAll<HTMLElement>(".settings-nav-item").forEach(n => {
+      if (n.dataset.panel === "keyboard") n.click();
+    });
+    for (const p of panels) {
+      expect(p.style.display, `${p.dataset.panel} after switching`)
+        .toBe(p.dataset.panel === "keyboard" ? "" : "none");
+    }
+  });
+});
+
 describe("settings — Revert", () => {
   it("keeps the settings page intact and re-renders only the SSH panel", async () => {
     const root = createSettingsContent();
@@ -42,8 +69,8 @@ describe("settings — Revert", () => {
       expect(root.querySelector(".settings-feedback")!.textContent).toBe("Reverted to saved config");
     });
 
-    // Page chrome survives: sidebar with all five panels, footer buttons.
-    expect(root.querySelectorAll(".settings-nav-item")).toHaveLength(5);
+    // Page chrome survives: sidebar with all six panels, footer buttons.
+    expect(root.querySelectorAll(".settings-nav-item")).toHaveLength(6);
     expect(revertButton(root).textContent).toBe("Revert");
     const footerApply = root.querySelector<HTMLButtonElement>(
       ".settings-footer .settings-btn:not(.settings-btn-revert)",
@@ -51,7 +78,7 @@ describe("settings — Revert", () => {
     expect(footerApply!.textContent).toBe("Apply");
 
     // Every panel still exists exactly once…
-    for (const name of ["general", "appearance", "profile", "ssh", "serial"]) {
+    for (const name of ["general", "appearance", "profile", "ssh", "serial", "keyboard"]) {
       expect(
         root.querySelectorAll(`.settings-panel-content[data-panel="${name}"]`),
         `${name} panel`,
@@ -78,7 +105,7 @@ describe("settings — Revert", () => {
       // feedback clears after 2s; don't wait, just proceed
     }
 
-    expect(root.querySelectorAll(".settings-nav-item")).toHaveLength(5);
+    expect(root.querySelectorAll(".settings-nav-item")).toHaveLength(6);
     expect(root.querySelectorAll('.settings-panel-content[data-panel="ssh"]')).toHaveLength(1);
     expect(root.querySelectorAll(".ssh-host-card")).toHaveLength(1);
   });

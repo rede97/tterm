@@ -16,14 +16,17 @@ import { tabManager, initTabManager } from "./terminal/tabmanager";
 import { initSearchBar } from "./terminal/search";
 import { initProfileMenu } from "./terminal/profilemenu";
 import { initSshAuthDialogs } from "./terminal/sshauth";
-import { initWindowControls } from "./ui/window";
+import { initWindowControls, toggleZenMode, toggleFullscreenMode } from "./ui/window";
+import { initKeymap } from "./core/keymap";
+import { setTabSwitcherHandlers, openQuickOpen, stepMruSwitcher } from "./ui/tabswitcher";
+import type { TerminalTab } from "./terminal/tab";
 import { configStore } from "./core/store";
 import { loadSshHosts } from "./config/ssh-config";
 import { loadAllWtData } from "./config/wt-profiles";
 import { setWtThemes, findTheme, applyTerminalBackground } from "./util/themes";
 import { loadCustomThemes } from "./config/custom-themes";
 import { loadSerialProfiles } from "./config/serial-profiles";
-import { logCatch, logError } from "./core/errorlog";
+import { logCatch, logError, swallow } from "./core/errorlog";
 import { showToast } from "./ui/toast";
 import { scheduleAutoUpdateCheck } from "./core/updater";
 
@@ -90,6 +93,15 @@ configStore.subscribe((keys) => {
       tab.terminal.options.theme = theme;
     }
     tabManager.triggerResize();
+    // A newly chosen webfont family loads lazily: the fit above can measure
+    // fallback metrics and leave the grid oversized (bottom clipped) once
+    // the real glyphs arrive. Load the primary family explicitly, then refit.
+    const primary = configStore.get("fontFamily").split(",")[0]?.trim().replace(/^["']|["']$/g, "");
+    if (primary) {
+      document.fonts.load(`${configStore.get("fontSize")}px "${primary}"`)
+        .then(() => tabManager.triggerResize())
+        .catch(swallow);
+    }
   }
 });
 
@@ -99,7 +111,7 @@ configStore.subscribe((keys) => {
 // NOTE: tabs must be a getter — _syncTabOrderFromDom reassigns the Map on
 // drag reorder, a captured reference would go stale.
 if (import.meta.env.DEV) {
-  (window as any).__tterm = { get tabs() { return tabManager.tabs; }, mgr: tabManager };
+  (window as any).__tterm = { get tabs() { return tabManager.tabs; }, mgr: tabManager, config: configStore };
   import("./util/imebox").then(m => {
     (window as any).__tterm.setImeMirrorMode = (mode: "auto" | "always" | "off") => {
       m.setImeMirrorMode(mode);
@@ -119,6 +131,52 @@ tabManager.initNewTabButton();
 initSearchBar();
 initProfileMenu();
 initSshAuthDialogs();
+
+// Keyboard shortcuts: global dispatcher (core/keymap) + tab switcher overlay.
+// Commands are rebindable in Settings → Keyboard.
+{
+  const toItem = ([id, t]: [string, TerminalTab], i: number) => ({
+    id,
+    label: t.label,
+    index: i + 1,
+    active: id === tabManager.activeTabId,
+    disconnected: t.disconnected,
+  });
+  setTabSwitcherHandlers({
+    listTabs: (mode) => {
+      const entries = [...tabManager.tabs.entries()];
+      if (mode === "mru") {
+        const byId = new Map(entries);
+        return tabManager.mruTabIds().map(id => {
+          const i = entries.findIndex(([eid]) => eid === id);
+          return toItem([id, byId.get(id)!], i);
+        });
+      }
+      return entries.map((e, i) => toItem(e, i));
+    },
+    switchTo: (id) => tabManager.switchTo(id),
+  });
+  initKeymap({
+    "workbench.action.quickOpen": () => openQuickOpen(),
+    "workbench.action.nextTab": () => stepMruSwitcher(1),
+    "workbench.action.prevTab": () => stepMruSwitcher(-1),
+    "workbench.action.closeTab": () => {
+      if (tabManager.settingsOpen) { tabManager.closeSettings(true); return; }
+      if (tabManager.activeTabId) tabManager.closeTab(tabManager.activeTabId);
+    },
+    "workbench.action.toggleFullScreen": () => {
+      toggleFullscreenMode().then(() => tabManager.triggerResize()).catch(logCatch("window.fullScreen"));
+    },
+    "workbench.action.toggleZenMode": () => {
+      toggleZenMode().then(() => tabManager.triggerResize()).catch(logCatch("window.zenMode"));
+    },
+    "workbench.action.terminal.clear": () => {
+      const t = tabManager.activeTab;
+      if (t) t.terminal.clear();
+    },
+  });
+}
+
 import("./terminal/quickpanel").then(m => {
   m.setQuickPanelHandlers({
     getActiveTab: () => (tabManager.settingsOpen ? undefined : tabManager.activeTab),

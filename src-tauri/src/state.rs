@@ -34,6 +34,15 @@ pub struct SessionState {
     pub(crate) alive: bool,
 }
 
+// Emitted on the "session-exited" Tauri event when a PTY child process
+// terminates. The frontend auto-closes the tab on a clean exit (code 0);
+// non-zero exits fall through to the dead-mode reconnect prompt.
+#[derive(Clone, Serialize)]
+pub struct SessionExited {
+    pub(crate) id: String,
+    pub(crate) code: u32,
+}
+
 pub struct SerialSession {
     pub(crate) cancel: Arc<AtomicBool>,
     pub(crate) ctl: std::sync::mpsc::Sender<SerialCtl>,
