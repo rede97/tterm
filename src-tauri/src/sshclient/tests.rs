@@ -2,6 +2,7 @@
 
 use super::*;
 use std::path::PathBuf;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use crate::relay::{register_session, WsHub};
@@ -69,6 +70,10 @@ struct ServerState {
     exec_log: Vec<String>,
     // When true, the "is the key already authorized" probe succeeds.
     key_present: bool,
+    // When true, channel_open_session does NOT spawn the drain reader:
+    // upstream data is never consumed, so the client window fills and
+    // data_bytes parks — the L13 blocked-send scenario.
+    suspend_read: bool,
 }
 
 /// Minimal in-process SSH server: password auth (u/pw), echo shell on
@@ -98,8 +103,12 @@ impl server::Handler for TestServer {
         reply.accept().await;
         // Keep the channel alive by spawning a reader that just drains
         // window adjustments etc.; echo itself happens in data().
-        let (mut rd, _wr) = channel.split();
-        tauri::async_runtime::spawn(async move { while rd.wait().await.is_some() {} });
+        // suspend_read skips the drain: the client window then fills and
+        // upstream sends block (L13 test).
+        if !self.state.lock().suspend_read {
+            let (mut rd, _wr) = channel.split();
+            tauri::async_runtime::spawn(async move { while rd.wait().await.is_some() {} });
+        }
         Ok(())
     }
 
@@ -298,6 +307,7 @@ fn embedded_ssh_end_to_end() {
             exec_sim: ExecSim::Posix,
             exec_log: Vec::new(),
             key_present: false,
+            suspend_read: false,
         }));
 
         // Bind the SSH server.
@@ -449,6 +459,7 @@ fn dynamic_forward_socks5_round_trip() {
             exec_sim: ExecSim::Posix,
             exec_log: Vec::new(),
             key_present: false,
+            suspend_read: false,
         }));
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -565,6 +576,7 @@ fn ssh_flood_delivers_entire_omp_stream() {
             exec_sim: ExecSim::Posix,
             exec_log: Vec::new(),
             key_present: false,
+            suspend_read: false,
         }));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let ssh_port = listener.local_addr().unwrap().port();
@@ -678,6 +690,7 @@ async fn spawn_exec_server(
         exec_sim: sim,
         exec_log: Vec::new(),
         key_present,
+        suspend_read: false,
     }));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
@@ -879,6 +892,96 @@ fn exec_capture_decodes_split_utf8() {
             .expect("exec");
         assert_eq!(status, 0);
         assert_eq!(out, "ok:中", "split multi-byte char must survive: {out:?}");
+
+        let _ = std::fs::remove_file(&kh);
+    });
+}
+
+/// L13 regression: with the server not reading (channel window full),
+/// data_bytes parks inside the upstream pump; kill (cancel + close_notify)
+/// must interrupt the blocked send promptly — before the fix, the thread
+/// only checked cancel during the 100ms idle poll and stayed wedged.
+#[test]
+fn kill_interrupts_window_blocked_send() {
+    tauri::async_runtime::block_on(async {
+        let (port, state) = spawn_exec_server(ExecSim::Posix, false).await;
+        state.lock().suspend_read = true; // never drain → window fills
+        let spec = test_session(port).spec;
+        let kh = temp_known_hosts("l13");
+        let _ = std::fs::remove_file(&kh);
+
+        let prompter: Arc<dyn Prompter> = Arc::new(TestPrompter);
+        let mut config = client::Config::default();
+        config.inactivity_timeout = None;
+        let handler = SshHandler {
+            host: spec.hostname.clone(),
+            port: spec.port,
+            prompter: prompter.clone(),
+            known_hosts: Some(kh.clone()),
+            forwards: Arc::new(Mutex::new(HashMap::new())),
+        };
+        let mut handle = client::connect(
+            Arc::new(config),
+            (spec.hostname.as_str(), spec.port),
+            handler,
+        )
+        .await
+        .expect("connect");
+        authenticate(&mut handle, &spec, &prompter, &Arc::new(Mutex::new(None)))
+            .await
+            .expect("auth");
+
+        let channel = handle.channel_open_session().await.expect("channel");
+        channel
+            .request_pty(false, "xterm-256color", 80, 24, 0, 0, &[])
+            .await
+            .expect("pty");
+        channel.request_shell(true).await.expect("shell");
+        let (_rd, ch_write) = channel.split();
+        let wh = Arc::new(ch_write);
+
+        let session = test_session(port);
+        let (in_tx, in_rx) = std::sync::mpsc::sync_channel::<Vec<u8>>(64);
+        let pump = spawn_upstream_pump(in_rx, wh, &session);
+
+        // 8 MiB upstream >> the 2 MiB default window: the pump drains the
+        // queue into the channel until data_bytes parks mid-send.
+        let fed = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let fed2 = fed.clone();
+        let total = 8 * 1024 * 1024 / (32 * 1024);
+        let feeder = std::thread::spawn(move || {
+            let chunk = vec![b'x'; 32 * 1024];
+            for _ in 0..total {
+                if in_tx.send(chunk.clone()).is_err() {
+                    break; // pump exited — queue receiver dropped
+                }
+                fed2.fetch_add(1, Ordering::Relaxed);
+            }
+        });
+
+        // Give the pump a moment to fill the window and park. The feeder
+        // must be STUCK — if the full 8 MiB went through, the window never
+        // blocked and this test proves nothing.
+        std::thread::sleep(Duration::from_millis(500));
+        let fed_count = fed.load(Ordering::Relaxed);
+        assert!(
+            fed_count < total,
+            "feeder delivered everything ({fed_count}/{total}) — window never blocked, test is vacuous"
+        );
+        session.cancel.store(true, Ordering::Relaxed);
+        session.close_notify.notify_waiters();
+
+        // The pump must exit promptly despite the blocked send; pre-fix it
+        // would hang here until the server read (i.e. forever).
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = pump.join();
+            let _ = done_tx.send(());
+        });
+        done_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("upstream pump did not exit within 5s of kill");
+        let _ = feeder.join();
 
         let _ = std::fs::remove_file(&kh);
     });

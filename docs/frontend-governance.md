@@ -172,13 +172,17 @@
 
 ## 第四轮剩余项（2026-08 审计追加，全部低优先）
 
+> **清账（2026-08）**：✅ 全部落地——R1（`write_config_file` 改 tmp+rename 原子写，`write_atomic` 单测覆盖覆盖写与 tmp 清理）、R2（核实**无需改码**：config.json 写路径自 A1 起即是写时重读合并，不同 key 并发写不丢；keybindings/themes 是整文档语义，浅合并会复活已删条目，整文件替换为正确语义，残余竞态即 B4 已接受项）、R8（L13 专项测试 `kill_interrupts_window_blocked_send`——测试 server 加 `suspend_read` 模式塞满 2MB 窗口，断言 feeder 被堵防假过；tab.destroy 清理链 5 个单测落地 tests/tab-destroy.test.ts）、R5（escapeHtml 补 `'` 转义，注释标注防深化）、nf-* 死依赖已删（bun install -2 包）、sshclient 卫生（glob re-export 收窄为 `#[cfg(test)]` 显式清单，lib.rs 改用全路径 `sshclient::session::ssh_spawn_embedded` 等；bridge_tcp_channel 抽为中性 `bridge.rs`，hostkey↔forward 解环）。验收：cargo test 112、vitest 350、biome 0 error、cargo fmt 干净。
+>
+> **锁方案评估记录（2026-08）**：settings 锁文件（tterm_config.lock）提案经评估**不采纳**——陈旧锁（崩溃残留）比竞态更糟；配置写入不限于 settings 面板（recentDirectories/托盘/keybindings 各有路径）；R1 原子写 + 既有写时合并已覆盖锁方案的所有实际场景且无 UX 失败模式。
+
 | # | 项目 | 评估 |
 |---|---|---|
-| R1/R2 | 配置原子写 + 多窗口 read-merge-write | **唯一残留中危**。tmp+rename 原子写（`write_config_file` 后端）与 B4 写前重读可合并为一个后端专项；B4 当前状态是"文档化接受"，R1/R2 即其正式修法 |
+| R1/R2 | 配置原子写 + 多窗口 read-merge-write | ✅ 已修/已核实（见上）——**中危清零** |
 | R4 | settings 面板字符串契约类型化 | 与挂账②（lit-html 试点）合并考虑——lit-html 模板天然绑定表达式，试点落地时顺手解决 |
-| R5 | `escapeHtml` 不转义单引号 | 已复核属实（dom.ts L37-43 无 `'` 转义），但全仓无 `='${…}'` 单引号属性插值，无可利用点；随下次模板改动顺手补 `.replace(/'/g, "&#39;")` |
-| R8 | tab.destroy 清理链 / L13 阻塞中 kill 无专项测试 | 测试缺口。L13 可模拟窗口满阻塞（测试 server 停发 window adjust）验证 kill 即时打断 |
-| — | nf-droid-sans-mono / nf-ubuntu-mono 死依赖（已复核：全仓零引用，fa48262 删内嵌字体后的残留）；sshclient `pub(crate) use *` 收窄；hostkey↔forward 解环（bridge_tcp_channel 宜移中性位置） | 随缘清理 |
+| R5 | ~~`escapeHtml` 不转义单引号~~ | ✅ 已修 |
+| R8 | ~~tab.destroy 清理链 / L13 阻塞中断无专项测试~~ | ✅ 已修 |
+| — | ~~nf-* 死依赖~~ ✅；~~sshclient glob re-export 收窄~~ ✅；~~hostkey↔forward 解环~~ ✅ | 已清 |
 
 | 阶段 | 内容 | 验收 | 风险 |
 |---|---|---|---|

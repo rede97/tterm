@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use russh::client::{self};
 use russh::keys::ssh_key;
 
-use super::forward::bridge_tcp_channel;
+use super::bridge::bridge_tcp_channel;
 use super::prompter::{HostKeyPrompt, Prompter};
 use super::ForwardEntry;
 

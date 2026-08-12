@@ -11,6 +11,7 @@ use std::time::Duration;
 
 use russh::client::{self, Handle};
 use russh::keys::PrivateKeyWithHashAlg;
+use russh::ChannelWriteHalf;
 use tauri::{Emitter, Manager};
 
 use super::forward::reapply_forwards;
@@ -59,6 +60,53 @@ impl Write for SshWriter {
     fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }
+}
+
+// A dedicated std thread because data_bytes is async while the relay
+// writer is blocking (and block_on must never run on a runtime thread).
+// The JoinHandle is returned so tests can prove the loop exits on kill.
+pub(crate) fn spawn_upstream_pump(
+    in_rx: std::sync::mpsc::Receiver<Vec<u8>>,
+    wh: Arc<ChannelWriteHalf<client::Msg>>,
+    session: &SshSession,
+) -> std::thread::JoinHandle<()> {
+    let cancel = session.cancel.clone();
+    let notify = session.close_notify.clone();
+    std::thread::spawn(move || loop {
+        match in_rx.recv_timeout(Duration::from_millis(100)) {
+            Ok(chunk) => {
+                // Race the send against close_notify: data_bytes can
+                // park for seconds while the channel window is full
+                // (slow server / flood), and kill must interrupt it
+                // instead of waiting for the idle-poll cancel check.
+                let sent = tauri::async_runtime::block_on(async {
+                    let notified = notify.notified();
+                    tokio::pin!(notified);
+                    // Register the waiter BEFORE re-checking cancel, so a
+                    // kill landing between the check and the select still
+                    // wakes us (notify_waiters only reaches registered
+                    // waiters).
+                    notified.as_mut().enable();
+                    if cancel.load(Ordering::Relaxed) {
+                        return false;
+                    }
+                    tokio::select! {
+                        r = wh.data_bytes(chunk) => r.is_ok(),
+                        _ = notified => false,
+                    }
+                });
+                if !sent {
+                    break;
+                }
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                if cancel.load(Ordering::Relaxed) {
+                    break;
+                }
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+        }
+    })
 }
 
 // ── Connect + session setup ──────────────────────────────────────────
@@ -283,49 +331,8 @@ pub(crate) async fn connect_session_with(
     }
 
     // Upstream: SshWriter -> mpsc -> forwarder thread -> channel.
-    // A dedicated std thread because data_bytes is async while the relay
-    // writer is blocking (and block_on must never run on a runtime thread).
     let (in_tx, in_rx) = std::sync::mpsc::sync_channel::<Vec<u8>>(64);
-    {
-        let cancel = session.cancel.clone();
-        let notify = session.close_notify.clone();
-        let wh = shell_writer.clone();
-        std::thread::spawn(move || loop {
-            match in_rx.recv_timeout(Duration::from_millis(100)) {
-                Ok(chunk) => {
-                    // Race the send against close_notify: data_bytes can
-                    // park for seconds while the channel window is full
-                    // (slow server / flood), and kill must interrupt it
-                    // instead of waiting for the idle-poll cancel check.
-                    let sent = tauri::async_runtime::block_on(async {
-                        let notified = notify.notified();
-                        tokio::pin!(notified);
-                        // Register the waiter BEFORE re-checking cancel, so a
-                        // kill landing between the check and the select still
-                        // wakes us (notify_waiters only reaches registered
-                        // waiters).
-                        notified.as_mut().enable();
-                        if cancel.load(Ordering::Relaxed) {
-                            return false;
-                        }
-                        tokio::select! {
-                            r = wh.data_bytes(chunk) => r.is_ok(),
-                            _ = notified => false,
-                        }
-                    });
-                    if !sent {
-                        break;
-                    }
-                }
-                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                    if cancel.load(Ordering::Relaxed) {
-                        break;
-                    }
-                }
-                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
-            }
-        });
-    }
+    spawn_upstream_pump(in_rx, shell_writer.clone(), session);
 
     // Re-establish port forwardings (no-op on first connect).
     let handle = Arc::new(handle);

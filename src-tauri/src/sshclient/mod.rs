@@ -22,31 +22,36 @@ use russh::client::{self, Handle};
 use russh::ChannelWriteHalf;
 use serde::{Deserialize, Serialize};
 
-use self::hostkey::SshHandler;
-
-mod forward;
-mod hostkey;
-mod install;
-mod keys;
-mod prompter;
-mod session;
+pub(crate) mod bridge;
+pub(crate) mod forward;
+pub(crate) mod hostkey;
+pub(crate) mod install;
+pub(crate) mod keys;
+pub(crate) mod prompter;
+pub(crate) mod session;
 #[cfg(test)]
 mod tests;
 
-pub use forward::{ssh_forward_add, ssh_forward_list, ssh_forward_remove};
-pub use install::ssh_install_pubkey;
-pub use keys::{ssh_keygen, ssh_list_keys};
-pub use prompter::{ssh_auth_response, ssh_hostkey_response, PendingPrompts};
-pub use session::ssh_spawn_embedded;
+pub use prompter::PendingPrompts;
 pub(crate) use session::{kill_ssh_session, resize_ssh_session};
 
-// Crate-internal re-exports so sibling modules reach each other via
-// `super::` and `mod tests` keeps working with `use super::*`.
-pub(crate) use forward::*;
-pub(crate) use install::*;
-pub(crate) use keys::*;
-pub(crate) use prompter::*;
-pub(crate) use session::*;
+// Test-only surface: integration tests (tests.rs, `use super::*`) exercise
+// internals directly. Explicit list — no glob re-exports, so production
+// code outside this module can't reach in through the wildcard.
+#[cfg(test)]
+pub(crate) use bridge::bridge_tcp_channel;
+#[cfg(test)]
+pub(crate) use forward::add_forward;
+#[cfg(test)]
+pub(crate) use hostkey::SshHandler;
+#[cfg(test)]
+pub(crate) use install::{exec_capture, install_pubkey_with};
+#[cfg(test)]
+pub(crate) use keys::{keygen_in, list_keys_in};
+#[cfg(test)]
+pub(crate) use prompter::{HostKeyPrompt, Prompter};
+#[cfg(test)]
+pub(crate) use session::{authenticate, connect_session_with, spawn_upstream_pump};
 
 pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 
@@ -80,7 +85,7 @@ pub(crate) struct ForwardEntry {
 }
 
 pub(crate) struct SshLive {
-    handle: Arc<Handle<SshHandler>>,
+    handle: Arc<Handle<hostkey::SshHandler>>,
     shell_writer: Arc<ChannelWriteHalf<client::Msg>>,
 }
 

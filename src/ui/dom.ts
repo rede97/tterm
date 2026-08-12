@@ -35,11 +35,16 @@ export function raw(s: string): SafeHtml {
 }
 
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  return (
+    s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      // Defense in depth: no single-quoted attribute interpolation exists
+      // today, but escaping `'` keeps that class of injection impossible.
+      .replace(/'/g, "&#39;")
+  );
 }
 
 function render(value: unknown): string {

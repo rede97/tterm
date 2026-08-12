@@ -22,6 +22,29 @@ mod tests {
         // the dev/ suffix here; the release arm is cfg'd out at compile time.
         assert!(cfg!(debug_assertions));
     }
+
+    #[test]
+    fn write_atomic_replaces_existing_and_leaves_no_tmp() {
+        let dir = std::env::temp_dir().join(format!("tterm-test-cfg-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("config.json");
+
+        super::write_atomic(&file, "{\"a\":1}").unwrap();
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "{\"a\":1}");
+
+        // Second write must replace (rename-over-existing works on NTFS too).
+        super::write_atomic(&file, "{\"a\":2,\"longer\":true}").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&file).unwrap(),
+            "{\"a\":2,\"longer\":true}"
+        );
+        assert!(
+            !file.with_extension("json.tmp").exists(),
+            "tmp file must be consumed by the rename"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
 
 // All app config lives in per-topic JSON files under the app config dir
@@ -46,13 +69,23 @@ pub fn read_config_file(app: tauri::AppHandle, name: &str) -> Result<String, Str
     Ok(std::fs::read_to_string(file).unwrap_or_else(|_| "{}".into()))
 }
 
+// Atomic write: a crash mid-write must never leave a truncated JSON
+// behind (read side would silently fall back to "{}"). Write a sibling
+// temp file, then rename over the target — same-directory rename is
+// atomic on both NTFS and POSIX.
+fn write_atomic(file: &std::path::Path, content: &str) -> Result<(), String> {
+    let tmp = file.with_extension("json.tmp");
+    std::fs::write(&tmp, content).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &file).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn write_config_file(app: tauri::AppHandle, name: &str, content: String) -> Result<(), String> {
     let file = config_path(&app, name)?;
     if let Some(dir) = file.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
-    std::fs::write(file, content).map_err(|e| e.to_string())
+    write_atomic(&file, &content)
 }
 
 #[tauri::command]
