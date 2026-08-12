@@ -370,3 +370,71 @@ describe("settings — SSH config dirty state", () => {
     await vi.waitFor(() => expect(isSshConfigDirty()).toBe(false));
   });
 });
+
+describe("settings — SSH panel lit-html rendering (pilot acceptance)", () => {
+  const twoHosts = [
+    { name: "a", HostName: "10.0.0.1", IdentityFile: "~/.ssh/id_a" },
+    { name: "b", HostName: "10.0.0.2" },
+  ];
+
+  it("re-render after Delete keeps sibling cards expanded (no collapse)", () => {
+    configStore.set({ sshHosts: twoHosts });
+    const panel = openPanel();
+    const cardA = panel.querySelector<HTMLElement>('.ssh-host-card[data-name="a"]')!;
+    cardA.querySelector<HTMLElement>(".ssh-host-row")!.click();
+    expect(cardA.classList.contains("expanded")).toBe(true);
+
+    panel
+      .querySelector<HTMLButtonElement>('.ssh-host-card[data-name="b"] .ssh-btn-delete')!
+      .click();
+
+    const after = panel.querySelector<HTMLElement>('.ssh-host-card[data-name="a"]')!;
+    expect(after.classList.contains("expanded")).toBe(true);
+    // The surviving card's detail DOM is the SAME node — not rebuilt.
+    expect(after.querySelector(".ssh-host-extra")!.textContent).toContain("IdentityFile");
+  });
+
+  it("pending Built-in toggle survives internal re-renders (keepPending is dead)", () => {
+    configStore.set({ sshHosts: twoHosts, sshEmbedded: true });
+    const panel = openPanel();
+    const cb = panel.querySelector<HTMLInputElement>("#set-ssh-embedded")!;
+    expect(cb.checked).toBe(true);
+    cb.click(); // user unchecks, has NOT applied yet
+    expect(cb.checked).toBe(false);
+
+    // Any internal re-render (here: Delete) must not reset the toggle to
+    // the stored value — the old keepPending hack's entire job.
+    panel
+      .querySelector<HTMLButtonElement>('.ssh-host-card[data-name="b"] .ssh-btn-delete')!
+      .click();
+    expect(panel.querySelector<HTMLInputElement>("#set-ssh-embedded")!.checked).toBe(false);
+  });
+
+  it("revert resets the pending toggle to the stored value", async () => {
+    configStore.set({ sshHosts: twoHosts, sshEmbedded: true });
+    const panel = openPanel();
+    panel.querySelector<HTMLInputElement>("#set-ssh-embedded")!.click();
+    const { refreshSshPanel } = await import("../src/settings/ssh");
+    // refreshSshPanel takes the settings page root; our bare panel works
+    // because it IS the [data-panel="ssh"] element's own subtree root.
+    const page = document.createElement("div");
+    page.appendChild(panel);
+    refreshSshPanel(page);
+    expect(panel.querySelector<HTMLInputElement>("#set-ssh-embedded")!.checked).toBe(true);
+  });
+
+  it("list element identity survives re-renders (Sortable binding stays live)", () => {
+    configStore.set({ sshHosts: twoHosts });
+    const panel = openPanel();
+    const listBefore = panel.querySelector<HTMLElement>(".ssh-host-list")!;
+    const cardABefore = panel.querySelector<HTMLElement>('.ssh-host-card[data-name="a"]')!;
+
+    panel
+      .querySelector<HTMLButtonElement>('.ssh-host-card[data-name="b"] .ssh-btn-delete')!
+      .click();
+
+    expect(panel.querySelector<HTMLElement>(".ssh-host-list")).toBe(listBefore);
+    // Keyed repeat: surviving card node is patched, not replaced.
+    expect(panel.querySelector<HTMLElement>('.ssh-host-card[data-name="a"]')).toBe(cardABefore);
+  });
+});

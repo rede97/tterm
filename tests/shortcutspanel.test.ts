@@ -115,4 +115,19 @@ describe("settings — Keyboard panel", () => {
     expect(visible.length).toBeGreaterThanOrEqual(1);
     expect(visible.every((r) => r.dataset.command === "workbench.action.toggleZenMode")).toBe(true);
   });
+
+  it("search keeps focus while filtering rows (lit diffing, no rebuild)", () => {
+    const panel = createShortcutsPanel();
+    document.body.appendChild(panel);
+    const search = panel.querySelector<HTMLInputElement>("#kb-search")!;
+    search.focus();
+    search.value = "zen";
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(panel.querySelectorAll(".kb-row[data-command]").length).toBeGreaterThanOrEqual(1);
+    expect(document.activeElement).toBe(search);
+    search.value = "";
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(panel.querySelectorAll(".kb-row[data-command]")).toHaveLength(KEY_COMMANDS.length);
+    expect(document.activeElement).toBe(search);
+  });
 });

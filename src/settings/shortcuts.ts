@@ -3,6 +3,13 @@
 // key capture, conflict detection, per-row reset. Edits accumulate in a
 // pending map and only land in configStore via the footer's Apply button
 // (collectShortcutsSettings); Revert re-reads the store (refreshShortcutsPanel).
+//
+// lit-html migration (docs/frontend-governance.md P3): the panel renders
+// through lit-html's diffing render() from the pending map + per-panel state
+// (search query, active capture). Rows are a keyed repeat, so typing in
+// #kb-search patches the list instead of rebuilding it — the search input
+// keeps focus, and the capture input survives the live combo/conflict
+// updates of a recording.
 
 import {
   comboFromEvent,
@@ -11,16 +18,47 @@ import {
   findConflict,
   formatCombo,
   KEY_COMMANDS,
+  type KeyCommand,
   resolveKeybindings,
   resumeKeymap,
   suspendKeymap,
 } from "../core/keymap";
 import { type ConfigState, configStore } from "../core/store";
-import { el } from "../ui/dom";
+import { html, nothing, render, repeat, section } from "../ui/lit";
 
 // Pending user overrides (same shape as the stored config). Null until the
 // panel is first rendered; refresh() re-syncs from the store.
 let _pending: Record<string, string> | null = null;
+
+// ---- Per-panel state ---------------------------------------------------
+// View/capture state only — the binding model stays in _pending. Per panel
+// element so a second Settings page never inherits another's capture.
+
+interface CaptureState {
+  commandId: string;
+  // Captured combo ("" = explicit unbind); null = nothing pressed yet.
+  combo: string | null;
+  // Command id the captured combo is already bound to; null = free.
+  conflict: string | null;
+  // Enter pressed while conflicted: shake the input, keep capturing.
+  shake: boolean;
+}
+
+interface ShortcutsPanelState {
+  query: string;
+  recording: CaptureState | null;
+}
+
+const panelStates = new WeakMap<HTMLElement, ShortcutsPanelState>();
+
+function stateOf(panel: HTMLElement): ShortcutsPanelState {
+  let st = panelStates.get(panel);
+  if (!st) {
+    st = { query: "", recording: null };
+    panelStates.set(panel, st);
+  }
+  return st;
+}
 
 function effectiveBindings(): Record<string, string> {
   return resolveKeybindings(_pending ?? configStore.get("keybindings"));
@@ -42,121 +80,174 @@ function setPending(panel: HTMLElement, commandId: string, combo: string): void 
   markDirty(panel);
 }
 
-function renderRows(panel: HTMLElement): void {
-  const tbody = panel.querySelector<HTMLElement>("#kb-rows");
-  if (!tbody) return;
-  const query =
-    panel.querySelector<HTMLInputElement>("#kb-search")?.value.trim().toLowerCase() ?? "";
-  const bindings = effectiveBindings();
-  const defaults = defaultKeybindings();
-  tbody.textContent = "";
-
-  for (const cmd of KEY_COMMANDS) {
-    const combo = bindings[cmd.id] ?? "";
-    const modified = combo !== defaults[cmd.id];
-    const haystack = `${cmd.title} ${cmd.desc} ${cmd.id} ${formatCombo(combo)}`.toLowerCase();
-    if (query && !query.split(/\s+/).every((w) => haystack.includes(w))) continue;
-
-    const row = el("div", "kb-row");
-    row.dataset.command = cmd.id;
-
-    const info = el("div", "kb-info");
-    info.appendChild(el("div", "kb-title", cmd.title));
-    info.appendChild(el("div", "kb-desc", cmd.desc));
-    row.appendChild(info);
-
-    const bindingCell = el("div", "kb-binding");
-    const chip = document.createElement("button");
-    chip.className = `kb-chip${combo ? "" : " kb-chip-empty"}${modified ? " kb-chip-modified" : ""}`;
-    chip.type = "button";
-    chip.title = "Click to change keybinding";
-    chip.textContent = combo ? formatCombo(combo) : "Unbound";
-    chip.addEventListener("click", () => startCapture(panel, bindingCell, cmd.id));
-    bindingCell.appendChild(chip);
-
-    if (modified) {
-      const reset = document.createElement("button");
-      reset.className = "kb-reset";
-      reset.textContent = "↺";
-      reset.type = "button";
-      reset.title = `Reset to default (${formatCombo(defaults[cmd.id]) || "Unbound"})`;
-      reset.addEventListener("click", () => {
-        setPending(panel, cmd.id, defaults[cmd.id]);
-        renderRows(panel);
-      });
-      bindingCell.appendChild(reset);
-    }
-    row.appendChild(bindingCell);
-
-    tbody.appendChild(row);
-  }
-
-  if (!tbody.children.length) {
-    tbody.appendChild(el("div", "kb-empty", "No matching commands"));
-  }
+function renderPanel(panel: HTMLElement): void {
+  render(shortcutsTemplate(panel), panel);
 }
 
-// Replace the chip with a capture input: the next non-modifier keydown is
-// the new combo (displayed live), Enter commits, Escape/blur cancels,
+// ---- Capture (click-to-record) -----------------------------------------
+// The chip swaps for a capture input: the next non-modifier keydown is the
+// new combo (displayed live), Enter commits, Escape/blur cancels,
 // Backspace/Delete unbinds. A combo already bound elsewhere is refused.
-function startCapture(panel: HTMLElement, cell: HTMLElement, commandId: string): void {
-  const input = document.createElement("input");
-  input.className = "kb-capture settings-input";
-  input.placeholder = "Press desired key combination, then Enter";
-  let combo: string | null = null;
-  let conflict: string | null = null;
-  let finished = false;
 
-  const finish = (commit: boolean) => {
-    if (finished) return;
-    finished = true;
-    resumeKeymap();
-    if (commit && combo !== null && !conflict) {
-      setPending(panel, commandId, combo);
-    }
-    renderRows(panel);
-  };
-
-  input.addEventListener("keydown", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.key === "Escape") {
-      finish(false);
-      return;
-    }
-    if (e.key === "Enter") {
-      if (combo !== null && !conflict) finish(true);
-      else if (conflict) input.classList.add("kb-capture-shake");
-      return;
-    }
-    // Backspace/Delete without modifiers = remove the binding.
-    if (
-      (e.key === "Backspace" || e.key === "Delete") &&
-      !e.ctrlKey &&
-      !e.altKey &&
-      !e.shiftKey &&
-      !e.metaKey
-    ) {
-      combo = "";
-      conflict = null;
-      input.value = "Unbound";
-      input.classList.remove("kb-capture-conflict");
-      input.title = "";
-      return;
-    }
-    const c = comboFromEvent(e);
-    if (!c) return; // modifier-only press: wait for the key
-    combo = c;
-    conflict = findConflict(effectiveBindings(), c, commandId);
-    input.value = formatCombo(c);
-    input.classList.toggle("kb-capture-conflict", conflict !== null);
-    input.title = conflict ? `Already bound to: ${commandTitle(conflict)}` : "";
-  });
-  input.addEventListener("blur", () => finish(false));
-
+function startCapture(panel: HTMLElement, commandId: string): void {
+  endCapture(panel, false); // one capture at a time
+  const st = stateOf(panel);
+  st.recording = { commandId, combo: null, conflict: null, shake: false };
   suspendKeymap(); // recorded keys must not fire commands (e.g. Ctrl+W)
-  cell.querySelector(".kb-chip")?.replaceWith(input);
-  input.focus();
+  renderPanel(panel);
+  panel.querySelector<HTMLInputElement>(".kb-capture")?.focus();
+}
+
+/** End the active capture (if any), committing on `commit`. Caller renders. */
+function endCapture(panel: HTMLElement, commit: boolean): boolean {
+  const st = stateOf(panel);
+  const rec = st.recording;
+  if (!rec) return false;
+  st.recording = null;
+  resumeKeymap();
+  if (commit && rec.combo !== null && !rec.conflict) {
+    setPending(panel, rec.commandId, rec.combo);
+  }
+  return true;
+}
+
+function onCaptureKeydown(panel: HTMLElement, e: KeyboardEvent): void {
+  e.preventDefault();
+  e.stopPropagation();
+  const rec = stateOf(panel).recording;
+  if (!rec) return;
+  if (e.key === "Escape") {
+    endCapture(panel, false);
+    renderPanel(panel);
+    return;
+  }
+  if (e.key === "Enter") {
+    if (rec.combo !== null && !rec.conflict) {
+      endCapture(panel, true);
+    } else if (rec.conflict) {
+      rec.shake = true; // refused: shake, keep capturing
+    }
+    renderPanel(panel);
+    return;
+  }
+  // Backspace/Delete without modifiers = remove the binding.
+  if (
+    (e.key === "Backspace" || e.key === "Delete") &&
+    !e.ctrlKey &&
+    !e.altKey &&
+    !e.shiftKey &&
+    !e.metaKey
+  ) {
+    rec.combo = "";
+    rec.conflict = null;
+    renderPanel(panel);
+    return;
+  }
+  const c = comboFromEvent(e);
+  if (!c) return; // modifier-only press: wait for the key
+  rec.combo = c;
+  rec.conflict = findConflict(effectiveBindings(), c, rec.commandId);
+  renderPanel(panel);
+}
+
+// ---- Rendering -----------------------------------------------------------
+
+function shortcutsTemplate(panel: HTMLElement) {
+  const st = stateOf(panel);
+  const bindings = effectiveBindings();
+  const defaults = defaultKeybindings();
+  const query = st.query.trim().toLowerCase();
+  const visible = KEY_COMMANDS.filter((cmd) => {
+    if (!query) return true;
+    const haystack =
+      `${cmd.title} ${cmd.desc} ${cmd.id} ${formatCombo(bindings[cmd.id] ?? "")}`.toLowerCase();
+    return query.split(/\s+/).every((w) => haystack.includes(w));
+  });
+
+  return section(
+    "Keyboard Shortcuts",
+    html`
+      <div class="settings-item-desc kb-hint">Click a keybinding to change it: press the new combination, Enter to confirm, Escape to cancel, Backspace to remove. Changes take effect with the Apply button below. Ctrl+D is deliberately not captured — it reaches the shell and ends the session (the tab then closes itself).</div>
+      <input
+        id="kb-search"
+        class="settings-input kb-search"
+        placeholder="Search keybindings…"
+        .value=${st.query}
+        @input=${(e: Event) => {
+          st.query = (e.target as HTMLInputElement).value;
+          renderPanel(panel);
+        }}
+      />
+      <div class="kb-table">
+        <div class="kb-row kb-row-head">
+          <div class="kb-info">Command</div>
+          <div class="kb-binding">Keybinding</div>
+        </div>
+        <div id="kb-rows">
+          ${repeat(
+            visible,
+            (cmd) => cmd.id,
+            (cmd) => rowTemplate(panel, st, cmd, bindings, defaults),
+          )}
+          ${visible.length === 0 ? html`<div class="kb-empty">No matching commands</div>` : nothing}
+        </div>
+      </div>
+    `,
+  );
+}
+
+function rowTemplate(
+  panel: HTMLElement,
+  st: ShortcutsPanelState,
+  cmd: KeyCommand,
+  bindings: Record<string, string>,
+  defaults: Record<string, string>,
+) {
+  const combo = bindings[cmd.id] ?? "";
+  const modified = combo !== defaults[cmd.id];
+  const rec = st.recording?.commandId === cmd.id ? st.recording : null;
+  return html`<div class="kb-row" data-command=${cmd.id}>
+    <div class="kb-info">
+      <div class="kb-title">${cmd.title}</div>
+      <div class="kb-desc">${cmd.desc}</div>
+    </div>
+    <div class="kb-binding">
+      ${
+        rec
+          ? html`<input
+            class="kb-capture settings-input${rec.conflict ? " kb-capture-conflict" : ""}${rec.shake ? " kb-capture-shake" : ""}"
+            placeholder="Press desired key combination, then Enter"
+            .value=${rec.combo === null ? "" : rec.combo === "" ? "Unbound" : formatCombo(rec.combo)}
+            title=${rec.conflict ? `Already bound to: ${commandTitle(rec.conflict)}` : ""}
+            @keydown=${(e: KeyboardEvent) => onCaptureKeydown(panel, e)}
+            @blur=${() => {
+              // No-op when a commit render already detached the input.
+              if (endCapture(panel, false)) renderPanel(panel);
+            }}
+          />`
+          : html`<button
+            class="kb-chip${combo ? "" : " kb-chip-empty"}${modified ? " kb-chip-modified" : ""}"
+            type="button"
+            title="Click to change keybinding"
+            @click=${() => startCapture(panel, cmd.id)}
+          >${combo ? formatCombo(combo) : "Unbound"}</button>`
+      }
+      ${
+        modified
+          ? html`<button
+            class="kb-reset"
+            type="button"
+            title="Reset to default (${formatCombo(defaults[cmd.id]) || "Unbound"})"
+            @click=${() => {
+              endCapture(panel, false);
+              setPending(panel, cmd.id, defaults[cmd.id]);
+              renderPanel(panel);
+            }}
+          >↺</button>`
+          : nothing
+      }
+    </div>
+  </div>`;
 }
 
 export function createShortcutsPanel(): HTMLElement {
@@ -166,48 +257,18 @@ export function createShortcutsPanel(): HTMLElement {
   // Hidden until the sidebar selects it (every non-General panel does this;
   // without it the panel renders stacked over the General page on open).
   panel.style.display = "none";
-
-  const section = el("div", "settings-section");
-  section.appendChild(el("div", "settings-section-title", "Keyboard Shortcuts"));
-
-  const hint = el(
-    "div",
-    "settings-item-desc",
-    "Click a keybinding to change it: press the new combination, Enter to confirm, Escape to cancel, Backspace to remove. Changes take effect with the Apply button below. Ctrl+D is deliberately not captured — it reaches the shell and ends the session (the tab then closes itself).",
-  );
-  hint.style.marginBottom = "12px";
-  section.appendChild(hint);
-
-  const search = document.createElement("input");
-  search.id = "kb-search";
-  search.className = "settings-input kb-search";
-  search.placeholder = "Search keybindings…";
-  search.addEventListener("input", () => renderRows(panel));
-  section.appendChild(search);
-
-  const table = el("div", "kb-table");
-  const head = el("div", "kb-row kb-row-head");
-  head.appendChild(el("div", "kb-info", "Command"));
-  head.appendChild(el("div", "kb-binding", "Keybinding"));
-  table.appendChild(head);
-  const rows = document.createElement("div");
-  rows.id = "kb-rows";
-  table.appendChild(rows);
-  section.appendChild(table);
-
-  panel.appendChild(section);
-  renderRows(panel);
+  renderPanel(panel);
   return panel;
 }
 
 export function refreshShortcutsPanel(root: HTMLElement): void {
   _pending = { ...configStore.get("keybindings") };
   const panel = root.querySelector<HTMLElement>('[data-panel="keyboard"]');
-  if (panel) {
-    const search = panel.querySelector<HTMLInputElement>("#kb-search");
-    if (search) search.value = "";
-    renderRows(panel);
-  }
+  if (!panel) return;
+  const st = stateOf(panel);
+  st.query = "";
+  endCapture(panel, false); // an open capture is cancelled by the Revert
+  renderPanel(panel);
 }
 
 export function collectShortcutsSettings(_root: HTMLElement): Partial<ConfigState> {

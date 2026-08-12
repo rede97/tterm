@@ -2131,6 +2131,106 @@ input[type="number"] {
   color: #f08c62;
 }
 
+/* ===== Settings — SSH host list ===== */
+
+.settings-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-toggle-flush {
+  padding: 0;
+  gap: 0;
+}
+
+.ssh-host-card {
+  margin-bottom: 4px;
+  background: #2a2a2a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ssh-host-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.ssh-host-check {
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.ssh-host-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.ssh-host-name {
+  margin-bottom: 2px;
+}
+
+.ssh-host-target {
+  margin-bottom: 0;
+}
+
+.ssh-host-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.ssh-host-detail {
+  display: none;
+  padding: 0 10px 8px 10px;
+}
+
+.ssh-host-card.expanded .ssh-host-detail {
+  display: block;
+}
+
+.ssh-host-extra {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 6px;
+  padding-left: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ssh-host-extra-line {
+  word-break: break-all;
+}
+
+.ssh-host-detail-actions {
+  display: flex;
+  gap: 6px;
+  padding-left: 28px;
+}
+
+.ssh-card-btn {
+  background: #4a4a4a;
+}
+
+.ssh-keys-hint {
+  margin-bottom: 6px;
+}
+
+.ssh-save-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ssh-save-hint {
+  margin: 0;
+}
+
 /* ===== Font Picker ===== */
 
 .font-picker-overlay {
@@ -3359,6 +3459,10 @@ input[type="number"] {
 }
 
 /* ---- Settings: Keyboard panel ---- */
+
+.kb-hint {
+  margin-bottom: 12px;
+}
 
 .kb-search {
   margin-bottom: 12px;

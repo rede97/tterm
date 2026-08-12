@@ -134,6 +134,10 @@
 
 **方法**：~30 行自动转义 `html` 标签模板助手收敛模板写法（✅ 已落地 `ui/dom.ts`，ssh.ts 示范迁移完成）；公共 `el()` 收进 `ui/dom.ts`（✅）；DOM id 常量表（✅ `core/dom-ids.ts`，chrome id 已收编）；原生 confirm 全部替换为 confirmDialog（✅）。
 
+> **试点落地（2026-08，SSH 面板）**：✅ lit-html 3.3.3 引入（index chunk +7kB），SSH 面板整体迁移为"store + 面板状态 → lit render"模型——`keepPending` hack 删除（toggle 绑定面板状态，Revert 时从 store 重置）；展开状态收进 `expanded: Set<string>`，Delete/Edit/Reload 重渲染不再收起卡片；Sortable 一次性绑定（keyed repeat 保列表节点身份，不再 destroy/recreate）；事件全部 `@event` 模板绑定（无 querySelector 接线、无 CSP 违规面）。共享组件词汇落 `ui/lit.ts`（`section/itemRow/toggle/linkBtn/infoRow` + repeat/ifDefined 再导出），SSH 面板内联样式全部正名为 styles.css 类（.ssh-host-*）。试点验收测试 4 个（展开存活 / pending toggle 存活 / Revert 重置 / 列表节点身份存活）+ 存量 15 个面板测试全过。**结论：范式成立，推广路径=逐面板按 ssh.ts 模式迁移（无专项排期，随面板改动顺手做）。**
+
+> **推广完成（2026-08，全 settings + quickpanel）**：✅ 六个面板全部迁移——general/profile（待决值入 WeakMap 状态，Revert 全量重建）、appearance（themeName pending 态出 dataset，镜像回写保测试契约）、serial（profile gallery 双 repeat）、shortcuts（录制态 `{recording, conflict, shake}` 入状态，搜索框在 diff 区内但绑定不变故焦点存活，新增焦点保持测试）、quickpanel（信号行/串口 select 纯状态驱动，session-state 重渲染不再打断进行中的下拉选择；forwardtable 经 `.qp-fwd-slot` 挂载点集成未重写）。**踩坑定型**：lit 的 property part 先于 child option 提交，`<select>` 的 `.value=` 必跳到首项——统一为 `data-current` + render 后 `syncSelectValues(root)`（已收进 ui/lit.ts，四处用法归一）。Revert 语义定型：lit 的 dirty check 跳过"绑定值未变"的写，无法重置用户未提交的编辑——需要重置的面板走 `render(nothing)` + 重建。R4（字符串契约类型化）随本批一并解决：lit 模板绑定表达式即类型化契约。验收：vitest 355、biome 0 error（warn 101→87）、e2e settings 相关 spec 全绿。
+
 > **后续路径（2026-08 决策）**：settings 交互打磨（重渲染丢焦点/滚动/展开状态，`keepPending` 系列 workaround 的根源）计划引入 **lit-html**（~5kb，tagged template + 默认转义 + 部件级 diff 渲染，与本项目模型兼容）——以 SSH 面板为试点验证"编辑不丢焦点、展开不收起"，成立再推广；一次性渲染场景继续用 `ui/dom.ts` 的 `html`` 助手。不引入 htm+preact 及以上量级方案。
 
 ## P4 — main.ts 接线堆 + 通知机制三套并存
@@ -168,7 +172,7 @@
 
 # 分期计划（缺陷修复优先于范式治理）
 
-> **总账（2026-08 收尾）**：阶段 -1/0/1/2 全部完成，阶段 3 以"卫星模块拆分 + wiring 组合根"落地（tabmanager 921→754，生命周期与标签条留内核属有意决策）。**剩余挂账仅两项**：② lit-html 试点（settings UX 主题，已立项）；④ 其余面板 html`` 迁移（棘轮，不设专项）。**关闭项**：①（sshclient 拆分 + L8–L13 清算，2026-08 完成，验收 cargo test 110 全绿）、③（Biome 自定义规则，2026-08 落地，见 P1 清账）、E2（一等 tab，已撤销）、B4（文档化接受）、C7（观感竞态，风险收益倒挂）、DOM id 全量常量化（chrome 已收编，面板内 id 维持模块私有）。
+> **总账（2026-08 收尾）**：阶段 -1/0/1/2 全部完成，阶段 3 以"卫星模块拆分 + wiring 组合根"落地（tabmanager 921→754，生命周期与标签条留内核属有意决策）。**剩余挂账仅一项**：④ 其余面板 html`` 迁移（棘轮，不设专项；settings/quickpanel 已完成，余下是一次性渲染场景，继续用 ui/dom.ts）。**关闭项**：①（sshclient 拆分 + L8–L13 清算，2026-08 完成，验收 cargo test 110 全绿）、②（lit-html 试点+推广，2026-08 全部 settings 面板 + quickpanel 落地，R4 随批解决，见 P3）、③（Biome 自定义规则，2026-08 落地，见 P1 清账）、E2（一等 tab，已撤销）、B4（文档化接受）、C7（观感竞态，风险收益倒挂）、DOM id 全量常量化（chrome 已收编，面板内 id 维持模块私有）。
 
 ## 第四轮剩余项（2026-08 审计追加，全部低优先）
 
@@ -179,7 +183,7 @@
 | # | 项目 | 评估 |
 |---|---|---|
 | R1/R2 | 配置原子写 + 多窗口 read-merge-write | ✅ 已修/已核实（见上）——**中危清零** |
-| R4 | settings 面板字符串契约类型化 | 与挂账②（lit-html 试点）合并考虑——lit-html 模板天然绑定表达式，试点落地时顺手解决 |
+| R4 | ~~settings 面板字符串契约类型化~~ | ✅ 随 lit-html 推广批解决（2026-08）——lit 模板绑定表达式即类型化契约 |
 | R5 | ~~`escapeHtml` 不转义单引号~~ | ✅ 已修 |
 | R8 | ~~tab.destroy 清理链 / L13 阻塞中断无专项测试~~ | ✅ 已修 |
 | — | ~~nf-* 死依赖~~ ✅；~~sshclient glob re-export 收窄~~ ✅；~~hostkey↔forward 解环~~ ✅ | 已清 |

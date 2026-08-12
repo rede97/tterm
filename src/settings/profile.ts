@@ -1,8 +1,13 @@
-// Settings — Profile panel
-// Default profile selection, WT profile visibility toggles
+// Settings — Profile panel (lit-html)
+// Default profile selection, WT profile visibility toggles.
+//
+// Migrated per the ssh.ts pilot (docs/frontend-governance.md P3): the panel
+// renders through lit-html's diffing render() straight from the store — no
+// per-panel state, pending edits live in the DOM until Apply and a Revert
+// re-render resets them.
 
-import { esc } from "../core/common";
 import { type ConfigState, configStore } from "../core/store";
+import { html, nothing, render, repeat, section, syncSelectValues } from "../ui/lit";
 
 export function createProfilePanel(): HTMLElement {
   const panel = document.createElement("div");
@@ -21,7 +26,7 @@ export function refreshProfilePanel(root: HTMLElement): void {
   if (panel) renderProfilePanel(panel);
 }
 
-function renderProfilePanel(container: HTMLElement) {
+function renderProfilePanel(panel: HTMLElement): void {
   const localProfiles = configStore.get("localProfiles");
   const hiddenProfiles = configStore.get("hiddenProfiles");
   // The select must OPEN on the configured default — an unmarked select
@@ -29,47 +34,66 @@ function renderProfilePanel(container: HTMLElement) {
   // defaultLocalProfile to it.
   const defaultProfile = configStore.get("defaultLocalProfile") ?? localProfiles[0]?.name ?? "";
 
-  container.innerHTML = `
-    <div class="settings-section">
-      <div class="settings-section-title">Default Profile</div>
-      <div class="settings-item settings-item-row">
-        <div class="settings-item-info">
-          <div class="settings-item-title">Default Profile</div>
-        </div>
-        <div class="settings-item-control">
-          <select id="set-default-profile" class="settings-select">
-            ${localProfiles.map((p) => `<option value="${esc(p.name)}" ${p.name === defaultProfile ? "selected" : ""}>${esc(p.name)}</option>`).join("")}
-          </select>
-        </div>
-      </div>
-    </div>
-    <div class="settings-section">
-      <div class="settings-section-title">Imported from Windows Terminal</div>
-      <div class="settings-item-desc" style="margin-bottom:10px">Toggle visibility of profiles imported from Windows Terminal. Uncheck to hide.</div>
-      ${localProfiles
-        .map((p) => {
-          const checked = !hiddenProfiles.includes(p.name);
-          return `<label class="settings-item settings-item-row" style="cursor:pointer;margin-bottom:4px;background:#2a2a2a;border-radius:4px;padding:6px 10px;">
+  // Full clear + rebuild: this panel has no per-panel state, so pending
+  // edits live in the DOM only — and lit skips a property binding whose
+  // new value equals the last committed one, even when the live DOM
+  // diverged. Revert must always land the store values, so it rebuilds.
+  render(nothing, panel);
+
+  render(
+    html`
+      ${section(
+        "Default Profile",
+        html`<div class="settings-item settings-item-row">
           <div class="settings-item-info">
-            <div class="settings-item-title" style="margin-bottom:0;">${esc(p.name)}</div>
-            <div class="settings-item-desc" style="margin-bottom:0;">${esc(p.command)}</div>
+            <div class="settings-item-title">Default Profile</div>
           </div>
           <div class="settings-item-control">
-            <span class="settings-toggle-row" style="padding:0;gap:0;">
-              <input type="checkbox" class="wt-profile-check" value="${esc(p.name)}" ${checked ? "checked" : ""} />
-            </span>
+            <select
+              id="set-default-profile"
+              class="settings-select"
+              data-current=${defaultProfile}
+            >
+              ${localProfiles.map((p) => html`<option value=${p.name}>${p.name}</option>`)}
+            </select>
           </div>
-        </label>`;
-        })
-        .join("")}
-    </div>
-  `;
-
-  // Set the value imperatively too: the `selected` attribute alone covers
-  // browsers, but select value-from-attribute on innerHTML re-parse is a
-  // known jsdom gap (and costs nothing in real engines).
-  const sel = container.querySelector<HTMLSelectElement>("#set-default-profile");
-  if (sel && sel.options.length > 0) sel.value = defaultProfile;
+        </div>`,
+      )}
+      ${section(
+        "Imported from Windows Terminal",
+        html`
+          <div class="settings-item-desc" style="margin-bottom:10px">
+            Toggle visibility of profiles imported from Windows Terminal. Uncheck to hide.
+          </div>
+          ${repeat(
+            localProfiles,
+            (p) => p.name,
+            (p) => html`<label
+              class="settings-item settings-item-row"
+              style="cursor:pointer;margin-bottom:4px;background:#2a2a2a;border-radius:4px;padding:6px 10px;"
+            >
+              <div class="settings-item-info">
+                <div class="settings-item-title" style="margin-bottom:0;">${p.name}</div>
+                <div class="settings-item-desc" style="margin-bottom:0;">${p.command}</div>
+              </div>
+              <div class="settings-item-control">
+                <span class="settings-toggle-row settings-toggle-flush">
+                  <input
+                    type="checkbox"
+                    class="wt-profile-check"
+                    value=${p.name}
+                    .checked=${!hiddenProfiles.includes(p.name)}
+                  />
+                </span>
+              </div>
+            </label>`,
+          )}
+        `,
+      )}
+    `,
+    panel,
+  );
+  syncSelectValues(panel);
 }
 
 export function collectProfileSettings(root: HTMLElement): Partial<ConfigState> {

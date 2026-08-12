@@ -1,215 +1,275 @@
-// Settings — Appearance panel
-// Font family, font size, color scheme gallery
+// Settings — Appearance panel (lit-html)
+// Font family, font size, color scheme gallery.
+//
+// Part of the lit-html migration (docs/frontend-governance.md P3; pilot:
+// settings/ssh.ts): the panel renders through lit-html's diffing render()
+// from store + per-panel state, so re-renders after a gallery click, a theme
+// editor save, or a font pick patch DOM instead of rebuilding it. The pending
+// gallery selection — root.dataset.themeName in the innerHTML era — is panel
+// state now; the dataset attribute is still mirrored onto the settings-page
+// root for the DOM contract (settings-theme tests read it).
 
 import { dedupeThemeName } from "../config/custom-themes";
-import { esc } from "../core/common";
 import { type ConfigState, configStore } from "../core/store";
+import { html, itemRow, nothing, render, repeat, section, type TemplateResult } from "../ui/lit";
 import { attachStepper } from "../ui/stepper";
 import { buildFontFamily, updateFontStack } from "../util/fontconfig";
 import { allThemes, DEFAULT_THEME_NAME, findTheme, type ThemeDef } from "../util/themes";
 import { showThemeEditor } from "./themeeditor";
+
+// ---- Per-panel state -------------------------------------------------
+// Pending selection only — the applied theme stays in configStore (single
+// source of truth). Per panel element so a second Settings page never
+// inherits another's pending pick.
+
+interface AppearancePanelState {
+  // Pending gallery selection (applied by the shell's Apply; dropped on
+  // Revert). null = follow the store. Replaces root.dataset.themeName.
+  pendingThemeName: string | null;
+}
+
+const panelStates = new WeakMap<HTMLElement, AppearancePanelState>();
+
+function stateOf(panel: HTMLElement): AppearancePanelState {
+  let st = panelStates.get(panel);
+  if (!st) {
+    st = { pendingThemeName: null };
+    panelStates.set(panel, st);
+  }
+  return st;
+}
+
+function pendingThemeName(panel: HTMLElement): string {
+  return stateOf(panel).pendingThemeName ?? configStore.get("themeName");
+}
+
+function appearancePanel(root: HTMLElement): HTMLElement | null {
+  return root.querySelector<HTMLElement>('.settings-panel-content[data-panel="appearance"]');
+}
+
+// DOM contract: the pending selection is mirrored onto the settings-page
+// root's dataset (settings-theme.test.ts reads root.dataset.themeName).
+function mirrorPendingTheme(panel: HTMLElement): void {
+  const page = panel.closest<HTMLElement>(".settings-page");
+  if (page) page.dataset.themeName = pendingThemeName(panel);
+}
 
 export function createAppearancePanel(): HTMLElement {
   const panel = document.createElement("div");
   panel.className = "settings-panel-content";
   panel.dataset.panel = "appearance";
   panel.style.display = "none";
-  panel.innerHTML = `
-    <div class="settings-section">
-      <div class="settings-section-title">Font</div>
-      <div class="settings-item settings-item-row">
-        <div class="settings-item-info">
-          <div class="settings-item-title">Font Family</div>
-          <div class="settings-item-desc" id="set-font-family-desc">${esc(configStore.get("fontFamily"))}</div>
-        </div>
-        <div class="settings-item-control">
-          <button id="set-font-config" class="settings-link-btn">Configure</button>
-        </div>
-      </div>
-      <div class="settings-item settings-item-row">
-        <div class="settings-item-info">
-          <div class="settings-item-title">Font Size</div>
-          <div class="settings-item-desc">Size of the terminal font in pixels.</div>
-        </div>
-        <div class="settings-item-control">
-          <input type="number" id="set-font-size" class="settings-input settings-input-narrow" value="${configStore.get("fontSize")}" min="10" max="32" step="1" />
-        </div>
-      </div>
-    </div>
-    <div class="settings-section">
-      <div class="settings-section-title">Color Scheme</div>
-      <div class="settings-item-desc" style="margin-bottom:6px">Click a card to choose. Windows Terminal schemes are imported automatically.</div>
-      <div id="set-theme-gallery" class="theme-gallery"></div>
-    </div>
-  `;
-
+  renderPanel(panel);
   // Font size gets the shared stepper (native spinners are hidden globally).
-  attachStepper(panel.querySelector<HTMLInputElement>("#set-font-size")!);
-
-  // Font config button — opens font picker
-  panel.querySelector("#set-font-config")?.addEventListener("click", () => {
-    import("../ui/fontpicker").then((m) => {
-      m.showFontPickerDialog((stack) => {
-        updateFontStack(stack);
-        configStore.set({ fontFamily: buildFontFamily(stack) });
-        const desc = panel.querySelector("#set-font-family-desc");
-        if (desc) desc.textContent = buildFontFamily(stack);
-        // Notify parent for apply button state
-        const evt = new CustomEvent("tterm-settings-changed");
-        panel.dispatchEvent(evt);
-      });
-    });
-  });
-
+  // attachStepper wraps the input in place; lit re-renders only touch dynamic
+  // parts (which hold direct element references), so the stepper survives.
+  const sizeInput = panel.querySelector<HTMLInputElement>("#set-font-size");
+  if (sizeInput) attachStepper(sizeInput);
   return panel;
 }
 
 export function refreshAppearancePanel(root: HTMLElement): void {
-  const fontDesc = root.querySelector("#set-font-family-desc");
-  const sizeEl = root.querySelector("#set-font-size") as HTMLInputElement;
-  if (fontDesc) fontDesc.textContent = configStore.get("fontFamily");
+  const panel = appearancePanel(root);
+  if (!panel) return;
+  stateOf(panel).pendingThemeName = null; // Revert drops the pending selection
+  renderPanel(panel);
+  // The size input is user-editable DOM: when the store value equals the last
+  // rendered value lit leaves it alone, so reset it explicitly (Revert).
+  const sizeEl = panel.querySelector<HTMLInputElement>("#set-font-size");
   if (sizeEl) sizeEl.value = String(configStore.get("fontSize"));
-  root.dataset.themeName = configStore.get("themeName");
-  renderThemeGallerySelection(root);
 }
 
 export function collectAppearanceSettings(root: HTMLElement): Partial<ConfigState> {
   const partial: Partial<ConfigState> = {};
   const sizeEl = root.querySelector("#set-font-size") as HTMLInputElement;
   if (sizeEl) partial.fontSize = Math.max(10, Math.min(32, parseInt(sizeEl.value, 10) || 14));
-  partial.themeName = root.dataset.themeName || configStore.get("themeName");
+  const panel = appearancePanel(root);
+  partial.themeName = panel
+    ? pendingThemeName(panel)
+    : root.dataset.themeName || configStore.get("themeName");
   return partial;
 }
 
+/** Re-render the theme gallery (theme changes, editor saves). Same lit render
+ *  path as the rest of the panel — only changed cards are patched. */
 export function renderThemeGallery(root: HTMLElement): void {
-  const gallery = root.querySelector("#set-theme-gallery") as HTMLElement;
-  if (!gallery) return;
-  root.dataset.themeName = root.dataset.themeName || configStore.get("themeName");
-  gallery.innerHTML = "";
+  const panel = appearancePanel(root);
+  if (panel) renderPanel(panel);
+}
 
-  const renderCard = (t: ThemeDef, grid: HTMLElement) => {
-    const th = t.theme;
-    const card = document.createElement("div");
-    card.className = "theme-card";
-    card.dataset.theme = t.name;
+// ---- Rendering ---------------------------------------------------------
 
-    const preview = document.createElement("div");
-    preview.className = "theme-card-preview";
-    preview.style.background = th.background ?? "";
-    preview.style.color = th.foreground ?? "";
-    preview.style.fontFamily = configStore.get("fontFamily");
+function renderPanel(panel: HTMLElement): void {
+  mirrorPendingTheme(panel);
+  render(appearanceTemplate(panel), panel);
+}
 
-    const line = document.createElement("div");
-    line.innerHTML = `$ ls <span style="color:${th.blue}">src/</span> <span style="color:${th.green}">run.sh</span> <span style="color:${th.red}">err.txt</span>`;
-    preview.appendChild(line);
+function appearanceTemplate(panel: HTMLElement): TemplateResult {
+  const current = pendingThemeName(panel);
+  return html`
+    ${section(
+      "Font",
+      html`
+        <div class="settings-item settings-item-row">
+          <div class="settings-item-info">
+            <div class="settings-item-title">Font Family</div>
+            <div class="settings-item-desc" id="set-font-family-desc">${configStore.get("fontFamily")}</div>
+          </div>
+          <div class="settings-item-control">
+            <button
+              id="set-font-config"
+              class="settings-link-btn"
+              @click=${() => openFontPicker(panel)}
+            >Configure</button>
+          </div>
+        </div>
+        ${itemRow(
+          "Font Size",
+          "Size of the terminal font in pixels.",
+          html`<input
+            type="number"
+            id="set-font-size"
+            class="settings-input settings-input-narrow"
+            .value=${String(configStore.get("fontSize"))}
+            min="10"
+            max="32"
+            step="1"
+          />`,
+        )}
+      `,
+    )}
+    ${section(
+      "Color Scheme",
+      html`
+        <div class="settings-item-desc" style="margin-bottom:6px">
+          Click a card to choose. Windows Terminal schemes are imported automatically.
+        </div>
+        <div id="set-theme-gallery" class="theme-gallery">${galleryTemplate(panel, current)}</div>
+      `,
+    )}
+  `;
+}
 
-    const swatches = document.createElement("div");
-    swatches.className = "theme-card-swatches";
-    for (const c of [
-      th.black,
-      th.red,
-      th.green,
-      th.yellow,
-      th.blue,
-      th.magenta,
-      th.cyan,
-      th.white,
-      th.brightBlack,
-      th.brightRed,
-      th.brightGreen,
-      th.brightYellow,
-      th.brightBlue,
-      th.brightMagenta,
-      th.brightCyan,
-      th.brightWhite,
-    ]) {
-      const s = document.createElement("span");
-      s.className = "theme-card-swatch";
-      s.style.background = c ?? "transparent";
-      swatches.appendChild(s);
-    }
-    preview.appendChild(swatches);
-    card.appendChild(preview);
-
-    const name = document.createElement("div");
-    name.className = "theme-card-name";
-    name.textContent = t.source === "wt" ? `${t.name} (WT)` : t.name;
-    card.appendChild(name);
-
-    // Card actions: duplicate any theme into a custom copy; custom themes
-    // can also be edited. Clicks must not select the card.
-    const actions = document.createElement("div");
-    actions.className = "theme-card-actions";
-    const dupBtn = document.createElement("button");
-    dupBtn.className = "theme-card-action";
-    dupBtn.textContent = "Duplicate";
-    dupBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      openThemeEditor(root, t, undefined);
-    });
-    actions.appendChild(dupBtn);
-    if (t.source === "custom") {
-      const editBtn = document.createElement("button");
-      editBtn.className = "theme-card-action";
-      editBtn.textContent = "Edit";
-      editBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        openThemeEditor(root, t, t.name);
-      });
-      actions.appendChild(editBtn);
-    }
-    card.appendChild(actions);
-
-    card.addEventListener("click", () => {
-      root.dataset.themeName = t.name;
-      renderThemeGallerySelection(root);
-      // The settings shell listens on the appearance PANEL; dispatching on
-      // root would never reach it (events bubble up, not down).
-      card.dispatchEvent(new CustomEvent("tterm-settings-changed", { bubbles: true }));
-    });
-    grid.appendChild(card);
-  };
-
+function galleryTemplate(panel: HTMLElement, current: string): TemplateResult {
   const themes = allThemes();
   const builtin = themes.filter((t) => t.source !== "custom");
   const custom = themes.filter((t) => t.source === "custom");
+  return html`
+    <div class="theme-group-title">Built-in</div>
+    <div class="theme-grid">
+      ${repeat(
+        builtin,
+        (t) => t.name,
+        (t) => themeCard(panel, t, current),
+      )}
+    </div>
+    <div class="theme-group-title">Custom</div>
+    <div class="theme-grid">
+      ${repeat(
+        custom,
+        (t) => t.name,
+        (t) => themeCard(panel, t, current),
+      )}
+      <button
+        id="set-theme-new"
+        class="settings-link-btn"
+        @click=${() => openThemeEditor(panel, findTheme(pendingThemeName(panel)), undefined)}
+      >+ New Theme</button>
+    </div>
+  `;
+}
 
-  // Built-in (and imported WT) schemes.
-  const builtinHeader = document.createElement("div");
-  builtinHeader.className = "theme-group-title";
-  builtinHeader.textContent = "Built-in";
-  gallery.appendChild(builtinHeader);
-  const builtinGrid = document.createElement("div");
-  builtinGrid.className = "theme-grid";
-  for (const t of builtin) renderCard(t, builtinGrid);
-  gallery.appendChild(builtinGrid);
+function themeCard(panel: HTMLElement, t: ThemeDef, current: string): TemplateResult {
+  const th = t.theme;
+  const swatchColors = [
+    th.black,
+    th.red,
+    th.green,
+    th.yellow,
+    th.blue,
+    th.magenta,
+    th.cyan,
+    th.white,
+    th.brightBlack,
+    th.brightRed,
+    th.brightGreen,
+    th.brightYellow,
+    th.brightBlue,
+    th.brightMagenta,
+    th.brightCyan,
+    th.brightWhite,
+  ];
+  return html`
+    <div
+      class="theme-card ${t.name === current ? "selected" : ""}"
+      data-theme=${t.name}
+      @click=${() => selectTheme(panel, t.name)}
+    >
+      <div
+        class="theme-card-preview"
+        style="background:${th.background ?? ""};color:${th.foreground ?? ""};font-family:${configStore.get("fontFamily")}"
+      >
+        <div>
+          $ ls <span style="color:${th.blue}">src/</span>
+          <span style="color:${th.green}">run.sh</span>
+          <span style="color:${th.red}">err.txt</span>
+        </div>
+        <div class="theme-card-swatches">
+          ${swatchColors.map(
+            (c) =>
+              html`<span class="theme-card-swatch" style="background:${c ?? "transparent"}"></span>`,
+          )}
+        </div>
+      </div>
+      <div class="theme-card-name">${t.source === "wt" ? `${t.name} (WT)` : t.name}</div>
+      <div class="theme-card-actions">
+        <button
+          class="theme-card-action"
+          @click=${(e: MouseEvent) => {
+            e.stopPropagation();
+            openThemeEditor(panel, t, undefined);
+          }}
+        >Duplicate</button>
+        ${
+          t.source === "custom"
+            ? html`<button
+              class="theme-card-action"
+              @click=${(e: MouseEvent) => {
+                e.stopPropagation();
+                openThemeEditor(panel, t, t.name);
+              }}
+            >Edit</button>`
+            : nothing
+        }
+      </div>
+    </div>
+  `;
+}
 
-  // User's own themes (themes.json) — always shown so the affordance exists.
-  const customHeader = document.createElement("div");
-  customHeader.className = "theme-group-title";
-  customHeader.textContent = "Custom";
-  gallery.appendChild(customHeader);
-  const customGrid = document.createElement("div");
-  customGrid.className = "theme-grid";
-  for (const t of custom) renderCard(t, customGrid);
+// ---- Actions -----------------------------------------------------------
 
-  // "New Theme" — duplicate the currently selected theme as a starting point.
-  const newBtn = document.createElement("button");
-  newBtn.id = "set-theme-new";
-  newBtn.className = "settings-link-btn";
-  newBtn.textContent = "+ New Theme";
-  newBtn.addEventListener("click", () => {
-    const base = findTheme(root.dataset.themeName);
-    openThemeEditor(root, base, undefined);
+function selectTheme(panel: HTMLElement, name: string): void {
+  stateOf(panel).pendingThemeName = name;
+  renderPanel(panel);
+  // The settings shell listens on the settings-page root; a bubbling event
+  // from the panel reaches it and enables the footer Apply.
+  panel.dispatchEvent(new CustomEvent("tterm-settings-changed", { bubbles: true }));
+}
+
+function openFontPicker(panel: HTMLElement): void {
+  import("../ui/fontpicker").then((m) => {
+    m.showFontPickerDialog((stack) => {
+      updateFontStack(stack);
+      configStore.set({ fontFamily: buildFontFamily(stack) });
+      renderPanel(panel); // the family desc is bound to the store value
+      // Notify the settings shell for apply button state.
+      panel.dispatchEvent(new CustomEvent("tterm-settings-changed", { bubbles: true }));
+    });
   });
-  customGrid.appendChild(newBtn);
-  gallery.appendChild(customGrid);
-
-  renderThemeGallerySelection(root);
 }
 
 /** Open the theme editor and reconcile the gallery/selection afterwards. */
-function openThemeEditor(root: HTMLElement, base: ThemeDef, editName: string | undefined): void {
+function openThemeEditor(panel: HTMLElement, base: ThemeDef, editName: string | undefined): void {
   showThemeEditor({
     base,
     editName,
@@ -217,11 +277,9 @@ function openThemeEditor(root: HTMLElement, base: ThemeDef, editName: string | u
     onSaved: (savedName) => {
       // Renaming the theme that is currently selected: follow the new name
       // everywhere (pending gallery selection + live terminals).
-      if (
-        editName &&
-        (root.dataset.themeName === editName || configStore.get("themeName") === editName)
-      ) {
-        root.dataset.themeName = savedName;
+      // pendingThemeName() falls back to the store, covering both.
+      if (editName && pendingThemeName(panel) === editName) {
+        stateOf(panel).pendingThemeName = savedName;
       }
       // The saved theme is the live one: re-apply (colors may have changed
       // under the same name). set() re-notifies even for an unchanged value.
@@ -229,24 +287,17 @@ function openThemeEditor(root: HTMLElement, base: ThemeDef, editName: string | u
       if (active === savedName || (editName && active === editName)) {
         configStore.set({ themeName: savedName });
       }
-      renderThemeGallery(root);
+      renderPanel(panel);
     },
     onDeleted: (deletedName) => {
       // Deleted the active theme: fall back to the default.
       if (configStore.get("themeName") === deletedName) {
         configStore.set({ themeName: DEFAULT_THEME_NAME });
       }
-      if (root.dataset.themeName === deletedName) {
-        root.dataset.themeName = DEFAULT_THEME_NAME;
+      if (pendingThemeName(panel) === deletedName) {
+        stateOf(panel).pendingThemeName = DEFAULT_THEME_NAME;
       }
-      renderThemeGallery(root);
+      renderPanel(panel);
     },
-  });
-}
-
-export function renderThemeGallerySelection(root: HTMLElement): void {
-  const current = root.dataset.themeName || configStore.get("themeName");
-  root.querySelectorAll<HTMLElement>("#set-theme-gallery .theme-card").forEach((card) => {
-    card.classList.toggle("selected", card.dataset.theme === current);
   });
 }

@@ -1,188 +1,244 @@
-// Settings — General panel
-// Renderer, scrollback, terminal bell, paste options, tab width, data management
+// Settings — General panel (lit-html)
+// Renderer, scrollback, terminal bell, paste options, data management.
+//
+// Migrated per the ssh.ts pilot (docs/frontend-governance.md P3): the panel
+// renders through lit-html's diffing render() from store + per-panel state.
+// Pending control edits live in panel state (not rescued DOM), so a Revert
+// re-render resets them from the store and a mid-edit re-render (the async
+// version label landing) never clobbers them.
 
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { logCatch, logError } from "../core/errorlog";
+import { logCatch, logError, swallow } from "../core/errorlog";
 import { type ConfigState, configStore } from "../core/store";
+import {
+  html,
+  itemRow,
+  linkBtn,
+  nothing,
+  render,
+  section,
+  syncSelectValues,
+  toggle,
+} from "../ui/lit";
 import { attachStepper } from "../ui/stepper";
+
+// ---- Per-panel state -------------------------------------------------
+// Pending control values + the async version label. The store stays the
+// source of truth: state initializes from it and refreshGeneralPanel
+// resets to it (Revert). Per panel element so a second Settings page
+// never inherits another's pending edits.
+
+interface GeneralPanelState {
+  // Version label, pushed in async by getVersion(); null = not resolved yet.
+  version: string | null;
+  autoUpdate: boolean;
+  renderer: string;
+  scrollback: string;
+  bell: boolean;
+  pasteWarning: boolean;
+  pasteTrim: boolean;
+}
+
+const panelStates = new WeakMap<HTMLElement, GeneralPanelState>();
+
+// Everything except the async version label comes straight from the store.
+function readStore() {
+  return {
+    autoUpdate: configStore.get("autoCheckUpdates"),
+    renderer: configStore.get("renderer"),
+    scrollback: String(configStore.get("scrollback")),
+    bell: configStore.get("terminalBell"),
+    pasteWarning: configStore.get("pasteWarning"),
+    pasteTrim: configStore.get("pasteTrim"),
+  };
+}
+
+function stateOf(panel: HTMLElement): GeneralPanelState {
+  let st = panelStates.get(panel);
+  if (!st) {
+    st = { version: null, ...readStore() };
+    panelStates.set(panel, st);
+  }
+  return st;
+}
 
 export function createGeneralPanel(): HTMLElement {
   const panel = document.createElement("div");
   panel.className = "settings-panel-content";
   panel.dataset.panel = "general";
-  panel.innerHTML = `
-    <div class="settings-section">
-      <div class="settings-section-title">About</div>
-      <div class="settings-item">
-        <div class="settings-about-row">
-          <div>
-            <div class="settings-item-title" id="set-version">TTerm</div>
-            <div class="settings-item-desc" style="margin-bottom:20px">A fast, lightweight, efficient WebView Terminal.</div>
-          </div>
-          <button id="set-homepage" class="settings-link-btn" style="flex-shrink:0;background:#3a3a3a;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:middle"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
-            Homepage
-          </button>
-        </div>
-      </div>
-    </div>
-    <div class="settings-section">
-      <div class="settings-section-title">Updates</div>
-      <div class="settings-item settings-item-row">
-        <div class="settings-item-info">
-          <div class="settings-item-title">Check for updates automatically</div>
-          <div class="settings-item-desc">Check GitHub Releases for a new version when the app starts.</div>
-        </div>
-        <div class="settings-item-control">
-          <label class="settings-toggle-row" style="padding:0;gap:0;">
-            <input type="checkbox" id="set-auto-update" ${configStore.get("autoCheckUpdates") ? "checked" : ""} />
-          </label>
-        </div>
-      </div>
-      <div class="settings-item settings-item-row">
-        <div class="settings-item-info">
-          <div class="settings-item-title">Manual check</div>
-          <div class="settings-item-desc">Check for a new version right now.</div>
-        </div>
-        <div class="settings-item-control">
-          <button id="set-check-update" class="settings-link-btn">Check for Updates</button>
-        </div>
-      </div>
-    </div>
-    <div class="settings-section">
-      <div class="settings-section-title">Terminal</div>
-      <div class="settings-item settings-item-row">
-        <div class="settings-item-info">
-          <div class="settings-item-title">Renderer</div>
-          <div class="settings-item-desc">Rendering backend for terminal output. WebGL is faster, Canvas has broader compatibility.</div>
-        </div>
-        <div class="settings-item-control">
-          <select id="set-renderer" class="settings-select">
-            <option value="webgl" ${configStore.get("renderer") === "webgl" ? "selected" : ""}>WebGL</option>
-            <option value="canvas" ${configStore.get("renderer") === "canvas" ? "selected" : ""}>Canvas</option>
-          </select>
-        </div>
-      </div>
-      <div class="settings-item settings-item-row">
-        <div class="settings-item-info">
-          <div class="settings-item-title">Scrollback</div>
-          <div class="settings-item-desc">Maximum number of lines stored in the scrollback buffer.</div>
-        </div>
-        <div class="settings-item-control">
-          <input type="number" id="set-scrollback" class="settings-input settings-input-narrow" value="${configStore.get("scrollback")}" min="100" max="100000" step="100" />
-        </div>
-      </div>
-      <div class="settings-item settings-item-row">
-        <div class="settings-item-info">
-          <div class="settings-item-title">Terminal bell</div>
-          <div class="settings-item-desc">Play a system sound when the terminal bell rings (BEL character).</div>
-        </div>
-        <div class="settings-item-control">
-          <label class="settings-toggle-row" style="padding:0;gap:0;">
-            <input type="checkbox" id="set-bell" ${configStore.get("terminalBell") ? "checked" : ""} />
-          </label>
-        </div>
-      </div>
-      <div class="settings-subsection">
-        <div class="settings-subsection-title">Paste</div>
-        <div class="settings-item settings-item-row">
-          <div class="settings-item-info">
-            <div class="settings-item-title">Multi-line paste warning</div>
-            <div class="settings-item-desc">Show a confirmation dialog when pasting text that spans multiple lines.</div>
-          </div>
-          <div class="settings-item-control">
-            <label class="settings-toggle-row" style="padding:0;gap:0;">
-              <input type="checkbox" id="set-paste-warning" ${configStore.get("pasteWarning") ? "checked" : ""} />
-            </label>
-          </div>
-        </div>
-        <div class="settings-item settings-item-row">
-          <div class="settings-item-info">
-            <div class="settings-item-title">Trim whitespace</div>
-            <div class="settings-item-desc">Strip leading, trailing, and blank lines from pasted content.</div>
-          </div>
-          <div class="settings-item-control">
-            <label class="settings-toggle-row" style="padding:0;gap:0;">
-              <input type="checkbox" id="set-paste-trim" ${configStore.get("pasteTrim") ? "checked" : ""} />
-            </label>
-          </div>
-        </div>
-      </div>
-      
-    </div>
-    <div class="settings-section">
-      <div class="settings-section-title">Data</div>
-      <div class="settings-item settings-item-row">
-        <div class="settings-item-info">
-          <div class="settings-item-title">Configuration</div>
-        </div>
-        <div class="settings-item-control" style="display:flex;gap:8px;">
-          <button id="set-open-config-dir" class="settings-link-btn">Open Directory</button>
-          <button id="set-reset-all" class="settings-link-btn settings-link-btn-danger">Reset All</button>
-        </div>
-      </div>
-    </div>
-  `;
+  rebuildGeneralPanel(panel);
 
-  // populate version async
+  // Populate the version label async. Kept in panel state (not a
+  // post-render DOM write) so later re-renders don't clobber it.
+  const st = stateOf(panel);
   getVersion()
     .then((v) => {
-      const el = panel.querySelector("#set-version");
-      if (el) el.textContent = `TTerm ${v}`;
+      st.version = v;
+      if (panel.isConnected) renderGeneralPanel(panel);
     })
-    .catch(() => {});
-
-  // Scrollback gets the shared stepper (native spinners are hidden globally).
-  attachStepper(panel.querySelector<HTMLInputElement>("#set-scrollback")!);
-
-  // homepage link
-  panel.querySelector("#set-homepage")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    openUrl("https://github.com/rede97/tterm");
-  });
-
-  // manual update check
-  panel.querySelector("#set-check-update")?.addEventListener("click", () => {
-    import("../core/updater")
-      .then((m) => m.checkForUpdates(true))
-      .catch(logCatch("updater.manual"));
-  });
-
-  // open config directory
-  panel.querySelector("#set-open-config-dir")?.addEventListener("click", () => {
-    invoke("open_config_dir").catch(logError.bind(null, "config.openDir"));
-  });
-
-  // reset all settings
-  panel.querySelector("#set-reset-all")?.addEventListener("click", async () => {
-    await invoke("delete_config_file", { name: "config" });
-    await invoke("delete_config_file", { name: "keybindings" });
-    await configStore.load();
-    // Notify parent to refresh
-    const evt = new CustomEvent("tterm-settings-reset");
-    panel.dispatchEvent(evt);
-  });
+    .catch(swallow); // version label is cosmetic — stay on the bare "TTerm"
 
   return panel;
 }
 
 export function refreshGeneralPanel(root: HTMLElement): void {
-  const pasteWarnEl = root.querySelector("#set-paste-warning") as HTMLInputElement;
-  const pasteTrimEl = root.querySelector("#set-paste-trim") as HTMLInputElement;
-  const bellEl = root.querySelector("#set-bell") as HTMLInputElement;
-  const rendererEl = root.querySelector("#set-renderer") as HTMLSelectElement;
-  const scrollbackEl = root.querySelector("#set-scrollback") as HTMLInputElement;
+  // Re-render ONLY the General panel inside the settings page, with pending
+  // edits dropped back to the store (Revert semantics).
+  const panel = root.querySelector<HTMLElement>('.settings-panel-content[data-panel="general"]');
+  if (!panel) return;
+  // Revert drops pending edits back to the store (version label kept).
+  Object.assign(stateOf(panel), readStore());
+  rebuildGeneralPanel(panel);
+}
 
-  if (pasteWarnEl) pasteWarnEl.checked = configStore.get("pasteWarning");
-  if (pasteTrimEl) pasteTrimEl.checked = configStore.get("pasteTrim");
-  if (bellEl) bellEl.checked = configStore.get("terminalBell");
-  if (rendererEl) rendererEl.value = configStore.get("renderer");
-  if (scrollbackEl) scrollbackEl.value = String(configStore.get("scrollback"));
+// ---- Rendering ---------------------------------------------------------
 
-  const autoUpdateEl = root.querySelector("#set-auto-update") as HTMLInputElement;
-  if (autoUpdateEl) autoUpdateEl.checked = configStore.get("autoCheckUpdates");
+function renderGeneralPanel(panel: HTMLElement): void {
+  render(generalTemplate(panel, stateOf(panel)), panel);
+  syncSelectValues(panel);
+}
+
+// Full clear + rebuild. A plain diffing re-render can't reset pending DOM
+// edits: lit skips a property binding whose new value equals the last
+// committed one, even when the live DOM diverged (user edited without
+// Apply). Revert must always land the store values, so it rebuilds —
+// which also means re-attaching the stepper.
+function rebuildGeneralPanel(panel: HTMLElement): void {
+  render(nothing, panel);
+  renderGeneralPanel(panel);
+  const scrollbackInput = panel.querySelector<HTMLInputElement>("#set-scrollback");
+  if (scrollbackInput) attachStepper(scrollbackInput);
+}
+
+function generalTemplate(panel: HTMLElement, st: GeneralPanelState) {
+  return html`
+    ${section(
+      "About",
+      html`<div class="settings-item">
+        <div class="settings-about-row">
+          <div>
+            <div class="settings-item-title" id="set-version">TTerm${st.version ? ` ${st.version}` : ""}</div>
+            <div class="settings-item-desc" style="margin-bottom:20px">A fast, lightweight, efficient WebView Terminal.</div>
+          </div>
+          <button
+            id="set-homepage"
+            class="settings-link-btn"
+            style="flex-shrink:0;background:#3a3a3a;"
+            @click=${(e: Event) => {
+              e.preventDefault();
+              openUrl("https://github.com/rede97/tterm");
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:middle"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85-1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+            Homepage
+          </button>
+        </div>
+      </div>`,
+    )}
+    ${section(
+      "Updates",
+      html`
+        ${itemRow(
+          "Check for updates automatically",
+          "Check GitHub Releases for a new version when the app starts.",
+          toggle(st.autoUpdate, (v) => (st.autoUpdate = v), { id: "set-auto-update" }),
+        )}
+        ${itemRow(
+          "Manual check",
+          "Check for a new version right now.",
+          linkBtn(
+            "Check for Updates",
+            () => {
+              import("../core/updater")
+                .then((m) => m.checkForUpdates(true))
+                .catch(logCatch("updater.manual"));
+            },
+            { id: "set-check-update" },
+          ),
+        )}
+      `,
+    )}
+    ${section(
+      "Terminal",
+      html`
+        ${itemRow(
+          "Renderer",
+          "Rendering backend for terminal output. WebGL is faster, Canvas has broader compatibility.",
+          html`<select
+            id="set-renderer"
+            class="settings-select"
+            data-current=${st.renderer}
+            @change=${(e: Event) => (st.renderer = (e.target as HTMLSelectElement).value)}
+          >
+            <option value="webgl">WebGL</option>
+            <option value="canvas">Canvas</option>
+          </select>`,
+        )}
+        ${itemRow(
+          "Scrollback",
+          "Maximum number of lines stored in the scrollback buffer.",
+          html`<input
+            type="number"
+            id="set-scrollback"
+            class="settings-input settings-input-narrow"
+            .value=${st.scrollback}
+            min="100"
+            max="100000"
+            step="100"
+            @change=${(e: Event) => (st.scrollback = (e.target as HTMLInputElement).value)}
+          />`,
+        )}
+        ${itemRow(
+          "Terminal bell",
+          "Play a system sound when the terminal bell rings (BEL character).",
+          toggle(st.bell, (v) => (st.bell = v), { id: "set-bell" }),
+        )}
+        <div class="settings-subsection">
+          <div class="settings-subsection-title">Paste</div>
+          ${itemRow(
+            "Multi-line paste warning",
+            "Show a confirmation dialog when pasting text that spans multiple lines.",
+            toggle(st.pasteWarning, (v) => (st.pasteWarning = v), { id: "set-paste-warning" }),
+          )}
+          ${itemRow(
+            "Trim whitespace",
+            "Strip leading, trailing, and blank lines from pasted content.",
+            toggle(st.pasteTrim, (v) => (st.pasteTrim = v), { id: "set-paste-trim" }),
+          )}
+        </div>
+      `,
+    )}
+    ${section(
+      "Data",
+      html`<div class="settings-item settings-item-row">
+        <div class="settings-item-info">
+          <div class="settings-item-title">Configuration</div>
+        </div>
+        <div class="settings-item-control" style="gap:8px;">
+          ${linkBtn(
+            "Open Directory",
+            () => {
+              invoke("open_config_dir").catch(logError.bind(null, "config.openDir"));
+            },
+            { id: "set-open-config-dir" },
+          )}
+          ${linkBtn(
+            "Reset All",
+            async () => {
+              await invoke("delete_config_file", { name: "config" });
+              await invoke("delete_config_file", { name: "keybindings" });
+              await configStore.load();
+              // Notify parent to refresh
+              panel.dispatchEvent(new CustomEvent("tterm-settings-reset"));
+            },
+            { danger: true, id: "set-reset-all" },
+          )}
+        </div>
+      </div>`,
+    )}
+  `;
 }
 
 export function collectGeneralSettings(root: HTMLElement): Partial<ConfigState> {

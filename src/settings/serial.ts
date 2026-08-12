@@ -2,6 +2,13 @@
 // Default baud rate, default serial profile, profile gallery.
 // Per-device parameter memory is gone: named profiles (serial-profiles.json)
 // replace it.
+//
+// lit-html migration (pilot: settings/ssh.ts): the panel renders from
+// configStore + per-panel state through lit's diffing render(). Pending
+// (unapplied) select values live in SerialPanelState, and profile-gallery
+// cards are a keyed repeat() — re-renders after editor save/delete patch
+// DOM instead of rebuilding it, so pending choices and node identity
+// survive.
 
 import {
   allSerialProfiles,
@@ -10,181 +17,179 @@ import {
   findSerialProfile,
   type SerialProfileDef,
 } from "../config/serial-profiles";
-import { esc, SERIAL_BAUD_RATES } from "../core/common";
+import { SERIAL_BAUD_RATES } from "../core/common";
 import { type ConfigState, configStore } from "../core/store";
+import { html, itemRow, nothing, render, repeat, section, syncSelectValues } from "../ui/lit";
 import { serialProfileSummary, showSerialProfileEditor } from "./serialprofileeditor";
+
+// ---- Per-panel state -------------------------------------------------
+// Pending (unapplied) select values. The store stays the source of truth;
+// state is reset from it on Revert (refreshSerialPanel). Per panel element
+// so a second Settings page never inherits another's pending choices.
+
+interface SerialPanelState {
+  baud: number;
+  profile: string;
+}
+
+const panelStates = new WeakMap<HTMLElement, SerialPanelState>();
+
+function stateOf(panel: HTMLElement): SerialPanelState {
+  let st = panelStates.get(panel);
+  if (!st) {
+    st = { baud: configStore.get("serialBaud"), profile: configStore.get("serialProfile") };
+    panelStates.set(panel, st);
+  }
+  return st;
+}
 
 export function createSerialPanel(): HTMLElement {
   const panel = document.createElement("div");
   panel.className = "settings-panel-content";
   panel.dataset.panel = "serial";
   panel.style.display = "none";
-  panel.innerHTML = `
-    <div class="settings-section">
-      <div class="settings-section-title">Defaults</div>
-      <div class="settings-item settings-item-row">
-        <div class="settings-item-info">
-          <div class="settings-item-title">Default baud rate</div>
-          <div class="settings-item-desc">Baud rate for new serial sessions (8N1).</div>
-        </div>
-        <div class="settings-item-control">
-          <select id="set-serial-baud" class="settings-select">${baudOptionsHtml(configStore.get("serialBaud"))}</select>
-        </div>
-      </div>
-      <div class="settings-item settings-item-row">
-        <div class="settings-item-info">
-          <div class="settings-item-title">Default profile</div>
-          <div class="settings-item-desc">Input mode, newline handling and flow control for new serial sessions.</div>
-        </div>
-        <div class="settings-item-control">
-          <select id="set-serial-profile" class="settings-select"></select>
-        </div>
-      </div>
-    </div>
-    <div class="settings-section">
-      <div class="settings-section-title">Profiles</div>
-      <div class="settings-item-desc" style="margin-bottom:6px">Named session modes. Duplicate a built-in profile to customize it.</div>
-      <div id="set-serial-profile-gallery" class="theme-gallery"></div>
-    </div>
-  `;
-  const baudEl = panel.querySelector<HTMLSelectElement>("#set-serial-baud")!;
-  baudEl.value = String(configStore.get("serialBaud"));
-  refreshProfileSelect(panel);
-  renderProfileGallery(panel);
+  renderSerialPanel(panel);
   return panel;
 }
 
 export function refreshSerialPanel(root: HTMLElement): void {
-  const baudEl = root.querySelector<HTMLSelectElement>("#set-serial-baud");
-  if (baudEl) baudEl.value = String(configStore.get("serialBaud"));
-  refreshProfileSelect(root, configStore.get("serialProfile"));
-  renderProfileGallery(root);
+  // Accepts the settings page root (shell Revert) or the panel itself.
+  const panel =
+    root.dataset.panel === "serial"
+      ? root
+      : root.querySelector<HTMLElement>('.settings-panel-content[data-panel="serial"]');
+  if (!panel) return;
+  const st = stateOf(panel);
+  st.baud = configStore.get("serialBaud"); // Revert drops the pending choices
+  st.profile = configStore.get("serialProfile");
+  renderSerialPanel(panel);
 }
 
-// Legacy name kept for src/settings/index.ts (Revert flow).
-function baudOptionsHtml(current: number): string {
-  return SERIAL_BAUD_RATES.map(
-    (b) => `<option value="${b}" ${current === b ? "selected" : ""}>${b}</option>`,
-  ).join("");
+// ---- Rendering ---------------------------------------------------------
+
+function renderSerialPanel(panel: HTMLElement): void {
+  const st = stateOf(panel);
+  // Keep the pending profile choice when valid, else fall back to Normal.
+  if (!allSerialProfiles().some((p) => p.name === st.profile)) {
+    st.profile = DEFAULT_SERIAL_PROFILE;
+  }
+  render(serialTemplate(panel, st), panel);
+  syncSelectValues(panel);
 }
 
-function profileOptionsHtml(selected: string): string {
+function profileOptions(label: string, list: SerialProfileDef[]) {
+  return html`<optgroup label=${label}>
+    ${list.map((p) => html`<option value=${p.name}>${p.name}</option>`)}
+  </optgroup>`;
+}
+
+function profileCard(panel: HTMLElement, p: SerialProfileDef) {
+  // Card actions: duplicate any profile into a custom copy; custom
+  // profiles can also be edited.
+  return html`<div class="theme-card sp-card" data-profile=${p.name}>
+    <div class="theme-card-name">${p.name}</div>
+    <div class="sp-card-summary">${serialProfileSummary(p)}</div>
+    <div class="theme-card-actions">
+      <button
+        class="theme-card-action"
+        @click=${(e: MouseEvent) => {
+          e.stopPropagation();
+          openProfileEditor(panel, p, undefined);
+        }}
+      >Duplicate</button>
+      ${
+        p.source === "custom"
+          ? html`<button
+            class="theme-card-action"
+            @click=${(e: MouseEvent) => {
+              e.stopPropagation();
+              openProfileEditor(panel, p, p.name);
+            }}
+          >Edit</button>`
+          : nothing
+      }
+    </div>
+  </div>`;
+}
+
+function serialTemplate(panel: HTMLElement, st: SerialPanelState) {
   const profiles = allSerialProfiles();
-  const group = (label: string, list: SerialProfileDef[]): string =>
-    `<optgroup label="${label}">` +
-    list
-      .map(
-        (p) =>
-          `<option value="${esc(p.name)}" ${p.name === selected ? "selected" : ""}>${esc(p.name)}</option>`,
-      )
-      .join("") +
-    `</optgroup>`;
-  return (
-    group(
-      "Built-in",
-      profiles.filter((p) => p.source === "builtin"),
-    ) +
-    group(
-      "Custom",
-      profiles.filter((p) => p.source === "custom"),
-    )
-  );
+  const ofSource = (source: SerialProfileDef["source"]) =>
+    profiles.filter((p) => p.source === source);
+
+  return html`
+    ${section(
+      "Defaults",
+      html`
+        ${itemRow(
+          "Default baud rate",
+          "Baud rate for new serial sessions (8N1).",
+          html`<select
+            id="set-serial-baud"
+            class="settings-select"
+            data-current=${st.baud}
+            @change=${(e: Event) => {
+              st.baud = parseInt((e.target as HTMLSelectElement).value, 10) || 115200;
+            }}
+          >
+            ${SERIAL_BAUD_RATES.map((b) => html`<option value=${b}>${b}</option>`)}
+          </select>`,
+        )}
+        ${itemRow(
+          "Default profile",
+          "Input mode, newline handling and flow control for new serial sessions.",
+          html`<select
+            id="set-serial-profile"
+            class="settings-select"
+            data-current=${st.profile}
+            @change=${(e: Event) => {
+              st.profile = (e.target as HTMLSelectElement).value;
+            }}
+          >
+            ${profileOptions("Built-in", ofSource("builtin"))}
+            ${profileOptions("Custom", ofSource("custom"))}
+          </select>`,
+        )}
+      `,
+    )}
+    ${section(
+      "Profiles",
+      html`
+        <div class="settings-item-desc" style="margin-bottom:6px">Named session modes. Duplicate a built-in profile to customize it.</div>
+        <div id="set-serial-profile-gallery" class="theme-gallery">
+          <div class="theme-group-title">Built-in</div>
+          <div class="theme-grid">
+            ${repeat(
+              ofSource("builtin"),
+              (p) => p.name,
+              (p) => profileCard(panel, p),
+            )}
+          </div>
+          <div class="theme-group-title">Custom</div>
+          <div class="theme-grid">
+            ${repeat(
+              ofSource("custom"),
+              (p) => p.name,
+              (p) => profileCard(panel, p),
+            )}
+            <button
+              id="set-serial-profile-new"
+              class="settings-link-btn"
+              @click=${() =>
+                openProfileEditor(panel, findSerialProfile(DEFAULT_SERIAL_PROFILE), undefined)}
+            >+ New Profile</button>
+          </div>
+        </div>
+      `,
+    )}
+  `;
 }
 
-/** Rebuild the default-profile select, keeping the pending choice when valid. */
-function refreshProfileSelect(root: HTMLElement, selected?: string): void {
-  const sel = root.querySelector<HTMLSelectElement>("#set-serial-profile");
-  if (!sel) return;
-  const want = selected ?? (sel.value || configStore.get("serialProfile"));
-  const valid = allSerialProfiles().some((p) => p.name === want) ? want : DEFAULT_SERIAL_PROFILE;
-  sel.innerHTML = profileOptionsHtml(valid);
-  sel.value = valid;
-}
-
-export function renderProfileGallery(root: HTMLElement): void {
-  const gallery = root.querySelector<HTMLElement>("#set-serial-profile-gallery");
-  if (!gallery) return;
-  gallery.innerHTML = "";
-
-  const renderCard = (p: SerialProfileDef, grid: HTMLElement) => {
-    const card = document.createElement("div");
-    card.className = "theme-card sp-card";
-    card.dataset.profile = p.name;
-
-    const name = document.createElement("div");
-    name.className = "theme-card-name";
-    name.textContent = p.name;
-    card.appendChild(name);
-
-    const summary = document.createElement("div");
-    summary.className = "sp-card-summary";
-    summary.textContent = serialProfileSummary(p);
-    card.appendChild(summary);
-
-    // Card actions: duplicate any profile into a custom copy; custom
-    // profiles can also be edited.
-    const actions = document.createElement("div");
-    actions.className = "theme-card-actions";
-    const dupBtn = document.createElement("button");
-    dupBtn.className = "theme-card-action";
-    dupBtn.textContent = "Duplicate";
-    dupBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      openProfileEditor(root, p, undefined);
-    });
-    actions.appendChild(dupBtn);
-    if (p.source === "custom") {
-      const editBtn = document.createElement("button");
-      editBtn.className = "theme-card-action";
-      editBtn.textContent = "Edit";
-      editBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        openProfileEditor(root, p, p.name);
-      });
-      actions.appendChild(editBtn);
-    }
-    card.appendChild(actions);
-    grid.appendChild(card);
-  };
-
-  const profiles = allSerialProfiles();
-  const builtin = profiles.filter((p) => p.source === "builtin");
-  const custom = profiles.filter((p) => p.source === "custom");
-
-  const builtinHeader = document.createElement("div");
-  builtinHeader.className = "theme-group-title";
-  builtinHeader.textContent = "Built-in";
-  gallery.appendChild(builtinHeader);
-  const builtinGrid = document.createElement("div");
-  builtinGrid.className = "theme-grid";
-  for (const p of builtin) renderCard(p, builtinGrid);
-  gallery.appendChild(builtinGrid);
-
-  // User's own profiles (serial-profiles.json) — always shown so the
-  // affordance exists.
-  const customHeader = document.createElement("div");
-  customHeader.className = "theme-group-title";
-  customHeader.textContent = "Custom";
-  gallery.appendChild(customHeader);
-  const customGrid = document.createElement("div");
-  customGrid.className = "theme-grid";
-  for (const p of custom) renderCard(p, customGrid);
-
-  // "New Profile" — always starts from Normal's plain values.
-  const newBtn = document.createElement("button");
-  newBtn.id = "set-serial-profile-new";
-  newBtn.className = "settings-link-btn";
-  newBtn.textContent = "+ New Profile";
-  newBtn.addEventListener("click", () => {
-    openProfileEditor(root, findSerialProfile(DEFAULT_SERIAL_PROFILE), undefined);
-  });
-  customGrid.appendChild(newBtn);
-  gallery.appendChild(customGrid);
-}
+// ---- Actions -----------------------------------------------------------
 
 /** Open the profile editor and reconcile the gallery/default afterwards. */
 function openProfileEditor(
-  root: HTMLElement,
+  panel: HTMLElement,
   base: SerialProfileDef,
   editName: string | undefined,
 ): void {
@@ -197,16 +202,14 @@ function openProfileEditor(
       if (editName && configStore.get("serialProfile") === editName) {
         configStore.set({ serialProfile: savedName });
       }
-      refreshProfileSelect(root);
-      renderProfileGallery(root);
+      renderSerialPanel(panel);
     },
     onDeleted: (deletedName) => {
       // Deleted the default profile: fall back to Normal.
       if (configStore.get("serialProfile") === deletedName) {
         configStore.set({ serialProfile: DEFAULT_SERIAL_PROFILE });
       }
-      refreshProfileSelect(root);
-      renderProfileGallery(root);
+      renderSerialPanel(panel);
     },
   });
 }
