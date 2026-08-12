@@ -4,6 +4,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { mustQuery } from "../ui/dom";
 import { createModal } from "../ui/modal";
 import { showToast } from "../ui/toast";
 
@@ -67,10 +68,10 @@ function showAuthDialog(payload: SshAuthRequest): void {
       </div>
     </div>
   `;
-  overlay.querySelector(".sshauth-label")!.textContent = payload.prompt;
+  mustQuery(overlay, ".sshauth-label").textContent = payload.prompt;
   document.body.appendChild(overlay);
 
-  const input = overlay.querySelector<HTMLInputElement>(".sshauth-input")!;
+  const input = mustQuery<HTMLInputElement>(overlay, ".sshauth-input");
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();

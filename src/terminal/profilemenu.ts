@@ -1,11 +1,13 @@
+import type { IconNode } from "lucide";
 import { Cable, createElement, Film, FlaskConical, Globe, Terminal as TerminalIcon } from "lucide";
 import { loadSerialPorts } from "../config/wt-profiles";
 import { hostProp } from "../core/common";
 import { DOM_ID } from "../core/dom-ids";
 import { configStore } from "../core/store";
+import { mustGetById } from "../ui/dom";
 import { tabManager } from "./tabmanager";
 
-const menuBtn = document.getElementById(DOM_ID.newTabMenuBtn)!;
+const menuBtn = mustGetById(DOM_ID.newTabMenuBtn);
 
 const profileMenu = document.createElement("div");
 profileMenu.id = "profile-menu";
@@ -36,7 +38,7 @@ function flipMenu() {
 }
 
 function createMenuItem(
-  iconFn: any,
+  iconFn: IconNode,
   label: string,
   detail: string,
   onClick: () => void,

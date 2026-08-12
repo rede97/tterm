@@ -13,6 +13,7 @@
 import { esc, hostProp } from "../core/common";
 import { configStore } from "../core/store";
 import type { SshHost } from "../core/types";
+import { mustQuery } from "../ui/dom";
 import type { ForwardEditorValue } from "../ui/forwardeditor";
 import { createForwardTable, forwardConfigLine, parseForwardLine } from "../ui/forwardtable";
 import { createModal } from "../ui/modal";
@@ -101,10 +102,10 @@ export function showSshHostEditor(opts: SshHostEditorOptions): void {
   const table = createForwardTable(base ? baseForwards(base) : []);
   overlay.querySelector(".she-table-slot")?.replaceWith(table.el);
 
-  const aliasInput = overlay.querySelector<HTMLInputElement>(".she-alias")!;
-  const hostnameInput = overlay.querySelector<HTMLInputElement>(".she-hostname")!;
-  const userInput = overlay.querySelector<HTMLInputElement>(".she-user")!;
-  const portInput = overlay.querySelector<HTMLInputElement>(".she-port")!;
+  const aliasInput = mustQuery<HTMLInputElement>(overlay, ".she-alias");
+  const hostnameInput = mustQuery<HTMLInputElement>(overlay, ".she-hostname");
+  const userInput = mustQuery<HTMLInputElement>(overlay, ".she-user");
+  const portInput = mustQuery<HTMLInputElement>(overlay, ".she-port");
 
   overlay.querySelector(".she-cancel")?.addEventListener("click", modal.close);
 

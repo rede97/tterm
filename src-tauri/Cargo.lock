@@ -6061,6 +6061,7 @@ dependencies = [
  "getrandom 0.4.2",
  "hmac",
  "http",
+ "httparse",
  "parking_lot",
  "portable-pty",
  "rand 0.9.5",

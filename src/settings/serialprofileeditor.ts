@@ -18,6 +18,7 @@ import {
 import { logCatch } from "../core/errorlog";
 import type { SerialFlowControl, SerialInputMode, SerialProfile } from "../core/types";
 import { confirmDialog } from "../ui/confirm";
+import { mustQuery } from "../ui/dom";
 import { createModal } from "../ui/modal";
 import { showToast } from "../ui/toast";
 
@@ -99,9 +100,9 @@ export function showSerialProfileEditor(opts: SerialProfileEditorOptions): void 
     </div>`;
   document.body.appendChild(overlay);
 
-  const nameInput = overlay.querySelector<HTMLInputElement>(".sp-name")!;
+  const nameInput = mustQuery<HTMLInputElement>(overlay, ".sp-name");
 
-  const hintEl = overlay.querySelector<HTMLElement>(".sp-hint")!;
+  const hintEl = mustQuery(overlay, ".sp-hint");
 
   overlay.querySelectorAll<HTMLSelectElement>(".sp-select").forEach((el) => {
     const field = el.dataset.field as keyof Omit<SerialProfile, "name">;
@@ -139,17 +140,18 @@ export function showSerialProfileEditor(opts: SerialProfileEditorOptions): void 
   });
 
   overlay.querySelector(".sp-delete")?.addEventListener("click", async () => {
-    if (!opts.editName) return;
+    const editName = opts.editName;
+    if (!editName) return;
     const confirmed = await confirmDialog({
       title: "Delete profile?",
-      message: `Delete profile "${opts.editName}"? This cannot be undone.`,
+      message: `Delete profile "${editName}"? This cannot be undone.`,
       okLabel: "Delete",
       danger: true,
     });
     if (!confirmed) return;
-    deleteSerialProfile(opts.editName)
+    deleteSerialProfile(editName)
       .then(() => {
-        opts.onDeleted?.(opts.editName!);
+        opts.onDeleted?.(editName);
         close();
       })
       .catch(logCatch("serialProfileEditor.delete"));

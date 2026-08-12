@@ -226,7 +226,8 @@ contextMenu.addEventListener("click", (e) => {
   const item = target.closest("[data-action]") as HTMLElement | null;
   if (!item) return;
   e.stopPropagation();
-  const action = item.dataset.action!;
+  const action = item.dataset.action;
+  if (!action) return;
   dispatch(action);
   closeContextMenu();
 });

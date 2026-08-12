@@ -3,12 +3,13 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Copy, createElement, Drama, Minus, Square, X } from "lucide";
 import { DOM_ID } from "../core/dom-ids";
 import { logCatch, swallow } from "../core/errorlog";
+import { mustGetById } from "./dom";
 
 const appWindow = getCurrentWindow();
 
 // -- maximize icon ----
 
-const btnMaximize = document.getElementById(DOM_ID.btnMaximize)!;
+const btnMaximize = mustGetById(DOM_ID.btnMaximize);
 
 async function updateMaximizeIcon() {
   try {
@@ -25,7 +26,7 @@ async function updateMaximizeIcon() {
 // -- drag ----
 
 function initDrag() {
-  const tabBar = document.getElementById(DOM_ID.tabBar)!;
+  const tabBar = mustGetById(DOM_ID.tabBar);
   tabBar.addEventListener("mousedown", (e) => {
     const target = e.target as HTMLElement;
     if (target.tagName === "BUTTON" || target.closest("button")) return;
@@ -52,7 +53,7 @@ function initDrag() {
 // -- window control buttons ----
 
 function initWindowButtons() {
-  const tabBar = document.getElementById(DOM_ID.tabBar)!;
+  const tabBar = mustGetById(DOM_ID.tabBar);
 
   tabBar.addEventListener("click", (e) => {
     const target = e.target instanceof Element ? e.target : (e.target as Node).parentElement;
@@ -89,9 +90,9 @@ function initWindowButtons() {
 // -- icons ---
 
 function injectIcons() {
-  const btnMinimize = document.getElementById(DOM_ID.btnMinimize)!;
-  const btnClose = document.getElementById(DOM_ID.btnClose)!;
-  const btnPark = document.getElementById(DOM_ID.btnParkTray)!;
+  const btnMinimize = mustGetById(DOM_ID.btnMinimize);
+  const btnClose = mustGetById(DOM_ID.btnClose);
+  const btnPark = mustGetById(DOM_ID.btnParkTray);
 
   btnPark.title = "Park to tray — sessions keep running; restore from the tray icon";
   // Mask icon: the window "disappears" into the tray while sessions run on.

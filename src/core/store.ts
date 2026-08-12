@@ -108,9 +108,16 @@ const RUNTIME_KEYS = new Set<SchemaKey>([
 function defaultState(): ConfigState {
   const state = {} as ConfigState;
   for (const [key, entry] of Object.entries(SCHEMA) as [SchemaKey, SchemaEntry<unknown>][]) {
-    (state as any)[key] = entry.default;
+    setStateKey(state, key, entry.default);
   }
   return state;
+}
+
+/** Write one schema-validated key into the typed state. Object.assign keeps
+ *  the dynamic-key write type-safe without casting the state to `any` — the
+ *  schema has already validated the value at each call site. */
+function setStateKey(state: ConfigState, key: string, value: unknown): void {
+  Object.assign(state, { [key]: value });
 }
 
 // ---- Pub/sub store ----
@@ -135,7 +142,7 @@ export class ConfigStore {
     for (const [k, v] of Object.entries(partial)) {
       const key = k as SchemaKey;
       if (key in SCHEMA && SCHEMA[key].validate(v)) {
-        (this._state as any)[key] = v;
+        setStateKey(this._state, key, v);
         changed.push(k);
         if (!RUNTIME_KEYS.has(key)) persisted[k] = v;
       }
@@ -251,7 +258,7 @@ export class ConfigStore {
     for (const [k, v] of Object.entries(cfg)) {
       const key = k as SchemaKey;
       if (key in SCHEMA && SCHEMA[key].validate(v)) {
-        (this._state as any)[key] = v;
+        setStateKey(this._state, key, v);
       }
     }
   }

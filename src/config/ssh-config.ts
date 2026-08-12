@@ -58,22 +58,20 @@ function captureGlobalSections(raw: string): void {
 export function parseSshConfig(raw: string): SshHost[] {
   captureGlobalSections(raw);
   const hosts: SshHost[] = [];
-  let current: SshHost | null = null;
+  // A Host block can name multiple aliases; `props` holds the block's
+  // options. Keeping the aliases separate from the options removes the old
+  // `__names` sentinel that had to be smuggled through `as any`.
+  let current: { names: string[]; props: Record<string, string> } | null = null;
   const preProps: Record<string, string> = {};
   let wildcardProps: Record<string, string> = {};
 
   const flush = () => {
     if (!current) return;
-    const names = (current as any).__names || [current.name];
-    for (const n of names) {
-      const h: SshHost = { name: n, ...wildcardProps, ...preProps };
-      for (const [k, v] of Object.entries(current)) {
-        if (k !== "name" && !(k as any).startsWith("__")) h[k] = v;
-      }
+    for (const n of current.names) {
+      const h: SshHost = { name: n, ...wildcardProps, ...preProps, ...current.props };
       if (n === "*") {
         wildcardProps = { ...h };
-        delete (wildcardProps as any).name;
-        delete (wildcardProps as any).__names;
+        delete wildcardProps.name;
       } else {
         hosts.push(h);
       }
@@ -91,25 +89,21 @@ export function parseSshConfig(raw: string): SshHost[] {
 
     if (key === "host") {
       flush();
-      const names = value.split(/\s+/);
-      current = { name: names[0], __names: names } as any;
+      current = { names: value.split(/\s+/), props: {} };
     } else if (current) {
       // ssh keywords are case-insensitive: find an existing property by
-      // lowercase name (never the host's own name/__names fields), so
-      // "LocalForward" then "localforward" doesn't split into two props
-      // and "HostName" then "hostname" keeps last-wins instead of
-      // emitting both on save.
-      const existing = Object.keys(current).find(
-        (k) => k !== "name" && !k.startsWith("__") && k.toLowerCase() === key,
-      );
+      // lowercase name, so "LocalForward" then "localforward" doesn't split
+      // into two props and "HostName" then "hostname" keeps last-wins
+      // instead of emitting both on save.
+      const existing = Object.keys(current.props).find((k) => k.toLowerCase() === key);
       // Forward directives may repeat (one per rule); merge into a
       // newline-separated value so nothing is lost. Other keywords keep
       // last-wins behavior.
       if (key === "localforward" || key === "remoteforward" || key === "dynamicforward") {
-        if (existing) current[existing] += `\n${value}`;
-        else current[rawKey] = value;
+        if (existing) current.props[existing] += `\n${value}`;
+        else current.props[rawKey] = value;
       } else {
-        current[existing ?? rawKey] = value;
+        current.props[existing ?? rawKey] = value;
       }
     } else {
       preProps[rawKey] = value;
@@ -117,9 +111,6 @@ export function parseSshConfig(raw: string): SshHost[] {
   }
   // flush last host
   flush();
-  for (const h of hosts) {
-    delete (h as any).__names;
-  }
   return hosts;
 }
 

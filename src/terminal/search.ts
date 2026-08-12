@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronUp, createElement, X } from "lucide";
 import { DOM_ID } from "../core/dom-ids";
+import { mustGetById } from "../ui/dom";
 import type { TerminalTab } from "./tab";
 
 // ---- Injected handlers (bound by wiring.ts — no tabmanager import here) ----
@@ -97,7 +98,7 @@ export function openFind(tabId: string) {
 // -- init --
 
 export function initSearchBar() {
-  const container = document.getElementById(DOM_ID.terminalContainer)!;
+  const container = mustGetById(DOM_ID.terminalContainer);
   container.appendChild(searchBar);
 
   searchInput.addEventListener("input", () => {

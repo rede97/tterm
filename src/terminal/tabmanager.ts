@@ -18,6 +18,7 @@ import type {
   TabType,
   WsConnectResult,
 } from "../core/types";
+import { mustGetById } from "../ui/dom";
 import { addForward, type NewForward } from "../ui/forwarding";
 import { showToast } from "../ui/toast";
 import { closeQuickPanel, closeQuickPanelForTab, updateQuickButton } from "./quickpanel";
@@ -73,9 +74,16 @@ export class TabManager {
 
   private _resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(tabsContainer: HTMLElement, terminalContainer: HTMLElement) {
-    this.tabsContainer = tabsContainer;
-    this.terminalContainer = terminalContainer;
+  constructor(
+    tabsContainer: HTMLElement | null = null,
+    terminalContainer: HTMLElement | null = null,
+  ) {
+    // The module-level singleton is constructed before the real containers
+    // exist (imports run before main.ts wires them via initTabManager's
+    // Object.assign). Detached placeholder divs satisfy the non-null field
+    // type until injection; they are never appended.
+    this.tabsContainer = tabsContainer ?? document.createElement("div");
+    this.terminalContainer = terminalContainer ?? document.createElement("div");
 
     window.addEventListener("resize", () => this._onResize());
 
@@ -190,7 +198,9 @@ export class TabManager {
     for (const el of this.tabsContainer.querySelectorAll<HTMLElement>(
       '.tab[data-tab-id^="tab-"]',
     )) {
-      const tab = this.tabs.get(el.dataset.tabId!);
+      const id = el.dataset.tabId;
+      if (!id) continue;
+      const tab = this.tabs.get(id);
       if (tab) ordered.set(tab.id, tab);
     }
     this.tabs = ordered;
@@ -529,7 +539,8 @@ export class TabManager {
 
       if (wasActive) {
         if (nextEl) {
-          this.switchTo((nextEl as HTMLElement).dataset.tabId!);
+          const nextId = (nextEl as HTMLElement).dataset.tabId;
+          if (nextId) this.switchTo(nextId);
         } else if (remaining.length > 0) {
           this.switchTo(remaining[remaining.length - 1]);
         } else {
@@ -697,7 +708,7 @@ export class TabManager {
   // -- new-tab button --
 
   initNewTabButton(): void {
-    const btn = document.getElementById(DOM_ID.newTab)!;
+    const btn = mustGetById(DOM_ID.newTab);
     btn.title = "New tab (Shift+click: open in folder, right-click: recent folders)";
 
     // Same lucide icon as the recent-dirs menu's "Browse…" entry; shown in
@@ -737,7 +748,7 @@ export class TabManager {
 
 // -- singleton ---
 
-export const tabManager = new TabManager(null!, null!);
+export const tabManager = new TabManager();
 
 export function initTabManager(
   tabsContainer: HTMLElement,

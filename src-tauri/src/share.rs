@@ -193,10 +193,20 @@ pub(crate) async fn is_plain_http(stream: &tokio::net::TcpStream) -> bool {
         match stream.peek(&mut buf).await {
             Ok(0) => return false, // peer went away; let the WS path handle it
             Ok(n) => {
-                let data = &buf[..n];
-                if let Some(pos) = find_subslice(data, b"\r\n\r\n") {
-                    let head = data[..pos].to_ascii_lowercase();
-                    return !contains_subslice(&head, b"upgrade: websocket");
+                let mut headers = [httparse::EMPTY_HEADER; 64];
+                let mut req = httparse::Request::new(&mut headers);
+                match req.parse(&buf[..n]) {
+                    Ok(httparse::Status::Complete(_)) => {
+                        // A WS handshake is still a valid HTTP GET — only the
+                        // Upgrade header separates it from the share API.
+                        let is_ws = req
+                            .headers
+                            .iter()
+                            .any(|h| h.name.eq_ignore_ascii_case("upgrade"));
+                        return !is_ws;
+                    }
+                    Ok(httparse::Status::Partial) => {}
+                    Err(_) => return false,
                 }
                 if n >= MAX_HEADER_BYTES {
                     return false;
@@ -208,14 +218,6 @@ pub(crate) async fn is_plain_http(stream: &tokio::net::TcpStream) -> bool {
         tokio::time::sleep(Duration::from_millis(5)).await;
     }
     false
-}
-
-fn find_subslice(hay: &[u8], needle: &[u8]) -> Option<usize> {
-    hay.windows(needle.len()).position(|w| w == needle)
-}
-
-fn contains_subslice(hay: &[u8], needle: &[u8]) -> bool {
-    find_subslice(hay, needle).is_some()
 }
 
 // ---- Minimal HTTP/1.1 handling (no keep-alive: Connection: close) ----
@@ -248,12 +250,37 @@ pub(crate) async fn handle_http(hub: Arc<WsHub>, mut stream: tokio::net::TcpStre
 async fn read_request(stream: &mut tokio::net::TcpStream) -> Option<HttpRequest> {
     let mut buf = Vec::with_capacity(4096);
     let mut chunk = [0u8; 4096];
-    let header_end = loop {
-        if let Some(pos) = find_subslice(&buf, b"\r\n\r\n") {
-            break pos;
-        }
-        if buf.len() >= MAX_HEADER_BYTES {
+
+    // Read until the head parses completely, extracting the request line and
+    // Content-Length with httparse (robust against folded / multi-valued
+    // headers and stray whitespace the hand-rolled split was not).
+    let (head_len, method, path, query, content_len) = loop {
+        if buf.len() > MAX_HEADER_BYTES {
             return None;
+        }
+        let mut headers = [httparse::EMPTY_HEADER; 64];
+        let mut req = httparse::Request::new(&mut headers);
+        match req.parse(&buf) {
+            Ok(httparse::Status::Complete(len)) => {
+                let method = req.method?.to_string();
+                let target = req.path?;
+                let (path, query) = match target.split_once('?') {
+                    Some((p, q)) => (p.to_string(), q.to_string()),
+                    None => (target.to_string(), String::new()),
+                };
+                let mut content_len = 0usize;
+                for h in req.headers.iter() {
+                    if h.name.eq_ignore_ascii_case("content-length") {
+                        content_len = std::str::from_utf8(h.value).ok()?.trim().parse().ok()?;
+                    }
+                }
+                if content_len > MAX_BODY_BYTES {
+                    return None;
+                }
+                break (len, method, path, query, content_len);
+            }
+            Ok(httparse::Status::Partial) => {}
+            Err(_) => return None,
         }
         let n = stream.read(&mut chunk).await.ok()?;
         if n == 0 {
@@ -261,28 +288,10 @@ async fn read_request(stream: &mut tokio::net::TcpStream) -> Option<HttpRequest>
         }
         buf.extend_from_slice(&chunk[..n]);
     };
-    let head = String::from_utf8_lossy(&buf[..header_end]).to_string();
-    let mut lines = head.split("\r\n");
-    let request_line = lines.next()?;
-    let mut parts = request_line.split_whitespace();
-    let method = parts.next()?.to_string();
-    let target = parts.next()?.to_string();
-    let (path, query) = match target.split_once('?') {
-        Some((p, q)) => (p.to_string(), q.to_string()),
-        None => (target, String::new()),
-    };
-    let mut content_len = 0usize;
-    for line in lines {
-        if let Some((k, v)) = line.split_once(':') {
-            if k.trim().eq_ignore_ascii_case("content-length") {
-                content_len = v.trim().parse().unwrap_or(0);
-            }
-        }
-    }
-    if content_len > MAX_BODY_BYTES {
-        return None;
-    }
-    let mut body = buf.split_off(header_end + 4);
+
+    // The head is parsed; `buf` holds any body bytes that arrived with it.
+    // Top up to the declared Content-Length.
+    let mut body = buf.split_off(head_len);
     while body.len() < content_len {
         let n = stream.read(&mut chunk).await.ok()?;
         if n == 0 {

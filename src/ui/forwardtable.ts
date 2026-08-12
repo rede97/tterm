@@ -13,7 +13,7 @@
 // survives a commit in another — the innerHTML rebuild this replaced used
 // to wipe pending input across ALL groups on every change.
 
-import { el } from "./dom";
+import { el, mustQuery } from "./dom";
 import type { ForwardEditorValue, ForwardKind } from "./forwardeditor";
 import { html, render, repeat, type TemplateResult } from "./lit";
 import { showToast } from "./toast";
@@ -204,18 +204,18 @@ export function createForwardTable(
    *  Returns the inputs in commit order, or null after flagging the
    *  first offending field. */
   function validateRow(rowEl: HTMLElement, hasTarget: boolean) {
-    const listenPort = rowEl.querySelector<HTMLInputElement>('input[aria-label="Listen port"]')!;
+    const listenPort = mustQuery<HTMLInputElement>(rowEl, 'input[aria-label="Listen port"]');
     const fields: { input: HTMLInputElement; rule: Rule }[] = [
       { input: listenPort, rule: portRule },
     ];
     if (hasTarget) {
       fields.push(
         {
-          input: rowEl.querySelector<HTMLInputElement>('input[aria-label="Target host"]')!,
+          input: mustQuery<HTMLInputElement>(rowEl, 'input[aria-label="Target host"]'),
           rule: hostRule,
         },
         {
-          input: rowEl.querySelector<HTMLInputElement>('input[aria-label="Target port"]')!,
+          input: mustQuery<HTMLInputElement>(rowEl, 'input[aria-label="Target port"]'),
           rule: portRule,
         },
       );

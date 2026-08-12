@@ -146,7 +146,8 @@ export function createSettingsContent(): HTMLElement {
         x.classList.remove("active");
       });
       t.classList.add("active");
-      const name = (t as HTMLElement).dataset.panel!;
+      const name = (t as HTMLElement).dataset.panel;
+      if (!name) return;
       root.querySelectorAll(".settings-panel-content").forEach((p) => {
         (p as HTMLElement).style.display = p.getAttribute("data-panel") === name ? "" : "none";
       });

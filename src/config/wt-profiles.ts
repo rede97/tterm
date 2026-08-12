@@ -29,12 +29,20 @@ function resolveVsProfile(name: string, vsInstalls: VsInstallation[]): string | 
   return null;
 }
 
-function addProfile(item: any, localProfiles: LocalProfile[], vsInstalls: VsInstallation[]): void {
-  if (item.hidden) return;
-  const src = (item.source || "") as string;
-  const name: string | null | undefined = item.name;
+function addProfile(
+  item: unknown,
+  localProfiles: LocalProfile[],
+  vsInstalls: VsInstallation[],
+): void {
+  // WT settings.json is external input — narrow the few fields each profile
+  // needs instead of trusting a hand-written shape.
+  if (typeof item !== "object" || item === null) return;
+  const p = item as Record<string, unknown>;
+  if (p.hidden) return;
+  const src = typeof p.source === "string" ? p.source : "";
+  const name = typeof p.name === "string" && p.name !== "" ? p.name : null;
   if (!name) return;
-  let command: string | null | undefined = item.commandline;
+  let command = typeof p.commandline === "string" && p.commandline !== "" ? p.commandline : null;
   if (!command) {
     if (/terminal\.visualstudio/i.test(src)) {
       command = resolveVsProfile(name, vsInstalls);
@@ -44,7 +52,7 @@ function addProfile(item: any, localProfiles: LocalProfile[], vsInstalls: VsInst
       command = `wt.exe -p "${name}"`;
     }
   }
-  if (!command && !item.source) {
+  if (!command && !src) {
     command = name;
   }
   if (command && !localProfiles.some((p) => p.name === name)) {
@@ -53,18 +61,21 @@ function addProfile(item: any, localProfiles: LocalProfile[], vsInstalls: VsInst
 }
 
 function parseProfilesFromJson(
-  root: any,
+  root: unknown,
   localProfiles: LocalProfile[],
   vsInstalls: VsInstallation[],
 ): void {
-  const list: any[] = root?.profiles?.list;
-  if (list) {
-    for (const item of list) addProfile(item, localProfiles, vsInstalls);
-    return;
+  if (typeof root !== "object" || root === null) return;
+  const profiles = (root as Record<string, unknown>).profiles;
+  if (typeof profiles === "object" && profiles !== null) {
+    const list = (profiles as Record<string, unknown>).list;
+    if (Array.isArray(list)) {
+      for (const item of list) addProfile(item, localProfiles, vsInstalls);
+      return;
+    }
   }
-  const arr: any[] = root?.profiles;
-  if (arr) {
-    for (const item of arr) addProfile(item, localProfiles, vsInstalls);
+  if (Array.isArray(profiles)) {
+    for (const item of profiles) addProfile(item, localProfiles, vsInstalls);
   }
 }
 

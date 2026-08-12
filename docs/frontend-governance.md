@@ -173,6 +173,11 @@
 # 分期计划（缺陷修复优先于范式治理）
 
 > **总账（2026-08 收尾）**：阶段 -1/0/1/2 全部完成，阶段 3 以"卫星模块拆分 + wiring 组合根"落地（tabmanager 921→754，生命周期与标签条留内核属有意决策）。**剩余挂账仅一项**：④ 其余面板 html`` 迁移（棘轮，不设专项；settings/quickpanel 已完成，余下是一次性渲染场景，继续用 ui/dom.ts）。**关闭项**：①（sshclient 拆分 + L8–L13 清算，2026-08 完成，验收 cargo test 110 全绿）、②（lit-html 试点+推广，2026-08 全部 settings 面板 + quickpanel 落地，R4 随批解决，见 P3）、③（Biome 自定义规则，2026-08 落地，见 P1 清账）、E2（一等 tab，已撤销）、B4（文档化接受）、C7（观感竞态，风险收益倒挂）、DOM id 全量常量化（chrome 已收编，面板内 id 维持模块私有）。
+>
+> **2026-08 评审落地（本轮追加）**：
+> - **④ 其余面板 html`` 迁移确认不改**——余下均为一次性渲染场景，html`` 的 diff/绑定收益为零，继续用 ui/dom.ts（el()/createElement）；"剩余挂账"就此清零。
+> - **`noDescendingSpecificity` 规则关闭**：16 处命中全是跨 section 无关规则的误报，重排 60KB 样式表是纯 churn 且有级联风险。**`noNonNullAssertion` / `noExplicitAny` 由 warn 提升为 error**——存量 89 条全部清零后锁死棘轮（tests/e2e 仍 off）。
+> - **tab.ts 拆分方案（拟，见 session 交付）**：tab.ts ~720 行是最后一个 god object；按"IME 锚定 / xterm 构造 / 拟合 / 会话生命周期"分轴抽离，生命周期（WS attach/resize/dispose）留内核——与 tabmanager 同款决策。
 
 ## 第四轮剩余项（2026-08 审计追加，全部低优先）
 

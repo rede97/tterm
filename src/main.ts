@@ -23,6 +23,7 @@ import { initProfileMenu } from "./terminal/profilemenu";
 import { initSearchBar } from "./terminal/search";
 import { initSshAuthDialogs } from "./terminal/sshauth";
 import { initTabManager, tabManager } from "./terminal/tabmanager";
+import { mustGetById } from "./ui/dom";
 import { showToast } from "./ui/toast";
 import { initWindowControls } from "./ui/window";
 import { parseFontFamily, setSystemFonts, updateFontStack } from "./util/fontconfig";
@@ -37,8 +38,8 @@ import {
 
 // -- DOM refs ---
 
-const terminalContainer = document.getElementById(DOM_ID.terminalContainer)!;
-const tabsContainer = document.getElementById(DOM_ID.tabs)!;
+const terminalContainer = mustGetById(DOM_ID.terminalContainer);
+const tabsContainer = mustGetById(DOM_ID.tabs);
 
 // scroll wheel on tab bar ->horizontal scroll
 tabsContainer.addEventListener(
@@ -83,7 +84,7 @@ tabManager.setSettingsFactory(async () => {
   return m.createSettingsContent();
 });
 
-const settingsBtn = document.getElementById(DOM_ID.settingsBtn)!;
+const settingsBtn = mustGetById(DOM_ID.settingsBtn);
 settingsBtn.appendChild(createElement(Cog, { stroke: "currentColor", width: 16, height: 16 }));
 settingsBtn.addEventListener("click", () => {
   tabManager.toggleSettings();

@@ -254,7 +254,8 @@ export class TerminalTab {
   // Filtered cursor position in pixels, relative to the terminal element.
   private _cursorPixelPos(): { x: number; y: number; cellH: number } {
     try {
-      const dims = cellDimensions(this.terminal)!;
+      const dims = cellDimensions(this.terminal);
+      if (!dims) throw new Error("no cell metrics");
       const cell = this._imeAnchorCell();
       return {
         x: cell.x * dims.width,
@@ -579,16 +580,20 @@ export class TerminalTab {
    * No dead zone, no oscillation just available space / char size.
    */
   fit(): { cols: number; rows: number } {
-    const dims = cellDimensions(this.terminal)!;
+    const dims = cellDimensions(this.terminal);
+    if (!dims) return { cols: this.terminal.cols, rows: this.terminal.rows };
     const charWidth = dims.width;
     const charHeight = dims.height;
 
-    const parent = this.element.parentElement!;
+    const parent = this.element.parentElement;
+    if (!parent) return { cols: this.terminal.cols, rows: this.terminal.rows };
     const ps = getComputedStyle(parent);
     const parentH = parseFloat(ps.height);
     const parentW = parseFloat(ps.width);
 
-    const xs = getComputedStyle(this.terminal.element!);
+    const termEl = this.terminal.element;
+    if (!termEl) return { cols: this.terminal.cols, rows: this.terminal.rows };
+    const xs = getComputedStyle(termEl);
     let padH = parseFloat(xs.paddingLeft) + parseFloat(xs.paddingRight);
     // xterm-screen padding-right = scrollbar safe area
     const scr = this.terminal.element?.querySelector(".xterm-screen");

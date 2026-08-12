@@ -456,10 +456,14 @@ fn menu_order(entries: &[TrayWindowEntry]) -> Vec<TrayWindowEntry> {
 // Menu layout: one submenu per parked window ("Rust#Tab 3" = window "Rust"
 // with 3 tabs) listing its tab labels — the tabs are how the user tells
 // windows apart. Clicking any tab item restores that window.
+// Build the tray menu. Returns None on any menu-build failure instead of
+// panicking: build_menu runs on a 2 s reconcile loop in the tray owner, and
+// a panic there would crash the process and orphan the icon. None leaves the
+// previous menu in place (or no menu) until the next reconcile retries.
 fn build_menu(
     app: &tauri::AppHandle,
     entries: &[TrayWindowEntry],
-) -> tauri::menu::Menu<tauri::Wry> {
+) -> Option<tauri::menu::Menu<tauri::Wry>> {
     let mut builder = tauri::menu::MenuBuilder::new(app);
     for e in menu_order(entries).iter() {
         let title = if e.name.is_empty() {
@@ -472,7 +476,8 @@ fn build_menu(
             let item = tauri::menu::MenuItemBuilder::new("Restore window")
                 .id(format!("{}{}", ITEM_SHOW_PREFIX, e.pid))
                 .build(app)
-                .expect("tray menu item");
+                .inspect_err(|err| eprintln!("[tterm] tray menu item: {err}"))
+                .ok()?;
             sub = sub.item(&item);
         } else {
             for (j, tab) in e.tabs.iter().enumerate() {
@@ -484,11 +489,15 @@ fn build_menu(
                 let item = tauri::menu::MenuItemBuilder::new(label)
                     .id(format!("{}{}:{}", ITEM_SHOW_PREFIX, e.pid, j))
                     .build(app)
-                    .expect("tray menu item");
+                    .inspect_err(|err| eprintln!("[tterm] tray menu item: {err}"))
+                    .ok()?;
                 sub = sub.item(&item);
             }
         }
-        let submenu = sub.build().expect("tray submenu");
+        let submenu = sub
+            .build()
+            .inspect_err(|err| eprintln!("[tterm] tray submenu: {err}"))
+            .ok()?;
         builder = builder.item(&submenu);
     }
     if !entries.is_empty() {
@@ -497,8 +506,13 @@ fn build_menu(
     let quit = tauri::menu::MenuItemBuilder::new("Quit TTerm")
         .id(ITEM_QUIT)
         .build(app)
-        .expect("tray menu item");
-    builder.item(&quit).build().expect("tray menu")
+        .inspect_err(|err| eprintln!("[tterm] tray menu item: {err}"))
+        .ok()?;
+    builder
+        .item(&quit)
+        .build()
+        .inspect_err(|err| eprintln!("[tterm] tray menu: {err}"))
+        .ok()
 }
 
 // Split parked registry entries for Quit into (kill, prune). Only a pid
@@ -669,8 +683,10 @@ fn reconcile(app: &tauri::AppHandle) {
     if *LAST_MENU.lock() != ordered {
         // Rebuild only on real change: rebuilding an open popup menu
         // closes it (the user is probably hovering it right now).
-        let _ = icon.set_menu(Some(build_menu(app, &entries)));
-        *LAST_MENU.lock() = ordered;
+        if let Some(menu) = build_menu(app, &entries) {
+            let _ = icon.set_menu(Some(menu));
+            *LAST_MENU.lock() = ordered;
+        }
     }
 }
 
@@ -690,10 +706,14 @@ fn spawn_tray(app: &tauri::AppHandle) {
         if slot.is_none() {
             let Some(base) = config_base(app) else { return };
             let entries = list_hidden(&base);
+            let menu = build_menu(app, &entries);
             let builder = tauri::tray::TrayIconBuilder::new()
                 .tooltip("TTerm")
-                .menu(&build_menu(app, &entries))
                 .on_menu_event(|app, e| on_menu_event(app, e.id().as_ref()));
+            let builder = match menu.as_ref() {
+                Some(menu) => builder.menu(menu),
+                None => builder,
+            };
             let builder = match app.default_window_icon() {
                 Some(icon) => builder.icon(icon.clone()),
                 None => builder,

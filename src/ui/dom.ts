@@ -67,3 +67,27 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): SafeH
 export function setHtml(target: HTMLElement, content: SafeHtml): void {
   target.innerHTML = content.toString();
 }
+
+// -- Required-element lookups (replace the old `!` assertion) --
+//
+// App-chrome ids and just-rendered template nodes are guaranteed to exist;
+// a missing one is a bug. These throw a descriptive error instead of the
+// opaque `TypeError: ... is null` the `!` assertion produced, without
+// changing the failure mode.
+
+/** Get an app-chrome element by id, throwing a descriptive error if absent. */
+export function mustGetById(id: string): HTMLElement {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`missing app-chrome element: #${id}`);
+  return el;
+}
+
+/** Query a required descendant, throwing a descriptive error if absent. */
+export function mustQuery<T extends Element = HTMLElement>(
+  parent: ParentNode,
+  selector: string,
+): T {
+  const el = parent.querySelector<T>(selector);
+  if (!el) throw new Error(`missing required element: ${selector}`);
+  return el;
+}

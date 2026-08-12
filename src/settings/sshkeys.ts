@@ -7,6 +7,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { esc } from "../core/common";
+import { mustQuery } from "../ui/dom";
 import { createModal } from "../ui/modal";
 import { showToast } from "../ui/toast";
 
@@ -57,9 +58,9 @@ export function showKeygenModal(opts: { onSaved: (key: SshKeyInfo) => void }): v
     </div>`;
   document.body.appendChild(modal.overlay);
 
-  const nameInput = modal.overlay.querySelector<HTMLInputElement>(".skg-name")!;
-  const algoInput = modal.overlay.querySelector<HTMLSelectElement>(".skg-algo")!;
-  const passInput = modal.overlay.querySelector<HTMLInputElement>(".skg-pass")!;
+  const nameInput = mustQuery<HTMLInputElement>(modal.overlay, ".skg-name");
+  const algoInput = mustQuery<HTMLSelectElement>(modal.overlay, ".skg-algo");
+  const passInput = mustQuery<HTMLInputElement>(modal.overlay, ".skg-pass");
   modal.overlay.querySelector(".skg-cancel")?.addEventListener("click", modal.close);
   modal.overlay.querySelector(".skg-save")?.addEventListener("click", async () => {
     try {
@@ -95,8 +96,8 @@ export function showInstallKeyModal(target: InstallTarget): void {
     </div>`;
   document.body.appendChild(modal.overlay);
 
-  const body = modal.overlay.querySelector<HTMLElement>(".ski-body")!;
-  const installBtn = modal.overlay.querySelector<HTMLButtonElement>(".ski-install")!;
+  const body = mustQuery<HTMLElement>(modal.overlay, ".ski-body");
+  const installBtn = mustQuery<HTMLButtonElement>(modal.overlay, ".ski-install");
   modal.overlay.querySelector(".ski-cancel")?.addEventListener("click", modal.close);
 
   listKeys().then((keys) => {

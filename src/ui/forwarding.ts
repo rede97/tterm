@@ -7,6 +7,7 @@
 // same operations and must give identical feedback.
 
 import { invoke } from "@tauri-apps/api/core";
+import { mustQuery } from "./dom";
 import { createForwardEditor } from "./forwardeditor";
 import { createModal } from "./modal";
 import { showToast } from "./toast";
@@ -103,7 +104,7 @@ function openDialog(tabId: string, initial: ForwardInfo[]): void {
     </div>`;
   document.body.appendChild(overlay);
 
-  const listEl = overlay.querySelector<HTMLElement>(".fwd-list")!;
+  const listEl = mustQuery<HTMLElement>(overlay, ".fwd-list");
   const editor = createForwardEditor();
   overlay.querySelector(".fwd-editor-slot")?.replaceWith(editor.el);
 

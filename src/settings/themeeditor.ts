@@ -11,6 +11,7 @@ import {
 } from "../config/custom-themes";
 import { logCatch } from "../core/errorlog";
 import { confirmDialog } from "../ui/confirm";
+import { mustQuery } from "../ui/dom";
 import { createModal } from "../ui/modal";
 import { showToast } from "../ui/toast";
 import { allThemes, type ThemeDef } from "../util/themes";
@@ -91,8 +92,8 @@ export function showThemeEditor(opts: ThemeEditorOptions): void {
     </div>`;
   document.body.appendChild(overlay);
 
-  const nameInput = overlay.querySelector<HTMLInputElement>(".te-name")!;
-  const preview = overlay.querySelector<HTMLElement>(".te-preview")!;
+  const nameInput = mustQuery<HTMLInputElement>(overlay, ".te-name");
+  const preview = mustQuery<HTMLElement>(overlay, ".te-preview");
 
   function renderPreview(): void {
     preview.style.background = working.background;
@@ -123,10 +124,16 @@ export function showThemeEditor(opts: ThemeEditorOptions): void {
   }
 
   overlay.querySelectorAll<HTMLInputElement>(".te-color").forEach((el) => {
-    el.addEventListener("input", () => syncColor(el.dataset.key!, el.value, "picker"));
+    el.addEventListener("input", () => {
+      const key = el.dataset.key;
+      if (key) syncColor(key, el.value, "picker");
+    });
   });
   overlay.querySelectorAll<HTMLInputElement>(".te-hex").forEach((el) => {
-    el.addEventListener("input", () => syncColor(el.dataset.key!, el.value.trim(), "hex"));
+    el.addEventListener("input", () => {
+      const key = el.dataset.key;
+      if (key) syncColor(key, el.value.trim(), "hex");
+    });
   });
 
   const close = modal.close;
@@ -158,17 +165,18 @@ export function showThemeEditor(opts: ThemeEditorOptions): void {
   });
 
   overlay.querySelector(".te-delete")?.addEventListener("click", async () => {
-    if (!opts.editName) return;
+    const editName = opts.editName;
+    if (!editName) return;
     const confirmed = await confirmDialog({
       title: "Delete theme?",
-      message: `Delete theme "${opts.editName}"? This cannot be undone.`,
+      message: `Delete theme "${editName}"? This cannot be undone.`,
       okLabel: "Delete",
       danger: true,
     });
     if (!confirmed) return;
-    deleteCustomTheme(opts.editName)
+    deleteCustomTheme(editName)
       .then(() => {
-        opts.onDeleted?.(opts.editName!);
+        opts.onDeleted?.(editName);
         close();
       })
       .catch(logCatch("themeEditor.delete"));

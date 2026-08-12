@@ -28,11 +28,11 @@
     "rules": {
       "recommended": true,
       "style": {
-        "noNonNullAssertion": "warn",
-        "noDescendingSpecificity": "warn"
+        "noNonNullAssertion": "error",
+        "noDescendingSpecificity": "off"
       },
       "suspicious": {
-        "noExplicitAny": "warn",
+        "noExplicitAny": "error",
         "noImportCycles": "error"
       },
       "complexity": {

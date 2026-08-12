@@ -3,6 +3,7 @@ import { Terminal } from "@xterm/xterm";
 import Sortable from "sortablejs";
 import { esc } from "../core/common";
 import { configStore } from "../core/store";
+import { mustQuery } from "../ui/dom";
 import { createModal } from "../ui/modal";
 import {
   BUILTIN_FONTS,
@@ -85,13 +86,13 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
   let previewFitAddon: FitAddon | null = null;
 
   // --- render lists ---
-  const builtinList = overlay.querySelector("#fp-builtin")!;
-  const systemList = overlay.querySelector("#fp-system")!;
-  const selectedList = overlay.querySelector<HTMLElement>("#fp-selected")!;
-  const searchInput = overlay.querySelector<HTMLInputElement>(".fp-search")!;
-  const previewFontLabel = overlay.querySelector("#fp-preview-font")!;
-  const systemCount = overlay.querySelector(".fp-system-count")!;
-  const previewContainer = overlay.querySelector<HTMLElement>("#fp-preview")!;
+  const builtinList = mustQuery(overlay, "#fp-builtin");
+  const systemList = mustQuery(overlay, "#fp-system");
+  const selectedList = mustQuery<HTMLElement>(overlay, "#fp-selected");
+  const searchInput = mustQuery<HTMLInputElement>(overlay, ".fp-search");
+  const previewFontLabel = mustQuery(overlay, "#fp-preview-font");
+  const systemCount = mustQuery(overlay, ".fp-system-count");
+  const previewContainer = mustQuery<HTMLElement>(overlay, "#fp-preview");
 
   function isInUse(family: string): boolean {
     return selected.some((s) => s.toLowerCase() === family.toLowerCase());
@@ -207,7 +208,10 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
     onEnd: () => {
       // Sortable already reordered the DOM; adopt it as the source of truth,
       // then re-render so rows keep their × wiring.
-      selected = [...selectedList.children].map((el) => (el as HTMLElement).dataset.family!);
+      selected = [...selectedList.children].flatMap((el) => {
+        const family = (el as HTMLElement).dataset.family;
+        return family ? [family] : [];
+      });
       refreshSelected();
       updatePreview();
     },

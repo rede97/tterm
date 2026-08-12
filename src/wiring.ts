@@ -31,9 +31,10 @@ export function initShortcutsWiring(): void {
       const entries = [...tabManager.tabs.entries()];
       if (mode === "mru") {
         const byId = new Map(entries);
-        return tabManager.mruTabIds().map((id) => {
+        return tabManager.mruTabIds().flatMap((id) => {
           const i = entries.findIndex(([eid]) => eid === id);
-          return toItem([id, byId.get(id)!], i);
+          const tab = byId.get(id);
+          return tab ? [toItem([id, tab], i)] : [];
         });
       }
       return entries.map((e, i) => toItem(e, i));

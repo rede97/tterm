@@ -20,7 +20,11 @@ interface Disposable {
   dispose(): void;
 }
 
-function listen(target: WebSocket, type: string, fn: (ev: any) => void): Disposable {
+function listen<K extends keyof WebSocketEventMap>(
+  target: WebSocket,
+  type: K,
+  fn: (ev: WebSocketEventMap[K]) => void,
+): Disposable {
   target.addEventListener(type, fn);
   return { dispose: () => target.removeEventListener(type, fn) };
 }

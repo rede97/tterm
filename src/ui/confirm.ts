@@ -3,6 +3,7 @@
 // createModal with the shared sshauth dialog styles. Every dismissal path
 // (Cancel, Escape, backdrop) resolves false: a dismissal never confirms.
 
+import { mustQuery } from "./dom";
 import { createModal } from "./modal";
 
 export interface ConfirmOptions {
@@ -37,13 +38,11 @@ export function confirmDialog(options: ConfirmOptions): Promise<boolean> {
         <button class="sshauth-btn ${options.danger ? "sshauth-btn-danger" : "sshauth-btn-ok"}" type="button"></button>
       </div>
     </div>`;
-  overlay.querySelector(".sshauth-header")!.textContent = options.title;
-  overlay.querySelector(".confirm-text")!.textContent = options.message;
-  const cancelBtn = overlay.querySelector<HTMLButtonElement>(".sshauth-btn-cancel")!;
+  mustQuery(overlay, ".sshauth-header").textContent = options.title;
+  mustQuery(overlay, ".confirm-text").textContent = options.message;
+  const cancelBtn = mustQuery<HTMLButtonElement>(overlay, ".sshauth-btn-cancel");
   cancelBtn.textContent = options.cancelLabel ?? "Cancel";
-  const okBtn = overlay.querySelector<HTMLButtonElement>(
-    ".sshauth-footer .sshauth-btn:last-child",
-  )!;
+  const okBtn = mustQuery<HTMLButtonElement>(overlay, ".sshauth-footer .sshauth-btn:last-child");
   okBtn.textContent = options.okLabel ?? "OK";
   document.body.appendChild(overlay);
 
