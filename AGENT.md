@@ -196,6 +196,7 @@ Backend-managed and in-band (`deadmode.rs` + relay dead mode): on byte-stream en
 ## Known limitations
 
 - **Multi-window config writes are last-write-wins**: each window owns a configStore and writes per-topic JSON files with debounced read-modify-write; two windows saving settings concurrently can lose one side's change (impact: one settings item). Accepted — no cross-process config coordination exists (tray coordination is file-based, config is not).
+- **Debug builds are config-isolated by design** (not a limitation, an invariant): `config::app_data_dir()` redirects ALL app-owned state to `%APPDATA%/com.rede.tterm/dev/` under `cfg!(debug_assertions)` — tauri dev / e2e / test binaries never touch the installed release's config, keybindings, themes, serial profiles, or tray registry. The window-state plugin alone still shares the parent dir (window geometry only). Keep every new app-owned file behind `app_data_dir()`.
 
 ## Keyboard shortcuts
 

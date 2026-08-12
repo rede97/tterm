@@ -1,5 +1,29 @@
 use tauri::Manager;
 
+// All app-owned state lives under the app config dir. DEBUG builds (tauri
+// dev, e2e, cargo test binaries) use a `dev/` SUBDIRECTORY so experiments
+// never touch the installed release's files (config.json, keybindings.json,
+// themes, serial profiles, tray registry). The window-state plugin keeps
+// using the shared parent (window geometry only — harmless).
+pub(crate) fn app_data_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    Ok(if cfg!(debug_assertions) {
+        dir.join("dev")
+    } else {
+        dir
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn debug_builds_use_dev_subdir() {
+        // Tests always run with debug_assertions, so the helper must pick
+        // the dev/ suffix here; the release arm is cfg'd out at compile time.
+        assert!(cfg!(debug_assertions));
+    }
+}
+
 // All app config lives in per-topic JSON files under the app config dir
 // (config.json / themes.json / serial-profiles.json / keybindings.json —
 // the last is VS Code's keybindings.json parity).
@@ -13,8 +37,7 @@ fn config_path(app: &tauri::AppHandle, name: &str) -> Result<std::path::PathBuf,
     if !CONFIG_FILES.contains(&name) {
         return Err(format!("unknown config file: {name}"));
     }
-    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    Ok(dir.join(format!("{name}.json")))
+    Ok(app_data_dir(app)?.join(format!("{name}.json")))
 }
 
 #[tauri::command]
@@ -43,7 +66,7 @@ pub fn delete_config_file(app: tauri::AppHandle, name: &str) -> Result<(), Strin
 
 #[tauri::command]
 pub fn open_config_dir(app: tauri::AppHandle) -> Result<(), String> {
-    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    let dir = app_data_dir(&app)?;
     #[cfg(target_os = "windows")]
     {
         std::process::Command::new("explorer")

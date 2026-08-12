@@ -32,6 +32,16 @@ Fixes
 - **Quick open / tab switcher no longer stalls** when a tab closes while
   the overlay is open
 
+Fixes
+
+- **F11 full screen did nothing on a maximized window** (a platform quirk:
+  fullscreen only engages from a normal window) — it now drops out of
+  maximize first and restores it on exit
+- **Dev builds no longer share config with the installed app** — debug
+  builds (tauri dev / e2e) now keep all app state in a separate `dev/`
+  subdirectory of the config dir, so testing can't mutate your real
+  settings, keybindings, or tray state
+
 ## v1.0.3
 
 New Features

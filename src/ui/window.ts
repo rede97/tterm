@@ -137,6 +137,10 @@ async function enterZen(kind: ZenKind): Promise<void> {
   // Explicit window.rs commands: the JS Window API's maximize/fullscreen
   // is not in our capabilities (same restriction as the maximize button).
   if (kind === "fullscreen") {
+    // tao quirk: set_fullscreen is a no-op on a MAXIMIZED window (verified
+    // on Windows — works fine from a normal window). Drop out of maximize
+    // first; exitZen re-maximizes when zenWasMaximized.
+    if (zenWasMaximized) await invoke("window_unmaximize").catch(logCatch("window.unmaximize"));
     await invoke("window_set_fullscreen", { on: true }).catch(logCatch("window.fullscreen"));
   } else if (!zenWasMaximized) {
     await invoke("window_maximize").catch(logCatch("window.maximize"));
@@ -149,9 +153,10 @@ async function exitZen(): Promise<void> {
   zenTransitionUntil = Date.now() + 600;
   document.body.classList.remove("zen-mode");
   if (kind === "fullscreen") {
-    // Exiting fullscreen returns the window to its pre-fullscreen state
-    // (a maximized window stays maximized) — no explicit restore needed.
     await invoke("window_set_fullscreen", { on: false }).catch(logCatch("window.fullscreen"));
+    // enterZen unmaximized to work around tao's maximized→fullscreen
+    // no-op — put the window back.
+    if (zenWasMaximized) await invoke("window_maximize").catch(logCatch("window.maximize"));
   } else if (!zenWasMaximized) {
     await invoke("window_unmaximize").catch(logCatch("window.unmaximize"));
   }

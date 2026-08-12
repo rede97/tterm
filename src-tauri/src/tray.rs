@@ -200,8 +200,9 @@ fn owner_path(base: &Path) -> PathBuf {
 }
 
 fn config_base(app: &tauri::AppHandle) -> Option<PathBuf> {
-    use tauri::Manager;
-    app.path().app_config_dir().ok()
+    // Debug builds park/restore against the dev/ subdirectory — a dev window
+    // must never share the tray registry with the installed release.
+    crate::config::app_data_dir(app).ok()
 }
 
 // ---- config ----

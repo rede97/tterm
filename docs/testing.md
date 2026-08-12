@@ -62,6 +62,8 @@ wdio (WebdriverIO) ──WebDriver──> tauri-driver ──> msedgedriver ─�
 
 ### 首次设置
 
+**配置隔离**：debug 构建（`tauri dev`、e2e、cargo test 二进制）的应用状态全部落在 `%APPDATA%/com.rede.tterm\dev\` 子目录（config.json / keybindings.json / themes.json / serial-profiles.json / 托盘注册表），与正式安装版完全隔离——e2e 随便改配置也不会污染日常使用的实例。仅 window-state 插件仍共享父目录（窗口几何，无害）。
+
 ```sh
 # 1. 安装 tauri-driver（已装可跳过）
 cargo install tauri-driver --locked

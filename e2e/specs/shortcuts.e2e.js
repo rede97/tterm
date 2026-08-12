@@ -85,17 +85,17 @@ describe("TTerm keyboard shortcuts", () => {
       { timeout: 5000, timeoutMsg: "full screen did not engage" },
     );
     expect(await $("#tab-bar").isDisplayed()).toBe(false);
-    // Browser-style: the window covers the taskbar (taller than the
-    // maximized work area). Skip when the session has no taskbar
-    // (availHeight === height), where the two are indistinguishable.
-    const dims = await browser.execute(() => ({
-      outer: window.outerHeight,
-      avail: screen.availHeight,
-      screen: screen.height,
-    }));
-    if (dims.avail < dims.screen) {
-      expect(dims.outer).toBeGreaterThan(dims.avail);
-    }
+    // Browser-style: the window covers the taskbar. The OS transition lags
+    // the class flip — wait for it, but ALWAYS exit before asserting so a
+    // failure can't strand the window in fullscreen for later tests.
+    const covered = await browser
+      .waitUntil(
+        async () =>
+          await browser.execute(() => window.outerHeight > screen.availHeight),
+        { timeout: 5000 },
+      )
+      .then(() => true)
+      .catch(() => false);
 
     await browser.keys(["F11"]);
     await browser.waitUntil(
@@ -103,9 +103,21 @@ describe("TTerm keyboard shortcuts", () => {
       { timeout: 5000, timeoutMsg: "full screen did not disengage" },
     );
     expect(await $("#tab-bar").isDisplayed()).toBe(true);
+    // Skip the coverage assertion when the session has no taskbar
+    // (availHeight === height): the two are indistinguishable there.
+    const hasTaskbar = await browser.execute(() => screen.availHeight < screen.height);
+    if (hasTaskbar) expect(covered).toBe(true);
   });
 
   it("Shift+F11 toggles zen mode: maximized with the tab bar hidden", async () => {
+    // Defensive: a previous failure could leave zen engaged.
+    if (await browser.execute(() => document.body.classList.contains("zen-mode"))) {
+      await browser.keys(["F11"]);
+      await browser.waitUntil(
+        async () => await browser.execute(() => !document.body.classList.contains("zen-mode")),
+        { timeout: 5000 },
+      );
+    }
     await browser.keys(["Shift", "F11"]);
     await browser.waitUntil(
       async () => await browser.execute(() => document.body.classList.contains("zen-mode")),
