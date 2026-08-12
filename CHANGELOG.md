@@ -1,3 +1,44 @@
+## v2.1.0
+
+Changes
+
+- **Settings and the quick panel rebuilt on a diffing renderer** — panels
+  no longer rebuild from scratch on every change, so expanding an SSH host
+  card, toggling an option before hitting Apply, searching in Settings →
+  Keyboard, or a half-typed port forward in the quick panel all survive
+  re-renders instead of being silently reset
+
+Fixes
+
+- **Host keys recorded in hashed `known_hosts` files can be re-learned** —
+  a changed key on a `|1|…` (ssh-keygen -H) entry could never be accepted,
+  locking you out of the host
+- **Serial Reconnect adapts to the session** instead of waiting a fixed
+  300 ms — reconnects faster, and no longer sends a stray Enter when the
+  device already came back on its own
+- **Tray "Quit TTerm" can no longer kill an unrelated process** — a parked
+  window is verified to still be a TTerm window before it is terminated
+  (PID-reuse race)
+- **Config files are written atomically** — a crash mid-save can no longer
+  leave a truncated `config.json` / `keybindings.json` / `themes.json`
+  (settings would silently fall back to defaults)
+- **SSH key install no longer garbles non-ASCII output** — a multi-byte
+  character split across packets showed up as U+FFFD when probing the
+  remote shell
+- **Closing a blocked SSH session is now immediate** — killing a tab whose
+  connection was stuck on a full channel window waited for the idle poll
+  instead of interrupting the send
+
+Internal
+
+- Backend hard rules are machine-enforced: Biome GritQL plugins reject
+  empty catch blocks and native dialogs, and import cycles are a CI error
+  (two cycle clusters in the terminal module were untangled)
+- `sshclient.rs` split into focused modules (prompter / hostkey / session /
+  forward / keys / install); WebSocket auth token compared in constant time;
+  multi-window settings merges different keys at write time; test suite
+  grew to 357 frontend + 112 backend tests with the full e2e suite green
+
 ## v2.0.0
 
 Changes
