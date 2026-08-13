@@ -143,10 +143,10 @@ describe("settings — Serial profile gallery", () => {
     // Switching the select updates the hint to the new mode's description.
     sel.value = "cr-in-lf";
     sel.dispatchEvent(new Event("change"));
-    expect(hint.textContent).toContain("staircase");
+    expect(hint.textContent).toBe("Lone \\n → \\r\\n");
     sel.value = "strip";
     sel.dispatchEvent(new Event("change"));
-    expect(hint.textContent).toContain("Remove all CR/LF");
+    expect(hint.textContent).toBe("\\r | \\n → (removed)");
   });
 
   it("saving a custom profile adds it to the Custom section with an Edit button", async () => {

@@ -24,18 +24,15 @@ export const SERIAL_OUTPUT_NEWLINES: [SerialOutputNewline, string][] = [
 ];
 
 // One-line help per output-newline mode, shown in the profile editor.
-// Semantics mirror src-tauri/src/newline.rs.
+// Bare mapping notation mirrors src-tauri/src/newline.rs semantics.
 export const SERIAL_OUTPUT_NEWLINE_DESCS: Record<SerialOutputNewline, string> = {
-  keep: "Pass through unchanged — the device already sends CRLF (most MCU/AT firmware).",
-  "cr-in-lf":
-    "Lone LF becomes CRLF (pairs untouched) — fixes staircase output from LF-only devices.",
-  "lf-in-cr":
-    "Every CR gains an LF — fixes line-overwrite from CR-only devices; CRLF pairs gain a blank line.",
-  "force-crlf":
-    "Normalize every ending (lone CR / lone LF / CRLF) to CRLF — tidiest for mixed-ending devices.",
-  "force-lf": "Normalize every ending to LF — for logging into Unix tools that split lines on LF.",
-  "force-cr": "Normalize every ending to CR — legacy compatibility fallback, rarely needed.",
-  strip: "Remove all CR/LF — single-line protocols that redraw in place, or binary streams.",
+  keep: "Pass through unchanged",
+  "cr-in-lf": "Lone \\n → \\r\\n",
+  "lf-in-cr": "\\r → \\r\\n",
+  "force-crlf": "\\r | \\n | \\r\\n → \\r\\n",
+  "force-lf": "\\r | \\n | \\r\\n → \\n",
+  "force-cr": "\\r | \\n | \\r\\n → \\r",
+  strip: "\\r | \\n → (removed)",
 };
 
 // ---- Utility functions ----

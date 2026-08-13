@@ -403,12 +403,14 @@ struct MockShared {
     tx: std::sync::mpsc::Sender<Vec<u8>>,
 }
 
-// Line-ending test blocks emitted by the newlines mock.
+// Line-ending test blocks emitted by the newlines mock. Each label shows
+// the block's own line ending in escaped form plus the profile/mode that
+// renders it cleanly, so the right Output-newlines choice is eyeballed.
 pub(crate) const NEWLINE_BLOCKS: [&str; 4] = [
-    "\x1b[36m[1] CRLF lines:\x1b[0m\r\nalpha\r\nbeta\r\n",
-    "\x1b[36m[2] LF only (staircase when raw):\x1b[0m\nalpha\nbeta\n",
-    "\x1b[36m[3] CR only (overwrite when raw):\x1b[0m\ralpha\rbeta\r",
-    "\x1b[36m[4] mixed:\x1b[0m\nalpha\r\nbeta\rgamma\r\n",
+    "\x1b[36m[1] CRLF \\r\\n - keep (Normal/AT)\x1b[0m\r\nalpha\r\nbeta\r\n",
+    "\x1b[36m[2] LF \\n - cr-in-lf (Log) fixes staircase\x1b[0m\nalpha\nbeta\n",
+    "\x1b[36m[3] CR \\r - lf-in-cr fixes overwrite\x1b[0m\ralpha\rbeta\r",
+    "\x1b[36m[4] mixed \\r\\n \\r \\n - force-crlf tidies\x1b[0m\nalpha\r\nbeta\rgamma\r\n",
 ];
 
 pub(crate) struct MockSerialPort {
