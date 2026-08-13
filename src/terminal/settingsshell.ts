@@ -48,7 +48,7 @@ export class SettingsShell {
   }
 
   private async openSettings(): Promise<void> {
-    if (this.pageEl || !this.factory) return;
+    if (this.open || !this.factory) return;
 
     this.open = true;
     closeQuickPanel();
@@ -74,6 +74,13 @@ export class SettingsShell {
     const sCloseBtn = this.tabEl.querySelector(".tab-close") as HTMLElement;
     if (sCloseBtn) sCloseBtn.style.opacity = "1";
 
+    // A suspended page (closed via a tab switch) keeps its DOM — re-show it
+    // instead of rebuilding, preserving unsaved edits / panel state.
+    if (this.pageEl) {
+      this.pageEl.style.display = "";
+      return;
+    }
+
     const page = await this.factory();
     // The factory is a dynamic import — genuinely async. If the user
     // closed settings (or switched to a tab) while it was in flight,
@@ -86,8 +93,14 @@ export class SettingsShell {
 
   close(restore = true): void {
     if (this.pageEl) {
-      this.pageEl.remove();
-      this.pageEl = null;
+      if (restore) {
+        this.pageEl.remove();
+        this.pageEl = null;
+      } else {
+        // Suspend (switch to a terminal tab): hide, keep the DOM so panel
+        // state (unsaved edits, active panel, expansion) survives.
+        this.pageEl.style.display = "none";
+      }
     }
     if (this.tabEl) {
       if (restore) {
