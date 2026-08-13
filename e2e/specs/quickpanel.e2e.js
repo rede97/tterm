@@ -150,17 +150,18 @@ describe("Quick-status button and panel", () => {
     ]);
     expect(info.text).toContain("Auto-reconnect");
 
-    // Default profile Normal, flow none: the signal block stays collapsed
-    // (no RTS/DTR toggles, no CTS/DSR status rows).
-    const noSignals = await browser.execute(() => {
+    // Default profile Normal, flow none: the signal block is visible too —
+    // open drives no modem line, so the toggles are the only way to raise
+    // RTS/DTR (CDC-ACM devices that gate TX on DTR need this).
+    const earlySignals = await browser.execute(() => {
       const sec = document.querySelector('.quick-panel [data-section="serial"]');
       return {
         toggles: sec.querySelectorAll(".qp-signals .qp-toggle-row").length,
         vals: sec.querySelectorAll(".qp-signals .qp-line-val").length,
       };
     });
-    expect(noSignals.toggles).toBe(0);
-    expect(noSignals.vals).toBe(0);
+    expect(earlySignals.toggles).toBe(2);
+    expect(earlySignals.vals).toBe(2);
 
     // Switch profile to AT: the section re-renders with its parameters
     // (echo input, CRLF enter) reflected in the live selects.
@@ -189,8 +190,9 @@ describe("Quick-status button and panel", () => {
       { timeout: 5000, timeoutMsg: "AT profile did not apply to the live session" },
     );
 
-    // Enable hardware flow control: the signal block expands with RTS/DTR
-    // toggles and live CTS/DSR status (mock port reports asserted).
+    // Enable hardware flow control: round-trips through the backend; the
+    // already-visible signal block keeps live CTS/DSR status (mock port
+    // reports asserted).
     await browser.execute(() => {
       const sel = document.querySelector(
         '.quick-panel [data-section="serial"] select[aria-label="Flow control"]',

@@ -134,7 +134,7 @@ fn open_serial(
     stop_bits: u8,
     flow_control: &str,
 ) -> Result<Box<dyn serialport::SerialPort>, String> {
-    let mut port = serialport::new(port_name, baud_rate)
+    let port = serialport::new(port_name, baud_rate)
         .data_bits(map_data_bits(data_bits)?)
         .parity(map_parity(parity)?)
         .stop_bits(map_stop_bits(stop_bits)?)
@@ -144,11 +144,13 @@ fn open_serial(
         .timeout(std::time::Duration::from_millis(20))
         .open()
         .map_err(|e| serial_open_error(port_name, &e))?;
-    // Assert DTR and RTS like PuTTY/node-serialport do. Many CDC-ACM devices
-    // (debug probes, Arduino-class boards) gate TX on these lines; FT232-style
-    // adapters don't care either way.
-    let _ = port.write_data_terminal_ready(true);
-    let _ = port.write_request_to_send(true);
+    // Modem lines are left untouched at open: the user drives them
+    // explicitly from the quick panel (or implicitly via hardware flow
+    // control, where the driver manages RTS). Asserting lines here is
+    // actively harmful on ESP32-C3/S3 native USB-Serial/JTAG devkits —
+    // their auto-reset circuit maps RTS → EN (chip held in reset) and
+    // DTR → IO0 (a mid-session reboot lands in download mode); both
+    // present as a silent terminal (verified on an ESP32-C3 devkit).
     Ok(port)
 }
 
@@ -210,10 +212,10 @@ pub(crate) fn serial_io_loop(
     mut newline_filter: NewlineFilter,
 ) {
     let mut buf = [0u8; 16384];
-    // RTS/DTR are asserted at open (open_serial); tracked here because the
-    // lines cannot be read back from the device.
-    let mut rts = true;
-    let mut dtr = true;
+    // Neither line is driven at open (open_serial); tracked here because
+    // the lines cannot be read back from the device.
+    let mut rts = false;
+    let mut dtr = false;
     'outer: loop {
         if cancel.load(Ordering::Relaxed) {
             break;

@@ -232,16 +232,18 @@ describe("quick panel — serial tab", () => {
     // Switching updates the hint; the handler still fires.
     outSel.value = "force-crlf";
     outSel.dispatchEvent(new Event("change"));
-    expect(hint.textContent).toContain("Normalize every ending");
+    expect(hint.textContent).toBe("\\r | \\n | \\r\\n → \\r\\n");
     expect(handlers.setSerialOutputNewline).toHaveBeenCalledWith("tab-7", "force-crlf");
   });
 
-  it("queries modem lines on open; auto-reconnect toggle works; no signal rows while flow is none", async () => {
+  it("queries modem lines on open; signal rows always visible; auto-reconnect toggle works", async () => {
     const p = openPanel();
     expect(invokeMock).toHaveBeenCalledWith("serial_line_status", { id: "tab-7" });
     const sec = p.querySelector('[data-section="serial"]')!;
-    expect(rowOf(sec, "RTS")).toBeUndefined();
-    expect(rowOf(sec, "DTR")).toBeUndefined();
+    // The signal block no longer hides at flow=none: open drives no modem
+    // line, so the toggles are the only way to raise RTS/DTR.
+    expect(rowOf(sec, "RTS")).toBeDefined();
+    expect(rowOf(sec, "DTR")).toBeDefined();
     switchOf(rowOf(sec, "Auto-reconnect")!).click();
     expect(invokeMock).toHaveBeenCalledWith("session_set_auto_reconnect", {
       id: "tab-7",
@@ -249,7 +251,7 @@ describe("quick panel — serial tab", () => {
     });
   });
 
-  it("flow control select calls serial_set_flow_control and reveals RTS/DTR/CTS/DSR rows", async () => {
+  it("flow control select calls serial_set_flow_control; signal rows reflect queried state", async () => {
     const p = openPanel();
     const sec = p.querySelector('[data-section="serial"]')!;
     const flowSel = rowOf(sec, "Flow control")!.querySelector("select")!;

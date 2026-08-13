@@ -359,11 +359,13 @@ function serialProfileTemplate(tab: TerminalTab, st: QuickPanelState): TemplateR
   </div>`;
 }
 
-// Flow control + modem signal lines. While flow !== "none" a signal block
-// expands: RTS/DTR are ours to drive (toggles), CTS/DSR are the device's
-// answer (read-only status). Ports whose driver can't report modem lines
-// (or a failed status query) grey the whole control out. Line values live
-// in panel state — the status read re-renders instead of rebuilding rows.
+// Flow control + modem signal lines. The signal block is always visible
+// (open no longer drives any modem line, so the toggles are the ONLY way
+// to raise DTR for CDC-ACM devices that gate TX on it): RTS/DTR are ours
+// to drive (toggles), CTS/DSR are the device's answer (read-only status).
+// Ports whose driver can't report modem lines (or a failed status query)
+// grey the whole control out. Line values live in panel state — the
+// status read re-renders instead of rebuilding rows.
 function serialFlowTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResult {
   const flow = tab.flowControl ?? "none";
   const supported = st.linesSupported;
@@ -387,16 +389,16 @@ function serialFlowTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResu
     </div>
     <div class="qp-signals">
       ${
-        supported && flow !== "none"
+        supported
           ? html`
-            ${qpToggle("RTS", lines?.rts ?? true, (on) => {
+            ${qpToggle("RTS", lines?.rts ?? false, (on) => {
               if (st.lines) st.lines = { ...st.lines, rts: on };
               renderPanel(tab);
               invoke("serial_set_rts", { id: tab.id, on }).catch((e) =>
                 showToast(`RTS: ${e}`, "error"),
               );
             })}
-            ${qpToggle("DTR", lines?.dtr ?? true, (on) => {
+            ${qpToggle("DTR", lines?.dtr ?? false, (on) => {
               if (st.lines) st.lines = { ...st.lines, dtr: on };
               renderPanel(tab);
               invoke("serial_set_dtr", { id: tab.id, on }).catch((e) =>
