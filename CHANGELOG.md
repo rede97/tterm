@@ -1,3 +1,12 @@
+## v2.2.4
+
+Changes
+
+- **AT profile also fixes lone LF in device output** — its default Output
+  newlines is now `\n → \r\n` (implicit CR), so LF-only firmware stops
+  staircasing out of the box; CRLF-well-behaved devices are unaffected
+  since pairs pass through untouched
+
 ## v2.2.3
 
 Changes
