@@ -1,3 +1,34 @@
+## v2.2.2
+
+Fixes
+
+- **ESP32-C3/S3 native-USB boards no longer stay silent when the port is
+  opened** — opening a serial session no longer drives any modem line.
+  USB-Serial/JTAG devkits wire RTS → EN and DTR → IO0 through the
+  auto-reset circuit, so asserting them held the chip in reset (or dropped
+  a mid-session reboot into download mode) and the terminal showed no
+  output at all. Lines are now driven only on demand: hardware flow
+  control lets the driver manage RTS, and the quick panel's RTS/DTR
+  toggles stay visible regardless of flow-control setting so CDC-ACM
+  devices that gate TX on DTR can still be raised by hand
+- **Serial default profile fully applies when a port is opened** — picking
+  Log (or any profile) as the default now takes effect immediately: output
+  newline conversion is handed to the backend at spawn (previously stuck on
+  "keep" until switched manually), and the profile's input mode and Enter
+  terminator are actually wired into the input handler (previously the
+  constructor-time defaults stayed live, so AT opened with echo off and
+  Enter sending CR instead of CRLF)
+
+Changes
+
+- **MOCK-NL blocks label their own line ending** — each emitted block now
+  leads with its escaped form and the mode that renders it cleanly, e.g.
+  `[2] LF \n - cr-in-lf (Log) fixes staircase`, so Output-newlines choices
+  are eyeballed against all four endings at a glance
+- **Output-newline help lines show just the mapping** — e.g. `\n → \r\n`
+  for Log's implicit-CR mode and `\r | \n | \r\n → \r\n` for Force CRLF,
+  so the conversion is readable at a glance
+
 ## v2.2.1
 
 Changes
