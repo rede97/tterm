@@ -365,6 +365,7 @@ export class TabManager {
         parity: "none",
         stopBits: 1,
         flowControl: profile.flowControl,
+        outputNewline: profile.outputNewline,
       });
     } catch (e) {
       showToast(String(e), "error");
@@ -377,9 +378,12 @@ export class TabManager {
     tab.serialBaud = baud;
     tab.serialProfile = profile.name;
     tab.outputNewline = profile.outputNewline;
-    tab.enterNewline = profile.enterNewline;
-    tab.inputMode = profile.inputMode;
     tab.flowControl = profile.flowControl;
+    // Setters (not field assignment): the input handler was hooked in the
+    // constructor with default mode/terminator and captures both — only the
+    // setters re-hook it with the profile's values.
+    tab.setSerialInputMode(profile.inputMode);
+    tab.setSerialEnterNewline(profile.enterNewline);
     return this._finalizeTab(tab, result);
   }
 
