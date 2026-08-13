@@ -1,3 +1,34 @@
+## v2.2.3
+
+Changes
+
+- **AI Share can read the full session history, not just the screen** —
+  new `/share/<id>/lines` endpoint with absolute line addressing:
+  `tail=N` for the latest N lines (no prior state needed), `before+count`
+  to page backwards, `from+to` for exact ranges, and `since=<seq>` for
+  append-only incremental reads paired with long-polling. Addresses stay
+  stable while output flows; an `epoch` field invalidates them on
+  clear/resize/fullscreen-TUI switches (stale epoch or aged-out seq →
+  409 with the current one). Screen snapshots now also carry
+  `epoch`/`total`/`viewport_first` for anchoring
+- **AI Share gains a control plane** — `GET /share/<id>/state` reports
+  what the session is (serial params, SSH forwards); `POST
+  /share/<id>/control` lets a read-write share change serial parameters
+  (baud, newline modes, input mode, flow control, RTS/DTR) and add/remove
+  SSH port forwards — the agent that spots staircased log output can now
+  switch `cr-in-lf` itself. Invalid values are rejected with a message,
+  never silently ignored
+- **AT profile defaults to line-by-line input** — local line editing with
+  echo and backspace before the command goes out (Enter still sends CRLF);
+  raw echo mode remains available per session in the quick panel
+
+Fixes
+
+- **Test environment hardening** — the IME freeze proxy no longer forwards
+  a Proxy receiver into `Reflect.set`, which crashed happy-dom's
+  CSSStyleDeclaration (production was unaffected); unhandled async errors
+  in tab-constructing tests are gone
+
 ## v2.2.2
 
 Fixes
