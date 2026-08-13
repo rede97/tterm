@@ -1,3 +1,11 @@
+## v2.2.1
+
+Changes
+
+- **Settings keeps your place across tab switches** — open Settings, switch
+  to a terminal tab and back, and your unsaved edits, active panel, and
+  expanded cards are still there; closing Settings resets it as before.
+
 ## v2.2.0
 
 Fixes
