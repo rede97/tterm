@@ -28,6 +28,7 @@ import { cursorIsHidden } from "../util/xterm-internals";
 import { BatchAttachAddon } from "./batchattach";
 import { computeGrid } from "./fit";
 import { pasteIntoTerminal } from "./paste";
+import { recordShareSeq } from "./sharelines";
 import { buildShareScreenshot, buildShareSnapshot } from "./sharescreen";
 import { TitleModel } from "./title";
 import { createXterm } from "./xtermfactory";
@@ -189,6 +190,7 @@ export class TerminalTab {
       this.cursorFilter.sample(buf.cursorX, buf.cursorY);
       this.refreshImeClasses();
       this.shareSeq++;
+      recordShareSeq(this.terminal, this.shareSeq);
       if (this.shared) {
         const now = Date.now();
         if (now - this.lastShareSeqSent > 200) {

@@ -9,6 +9,13 @@ interface XtermInternals {
   _renderService?: {
     dimensions: { css: { cell: { width: number; height: number } } };
   };
+  _bufferService?: {
+    buffer?: {
+      lines?: {
+        onTrim?: (cb: (trimmed: number) => void) => { dispose(): void };
+      };
+    };
+  };
   textarea?: HTMLTextAreaElement;
   screenElement?: HTMLElement;
 }
@@ -42,4 +49,21 @@ export function cellDimensions(term: Terminal): { width: number; height: number 
 /** xterm's hidden input textarea (IME composition target). */
 export function terminalTextarea(term: Terminal): HTMLTextAreaElement | undefined {
   return internals(term).textarea;
+}
+
+/** Subscribe to scrollback trims of the ACTIVE buffer's line list (xterm's
+ * CircularList.onTrim — the only accurate signal for "N lines dropped off
+ * the top"; xterm's own SelectionService uses it). Null when the internal
+ * shape is unavailable (xterm upgrade) — callers must degrade to an epoch
+ * bump, never to silently wrong line addresses. */
+export function onBufferTrim(
+  term: Terminal,
+  cb: (trimmed: number) => void,
+): { dispose(): void } | null {
+  try {
+    const sub = internals(term)._bufferService?.buffer?.lines?.onTrim?.(cb);
+    return sub ?? null;
+  } catch {
+    return null;
+  }
 }

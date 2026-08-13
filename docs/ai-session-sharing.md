@@ -34,6 +34,10 @@ http://127.0.0.1:<port>/share/<session-id>?token=<share-token>
 | GET | `/share/<id>?token=<t>` | 提示词文档(本说明) |
 | GET | `/share/<id>/screen?token=<t>` | 屏幕快照(JSON,见下) |
 | GET | `/share/<id>/screen?token=<t>&wait=<seq>&timeout=<s>` | 长轮询:屏幕 seq 超过 `<seq>` 立即返回,否则至多等 `<s>` 秒(上限 30) |
+| GET | `/share/<id>/lines?token=<t>&tail=<N>` | 历史行读取(绝对行号,三种参数形式,见"行历史"一节;限频 5/s) |
+| GET | `/share/<id>/lines?token=<t>&since=<seq>` | 增量:只回该 seq 之后**追加**的行(与长轮询配套;原地改写请用 /screen) |
+| GET | `/share/<id>/state?token=<t>` | 会话类型 + 当前配置(串口参数/SSH 映射列表) |
+| POST | `/share/<id>/control?token=<t>` | 改会话配置(串口参数、SSH 映射增删;**仅读写分享**,见"控制面"一节) |
 | GET | `/share/<id>/screenshot?token=<t>&scale=<1-4>` | 屏幕 PNG 截图(限频 1/s;前端按主题色重绘 buffer) |
 | POST | `/share/<id>/input?token=<t>` | 键盘输入:JSON 形式或原始字节(**均须 UTF-8**,见下) |
 
@@ -79,6 +83,38 @@ JSON 字段:`text`(字符串,可含 `\r`)、`keys`(按键数组,按序发送)、
 - `cursor.visible = false` 表示 TUI 隐藏了真光标;此时 **`fake_cursor` 给出渲染出来的假光标位置**(输入实际落点)——这是 TTerm 独有的信息(与 IME 锚点同一条扫描链)
 - `alt_screen = true` 表示正处于全屏 TUI(vim/htop/agent 界面)
 - `seq` 单调递增,供长轮询使用
+- 快照另带 `epoch` / `total` / `viewport_first`(可视区首行的绝对行号),供行历史读取锚定
+
+### 行历史(/lines,绝对行号)
+
+任意区间读取(含 scrollback),行号绝对:**0 是会话最早一行(当前 epoch 内),`total` 是最新行 +1**。三种参数形式(每次恰好一种,`epoch` 永远可选):
+
+```sh
+curl "…/lines?token=<t>&tail=200"               # 最新 200 行(冷启动入口,无需先验状态)
+curl "…/lines?token=<t>&before=3950&count=200"  # 锚点往前翻页
+curl "…/lines?token=<t>&from=100&to=150"        # 精确半开区间
+```
+
+响应:`{ epoch, total, from, count, lines, alt_screen, viewport_first, addressing }`。**相对进、绝对出**——`tail` 读完用响应里的 `from` 作为下次翻页锚点;同一 epoch 内绝对行号稳定,两次 `tail` 可用 `from` 对账去重。
+
+**增量跟踪**:`since=<seq>` 只回该 seq 之后追加的行(seq 来自任意 /screen 或 /lines 响应),与 `wait=` 长轮询配套构成高效跟踪循环。语义只覆盖**追加**;原地改写(进度条、提示符编辑)属于可视区,用 /screen 观察。epoch 之前的 seq 或已被挤出追加日志(256 条环形)的 seq 返回 `409 unknown_seq`,重新 `tail` 锚定。
+
+**epoch 使所有地址失效**:clear / resize(重排)/ 进出全屏 TUI 都会 bump。请求带 `&epoch=<旧值>` 且不匹配时返回 `409 { epoch, total }`,重新 `tail` 锚定即可。超出 scrollback 上限的行永久丢失(`from` 静默上移,与锚点比较可知)。单请求上限 2000 行(`truncated: true` 表示被钳)。`addressing: false` 表示该构建无法保证地址稳定(xterm 内部结构变动),`from`/`total` 仅作参考。实现:前端 `terminal/sharelines.ts`,裁剪计数来自 xterm CircularList 的 `onTrim` 内部事件(与 xterm 自身 SelectionService 同一信号源)。
+
+### 控制面(/state + /control)
+
+`/state` 回答"你在驱动什么":会话类型、存活状态;串口会话带 `serial`(port/baud/profile/inputMode/enterNewline/outputNewline/flowControl),内嵌 SSH 会话带 `forwards` 列表。
+
+`/control` 改配置,body 是一个 JSON 对象,非法值一律 400 报原因、绝不静默忽略:
+
+```json
+{ "serial": { "outputNewline": "cr-in-lf" } }
+{ "serial": { "baud": 9600, "flowControl": "hardware", "rts": true } }
+{ "forward": { "action": "add", "kind": "local", "listenPort": 8080, "targetHost": "db", "targetPort": 5432 } }
+{ "forward": { "action": "remove", "forwardId": 3 } }
+```
+
+前端 `terminal/sharecontrol.ts` 实现,串口动作复用 quick panel 同一组 setter(agent 的修改与人的修改走同一路径)。**仅读写分享可用**(只读分享 403)——control 比 input 权限更大:错的波特率或 RTS 翻转能把设备打哑,forward 会开真实监听端口。提示词文档中对 agent 有明确警告。
 
 ### 限频
 
@@ -125,4 +161,4 @@ curl -X POST -H "Content-Type: application/json" \
 3. ~~`GET /share/<id>` 提示词 / `GET /screen`(限频 + 长轮询)/ `POST /input`~~ ✅
 4. ~~前端:buffer 快照(`share-screen-request` 事件往返)、seq 变更上报、tab 右键 Share with AI / Copy Share Link / Stop Sharing、共享中角标~~ ✅
 5. ~~JSON 输入形式(Unicode 文本 + 命名按键编码器)、PNG 截图(前端 2D canvas 重绘)~~ ✅
-6. 迭代项:relay 下行 mpsc → broadcast,WS 原始字节流分享(多订阅者);只读分享的 UI 开关;`?scrollback=N` 历史行;ANSI 保色快照
+6. ~~`?scrollback=N` 历史行~~ ✅(以 `/lines` 绝对行号端点落地,见"行历史"一节);~~控制面~~ ✅(`/state` + `/control`:串口参数、SSH 端口映射,见"控制面"一节);迭代项:relay 下行 mpsc → broadcast,WS 原始字节流分享(多订阅者);只读分享的 UI 开关;ANSI 保色快照

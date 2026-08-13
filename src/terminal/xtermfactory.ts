@@ -9,6 +9,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import { findTheme } from "../util/themes";
 import { setupTerminalLinks } from "./links";
+import { attachShareLineTracking } from "./sharelines";
 
 export interface XtermInstance {
   terminal: Terminal;
@@ -40,6 +41,9 @@ export function createXterm(container: HTMLElement, cfg: XtermConfig): XtermInst
   // Clickable links: plain-click OSC 8 hyperlinks, Ctrl+click URLs.
   setupTerminalLinks(terminal);
   if (cfg.renderer === "webgl") terminal.loadAddon(new WebglAddon());
+  // AI-share line addressing must see every trim from birth — attach before
+  // any output can arrive.
+  attachShareLineTracking(terminal);
   terminal.open(container);
   return { terminal, fitAddon, searchAddon };
 }

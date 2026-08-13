@@ -7,6 +7,11 @@
 //!   GET  /share/<id>?token=…                            self-describing prompt
 //!   GET  /share/<id>/screen?token=…                     JSON screen snapshot
 //!   GET  /share/<id>/screen?…&wait=<seq>&timeout=<s>    long-poll on change
+//!   GET  /share/<id>/lines?token=…&tail=N               history, absolute-
+//!        addressed (also before+count / from+to / since=SEQ; epoch-guarded)
+//!   GET  /share/<id>/state?token=…                      session type + config
+//!   POST /share/<id>/control?token=…                    session config (serial
+//!        params, SSH forwards); read-write shares only
 //!   POST /share/<id>/input?token=…                      body bytes = keystrokes
 //!
 //! The character grid lives in the frontend (the xterm buffer is the ground
@@ -26,6 +31,9 @@ use crate::state::AppState;
 // Non-long-poll /screen requests are limited to one per second per share
 // token — agents are told (in the prompt document) to prefer long-polling.
 const SCREEN_MIN_INTERVAL: Duration = Duration::from_secs(1);
+// /lines reads are cheap buffer slices; history paging needs a faster pace
+// than /screen's 1/s.
+const LINES_MIN_INTERVAL: Duration = Duration::from_millis(200);
 const SCREEN_ROUNDTRIP_TIMEOUT: Duration = Duration::from_millis(1500);
 const LONG_POLL_MAX_TIMEOUT_SECS: u64 = 30;
 const MAX_HEADER_BYTES: usize = 16 * 1024;
@@ -41,6 +49,7 @@ pub(crate) struct ShareEntry {
     pub notify: tokio::sync::Notify,
     pub last_screen_poll: Mutex<Option<Instant>>,
     pub last_shot_poll: Mutex<Option<Instant>>,
+    pub last_lines_poll: Mutex<Option<Instant>>,
 }
 
 pub(crate) type ShareRegistry = Arc<Mutex<HashMap<String, Arc<ShareEntry>>>>;
@@ -114,6 +123,7 @@ pub fn share_create(
         notify: tokio::sync::Notify::new(),
         last_screen_poll: Mutex::new(None),
         last_shot_poll: Mutex::new(None),
+        last_lines_poll: Mutex::new(None),
     });
     state
         .hub
@@ -320,6 +330,7 @@ fn reason(code: u16) -> &'static str {
         403 => "Forbidden",
         404 => "Not Found",
         405 => "Method Not Allowed",
+        409 => "Conflict",
         429 => "Too Many Requests",
         500 => "Internal Server Error",
         503 => "Service Unavailable",
@@ -387,11 +398,17 @@ async fn route(hub: &Arc<WsHub>, req: &HttpRequest) -> Vec<u8> {
             "",
         ),
         ("GET", "screen") => handle_screen(hub, &entry, token, req).await,
+        ("GET", "lines") => handle_lines(hub, &entry, req).await,
+        ("GET", "state") => handle_state(hub, &entry).await,
+        ("POST", "control") => handle_control(hub, &entry, req).await,
         ("GET", "screenshot") => handle_screenshot(hub, &entry, req).await,
         ("POST", "input") => handle_input(&entry, writer, req).await,
-        ("GET", "input") | ("POST", "screen") | ("POST", "screenshot") => {
-            text(405, "method not allowed\n")
-        }
+        ("GET", "input")
+        | ("POST", "screen")
+        | ("POST", "screenshot")
+        | ("POST", "lines")
+        | ("POST", "state")
+        | ("GET", "control") => text(405, "method not allowed\n"),
         _ => text(404, "unknown route\n"),
     }
 }
@@ -453,6 +470,145 @@ async fn handle_screen(
             "",
         ),
         Err(e) => text(503, &format!("screen unavailable: {}\n", e)),
+    }
+}
+
+// Parse /lines query params into the frontend request payload. Exactly one
+// range form is allowed: tail=N | before=A&count=N | from=A&to=B; epoch is
+// always optional. Pure so the combos are unit-testable without a hub.
+fn parse_lines_query(query: &str) -> Result<serde_json::Value, String> {
+    let num = |k: &str| -> Result<Option<u64>, String> {
+        query_param(Some(query), k)
+            .map(|v| {
+                v.parse::<u64>()
+                    .map_err(|_| format!("invalid {}: expected a non-negative integer", k))
+            })
+            .transpose()
+    };
+    let (tail, before, count, from, to, since, epoch) = (
+        num("tail")?,
+        num("before")?,
+        num("count")?,
+        num("from")?,
+        num("to")?,
+        num("since")?,
+        num("epoch")?,
+    );
+    let forms = (tail.is_some() as u8)
+        + ((before.is_some() || count.is_some()) as u8)
+        + ((from.is_some() || to.is_some()) as u8)
+        + (since.is_some() as u8);
+    if forms != 1 {
+        return Err(
+            "expected exactly one of: tail=N | before=A&count=N | from=A&to=B | since=SEQ".into(),
+        );
+    }
+    if before.is_some() != count.is_some() {
+        return Err("before and count must be given together".into());
+    }
+    if from.is_some() != to.is_some() {
+        return Err("from and to must be given together".into());
+    }
+    let mut lines = serde_json::Map::new();
+    for (k, v) in [
+        ("tail", tail),
+        ("before", before),
+        ("count", count),
+        ("from", from),
+        ("to", to),
+        ("since", since),
+        ("epoch", epoch),
+    ]
+    .into_iter()
+    .flat_map(|(k, v)| v.map(|v| (k, v)))
+    {
+        lines.insert(k.into(), v.into());
+    }
+    Ok(serde_json::json!({ "lines": lines }))
+}
+
+// GET /share/<id>/lines — absolute-addressed history reads. The buffer
+// lives in the frontend; this is a thin param-check + round-trip layer.
+async fn handle_lines(hub: &Arc<WsHub>, entry: &Arc<ShareEntry>, req: &HttpRequest) -> Vec<u8> {
+    // Validate before limiting: a malformed request must not burn budget.
+    let extra = match parse_lines_query(&req.query) {
+        Ok(v) => v,
+        Err(e) => return text(400, &format!("{}\n", e)),
+    };
+    {
+        let mut last = match entry.last_lines_poll.lock() {
+            Ok(l) => l,
+            Err(_) => return text(500, "rate-limit lock poisoned\n"),
+        };
+        if let Some(t) = *last {
+            if t.elapsed() < LINES_MIN_INTERVAL {
+                return text(429, "rate limited: /lines allows 5 requests per second\n");
+            }
+        }
+        *last = Some(Instant::now());
+    }
+    match fetch_snapshot(hub, &entry.session_id, extra).await {
+        Ok(v) => {
+            let status = match v.get("error").and_then(|e| e.as_str()) {
+                Some("stale_epoch") | Some("unknown_seq") => 409,
+                Some("bad_range") => 400,
+                Some(_) => 503,
+                None => 200,
+            };
+            respond(
+                status,
+                "application/json; charset=utf-8",
+                v.to_string().as_bytes(),
+                "",
+            )
+        }
+        Err(e) => text(503, &format!("lines unavailable: {}\n", e)),
+    }
+}
+
+// GET /share/<id>/state — session type + live config (serial params, SSH
+// forwards). Read-only shares allowed: it exposes nothing the screen
+// doesn't imply.
+async fn handle_state(hub: &Arc<WsHub>, entry: &Arc<ShareEntry>) -> Vec<u8> {
+    match fetch_snapshot(hub, &entry.session_id, serde_json::json!({ "state": true })).await {
+        Ok(v) => respond(
+            200,
+            "application/json; charset=utf-8",
+            v.to_string().as_bytes(),
+            "",
+        ),
+        Err(e) => text(503, &format!("state unavailable: {}\n", e)),
+    }
+}
+
+// POST /share/<id>/control — agent-driven session config (serial params,
+// SSH forwards). Read-write shares only: control can silence a session
+// (wrong baud) or open listeners (forwards), so it is gated like input.
+async fn handle_control(hub: &Arc<WsHub>, entry: &Arc<ShareEntry>, req: &HttpRequest) -> Vec<u8> {
+    if !entry.allow_write {
+        return text(403, "read-only share\n");
+    }
+    let action: serde_json::Value = match serde_json::from_slice::<serde_json::Value>(&req.body) {
+        Ok(v) if v.is_object() => v,
+        _ => return text(400, "control body must be a JSON object\n"),
+    };
+    match fetch_snapshot(
+        hub,
+        &entry.session_id,
+        serde_json::json!({ "control": action }),
+    )
+    .await
+    {
+        Ok(v) => {
+            let status = if v.get("error").is_some() { 400 } else { 200 };
+            respond(
+                status,
+                "application/json; charset=utf-8",
+                v.to_string().as_bytes(),
+                "",
+            )
+        }
+        Err(e) => text(503, &format!("control unavailable: {}\n", e)),
     }
 }
 
@@ -760,6 +916,10 @@ requests will start returning 403 — stop then, do not retry).
 | GET | `{base}?token={token}` | this document |
 | GET | `{base}/screen?token={token}` | screen snapshot (JSON) |
 | GET | `{base}/screen?token={token}&wait=<seq>&timeout=<s>` | long-poll: returns as soon as the screen changes after `seq` (max 30 s) |
+| GET | `{base}/lines?token={token}&tail=<N>` | history lines, absolute-addressed (see "Line history" below; rate limit: 5/s) |
+| GET | `{base}/lines?token={token}&since=<seq>` | only lines appended since `seq` (pair with long-poll) |
+| GET | `{base}/state?token={token}` | session type + live config (serial params, SSH forwards) |
+| POST | `{base}/control?token={token}` | change session config (see "Control" below; write shares only) |
 | GET | `{base}/screenshot?token={token}&scale=<1-4>` | PNG image of the screen (rate limit: 1/s) |
 | POST | `{base}/input?token={token}` | keystrokes (JSON form or raw UTF-8 bytes) |
 
@@ -776,6 +936,7 @@ curl -s "{base}/screen?token={token}"
   "fake_cursor": {{ "x": 11, "y": 12 }},
   "alt_screen": true,
   "seq": 1831,
+  "epoch": 2, "total": 4150, "viewport_first": 4120,
   "lines": ["exactly `rows` strings, trailing spaces trimmed"]
 }}
 ```
@@ -787,6 +948,107 @@ curl -s "{base}/screen?token={token}"
   your input actually lands**.
 - `alt_screen = true` means a fullscreen TUI (vim, htop, an agent UI) is up.
 - `seq` increments on every screen change — pass it to `wait=`.
+
+## Line history (absolute addressing)
+
+`/lines` reads ANY range of the session — scrollback included — using
+absolute line numbers. Line 0 is the oldest line the session ever produced
+(within the current epoch); `total` is one past the newest line.
+
+Three query forms (exactly one per request; `epoch` always optional):
+
+```sh
+curl -s "{base}/lines?token={token}&tail=200"             # last 200 lines
+curl -s "{base}/lines?token={token}&before=3950&count=200" # 200 lines above 3950
+curl -s "{base}/lines?token={token}&from=100&to=150"       # exact range [100,150)
+```
+
+```json
+{{
+  "epoch": 2, "total": 4150, "from": 3950, "count": 200,
+  "lines": ["..."],
+  "alt_screen": false, "viewport_first": 4120, "addressing": true
+}}
+```
+
+- **Relative in, absolute out**: `tail` needs no prior state; the response's
+  `from` is the absolute number of the first returned line — keep it as
+  your anchor for paging (`before=<from>&count=N` walks further back).
+- **New output shifts nothing**: absolute numbers are stable within an
+  epoch, so two `tail` reads can be de-duplicated by comparing `from`.
+- **epoch invalidates every address you hold.** It bumps on terminal
+  clear, resize (reflow), and fullscreen-TUI enter/exit. Pass
+  `&epoch=<yours>`; on mismatch you get `409` with the current
+  `{{"epoch", "total"}}` — re-anchor with a fresh `tail` read. Responses
+  include the current `epoch` even without the param.
+- `total` moves as output flows; lines beyond the scrollback cap are gone
+  for good (`from` clamps upward silently — compare against your anchor).
+- Max 2000 lines per request (`truncated: true` when clamped); page with
+  `before`/`count`.
+- `addressing: false` means this build can't guarantee stable addresses —
+  treat `from`/`total` as best-effort hints only.
+- On the alt screen there is no scrollback; `tail` covers the viewport.
+
+### Incremental reads: since
+
+`GET {base}/lines?token={token}&since=<seq>` returns ONLY the lines
+appended after `seq` (a seq you took from any /screen or /lines response).
+Pair it with long-polling for an efficient tracking loop:
+
+```sh
+curl -s "{base}/screen?token={token}&wait=<seq>&timeout=25" > /dev/null  # wake on change
+curl -s "{base}/lines?token={token}&since=<seq>"                          # fetch just the new lines
+```
+
+- Answer shape is the same as other /lines forms (`from` = first new line).
+- `since` tracks APPENDS. In-place rewrites (progress bars, prompt
+  editing) are viewport business — watch those with /screen.
+- A seq from before the last epoch bump (or evicted from the 256-entry
+  append log) answers `409 {{"error":"unknown_seq", ...}}` — re-anchor
+  with `tail`.
+
+## Session state & control
+
+`GET {base}/state?token={token}` — what you're driving, e.g. a serial
+session:
+
+```json
+{{
+  "id": "{id}", "label": "COM25 · 115200", "type": "serial", "alive": true,
+  "serial": {{ "port": "COM25", "baud": 115200, "profile": "Log",
+              "inputMode": "normal", "enterNewline": "cr",
+              "outputNewline": "cr-in-lf", "flowControl": "none" }}
+}}
+```
+
+Embedded-SSH sessions also carry `forwards` (id, kind, endpoints).
+
+`POST {base}/control?token={token}` — change session config. Body is one
+JSON object; invalid values are rejected (400) with a message, never
+silently ignored. Response: `{{"ok": true, "applied": [...]}}`.
+
+```sh
+# Serial: fix staircasing log output yourself instead of asking the human
+curl -s -X POST -H "Content-Type: application/json" \
+  --data '{{"serial": {{"outputNewline": "cr-in-lf"}}}}' \
+  "{base}/control?token={token}"
+
+# Serial: baud / flow / modem lines
+#   {{"serial": {{"baud": 9600, "flowControl": "hardware", "rts": true}}}}
+#   inputMode: normal|echo|line   enterNewline: cr|lf|crlf
+#   outputNewline: keep|cr-in-lf|lf-in-cr|force-crlf|force-lf|force-cr|strip
+#   flowControl: none|software|hardware
+
+# SSH forward (embedded client): add → returns forwardId; remove by id
+curl -s -X POST -H "Content-Type: application/json" \
+  --data '{{"forward": {{"action": "add", "kind": "local", "listenPort": 8080, "targetHost": "db.internal", "targetPort": 5432}}}}' \
+  "{base}/control?token={token}"
+#   {{"forward": {{"action": "remove", "forwardId": 3}}}}
+```
+
+> **Careful**: control changes the session the human is looking at. A
+> wrong baud or an RTS flip can silence a device; a forward opens a real
+> listener. Confirm intent with the human when in doubt.
 
 ## Recommended loop
 
@@ -850,6 +1112,7 @@ mod tests {
                 notify: tokio::sync::Notify::new(),
                 last_screen_poll: Mutex::new(None),
                 last_shot_poll: Mutex::new(None),
+                last_lines_poll: Mutex::new(None),
             }),
         );
     }
@@ -1032,6 +1295,153 @@ mod tests {
             "GET /share/tab-rl/screen?token=tokrl HTTP/1.1\r\nHost: x\r\n\r\n",
         );
         assert_eq!(status(&r2), 429);
+    }
+
+    #[test]
+    fn lines_query_parsing() {
+        // Exactly one range form per request.
+        let v = parse_lines_query("token=x&tail=200").unwrap();
+        assert_eq!(v["lines"]["tail"], 200);
+        let v = parse_lines_query("token=x&before=3950&count=100&epoch=2").unwrap();
+        assert_eq!(v["lines"]["before"], 3950);
+        assert_eq!(v["lines"]["count"], 100);
+        assert_eq!(v["lines"]["epoch"], 2);
+        let v = parse_lines_query("token=x&from=10&to=20").unwrap();
+        assert_eq!(v["lines"]["from"], 10);
+        assert_eq!(v["lines"]["to"], 20);
+        let v = parse_lines_query("token=x&since=1831").unwrap();
+        assert_eq!(v["lines"]["since"], 1831);
+
+        assert!(parse_lines_query("token=x").is_err()); // no form
+        assert!(parse_lines_query("token=x&tail=5&from=1&to=2").is_err()); // two forms
+        assert!(parse_lines_query("token=x&since=3&tail=5").is_err()); // since is a form too
+        assert!(parse_lines_query("token=x&before=5").is_err()); // half a form
+        assert!(parse_lines_query("token=x&count=5").is_err());
+        assert!(parse_lines_query("token=x&from=5").is_err());
+        assert!(parse_lines_query("token=x&tail=abc").is_err()); // not a number
+        assert!(parse_lines_query("token=x&tail=-1").is_err()); // negative
+    }
+
+    #[test]
+    fn share_lines_route_guards() {
+        let (hub, _shell) = start_hub_with_session("tab-ln");
+        add_share(&hub, "tab-ln", "tokln", true);
+
+        // Auth first: bad token → 403, even with valid params.
+        assert_eq!(
+            status(&http(
+                &hub,
+                "GET /share/tab-ln/lines?token=nope&tail=10 HTTP/1.1\r\nHost: x\r\n\r\n"
+            )),
+            403
+        );
+        // Bad param combos → 400, never reaching the frontend round-trip.
+        assert_eq!(
+            status(&http(
+                &hub,
+                "GET /share/tab-ln/lines?token=tokln HTTP/1.1\r\nHost: x\r\n\r\n"
+            )),
+            400
+        );
+        assert_eq!(
+            status(&http(
+                &hub,
+                "GET /share/tab-ln/lines?token=tokln&before=5 HTTP/1.1\r\nHost: x\r\n\r\n"
+            )),
+            400
+        );
+        // POST → 405.
+        assert_eq!(
+            status(&http(
+                &hub,
+                "POST /share/tab-ln/lines?token=tokln&tail=10 HTTP/1.1\r\nHost: x\r\nContent-Length: 0\r\n\r\n"
+            )),
+            405
+        );
+        // Valid form: no frontend attached in tests → 503, and the poll
+        // counts toward the rate limiter (immediate retry → 429).
+        assert_eq!(
+            status(&http(
+                &hub,
+                "GET /share/tab-ln/lines?token=tokln&tail=10 HTTP/1.1\r\nHost: x\r\n\r\n"
+            )),
+            503
+        );
+        assert_eq!(
+            status(&http(
+                &hub,
+                "GET /share/tab-ln/lines?token=tokln&tail=10 HTTP/1.1\r\nHost: x\r\n\r\n"
+            )),
+            429
+        );
+    }
+
+    #[test]
+    fn share_state_and_control_guards() {
+        let (hub, _shell) = start_hub_with_session("tab-ctl");
+        add_share(&hub, "tab-ctl", "tokrw", true);
+        add_share(&hub, "tab-ctl", "tokro", false);
+
+        // /state: both share kinds may read; without a frontend the
+        // round-trip fails fast with 503.
+        assert_eq!(
+            status(&http(
+                &hub,
+                "GET /share/tab-ctl/state?token=tokro HTTP/1.1\r\nHost: x\r\n\r\n"
+            )),
+            503
+        );
+        // /control: read-only token → 403 before anything runs.
+        assert_eq!(
+            status(&http(
+                &hub,
+                r#"POST /share/tab-ctl/control?token=tokro HTTP/1.1
+Host: x
+Content-Length: 2
+
+{}"#
+            )),
+            403
+        );
+        // /control: non-object body → 400.
+        assert_eq!(
+            status(&http(
+                &hub,
+                r#"POST /share/tab-ctl/control?token=tokrw HTTP/1.1
+Host: x
+Content-Length: 5
+
+[1,2]"#
+            )),
+            400
+        );
+        // /control: valid object, no frontend → 503.
+        assert_eq!(
+            status(&http(
+                &hub,
+                r#"POST /share/tab-ctl/control?token=tokrw HTTP/1.1
+Host: x
+Content-Length: 35
+
+{"serial":{"outputNewline":"keep"}}"#
+            )),
+            503
+        );
+        // Wrong methods → 405.
+        assert_eq!(
+            status(&http(
+                &hub,
+                "GET /share/tab-ctl/control?token=tokrw HTTP/1.1\r\nHost: x\r\n\r\n"
+            )),
+            405
+        );
+        assert_eq!(
+            status(&http(
+                &hub,
+                "POST /share/tab-ctl/state?token=tokrw HTTP/1.1\r\nHost: x\r\nContent-Length: 0\r\n\r\n"
+            )),
+            405
+        );
     }
 
     #[test]

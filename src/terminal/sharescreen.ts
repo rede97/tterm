@@ -7,6 +7,7 @@
 import type { IBufferCell, Terminal } from "@xterm/xterm";
 import type { TabType } from "../core/types";
 import { cellDimensions } from "../util/xterm-internals";
+import { shareLineState } from "./sharelines";
 
 /** Everything the capture needs from a tab — kept as a narrow interface so
  * this module never sees TerminalTab (and stays testable). */
@@ -28,6 +29,7 @@ export function buildShareSnapshot(t: ShareScreenSource): Record<string, unknown
     lines.push(buf.getLine(buf.viewportY + y)?.translateToString(true) ?? "");
   }
   const cursorHidden = t.cursorHidden();
+  const ls = shareLineState(t.terminal);
   const snap: Record<string, unknown> = {
     id: t.id,
     label: t.label,
@@ -37,6 +39,11 @@ export function buildShareSnapshot(t: ShareScreenSource): Record<string, unknown
     cursor: { x: buf.cursorX, y: buf.cursorY, visible: !cursorHidden },
     alt_screen: buf.type === "alternate",
     seq: t.shareSeq,
+    // Absolute line addressing (see /lines endpoint): total = one past the
+    // newest line; viewport_first = absolute index of the top visible row.
+    epoch: ls.epoch,
+    total: ls.trimBase + buf.length,
+    viewport_first: ls.trimBase + buf.viewportY,
     lines,
   };
   if (cursorHidden) snap.fake_cursor = t.fakeCursorCell();
