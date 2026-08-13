@@ -37,11 +37,13 @@ export const BUILTIN_SERIAL_PROFILES: SerialProfileDef[] = [
     source: "builtin",
   },
   {
-    // Modem-style: line-by-line editing with local echo, Enter sends CRLF.
+    // Modem-style: line-by-line editing with local echo, Enter sends CRLF;
+    // bare LF in device output gains a CR (CRLF pairs pass through
+    // untouched, so this is safe for well-behaved firmware too).
     name: "AT",
     inputMode: "line",
     enterNewline: "crlf",
-    outputNewline: "keep",
+    outputNewline: "cr-in-lf",
     flowControl: "none",
     source: "builtin",
   },

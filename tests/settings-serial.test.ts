@@ -95,7 +95,7 @@ describe("settings — Serial profile gallery", () => {
       "normal · Enter→CR · out cr-in-lf · flow none",
     );
     expect(card(panel, "AT").querySelector(".sp-card-summary")!.textContent).toBe(
-      "line · Enter→CRLF · out keep · flow none",
+      "line · Enter→CRLF · out cr-in-lf · flow none",
     );
 
     // Every card has Duplicate; built-ins have no Edit.
@@ -133,17 +133,17 @@ describe("settings — Serial profile gallery", () => {
 
     const sel = overlay.querySelector<HTMLSelectElement>('.sp-select[data-field="outputNewline"]')!;
     const hint = overlay.querySelector<HTMLElement>(".sp-hint")!;
-    // AT profile is out=keep: hint explains the current selection.
-    expect(sel.value).toBe("keep");
-    expect(hint.textContent).toContain("Pass through unchanged");
+    // AT profile is out=cr-in-lf: hint explains the current selection.
+    expect(sel.value).toBe("cr-in-lf");
+    expect(hint.textContent).toBe("Lone \\n → \\r\\n");
     // Every option carries its description as a hover tooltip.
     for (const opt of sel.querySelectorAll("option")) {
       expect(opt.title.length).toBeGreaterThan(0);
     }
     // Switching the select updates the hint to the new mode's description.
-    sel.value = "cr-in-lf";
+    sel.value = "keep";
     sel.dispatchEvent(new Event("change"));
-    expect(hint.textContent).toBe("Lone \\n → \\r\\n");
+    expect(hint.textContent).toContain("Pass through unchanged");
     sel.value = "strip";
     sel.dispatchEvent(new Event("change"));
     expect(hint.textContent).toBe("\\r | \\n → (removed)");
@@ -165,7 +165,7 @@ describe("settings — Serial profile gallery", () => {
         name: "AT Copy",
         inputMode: "line",
         enterNewline: "crlf",
-        outputNewline: "keep",
+        outputNewline: "cr-in-lf",
         flowControl: "none",
       },
     ]);
