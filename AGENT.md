@@ -290,7 +290,13 @@ reflects the active tab: red = session down, blue = AI-shared
 follows the active tab's type: AI share toggle for all, SSH adds
 auto-reconnect + inline port forwards (embedded client only, compact
 single-line table), serial adds
-auto-reconnect + baud/newline selects + RTS toggle + live CTS status.
+auto-reconnect + profile/baud/newline selects + an always-visible
+modem-line block (RTS/DTR toggles, live CTS/DSR status).
+**Modem-line policy**: `open_serial` drives NO line at open —
+ESP32-C3/S3 USB-Serial/JTAG devkits wire RTS → EN (chip held in reset)
+and DTR → IO0 (mid-session reboot lands in download mode), so asserting
+either presents as a silent terminal. Lines move only via the toggles or
+the driver under hardware flow control.
 
 ## System tray (park window)
 

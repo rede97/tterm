@@ -46,6 +46,14 @@ applies a profile to a RUNNING session: input mode + Enter terminator
 `serial_set_flow_control`). Baud stays separate — it is a physical link
 parameter, not a mode.
 
+Opening a port applies the whole profile too (`createSerialTab`):
+`flowControl` + `outputNewline` ride the `serial_spawn` args (the backend
+newline converter starts in the profile's mode — there is no second
+"apply" call), and `inputMode`/`enterNewline` go through the tab SETTERS,
+not field assignment, because the input handler hooked in the TerminalTab
+constructor captures mode + terminator by value and must be re-hooked.
+Regression coverage: `tests/serial-open-profile.test.ts`.
+
 ## Newline handling (device → terminal)
 
 Terminal line control is two independent actions: `CR` = cursor to column
@@ -86,12 +94,17 @@ Per profile: **Normal** (direct), **Echo** (local echo), **Line-by-line**
 ## Flow control & modem lines
 
 Flow control (none / software XON-XOFF / hardware RTS-CTS) is a profile
-option, switchable live via `serial_set_flow_control` (no reopen). When
-the active profile enables it, the quick panel expands a signal block:
-RTS/DTR toggles (ours to drive, `serial_set_rts` / `serial_set_dtr`) and
-CTS/DSR live status (the device's answers). `serial_line_status` returns
+option, switchable live via `serial_set_flow_control` (no reopen). The
+quick panel's signal block is always visible: RTS/DTR toggles (ours to
+drive, `serial_set_rts` / `serial_set_dtr`) and CTS/DSR live status (the
+device's answers). `serial_line_status` returns
 `{ rts, cts, dtr, dsr, supported }` — `supported: false` when the driver
-can't report modem lines, and the block greys out.
+can't report modem lines, and the block greys out. At open, `open_serial`
+drives NO modem line: ESP32-C3/S3 USB-Serial/JTAG devkits wire RTS → EN
+(chip held in reset) and DTR → IO0 (mid-session reboot lands in download
+mode) through the auto-reset circuit, so asserting either presented as a
+silent terminal. Lines move only on demand — the toggles, or the driver
+itself under hardware flow control.
 
 ## Quick panel & auto-reconnect
 
@@ -112,7 +125,7 @@ xterm) with zero release-build code (cfg-gated `MockSerialPort` in
 | Port | Behavior |
 |---|---|
 | `MOCK-LOOP` | loopback: writes echo back (baud changes echo a confirmation) — input modes, latency, baud switching |
-| `MOCK-NL` | periodically emits four newline-pattern blocks (CRLF / LF-only / CR-only / mixed) — output newline handling |
+| `MOCK-NL` | periodically emits four newline-pattern blocks (CRLF / LF-only / CR-only / mixed), each labeled with its escaped ending + the fixing mode (`[2] LF \n - cr-in-lf (Log)…`) — output newline handling |
 
 ## Testing
 

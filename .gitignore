@@ -20,6 +20,10 @@ e2e/drivers/
 
 experiments/
 
+# Local hardware test artifacts (ESP32 serial probe — not part of the app)
+logtest/
+*_com25.ps1
+
 # pi local state (skills stay committed)
 .pi/settings.local.json
 .pi/sessions/
