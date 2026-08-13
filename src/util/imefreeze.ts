@@ -58,19 +58,24 @@ export function patchImeFreeze(
   // clamped during IME composition.
   const origStyle = ta.style;
   const proxyHandler: ProxyHandler<CSSStyleDeclaration> = {
-    set(target, prop, value, receiver) {
+    set(target, prop, value) {
+      // No `receiver` forwarding: the get() below mints a FRESH Proxy per
+      // access, and forwarding it as receiver breaks CSSStyleDeclaration
+      // implementations that rely on private fields (happy-dom throws
+      // "Cannot read private member"; real WebView2 tolerates it). Setting
+      // straight on the target is the same operation without the hazard.
       if (left !== null && top !== null) {
         if (prop === "left") {
-          return Reflect.set(target, prop, `${left}px`, receiver);
+          return Reflect.set(target, prop, `${left}px`);
         }
         if (prop === "top") {
-          return Reflect.set(target, prop, `${top}px`, receiver);
+          return Reflect.set(target, prop, `${top}px`);
         }
         // Prevent xterm.js from setting width to a huge value (screen width).
         // Clamp to one cell width so IME candidate window stays at correct position.
         if (prop === "width") {
           const cellW = cellDimensions(terminal)?.width ?? 8;
-          return Reflect.set(target, prop, `${Math.max(cellW, 1)}px`, receiver);
+          return Reflect.set(target, prop, `${Math.max(cellW, 1)}px`);
         }
         // With the composition-view suppressed (display:none), xterm measures
         // its bounds as 0 and would shrink the textarea to 1px x 1px —
@@ -78,10 +83,10 @@ export function patchImeFreeze(
         // Keep the textarea a full cell so the TSF composition stays alive.
         if (prop === "height" || prop === "lineHeight") {
           const cellH = cellDimensions(terminal)?.height ?? 16;
-          return Reflect.set(target, prop, `${Math.max(cellH, 1)}px`, receiver);
+          return Reflect.set(target, prop, `${Math.max(cellH, 1)}px`);
         }
       }
-      return Reflect.set(target, prop, value, receiver);
+      return Reflect.set(target, prop, value);
     },
   };
 
