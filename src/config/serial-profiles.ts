@@ -37,9 +37,9 @@ export const BUILTIN_SERIAL_PROFILES: SerialProfileDef[] = [
     source: "builtin",
   },
   {
-    // Modem-style: local echo on, Enter sends CRLF.
+    // Modem-style: line-by-line editing with local echo, Enter sends CRLF.
     name: "AT",
-    inputMode: "echo",
+    inputMode: "line",
     enterNewline: "crlf",
     outputNewline: "keep",
     flowControl: "none",

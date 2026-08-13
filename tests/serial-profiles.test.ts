@@ -45,9 +45,9 @@ describe("built-in profiles", () => {
     expect(BUILTIN_SERIAL_PROFILES.find((p) => p.name === "Log")!.outputNewline).toBe("cr-in-lf");
   });
 
-  it("AT echoes locally and sends CRLF on Enter", () => {
+  it("AT edits line-by-line and sends CRLF on Enter", () => {
     const p = BUILTIN_SERIAL_PROFILES.find((p) => p.name === "AT")!;
-    expect(p.inputMode).toBe("echo");
+    expect(p.inputMode).toBe("line");
     expect(p.enterNewline).toBe("crlf");
   });
 });

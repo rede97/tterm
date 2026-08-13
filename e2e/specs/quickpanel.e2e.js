@@ -164,7 +164,7 @@ describe("Quick-status button and panel", () => {
     expect(earlySignals.vals).toBe(2);
 
     // Switch profile to AT: the section re-renders with its parameters
-    // (echo input, CRLF enter) reflected in the live selects.
+    // (line-by-line input, CRLF enter) reflected in the live selects.
     await browser.execute(() => {
       const sel = document.querySelector(
         '.quick-panel [data-section="serial"] select[aria-label="Profile"]',
@@ -182,9 +182,9 @@ describe("Quick-status button and panel", () => {
           );
           return (
             tab.serialProfile === "AT" &&
-            tab.inputMode === "echo" &&
+            tab.inputMode === "line" &&
             inputSel &&
-            inputSel.value === "echo"
+            inputSel.value === "line"
           );
         }),
       { timeout: 5000, timeoutMsg: "AT profile did not apply to the live session" },

@@ -95,7 +95,7 @@ describe("settings — Serial profile gallery", () => {
       "normal · Enter→CR · out cr-in-lf · flow none",
     );
     expect(card(panel, "AT").querySelector(".sp-card-summary")!.textContent).toBe(
-      "echo · Enter→CRLF · out keep · flow none",
+      "line · Enter→CRLF · out keep · flow none",
     );
 
     // Every card has Duplicate; built-ins have no Edit.
@@ -118,7 +118,7 @@ describe("settings — Serial profile gallery", () => {
     expect(overlay!.querySelector<HTMLInputElement>(".sp-name")!.value).toBe("AT Copy");
     expect(
       overlay!.querySelector<HTMLSelectElement>('.sp-select[data-field="inputMode"]')!.value,
-    ).toBe("echo");
+    ).toBe("line");
     expect(
       overlay!.querySelector<HTMLSelectElement>('.sp-select[data-field="enterNewline"]')!.value,
     ).toBe("crlf");
@@ -163,7 +163,7 @@ describe("settings — Serial profile gallery", () => {
     expect(JSON.parse(file.content)).toEqual([
       {
         name: "AT Copy",
-        inputMode: "echo",
+        inputMode: "line",
         enterNewline: "crlf",
         outputNewline: "keep",
         flowControl: "none",

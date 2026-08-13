@@ -36,7 +36,7 @@ Built-ins:
 |---|---|
 | **Normal** | direct interactive mode for shells/TUIs (uboot, UEFI): keystrokes pass through, Enter sends CR, no output conversion |
 | **Log** | recording device output: bare LF → CRLF so prints don't staircase |
-| **AT** | modem-style: local echo on, Enter sends CRLF |
+| **AT** | modem-style: line-by-line editing with local echo, Enter sends CRLF |
 
 Custom profiles are duplicates of any profile, like custom themes; the
 picker groups Built-in vs Custom. `TabManager.setSerialProfile(tabId, name)`

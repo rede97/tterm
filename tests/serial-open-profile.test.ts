@@ -91,7 +91,7 @@ describe("createSerialTab applies the default profile", () => {
   });
 
   it("re-hooks the input handler with the profile's mode and terminator", async () => {
-    configStore.set({ serialProfile: "AT" }); // builtin: echo + Enter CRLF
+    configStore.set({ serialProfile: "AT" }); // builtin: line mode + Enter CRLF
     const mgr = makeManager();
     const tab = await mgr.createSerialTab(PORT);
     expect(tab).not.toBeNull();
@@ -105,7 +105,10 @@ describe("createSerialTab applies the default profile", () => {
     // crlf terminator: the \r must go out as \r\n (plain field assignment
     // would leave the constructor-hooked "cr" default live → "AT\r").
     expect(sock.sent.join("")).toBe("AT\r\n");
-    // echo mode: input appears locally even though the device sent nothing.
-    expect(tab!.terminal.buffer.active.getLine(0)?.translateToString(true)).toContain("AT");
+    // line mode: input echoes locally (via terminal.write — async) even
+    // though the device sent nothing.
+    await vi.waitFor(() => {
+      expect(tab!.terminal.buffer.active.getLine(0)?.translateToString(true)).toContain("AT");
+    });
   });
 });
