@@ -5,7 +5,6 @@
 import { Terminal } from "@xterm/xterm";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  attachShareLineTracking,
   readShareLines,
   recordShareSeq,
   SHARE_LINES_MAX,
@@ -26,7 +25,7 @@ function makeTerm(): Terminal {
   const el = document.createElement("div");
   document.body.appendChild(el);
   const term = new Terminal({ rows: ROWS, scrollback: SCROLLBACK, cols: 40 });
-  attachShareLineTracking(term);
+  shareLineState(term); // attach tracking (the factory does this in prod)
   term.open(el);
   return term;
 }

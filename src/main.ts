@@ -173,26 +173,25 @@ listen<{
   state?: boolean;
   control?: unknown;
 }>("share-screen-request", (e) => {
-    const respond = (snapshot: unknown) =>
-      invoke("share_screen_response", { req: e.payload.req, snapshot }).catch(
-        logCatch("share.screenResponse"),
-      );
-    const tab = tabManager.get(e.payload.id);
-    if (!tab) {
-      respond({ error: "session has no terminal" });
-    } else if (e.payload.lines) {
-      respond(readShareLines(tab.terminal, e.payload.lines));
-    } else if (e.payload.state) {
-      buildShareState(tab).then(respond);
-    } else if (e.payload.control !== undefined) {
-      applyShareControl(tab, e.payload.control as never).then(respond);
-    } else if (e.payload.format === "png") {
-      tab.buildShareScreenshot(e.payload.scale ?? 2).then(respond);
-    } else {
-      respond(tab.buildShareSnapshot());
-    }
-  },
-);
+  const respond = (snapshot: unknown) =>
+    invoke("share_screen_response", { req: e.payload.req, snapshot }).catch(
+      logCatch("share.screenResponse"),
+    );
+  const tab = tabManager.get(e.payload.id);
+  if (!tab) {
+    respond({ error: "session has no terminal" });
+  } else if (e.payload.lines) {
+    respond(readShareLines(tab.terminal, e.payload.lines));
+  } else if (e.payload.state) {
+    buildShareState(tab).then(respond);
+  } else if (e.payload.control !== undefined) {
+    applyShareControl(tab, e.payload.control as never).then(respond);
+  } else if (e.payload.format === "png") {
+    tab.buildShareScreenshot(e.payload.scale ?? 2).then(respond);
+  } else {
+    respond(tab.buildShareSnapshot());
+  }
+});
 initWindowControls();
 
 // Flush pending debounced config writes before the window closes.

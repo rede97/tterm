@@ -6,8 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn(() => Promise.resolve(null)) }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 
-import type { TerminalTab } from "../src/terminal/tab";
 import { applyShareControl, buildShareState } from "../src/terminal/sharecontrol";
+import type { TerminalTab } from "../src/terminal/tab";
 
 function fakeSerialTab(type = "serial"): TerminalTab {
   return {
@@ -100,7 +100,13 @@ describe("share /control forward", () => {
       cmd === "ssh_forward_add" ? Promise.resolve(7) : Promise.resolve(null),
     );
     const r = await applyShareControl(sshTab(), {
-      forward: { action: "add", kind: "local", listenPort: 8080, targetHost: "db", targetPort: 5432 },
+      forward: {
+        action: "add",
+        kind: "local",
+        listenPort: 8080,
+        targetHost: "db",
+        targetPort: 5432,
+      },
     });
     expect(r.ok).toBe(true);
     expect(r.forwardId).toBe(7);

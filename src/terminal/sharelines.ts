@@ -49,10 +49,12 @@ export interface ShareLinesQuery {
   epoch?: number;
 }
 
-/** Attach line tracking to a freshly created terminal (once, from the
- * factory — trims before attach are untracked). */
-export function attachShareLineTracking(term: Terminal): void {
-  if (states.has(term)) return;
+/** Line-address state for a terminal, attaching trackers on first call.
+ * The factory calls this at terminal birth — trims before attach are
+ * untracked, so addresses are only valid from the attach point. */
+export function shareLineState(term: Terminal): ShareLineState {
+  const existing = states.get(term);
+  if (existing) return existing;
   const st: ShareLineState = {
     epoch: 0,
     trimBase: 0,
@@ -94,13 +96,7 @@ export function attachShareLineTracking(term: Terminal): void {
       if (sub) st.disposables.push(sub);
     }),
   );
-}
-
-/** State for reads; auto-attaches (with an empty history base) if the
- * factory hook was missed — addresses are then only valid from this point. */
-export function shareLineState(term: Terminal): ShareLineState {
-  attachShareLineTracking(term);
-  return states.get(term)!;
+  return st;
 }
 
 /** Record a render's seq (called from the tab's onRender, AFTER shareSeq++

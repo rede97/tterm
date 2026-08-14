@@ -19,7 +19,15 @@ import type { TerminalTab } from "./tab";
 
 const INPUT_MODES = ["normal", "echo", "line"];
 const ENTER_NEWLINES = ["cr", "lf", "crlf"];
-const OUTPUT_NEWLINES = ["keep", "cr-in-lf", "lf-in-cr", "force-crlf", "force-lf", "force-cr", "strip"];
+const OUTPUT_NEWLINES = [
+  "keep",
+  "cr-in-lf",
+  "lf-in-cr",
+  "force-crlf",
+  "force-lf",
+  "force-cr",
+  "strip",
+];
 const FLOW_CONTROLS = ["none", "software", "hardware"];
 const FORWARD_KINDS = ["local", "remote", "dynamic"];
 
@@ -139,14 +147,18 @@ export async function applyShareControl(
     }
     const f: ForwardAction = action.forward;
     if (f.action === "add") {
-      if (!f.kind || !FORWARD_KINDS.includes(f.kind)) {
+      const kind = f.kind;
+      const listenPort = f.listenPort;
+      if (!kind || !FORWARD_KINDS.includes(kind)) {
         return { error: `invalid forward kind: ${String(f.kind)}` };
       }
-      if (!Number.isInteger(f.listenPort)) return { error: "forward add needs listenPort" };
+      if (typeof listenPort !== "number" || !Number.isInteger(listenPort)) {
+        return { error: "forward add needs listenPort" };
+      }
       const spec: NewForward = {
-        kind: f.kind!,
+        kind,
         listenHost: f.listenHost ?? "127.0.0.1",
-        listenPort: f.listenPort!,
+        listenPort,
         targetHost: f.targetHost ?? "",
         targetPort: f.targetPort ?? 0,
       };
