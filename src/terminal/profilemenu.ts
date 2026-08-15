@@ -5,6 +5,7 @@ import { hostProp } from "../core/common";
 import { DOM_ID } from "../core/dom-ids";
 import { configStore } from "../core/store";
 import { mustGetById } from "../ui/dom";
+import { handleMenuKeydown, menuItems, restoreFocus } from "../ui/menukeys";
 import { tabManager } from "./tabmanager";
 
 const menuBtn = mustGetById(DOM_ID.newTabMenuBtn);
@@ -43,8 +44,9 @@ function createMenuItem(
   detail: string,
   onClick: () => void,
   subline = "",
-): HTMLElement {
-  const item = document.createElement("div");
+): HTMLButtonElement {
+  const item = document.createElement("button");
+  item.type = "button";
   item.className = "profile-item";
 
   const iconWrap = document.createElement("span");
@@ -169,24 +171,50 @@ function populateMenu() {
   }
 }
 
+// Focus returns to the trigger button on dismissal; an item activation
+// skips the restore because the action itself moves focus (new terminal).
+function closeMenu(restore = true) {
+  profileMenu.classList.remove("open");
+  if (restore) restoreFocus(menuBtn);
+}
+
 export function initProfileMenu() {
   menuBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     if (profileMenu.classList.contains("open")) {
-      profileMenu.classList.remove("open");
+      closeMenu(false);
     } else {
       populateMenu();
       positionMenu();
       profileMenu.classList.add("open");
+      // Keyboard entry point: focus lands on the first usable entry. The
+      // async serial re-enumeration repopulates without stealing it back.
+      menuItems(profileMenu)[0]?.focus();
       requestAnimationFrame(() => flipMenu());
       loadSerialPorts().then((ports) => {
         configStore.set({ serialPorts: ports });
         if (profileMenu.classList.contains("open")) {
+          const focusedIndex = menuItems(profileMenu).indexOf(
+            document.activeElement as HTMLElement,
+          );
           populateMenu();
           flipMenu();
+          // The repopulate rebuilds the DOM. Preserve the user's current
+          // keyboard position when possible, falling back to the first item.
+          if (focusedIndex >= 0 || !profileMenu.contains(document.activeElement)) {
+            const items = menuItems(profileMenu);
+            items[Math.min(Math.max(focusedIndex, 0), items.length - 1)]?.focus();
+          }
         }
       });
     }
+  });
+
+  profileMenu.addEventListener("keydown", (e) => {
+    handleMenuKeydown(e, {
+      items: () => menuItems(profileMenu),
+      close: () => closeMenu(),
+    });
   });
 
   document.addEventListener("click", (e) => {
@@ -195,7 +223,7 @@ export function initProfileMenu() {
       !profileMenu.contains(e.target as Node) &&
       e.target !== menuBtn
     ) {
-      profileMenu.classList.remove("open");
+      closeMenu(false);
     }
   });
 

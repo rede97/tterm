@@ -129,4 +129,54 @@ describe("profile menu (serial enumeration)", () => {
     (demo as HTMLElement).click();
     expect(tabManagerMock.createDemoTab).toHaveBeenCalledTimes(1);
   });
+
+  it("menu entries are native buttons", async () => {
+    await openMenu();
+    const items = [...document.querySelectorAll(".profile-menu .profile-item")];
+    expect(items.length).toBeGreaterThan(0);
+    for (const item of items) {
+      expect(item.tagName).toBe("BUTTON");
+      expect((item as HTMLButtonElement).type).toBe("button");
+    }
+  });
+
+  function pressKey(key: string) {
+    document.activeElement?.dispatchEvent(
+      new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+    );
+  }
+
+  it("open focuses the first entry; arrows and Home/End move within the menu", async () => {
+    await openMenu();
+    const items = [...document.querySelectorAll<HTMLElement>(".profile-menu .profile-item")];
+    expect(document.activeElement).toBe(items[0]);
+
+    pressKey("ArrowDown");
+    expect(document.activeElement).toBe(items[1]);
+    pressKey("ArrowUp");
+    expect(document.activeElement).toBe(items[0]);
+    pressKey("End");
+    expect(document.activeElement).toBe(items[items.length - 1]);
+    pressKey("Home");
+    expect(document.activeElement).toBe(items[0]);
+    pressKey("ArrowUp"); // wraps to the last entry
+    expect(document.activeElement).toBe(items[items.length - 1]);
+  });
+
+  it("Enter activates the focused entry and closes the menu", async () => {
+    await openMenu();
+    const first = document.querySelector<HTMLElement>(".profile-menu .profile-item")!;
+    expect(document.activeElement).toBe(first);
+
+    pressKey("Enter");
+    expect(tabManagerMock.createLocalTab).toHaveBeenCalledTimes(1);
+    expect(document.querySelector(".profile-menu")!.classList.contains("open")).toBe(false);
+  });
+
+  it("Escape closes the menu and returns focus to the menu button", async () => {
+    await openMenu();
+    pressKey("Escape");
+    expect(document.querySelector(".profile-menu")!.classList.contains("open")).toBe(false);
+    expect(document.activeElement).toBe(document.getElementById("new-tab-menu-btn"));
+  });
 });

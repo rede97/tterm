@@ -69,4 +69,12 @@ describe("SettingsShell suspend vs dismiss", () => {
     expect(getFactoryCalls()).toBe(2);
     expect(terminalContainer.querySelector(".settings-page")).not.toBeNull();
   });
+
+  it("settings pseudo-tab close button carries a readable name", async () => {
+    const { shell, terminalContainer } = makeShell();
+    await open(shell, terminalContainer);
+    const closeBtn = document.querySelector<HTMLButtonElement>(".tab-close");
+    expect(closeBtn?.getAttribute("aria-label")).toBe("Close settings");
+    expect(closeBtn?.title).toBe("Close settings");
+  });
 });

@@ -105,6 +105,27 @@ describe("quick-status button", () => {
     updateQuickButton();
     expect(button().dataset.state).toBe("shared");
   });
+
+  it("accessible name tracks the session state (P1-03)", () => {
+    updateQuickButton();
+    expect(button().getAttribute("aria-label")).toBe("Session quick actions, no active session");
+    expect(button().title).toBe("Session quick actions, no active session");
+
+    activeTab = fakeTab({ id: "tab-1", label: "pwsh" });
+    updateQuickButton();
+    expect(button().getAttribute("aria-label")).toBe("Session quick actions: pwsh, connected");
+    expect(button().title).toBe("Session quick actions: pwsh, connected");
+
+    activeTab = fakeTab({ id: "tab-1", label: "pwsh", disconnected: true });
+    updateQuickButton();
+    expect(button().getAttribute("aria-label")).toBe("Session quick actions: pwsh, disconnected");
+
+    activeTab = fakeTab({ id: "tab-1", label: "pwsh", shared: true });
+    updateQuickButton();
+    expect(button().getAttribute("aria-label")).toBe(
+      "Session quick actions: pwsh, sharing with AI",
+    );
+  });
 });
 
 describe("quick panel — local tab", () => {
@@ -393,5 +414,12 @@ describe("quick panel — dismissal", () => {
     openPanel();
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(p.classList.contains("open")).toBe(false);
+  });
+
+  it("Escape returns keyboard focus to the quick-status button", () => {
+    activeTab = fakeTab({ id: "tab-1" });
+    openPanel();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(document.activeElement).toBe(button());
   });
 });

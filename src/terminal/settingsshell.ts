@@ -61,6 +61,8 @@ export class SettingsShell {
       this.tabEl.dataset.tabId = "#settings";
       this.tabEl.appendChild(el("span", "tab-label", "Settings"));
       const closeBtn = el("button", "tab-close", "×");
+      closeBtn.setAttribute("aria-label", "Close settings");
+      closeBtn.title = "Close settings";
       closeBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         this.close(true);

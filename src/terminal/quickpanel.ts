@@ -614,6 +614,8 @@ function togglePanel(): void {
 
 // Reflect the active tab's state on the tab-bar button: red dot while the
 // session is down (dead mode), blue dot while AI-shared, dimmed with no tab.
+// The accessible name tracks the same state (P1-03) so the button reads
+// "no session / connected / disconnected / sharing with AI" out loud.
 export function updateQuickButton(): void {
   const btn = qsButton();
   if (!btn) return;
@@ -623,6 +625,18 @@ export function updateQuickButton(): void {
   btn.disabled = !tab;
   btn.classList.toggle("disabled", !tab);
   btn.dataset.state = !tab ? "" : tab.disconnected ? "down" : tab.shared ? "shared" : "";
+  const state = !tab
+    ? "no active session"
+    : tab.disconnected
+      ? "disconnected"
+      : tab.shared
+        ? "sharing with AI"
+        : "connected";
+  const name = tab
+    ? `Session quick actions: ${tab.label}, ${state}`
+    : `Session quick actions, ${state}`;
+  btn.setAttribute("aria-label", name);
+  btn.title = name;
 }
 
 export function initQuickPanel(): void {
@@ -655,7 +669,11 @@ export function initQuickPanel(): void {
     }
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && panelTabId !== null) closeQuickPanel();
+    if (e.key === "Escape" && panelTabId !== null) {
+      closeQuickPanel();
+      // Focus returns to the trigger button, never to <body>.
+      qsButton()?.focus();
+    }
   });
 
   // Session death/respawn: refresh the button dot, and re-render the panel

@@ -27,10 +27,14 @@ searchInput.placeholder = "Find...";
 searchBar.appendChild(searchInput);
 
 const searchPrev = document.createElement("button");
+searchPrev.setAttribute("aria-label", "Previous match");
+searchPrev.title = "Previous match";
 searchPrev.appendChild(createElement(ChevronUp, { stroke: "currentColor", width: 14, height: 14 }));
 searchBar.appendChild(searchPrev);
 
 const searchNext = document.createElement("button");
+searchNext.setAttribute("aria-label", "Next match");
+searchNext.title = "Next match";
 searchNext.appendChild(
   createElement(ChevronDown, { stroke: "currentColor", width: 14, height: 14 }),
 );
@@ -41,6 +45,8 @@ searchResults.id = "search-results";
 searchBar.appendChild(searchResults);
 
 const searchClose = document.createElement("button");
+searchClose.setAttribute("aria-label", "Close search");
+searchClose.title = "Close search";
 searchClose.appendChild(createElement(X, { stroke: "currentColor", width: 14, height: 14 }));
 searchClose.className = "search-close";
 searchBar.appendChild(searchClose);

@@ -229,17 +229,17 @@ body {
   color: #cccccc;
 }
 
-.profile-item.disabled {
+.profile-item:disabled {
   cursor: default;
   opacity: 0.5;
 }
 
-.profile-item.disabled:hover {
+.profile-item:disabled:hover {
   background: transparent;
   color: #cccccc;
 }
 
-.profile-item.disabled:hover .item-detail {
+.profile-item:disabled:hover .item-detail {
   color: #888888;
 }
 
@@ -1165,6 +1165,53 @@ body {
   display: none;
 }
 
+/* Menu entries are native buttons (P1-01): strip UA button chrome so the
+   existing item styles below own the visuals. Padding stays with the item
+   rules — only font/text/border need resetting. */
+.profile-menu button.profile-item,
+.tab-context-menu button.menu-item,
+.tab-context-menu button.color-swatch,
+.tab-context-menu button.color-clear {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+}
+
+.tab-context-menu button.color-swatch {
+  padding: 0;
+  width: 20px;
+}
+
+/* Keyboard focus uses the same highlight as hover. */
+.profile-menu button.profile-item:focus-visible,
+.tab-context-menu button.menu-item:focus-visible,
+.tab-context-menu button.color-clear:focus-visible {
+  background: #094771;
+  color: #ffffff;
+  outline: none;
+}
+
+.profile-menu button.profile-item:focus-visible .item-detail {
+  color: #cccccc;
+}
+
+.tab-context-menu button.menu-item:focus-visible .menu-icon {
+  color: #ffffff;
+}
+
+.tab-context-menu button.menu-item:focus-visible .menu-arrow {
+  color: #ccc;
+}
+
+.tab-context-menu button.color-swatch:focus-visible {
+  border-color: #ffffff;
+  outline: none;
+}
+
 .tab-context-menu.open {
   display: block;
 }
@@ -1217,6 +1264,10 @@ body {
 }
 
 /* -- color submenu -- */
+
+.menu-submenu-wrap {
+  position: relative;
+}
 
 .color-submenu {
   display: none;

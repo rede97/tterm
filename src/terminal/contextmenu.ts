@@ -23,6 +23,7 @@ import {
 } from "lucide";
 import { logCatch } from "../core/errorlog";
 import { showPortForwardingDialog } from "../ui/forwarding";
+import { handleMenuKeydown, menuItems, restoreFocus } from "../ui/menukeys";
 import { showToast } from "../ui/toast";
 import { openFind } from "./search";
 
@@ -77,15 +78,23 @@ contextMenu.className = "tab-context-menu";
 document.body.appendChild(contextMenu);
 
 let currentTabId = "";
+// Element that had focus when the menu opened (the tab strip or the
+// terminal's helper textarea for a right-click) — focus returns here.
+let menuTrigger: Element | null = null;
 
-function closeContextMenu() {
+function closeContextMenu(restore = true) {
   contextMenu.classList.remove("open");
+  closeColorSub();
+  if (restore) restoreFocus(menuTrigger);
+  menuTrigger = null;
 }
 
 function showAt(x: number, y: number) {
   contextMenu.style.left = `${x}px`;
   contextMenu.style.top = `${y}px`;
   contextMenu.classList.add("open");
+  // Keyboard entry point: focus lands on the first usable entry.
+  menuItems(contextMenu)[0]?.focus();
 
   requestAnimationFrame(() => {
     const rect = contextMenu.getBoundingClientRect();
@@ -103,8 +112,9 @@ function mkItem(
   label: string,
   action: string,
   iconFn?: Parameters<typeof createElement>[0],
-): HTMLElement {
-  const el = document.createElement("div");
+): HTMLButtonElement {
+  const el = document.createElement("button");
+  el.type = "button";
   el.className = "menu-item";
   if (iconFn) {
     const icon = document.createElement("span");
@@ -135,8 +145,13 @@ tabMenuGroup.appendChild(mkItem("Open in New Window", "new-window", ExternalLink
 tabMenuGroup.appendChild(mkSeparator());
 
 // Color submenu
-const colorItem = document.createElement("div");
+const colorItemWrap = document.createElement("div");
+colorItemWrap.className = "menu-submenu-wrap";
+const colorItem = document.createElement("button");
+colorItem.type = "button";
 colorItem.className = "menu-item has-submenu";
+colorItem.setAttribute("aria-haspopup", "true");
+colorItem.setAttribute("aria-expanded", "false");
 const colorIcon = document.createElement("span");
 colorIcon.className = "menu-icon";
 colorIcon.appendChild(createElement(Palette, { stroke: "currentColor", width: 14, height: 14 }));
@@ -148,29 +163,57 @@ const arrow = document.createElement("span");
 arrow.className = "menu-arrow";
 arrow.textContent = "\u203a";
 colorItem.appendChild(arrow);
-tabMenuGroup.appendChild(colorItem);
+colorItemWrap.appendChild(colorItem);
+tabMenuGroup.appendChild(colorItemWrap);
 
 const colorSub = document.createElement("div");
 colorSub.className = "color-submenu";
+// Inline display mirrors the .open class so the shared menu keyboard
+// helper can tell the closed submenu's buttons are not reachable.
+colorSub.style.display = "none";
 const colorGrid = document.createElement("div");
 colorGrid.className = "color-grid";
 for (const c of TAB_COLORS) {
-  const swatch = document.createElement("div");
+  const swatch = document.createElement("button");
+  swatch.type = "button";
   swatch.className = "color-swatch";
   swatch.style.background = c;
   swatch.dataset.color = c;
+  swatch.setAttribute("aria-label", `Tab color ${c}`);
+  swatch.title = c;
   colorGrid.appendChild(swatch);
 }
-const clearColorBtn = document.createElement("div");
+const clearColorBtn = document.createElement("button");
+clearColorBtn.type = "button";
 clearColorBtn.className = "color-clear";
 clearColorBtn.textContent = "Reset Color";
 clearColorBtn.dataset.action = "reset-color";
 colorSub.appendChild(colorGrid);
 colorSub.appendChild(clearColorBtn);
-colorItem.appendChild(colorSub);
+// Sibling of the item inside a non-interactive wrapper: a <button> must
+// not nest interactive content, while the wrapper preserves one shared
+// mouse hover region for the parent item and its flyout.
+colorItemWrap.appendChild(colorSub);
 
-colorItem.addEventListener("mouseenter", () => colorSub.classList.add("open"));
-colorItem.addEventListener("mouseleave", () => colorSub.classList.remove("open"));
+function openColorSub(focusFirst = false) {
+  colorSub.classList.add("open");
+  colorSub.style.display = "";
+  colorItem.setAttribute("aria-expanded", "true");
+  if (focusFirst) menuItems(colorSub)[0]?.focus();
+}
+
+function closeColorSub(refocus = false) {
+  colorSub.classList.remove("open");
+  colorSub.style.display = "none";
+  colorItem.setAttribute("aria-expanded", "false");
+  if (refocus && contextMenu.classList.contains("open")) colorItem.focus();
+}
+
+colorItemWrap.addEventListener("mouseenter", () => openColorSub());
+colorItemWrap.addEventListener("mouseleave", () => {
+  // Keyboard focus inside the submenu outranks the mouse leaving.
+  if (!colorSub.contains(document.activeElement)) closeColorSub();
+});
 
 tabMenuGroup.appendChild(mkItem("Rename", "rename", Pencil));
 tabMenuGroup.appendChild(mkItem("Duplicate Tab", "duplicate", Copy));
@@ -212,6 +255,47 @@ termMenuGroup.appendChild(mkItem("Open in New Window", "new-window"));
 
 contextMenu.appendChild(termMenuGroup);
 
+// -- Keyboard model (P1-02/P1-04) --
+contextMenu.addEventListener("keydown", (e) => {
+  if (!contextMenu.classList.contains("open")) return;
+
+  // Focus inside the open color submenu: its own little list. Escape or
+  // ArrowLeft returns to the parent item; Enter/Space picks a color.
+  if (colorSub.classList.contains("open") && colorSub.contains(document.activeElement)) {
+    if (e.key === "Escape" || e.key === "ArrowLeft") {
+      e.preventDefault();
+      e.stopPropagation();
+      closeColorSub(true);
+      return;
+    }
+    handleMenuKeydown(e, {
+      items: () => menuItems(colorSub),
+      close: () => closeColorSub(true),
+    });
+    return;
+  }
+
+  // The submenu parent opens with ArrowRight (Enter/Space fall through to
+  // the shared handler, which clicks the button — see its click listener).
+  if (e.key === "ArrowRight" && document.activeElement === colorItem) {
+    e.preventDefault();
+    e.stopPropagation();
+    openColorSub(true);
+    return;
+  }
+
+  handleMenuKeydown(e, {
+    items: () => menuItems(contextMenu),
+    close: () => closeContextMenu(),
+  });
+});
+
+// Keyboard open of the color submenu (mouse uses hover; a click while it
+// is already hover-open leaves it alone).
+colorItem.addEventListener("click", () => {
+  if (!colorSub.classList.contains("open")) openColorSub(true);
+});
+
 // -- Delegated click handler --
 contextMenu.addEventListener("click", (e) => {
   const target = e.target as HTMLElement;
@@ -228,8 +312,10 @@ contextMenu.addEventListener("click", (e) => {
   e.stopPropagation();
   const action = item.dataset.action;
   if (!action) return;
-  dispatch(action);
+  // Close first: the restore lands on the trigger, then the action claims
+  // its own focus (Find focuses the search input, Rename its dialog…).
   closeContextMenu();
+  dispatch(action);
 });
 
 function dispatch(action: string) {
@@ -316,6 +402,7 @@ function dispatch(action: string) {
 // -- Public API --
 export function showTabContextMenu(tabId: string, x: number, y: number) {
   currentTabId = tabId;
+  menuTrigger = document.activeElement;
   const shared = _handlers?.isTabShared(tabId) ?? false;
   shareItem.style.display = shared ? "none" : "";
   copyShareItem.style.display = shared ? "" : "none";
@@ -328,6 +415,7 @@ export function showTabContextMenu(tabId: string, x: number, y: number) {
 
 export function showTerminalContextMenu(tabId: string, x: number, y: number) {
   currentTabId = tabId;
+  menuTrigger = document.activeElement;
   tabMenuGroup.style.display = "none";
   termMenuGroup.style.display = "";
   showAt(x, y);
@@ -336,7 +424,8 @@ export function showTerminalContextMenu(tabId: string, x: number, y: number) {
 export function initContextMenu() {
   document.addEventListener("click", (e) => {
     if (contextMenu.classList.contains("open") && !contextMenu.contains(e.target as Node)) {
-      closeContextMenu();
+      // Outside click: the click target takes focus, no restore.
+      closeContextMenu(false);
     }
   });
 
@@ -351,5 +440,11 @@ export function initContextMenu() {
         openFind(activeId);
       }
     }
+  });
+
+  // A resize invalidates the stored coordinates — close safely rather
+  // than leaving the menu floating over the wrong spot.
+  window.addEventListener("resize", () => {
+    if (contextMenu.classList.contains("open")) closeContextMenu();
   });
 }

@@ -174,7 +174,8 @@ export class TabManager {
 
     const closeBtn = document.createElement("button");
     closeBtn.className = "tab-close";
-    closeBtn.textContent = "\xd7";
+    closeBtn.textContent = "×";
+    closeBtn.setAttribute("aria-label", `Close ${tab.label}`);
     closeBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       this.closeTab(tab.id);

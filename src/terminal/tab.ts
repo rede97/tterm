@@ -444,6 +444,8 @@ export class TerminalTab {
     const labelEl = this.tabElement.querySelector(".tab-label") as HTMLElement;
     if (labelEl) labelEl.textContent = this.label;
     this.tabElement.title = this.label;
+    // The close button's accessible name carries the same dynamic label.
+    this.tabElement.querySelector(".tab-close")?.setAttribute("aria-label", `Close ${this.label}`);
     if (notifyTray) notifyTrayTabs();
   }
 
