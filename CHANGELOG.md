@@ -1,3 +1,17 @@
+## v2.2.5-1 (beta 1)
+
+Changes
+
+- **IME candidate window no longer jumps to the screen corner while
+  composing in actively-refreshing TUIs** — the freeze proxy now skips
+  ticks with transient invalid geometry (0-sized element, missing cell
+  metrics) instead of clamping the hidden textarea to (0,0), and the
+  composition display owner (mirror vs xterm's inline view) is locked for
+  the lifetime of a composition instead of flipping when the TUI flickers
+  its cursor. See `docs/ime-anchor-stability.md`. Beta build for
+  real-world verification — please report any remaining jump with
+  `__tterm.imeDebug({ reanchor: false })` diagnostics
+
 ## v2.2.4
 
 Changes
