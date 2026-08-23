@@ -229,6 +229,12 @@ export class ImeBox {
     return this.el.style.display !== "none";
   }
 
+  // A composition is in flight (even while the box is hidden for an empty
+  // string). Used to lock display ownership mid-composition.
+  get isComposing(): boolean {
+    return this.active;
+  }
+
   get isFading(): boolean {
     return this.el.classList.contains("fading");
   }

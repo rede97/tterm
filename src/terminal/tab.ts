@@ -235,6 +235,13 @@ export class TerminalTab {
   refreshImeClasses(): void {
     const hidden = this._isCursorHidden();
     this.element.classList.toggle("cursor-hidden", hidden);
+    // Display ownership is locked while a composition is in flight: Agent
+    // TUIs flicker the hardware cursor around input fields, and flipping
+    // the suppression class mid-composition makes the visible path
+    // (mirror vs xterm composition-view) change under the user — the
+    // intermittent "native IME box / mirror vanished" symptom. Ownership
+    // decided at compositionstart stands until compositionend.
+    if (this.imeBox.isComposing) return;
     const active = imeMirrorActiveFor(hidden) && getImeDebugFlags().suppress;
     this.element.classList.toggle("ime-mirror-on", active);
   }

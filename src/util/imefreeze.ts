@@ -44,7 +44,12 @@ export function patchImeFreeze(
   const SAFE_RIGHT = 220; // typical single-row candidate window width
   const pxPos = (): { x: number; y: number } | null => {
     const cellDims = cellDimensions(terminal);
-    if (!cellDims) return null;
+    // Transient invalid geometry (renderer rebuild, layout churn, hidden
+    // tab): skip this tick entirely. Clamping a 0 measurement would pin the
+    // textarea — and with it the OS candidate window — to (0,0), the bug
+    // seen when composing in actively-refreshing TUIs.
+    if (!cellDims || cellDims.width <= 0 || cellDims.height <= 0) return null;
+    if (element.clientWidth <= 0 || element.clientHeight <= 0) return null;
     const cell = imeAnchorCell(terminal, filter);
     const maxX = Math.max(0, element.clientWidth - cellDims.width - SAFE_RIGHT);
     const maxY = Math.max(0, element.clientHeight - cellDims.height);
