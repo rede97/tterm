@@ -1,8 +1,9 @@
-// Live parameter control for open SERIAL sessions (this session only, unless
-// noted). Extracted from TabManager — these functions operate purely on the
-// tab object + backend IPC + configStore, no manager internals.
+// Live parameter control for open SERIAL sessions — strictly session-only:
+// the quick panel never persists anything; defaults live in Settings →
+// Serial. Extracted from TabManager — these functions operate purely on the
+// tab object + backend IPC, no manager internals.
 //
-//   setSerialProfile        apply a named profile; becomes the global default
+//   setSerialProfile        apply a named profile to this session
 //   setSerialBaud           live baud switch (backend) + tab-label refresh
 //   setSerialInputMode      frontend input modes (normal/echo/line)
 //   setSerialEnterNewline   frontend Enter terminator
@@ -10,7 +11,6 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { findSerialProfile } from "../config/serial-profiles";
-import { configStore } from "../core/store";
 import type { SerialEnterNewline, SerialInputMode, SerialOutputNewline } from "../core/types";
 import type { TerminalTab } from "./tab";
 
@@ -19,8 +19,10 @@ function serialTab(tab: TerminalTab | undefined): TerminalTab | undefined {
 }
 
 // Apply a profile to a live serial session: input mode + Enter terminator
-// (frontend input handler), output newline + flow control (backend).
-// The choice becomes the global default for the next tab.
+// (frontend input handler), output newline + flow control (backend). The
+// backend keeps the session spec in sync, so an in-band reconnect of THIS
+// tab preserves the switch — but the global default profile is untouched
+// (quick-panel changes never persist; defaults change in Settings only).
 export async function setSerialProfile(tab: TerminalTab | undefined, name: string): Promise<void> {
   const t = serialTab(tab);
   if (!t) return;
@@ -32,7 +34,6 @@ export async function setSerialProfile(tab: TerminalTab | undefined, name: strin
   t.outputNewline = profile.outputNewline;
   t.flowControl = profile.flowControl;
   t.serialProfile = profile.name;
-  configStore.set({ serialProfile: profile.name });
 }
 
 // Live Enter-key newline switch (frontend-side, this session only).
