@@ -217,11 +217,11 @@
       <a class="card" href="/docs/command-palette-preview.html">
         <div class="kicker">Ctrl+P · Ctrl+Shift+P</div>
         <h2>Command palette</h2>
-        <p>Go to Tab + <code>&gt;</code> 命令面；SSH 转发 / Serial 参数二级选择。</p>
+        <p>Go to Tab + <code>&gt;</code> 命令面；New Tab / SSH / Serial 二级选择。</p>
         <ul>
           <li><strong>Ctrl+P</strong>：编号 / 标题过滤跳 Tab</li>
-          <li><strong>Ctrl+Shift+P</strong>：<code>&gt;</code> 前缀命令（New Window / Tab / QP / Share）</li>
-          <li><strong>Serial / SSH</strong>：波特率 · Profile · 流控 · Port Forward；临时 SSH（user@host，不写配置）</li>
+          <li><strong>Ctrl+Shift+P</strong>：<code>&gt;</code> 前缀命令；<strong>New Tab…</strong> → Local / SSH / Serial → 目标</li>
+          <li><strong>Serial / SSH</strong>：波特率 · Profile · 流控 · Port Forward；临时 SSH（host → password，不写配置）</li>
         </ul>
         <span class="go">Open →</span>
       </a>
@@ -230,6 +230,14 @@
     <section class="ux-log" aria-labelledby="ux-log-title">
       <h2 id="ux-log-title">Menus &amp; UX — 本轮标注</h2>
       <dl>
+        <dt><a href="/docs/settings-preview.html">Settings · Keyboard</a></dt>
+        <dd>
+          快捷键表加入 <strong>Show Command Palette…</strong>（默认 <code>Ctrl+Shift+P</code>），与 Go to Tab（<code>Ctrl+P</code>）并列可改绑。
+        </dd>
+        <dt><a href="/docs/command-palette-preview.html">Command palette · New Tab</a></dt>
+        <dd>
+          命令面 <strong>New Tab…</strong> 先选 Local / SSH / Serial，再选 shell · host · COM（对齐 Profiles ▾）；SSH 含 Temporary Connect…；Esc 逐级返回。
+        </dd>
         <dt><a href="/docs/tabbar-preview.html">Tab bar · 菜单</a></dt>
         <dd>
           Profiles 下拉三列等宽；hover 用 tab 色非主题蓝。Tab 右键去掉 New / Port Forwarding，首项 Duplicate，Change Tab Color 带当前色预览与左侧色带。

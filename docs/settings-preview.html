@@ -2682,7 +2682,7 @@
       <li><strong>SSH</strong> 无独立 Save；Apply 一次写 app config + <code>~/.ssh/config</code>。Add Host 为主按钮 + 配置对话框。</li>
       <li><strong>About</strong> 左文案 / 右 Homepage（GitHub），对齐原版。</li>
       <li><strong>Font</strong> 保留 Configure 对话框：搜索、内置/系统、fallback 排序、预览。</li>
-      <li><strong>Keyboard</strong> 可搜索快捷键表（对齐 <code>shortcuts.ts</code>），点击 chip 改绑进 Apply。</li>
+      <li><strong>Keyboard</strong> 可搜索快捷键表（对齐 <code>shortcuts.ts</code> / <code>KEY_COMMANDS</code>）：含 <strong>Ctrl+P</strong> Go to Tab、<strong>Ctrl+Shift+P</strong> Command Palette；点击 chip 改绑进 Apply。</li>
       <li><strong>Select</strong> 自定义下拉（与 quickpanel 同族），不用系统菜单。</li>
       <li><strong>Serial</strong> 对齐 <code>serial.ts</code>：默认波特率 / 默认 profile、Built-in+Custom 卡片、Duplicate/Edit、profile 编辑器。</li>
       <li><strong>Theme editor</strong> 对齐 <code>themeeditor.ts</code>：New Theme 磁贴、Core+Palette、live preview；Duplicate / Save 进画廊。</li>
@@ -2835,6 +2835,13 @@
       desc: "Show a searchable list of all tabs; type a number or name to jump.",
       combo: "Ctrl+P",
       defaultCombo: "Ctrl+P",
+    },
+    {
+      id: "workbench.action.showCommands",
+      title: "Show Command Palette…",
+      desc: "Open the > command palette (New Tab, Serial, SSH, and other actions).",
+      combo: "Ctrl+Shift+P",
+      defaultCombo: "Ctrl+Shift+P",
     },
     {
       id: "workbench.action.nextTab",

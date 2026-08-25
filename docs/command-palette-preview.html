@@ -467,13 +467,14 @@ Type &gt; inside Ctrl+P to flip into commands (VS Code).</span></div>
     <ol>
       <li><strong>Ctrl+P</strong>：编号 + 标题过滤（纯数字按 tab 序号）；点选 / Enter 跳转。</li>
       <li><strong>Ctrl+Shift+P</strong>：输入框固定 <code>&gt;</code> 前缀；命令按分类列出，右侧可显示默认快捷键。</li>
-      <li><strong>中断式命令</strong>：选 Baud / Profile / Flow 等会进入二级列表（仍在同一面板），Esc 退回命令面。</li>
+      <li><strong>中断式命令</strong>：Baud / Profile / Flow、临时 SSH（host → <strong>password 二级</strong>）均在同一面板；Esc 逐级返回。</li>
+      <li><strong>New Tab…</strong>：先选 Local / SSH / Serial，再选具体 profile / host / COM（同 Profiles ▾）；SSH 含 Temporary Connect…。</li>
       <li><strong>覆盖面</strong>：New Window / New Tab、Quick Panel、Share、<strong>临时 SSH</strong>（不必写配置）、SSH Port Forwards、Serial Profile·波特率·流控。</li>
       <li><strong>落地</strong>：复用 <code>tabswitcher.ts</code> 外壳；命令注册进 <code>keymap.ts</code> / 新 command registry；无绑定的命令只从 Palette 触发。</li>
     </ol>
 
     <div class="hint">
-      预览 only — 不写 <code>src/</code>。二级选择（波特率 / 临时 SSH 目标）用同一 overlay，避免再弹 modal。临时 SSH 不落盘 <code>~/.ssh/config</code> / Settings 主机列表。
+      预览 only — 不写 <code>src/</code>。二级选择（New Tab 类型 → 目标 / 波特率 / 临时 SSH / <strong>密码</strong>）用同一 overlay。临时 SSH 不落盘 <code>~/.ssh/config</code>；密码步用 <code>type=password</code>，空密码可走 agent/key。
     </div>
   </aside>
 </div>
@@ -496,12 +497,37 @@ Type &gt; inside Ctrl+P to flip into commands (VS Code).</span></div>
     ["hardware", "Hardware (RTS/CTS)"],
   ];
 
+  /** New Tab secondary menus — mirrors profilemenu.ts columns */
+  const NEW_TAB_KINDS = [
+    { id: "local", title: "Local", meta: "shell profiles" },
+    { id: "ssh", title: "SSH", meta: "saved hosts" },
+    { id: "serial", title: "Serial", meta: "COM ports" },
+  ];
+  const NEW_TAB_TARGETS = {
+    local: [
+      { label: "PowerShell", detail: "pwsh.exe", kind: "local" },
+      { label: "Command Prompt", detail: "cmd.exe", kind: "local" },
+      { label: "Ubuntu", detail: "wsl.exe -d Ubuntu", kind: "local" },
+      { label: "Git Bash", detail: "bash.exe", kind: "local" },
+    ],
+    ssh: [
+      { label: "pi", detail: "pi@192.168.1.42", kind: "ssh" },
+      { label: "github.com", detail: "git@github.com", kind: "ssh" },
+      { label: "lab-jtag", detail: "root@10.0.0.8", kind: "ssh" },
+      { label: "Temporary Connect…", detail: "user@host · no config", kind: "ssh", action: "adhocSsh" },
+    ],
+    serial: [
+      { label: "COM3 · USB 串行设备", detail: "Microsoft 303A:1001", kind: "serial" },
+      { label: "COM5 · CP210x", detail: "Silicon Labs", kind: "serial" },
+    ],
+  };
+
   /** Top-level commands — id, title, group, optional keybinding, optional picker */
   const COMMANDS = [
     { id: "window.new", title: "New Window", group: "Window", key: "Ctrl+Shift+N" },
     { id: "window.close", title: "Close Window", group: "Window" },
 
-    { id: "tab.new", title: "New Tab", group: "Tab", key: "Ctrl+T" },
+    { id: "tab.new", title: "New Tab…", group: "Tab", key: "Ctrl+T", action: "newTab" },
     { id: "tab.duplicate", title: "Duplicate Tab", group: "Tab" },
     { id: "tab.close", title: "Close Tab", group: "Tab", key: "Ctrl+W" },
     { id: "tab.quickOpen", title: "Go to Tab…", group: "Tab", key: "Ctrl+P", action: "openQuick" },
@@ -592,10 +618,14 @@ Type &gt; inside Ctrl+P to flip into commands (VS Code).</span></div>
   });
   window.addEventListener("resize", updatePalScrollbar);
 
-  /** @type {"tabs" | "commands" | "picker" | "adhocSsh" | null} */
+  /** @type {"tabs" | "commands" | "picker" | "adhocSsh" | "adhocSshPass" | "newTabKind" | "newTabPick" | null} */
   let mode = null;
   /** @type {string | null} */
   let pickerKind = null;
+  /** @type {"local" | "ssh" | "serial" | null} */
+  let newTabKind = null;
+  /** @type {{ user: string, host: string, port: number, label: string } | null} */
+  let adhocTarget = null;
   let selected = 0;
   let visible = [];
 
@@ -610,6 +640,12 @@ Type &gt; inside Ctrl+P to flip into commands (VS Code).</span></div>
     const port = m[3] ? Number(m[3]) : 22;
     if (!host || port < 1 || port > 65535) return null;
     return { user, host, port, label: user ? `${user}@${host}:${port}` : `${host}:${port}` };
+  }
+
+  function setPalInputSecret(on) {
+    input.type = on ? "password" : "text";
+    input.autocomplete = on ? "current-password" : "off";
+    input.spellcheck = !on;
   }
 
   function activeTab() {
@@ -726,6 +762,7 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
   function syncChrome() {
     const isCmd = mode === "commands";
     prefix.classList.toggle("on", isCmd);
+    setPalInputSecret(mode === "adhocSshPass");
     if (mode === "tabs") {
       hint.textContent = "Go to tab — type a number or name. Prefix with > for commands.";
       input.placeholder = "Search tabs…";
@@ -741,9 +778,27 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
       };
       hint.textContent = `Choose ${labels[pickerKind] || "value"} — Esc returns to commands.`;
       input.placeholder = "filter…";
+    } else if (mode === "newTabKind") {
+      hint.textContent = "New Tab — pick Local, SSH, or Serial. Esc returns to commands.";
+      input.placeholder = "Local · SSH · Serial…";
+    } else if (mode === "newTabPick") {
+      const labels = { local: "shell", ssh: "host", serial: "port" };
+      hint.textContent = `New Tab · ${newTabKind || "…"} — pick a ${labels[newTabKind] || "target"}. Esc back.`;
+      input.placeholder =
+        newTabKind === "local"
+          ? "Filter shells…"
+          : newTabKind === "ssh"
+            ? "Filter hosts…"
+            : "Filter ports…";
     } else if (mode === "adhocSsh") {
-      hint.textContent = "Temporary SSH — not saved to ~/.ssh/config. Esc returns to commands.";
+      hint.textContent = newTabKind
+        ? "Temporary SSH — not saved. Esc returns to SSH targets."
+        : "Temporary SSH — not saved to ~/.ssh/config. Esc returns to commands.";
       input.placeholder = "user@host[:port]";
+    } else if (mode === "adhocSshPass") {
+      const who = adhocTarget?.label || "host";
+      hint.textContent = `Password for ${who} — same palette step · Esc back to host · empty = agent/key`;
+      input.placeholder = "password";
     }
   }
 
@@ -770,8 +825,8 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
         visible = [
           {
             type: "adhoc",
-            title: `Connect ${parsed.label}`,
-            meta: "ephemeral · no config",
+            title: `Continue → ${parsed.label}`,
+            meta: "next: password",
             parsed,
           },
         ];
@@ -786,6 +841,53 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
           },
         ];
       }
+    } else if (mode === "adhocSshPass") {
+      const hasPw = input.value.length > 0;
+      visible = [
+        {
+          type: "adhocPass",
+          title: hasPw ? `Connect with password` : `Connect (empty password)`,
+          meta: adhocTarget?.label || "",
+          usePassword: true,
+        },
+        {
+          type: "adhocPass",
+          title: "Use SSH agent / key only",
+          meta: "skip password",
+          usePassword: false,
+        },
+      ];
+    } else if (mode === "newTabKind") {
+      const lq = q.toLowerCase();
+      visible = NEW_TAB_KINDS.filter(
+        (k) =>
+          !lq ||
+          k.title.toLowerCase().includes(lq) ||
+          k.meta.toLowerCase().includes(lq) ||
+          k.id.includes(lq),
+      ).map((k) => ({
+        type: "newTabKind",
+        id: k.id,
+        title: k.title,
+        meta: k.meta,
+      }));
+    } else if (mode === "newTabPick" && newTabKind) {
+      const lq = q.toLowerCase();
+      const targets = NEW_TAB_TARGETS[newTabKind] || [];
+      visible = targets
+        .filter(
+          (t) =>
+            !lq ||
+            t.label.toLowerCase().includes(lq) ||
+            t.detail.toLowerCase().includes(lq),
+        )
+        .map((t, i) => ({
+          type: "newTabTarget",
+          id: `${newTabKind}-${i}`,
+          title: t.label,
+          meta: t.detail,
+          target: t,
+        }));
     } else {
       visible = [];
     }
@@ -799,9 +901,15 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
           ? "No matching tabs"
           : mode === "picker"
             ? "No matching values"
-            : mode === "adhocSsh"
-              ? "Enter user@host[:port]"
-              : "No matching commands";
+            : mode === "newTabKind"
+              ? "No matching kinds"
+              : mode === "newTabPick"
+                ? "No matching targets"
+                : mode === "adhocSsh"
+                  ? "Enter user@host[:port]"
+                  : mode === "adhocSshPass"
+                    ? "Type password, then Enter"
+                    : "No matching commands";
       listEl.appendChild(empty);
       requestAnimationFrame(updatePalScrollbar);
       return;
@@ -816,6 +924,25 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
         const g = document.createElement("div");
         g.className = "pal-group";
         g.textContent = it.group;
+        listEl.appendChild(g);
+      }
+      if (it.type === "adhocPass" && i === 0) {
+        const g = document.createElement("div");
+        g.className = "pal-group";
+        g.textContent = "Authenticate";
+        listEl.appendChild(g);
+      }
+      if (it.type === "newTabKind" && i === 0) {
+        const g = document.createElement("div");
+        g.className = "pal-group";
+        g.textContent = "Connection type";
+        listEl.appendChild(g);
+      }
+      if (it.type === "newTabTarget" && i === 0) {
+        const g = document.createElement("div");
+        g.className = "pal-group";
+        g.textContent =
+          newTabKind === "local" ? "Local shells" : newTabKind === "ssh" ? "SSH hosts" : "Serial ports";
         listEl.appendChild(g);
       }
       const row = document.createElement("div");
@@ -833,7 +960,13 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
         row.innerHTML = `
           <span class="pal-label">${escapeHtml(it.title)}</span>
           ${it.key ? `<span class="pal-kbd">${escapeHtml(it.key)}</span>` : ""}`;
-      } else if (it.type === "adhoc" || it.type === "adhocHint") {
+      } else if (
+        it.type === "adhoc" ||
+        it.type === "adhocHint" ||
+        it.type === "adhocPass" ||
+        it.type === "newTabKind" ||
+        it.type === "newTabTarget"
+      ) {
         row.innerHTML = `
           <span class="pal-label">${escapeHtml(it.title)}</span>
           ${it.meta ? `<span class="pal-meta">${escapeHtml(it.meta)}</span>` : ""}`;
@@ -860,6 +993,8 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
   function openPalette(nextMode) {
     mode = nextMode;
     pickerKind = null;
+    newTabKind = null;
+    adhocTarget = null;
     selected = 0;
     input.value = "";
     syncChrome();
@@ -872,6 +1007,8 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
   function openPicker(kind) {
     mode = "picker";
     pickerKind = kind;
+    newTabKind = null;
+    adhocTarget = null;
     selected = 0;
     input.value = "";
     syncChrome();
@@ -879,14 +1016,91 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
     input.focus();
   }
 
-  function openAdhocSsh() {
-    mode = "adhocSsh";
+  function openNewTabKind() {
+    mode = "newTabKind";
+    newTabKind = null;
     pickerKind = null;
+    adhocTarget = null;
     selected = 0;
     input.value = "";
     syncChrome();
     renderList();
     input.focus();
+  }
+
+  function openNewTabPick(kind) {
+    mode = "newTabPick";
+    newTabKind = kind;
+    pickerKind = null;
+    adhocTarget = null;
+    selected = 0;
+    input.value = "";
+    syncChrome();
+    renderList();
+    input.focus();
+  }
+
+  function addDemoTab(label, kind) {
+    const nextIndex = TABS.length + 1;
+    TABS.forEach((t) => {
+      t.active = false;
+    });
+    TABS.push({
+      id: `t-${Date.now()}`,
+      index: nextIndex,
+      label,
+      kind,
+      active: true,
+      disconnected: false,
+    });
+    renderTabBar();
+    paintTerm();
+  }
+
+  function openAdhocSsh() {
+    mode = "adhocSsh";
+    pickerKind = null;
+    adhocTarget = null;
+    selected = 0;
+    input.value = "";
+    syncChrome();
+    renderList();
+    input.focus();
+  }
+
+  function openAdhocSshPass(target) {
+    mode = "adhocSshPass";
+    pickerKind = null;
+    adhocTarget = target;
+    selected = 0;
+    input.value = "";
+    syncChrome();
+    renderList();
+    input.focus();
+  }
+
+  function finishAdhocConnect(opts) {
+    const p = adhocTarget;
+    if (!p) return;
+    const nextIndex = TABS.length + 1;
+    TABS.forEach((t) => { t.active = false; });
+    TABS.push({
+      id: `tmp-${Date.now()}`,
+      index: nextIndex,
+      label: p.label,
+      kind: "ssh",
+      active: true,
+      disconnected: false,
+    });
+    renderTabBar();
+    paintTerm();
+    const auth = opts.usePassword
+      ? opts.password
+        ? "password"
+        : "empty password"
+      : "agent/key";
+    closePalette();
+    showToast(`Temporary SSH → ${p.label} (${auth}, not saved)`, "ok");
   }
 
   function closePalette() {
@@ -894,7 +1108,11 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
     overlay.setAttribute("aria-hidden", "true");
     mode = null;
     pickerKind = null;
+    newTabKind = null;
+    adhocTarget = null;
     visible = [];
+    setPalInputSecret(false);
+    input.value = "";
   }
 
   function commit(index) {
@@ -918,25 +1136,35 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
       return;
     }
 
+    if (it.type === "newTabKind") {
+      openNewTabPick(it.id);
+      return;
+    }
+
+    if (it.type === "newTabTarget") {
+      const t = it.target;
+      if (t.action === "adhocSsh") {
+        openAdhocSsh();
+        return;
+      }
+      addDemoTab(t.label, t.kind);
+      closePalette();
+      showToast(`New tab · ${t.label}`, "ok");
+      return;
+    }
+
     if (it.type === "adhocHint") return;
 
     if (it.type === "adhoc") {
-      const p = it.parsed;
-      // Demo: add an ephemeral tab; does not touch SSH host gallery / config.
-      const nextIndex = TABS.length + 1;
-      TABS.forEach((t) => { t.active = false; });
-      TABS.push({
-        id: `tmp-${Date.now()}`,
-        index: nextIndex,
-        label: p.label,
-        kind: "ssh",
-        active: true,
-        disconnected: false,
+      openAdhocSshPass(it.parsed);
+      return;
+    }
+
+    if (it.type === "adhocPass") {
+      finishAdhocConnect({
+        usePassword: it.usePassword,
+        password: it.usePassword ? input.value : "",
       });
-      renderTabBar();
-      paintTerm();
-      closePalette();
-      showToast(`Temporary SSH → ${p.label} (not saved)`, "ok");
       return;
     }
 
@@ -944,7 +1172,12 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
       openPalette("tabs");
       return;
     }
+    if (it.action === "newTab") {
+      openNewTabKind();
+      return;
+    }
     if (it.action === "adhocSsh") {
+      newTabKind = null;
       openAdhocSsh();
       return;
     }
@@ -979,9 +1212,30 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
   input.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       e.preventDefault();
-      if (mode === "picker" || mode === "adhocSsh") {
+      if (mode === "adhocSshPass") {
+        // Back to host step; restore previous target in the field
+        const keep = (adhocTarget?.label || "").replace(/:22$/, "");
+        openAdhocSsh();
+        if (keep) {
+          input.value = keep;
+          selected = 0;
+          renderList();
+        }
+        return;
+      }
+      if (mode === "adhocSsh" && newTabKind === "ssh") {
+        openNewTabPick("ssh");
+        return;
+      }
+      if (mode === "newTabPick") {
+        openNewTabKind();
+        return;
+      }
+      if (mode === "picker" || mode === "adhocSsh" || mode === "newTabKind") {
         mode = "commands";
         pickerKind = null;
+        newTabKind = null;
+        adhocTarget = null;
         input.value = "";
         selected = 0;
         syncChrome();
@@ -999,9 +1253,12 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
           showToast("Use user@host[:port]", "info");
           return;
         }
-        // Ensure connect row is selected then commit
-        renderList();
-        commit(0);
+        openAdhocSshPass(parsed);
+        return;
+      }
+      if (mode === "adhocSshPass") {
+        // Enter always connects with typed password (may be empty)
+        finishAdhocConnect({ usePassword: true, password: input.value });
         return;
       }
       commit(selected);
@@ -1015,7 +1272,6 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
         : (selected - 1 + visible.length) % visible.length;
       renderList();
     }
-    // Backspace on empty command input does not exit — prefix is chrome.
   });
 
   overlay.addEventListener("mousedown", (e) => {
