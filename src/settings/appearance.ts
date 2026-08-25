@@ -1,8 +1,8 @@
 // Settings — Appearance panel (lit-html)
 // Font family, font size, color scheme gallery.
 //
-// Part of the lit-html migration (docs/frontend-governance.md P3; pilot:
-// settings/ssh.ts): the panel renders through lit-html's diffing render()
+// lit-html panel (pilot: settings/ssh.ts): the panel renders through
+// lit-html's diffing render()
 // from store + per-panel state, so re-renders after a gallery click, a theme
 // editor save, or a font pick patch DOM instead of rebuilding it. The pending
 // gallery selection — root.dataset.themeName in the innerHTML era — is panel

@@ -4,8 +4,8 @@
 // pending map and only land in configStore via the footer's Apply button
 // (collectShortcutsSettings); Revert re-reads the store (refreshShortcutsPanel).
 //
-// lit-html migration (docs/frontend-governance.md P3): the panel renders
-// through lit-html's diffing render() from the pending map + per-panel state
+// lit-html panel: renders through lit-html's diffing render() from the
+// pending map + per-panel state
 // (search query, active capture). Rows are a keyed repeat, so typing in
 // #kb-search patches the list instead of rebuilding it — the search input
 // keeps focus, and the capture input survives the live combo/conflict

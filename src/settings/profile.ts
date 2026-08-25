@@ -1,8 +1,7 @@
 // Settings — Profile panel (lit-html)
 // Default profile selection, WT profile visibility toggles.
 //
-// Migrated per the ssh.ts pilot (docs/frontend-governance.md P3): the panel
-// renders through lit-html's diffing render() straight from the store — no
+// lit-html panel: renders through lit-html's diffing render() straight from the store — no
 // per-panel state, pending edits live in the DOM until Apply and a Revert
 // re-render resets them.
 

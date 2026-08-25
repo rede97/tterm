@@ -1,8 +1,8 @@
 // Settings — SSH panel (lit-html pilot)
 // SSH config file management, host list, visibility, save/clear.
 //
-// Pilot for the lit-html migration (docs/frontend-governance.md P3): the
-// panel renders through lit-html's diffing render() from store + per-panel
+// lit-html panel (pilot): the panel renders through lit-html's diffing
+// render() from store + per-panel
 // state, so re-renders after Add/Edit/Delete/Reload/Save patch DOM instead
 // of rebuilding it — card expansion, the pending Built-in toggle, and the
 // Sortable instance all survive. The keepPending hack is gone: the toggle

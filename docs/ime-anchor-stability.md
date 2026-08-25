@@ -1,6 +1,6 @@
 # IME 候选窗锚定稳定性：高频重绘下的跳变问题
 
-> 状态：问题确认 + beta 修复（v2.2.5-beta.1）。
+> 状态：问题确认 + beta 修复（v2.2.5-beta.1）。**真人输入法专项验收与后续计划见 `docs/backlog.md`（IME 节）**——本项未关。
 > 关联：`docs/ime-composition.md`（Plan C 总体设计）、`src/util/imefreeze.ts`、`src/util/imebox.ts`。
 
 ## 1. 现象
@@ -33,7 +33,7 @@ Windows TSF/IMM32 双栈与 IME 厂商差异是触发面的放大器；**输入�
 1. **几何无效即跳过**：`pxPos()` 在 `clientWidth/clientHeight` 为 0（隐藏 tab、布局瞬变）或 cell 尺寸缺失/为 0 时返回 `null`——compositionstart 冻结与 200ms re-anchor 都跳过该拍，任何路径不再写 `(0,0)`。
 2. **显示所有权在 composition 期间锁定**：`refreshImeClasses()` 在本 tab 有进行中的 composition（`imeBox.isComposing`）时不再翻转 `ime-mirror-on`，所有权以 compositionstart 时的判定为准，compositionend 后恢复随帧计算。
 
-明确不做（留给后续版本）：
+明确不做（留给后续版本）——清单与勾选用例见 `docs/backlog.md`：
 
 - 反色扫描置信度（多反色格/扫描失败的锚点保持）；
 - re-anchor 的默认开关策略重审（是否回归"单次锚定"）；
@@ -43,5 +43,4 @@ Windows TSF/IMM32 双栈与 IME 厂商差异是触发面的放大器；**输入�
 
 - 单元测试：0 尺寸/缺度量的瞬态拍断言 textarea 不被写 `(0,0)`；composition 期间 `ime-mirror-on` 不翻转；
 - 既有基线：`bun run test`、`bun run lint`、`bun run build`、`cargo test`、`e2e/specs/ime.e2e.js` 全绿；
-- 人工 beta 验证（本 release 的目的）：在持续刷新的 Agent TUI 中输入中文，观察候选窗是否还跳 (0,0)、镜像是否消失、原生框是否出现；
-- 若仍复发，dev 控制台取证：`__tterm.imeDebug({ reanchor: false })` / `setImeTrace(true)`，记录 trace 日志与复现场景（是否在 resize/切 tab/输出风暴中）。
+- **真人 IME 专项测试**（关闭 backlog 项之前必做）：见 `docs/backlog.md` 勾选清单。自动化不能代替 TSF。

@@ -8,8 +8,8 @@
 //               newline selects, auto-reconnect toggle (re-plug detection),
 //               flow control + modem lines (RTS/DTR drive, CTS/DSR status)
 //
-// The panel body renders through lit-html (docs/frontend-governance.md P3,
-// pilot: settings/ssh.ts): session-state events and serial line-status
+// The panel body renders through lit-html (pilot: settings/ssh.ts):
+// session-state events and serial line-status
 // reads re-render via render(template, panel), which patches only the
 // bindings that changed — an in-flight select interaction is no longer
 // wiped by the innerHTML rebuilds this panel used to do on every event.

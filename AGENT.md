@@ -35,12 +35,15 @@ src/
     fit.ts              computeGrid — pure grid-fit calc (hysteresis + cell metrics)
     xtermfactory.ts     createXterm — Terminal construction + addon assembly
     tabmanager.ts       TabManager singleton (tab Map, active tab, settings tab, sortable)
+    serialctl.ts        live serial profile/baud/newline setters (byte-stream + link IPC)
+    quickpanel.ts       tab-bar quick-status panel (share / SSH forwards / serial link)
     batchattach.ts      BatchAttachAddon — coalesces WS frames before terminal.write (see below)
     contextmenu.ts      tab-bar menu + shift-right-click terminal menu
     search.ts           search bar (per-tab query save/restore)
     profilemenu.ts      new-tab dropdown (Local / SSH / Serial columns)
     dirmenu.ts          "+" button folder picker + recent-folders menu (Shift+click / right-click)
     fontpicker.ts       font picker modal (dynamically imported by settings)
+  wiring.ts             composition root: injects handlers into menus/quickpanel/search
   core/
     store.ts            configStore — reactive config, single source of truth (schema + defaults);
                         per-topic JSON files: config.json + keybindings.json (keybindings route)
@@ -51,6 +54,7 @@ src/
   config/
     ssh-config.ts       ~/.ssh/config parse + generate (frontend-owned; Host * and pre-Host globals round-trip)
     wt-profiles.ts      Windows Terminal settings.json + fragment import
+    serial-profiles.ts  named serial session modes (serial-profiles.json)
   settings/
     index.ts            settings shell (sidebar nav, footer Apply/Revert, panel routing)
     general|appearance|profile|ssh|serial|shortcuts.ts   the six panels
@@ -81,12 +85,15 @@ src-tauri/src/
                         generation + ssh-copy-id install (see docs/ssh-client.md).
                         Split: prompter/hostkey/session/forward/keys/install
   deadmode.rs           in-band "session ended, Enter to reconnect" protocol
-  serial.rs             serial sessions (+ live baud via SerialCtl)
+  serial.rs             serial sessions (+ live baud/flow via SerialCtl)
+  serial_win.rs         Windows DCB helpers (PuTTY RTS/CTS; cfg(windows) only)
   share.rs              AI session sharing: HTTP API on the hub (prompt doc, screen
                         snapshots w/ rate limit + long-poll, input POST), share tokens
   demo.rs               demo/anime TTY (debug builds only)
   ssh.rs wt.rs config.rs fonts.rs window.rs cmdparse.rs newline.rs
 ```
+
+Open work / manual-test checklists: `docs/backlog.md` (IME real-IME verification first).
 
 ### Hard rules
 
@@ -97,8 +104,7 @@ src-tauri/src/
 ### Frontend discipline (TypeScript & DOM)
 
 Style rules every agent must follow without being told twice. **Biome
-enforces the mechanical ones** (`bun run lint`); the rest are review-duty
-until the custom-rule rollout (`docs/frontend-governance.md` P1).
+enforces the mechanical ones** (`bun run lint`); the rest are review-duty.
 
 **Lint principles:**
 - Zero lint ERRORS before every commit — CI's `check` job gates on it.
@@ -123,7 +129,7 @@ until the custom-rule rollout (`docs/frontend-governance.md` P1).
 
 ## IME composition mirror (headline feature — read the docs first)
 
-Docs: `docs/ime-composition.md` (final design, rejected Plans A/B, and the 1px-textarea root cause). Read it before touching `imebox.ts`, the freeze proxy, or composition handling.
+Docs: `docs/ime-composition.md` (final design, rejected Plans A/B, and the 1px-textarea root cause). High-refresh candidate-window jump: `docs/ime-anchor-stability.md`. Outstanding real-IME test checklist: `docs/backlog.md`. Read these before touching `imebox.ts`, the freeze proxy, or composition handling.
 
 Key facts:
 
@@ -268,7 +274,7 @@ one-off prompt for a single feature. Four pieces cover every case:
 - **Per-session quick actions** → the quick-status panel
   (`src/terminal/quickpanel.ts`), opened from the button at the right end of
   the tab bar. Like contextmenu it never imports TabManager: actions go
-  through injected handlers (`setQuickPanelHandlers` in main.ts).
+  through injected handlers (`setQuickPanelHandlers` from `src/wiring.ts`).
 
 When two surfaces drive the same backend operation, the operation + its
 error wording live in ONE module — e.g. `forwarding.ts`
@@ -303,8 +309,10 @@ baud / flow change) drops DTR, so the pump deasserts RTS first, then
 restores DTR (then RTS if we were driving it). Hardware RTS/CTS: Windows
 matches PuTTY (`RTS_CONTROL_HANDSHAKE` + CTS gating, DTR stays ENABLE);
 software `SetRts` is ignored and the quick-panel RTS toggle is disabled.
-A live **profile** switch is byte-stream only and must not call
-`serial_set_flow_control`.
+A live **profile** switch is byte-stream only (input mode, Enter
+terminator, output newline) and must not call any link API
+(`serial_set_flow_control` / baud / RTS / DTR). Full design:
+`docs/serial-design.md`.
 
 ## System tray (park window)
 

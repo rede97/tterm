@@ -1,8 +1,8 @@
 // Settings — General panel (lit-html)
 // Renderer, scrollback, terminal bell, paste options, data management.
 //
-// Migrated per the ssh.ts pilot (docs/frontend-governance.md P3): the panel
-// renders through lit-html's diffing render() from store + per-panel state.
+// lit-html panel: renders through lit-html's diffing render() from store
+// + per-panel state.
 // Pending control edits live in panel state (not rescued DOM), so a Revert
 // re-render resets them from the store and a mid-edit re-render (the async
 // version label landing) never clobbers them.

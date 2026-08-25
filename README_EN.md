@@ -79,7 +79,7 @@ Chinese is the first priority. Japanese, Korean, and other CJK composition workf
 
 - **Local projects:** Windows Terminal profiles and shells launched directly in a selected directory
 - **SSH:** existing OpenSSH configuration, host-key verification, keys, and port forwarding
-- **Serial:** automatic discovery and reusable device profiles
+- **Serial:** automatic discovery and named session profiles (input / newline modes; baud and flow stay with the link)
 - **Session recovery:** silent reattachment after sleep or short transport interruptions
 - **Low overhead:** Tauri + xterm.js, sub-second cold start, ~7 MB installer, and under 30 MB idle memory
 

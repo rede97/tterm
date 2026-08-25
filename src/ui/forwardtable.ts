@@ -8,8 +8,8 @@
 // pinned to 127.0.0.1 by design: only its port is editable. Dynamic
 // forwards are SOCKS5 listeners and have no target endpoint.
 //
-// Renders through lit-html (docs/frontend-governance.md P3): commits diff
-// the table instead of rebuilding it, so a half-typed add-row in one group
+// Renders through lit-html: commits diff the table instead of rebuilding
+// it, so a half-typed add-row in one group
 // survives a commit in another — the innerHTML rebuild this replaced used
 // to wipe pending input across ALL groups on every change.
 

@@ -1,7 +1,6 @@
 # Serial sessions — design
 
-Final-state design of serial-port sessions. Supersedes the old plan /
-newlines-evaluation / profiles docs.
+Final-state design of serial-port sessions.
 
 ## Architecture: serial I/O connects straight to the WS relay — no PTY
 
@@ -24,13 +23,24 @@ xterm.js <─AttachAddon─> ws://127.0.0.1:<port> <─tokio─> serial port (CO
   `map_flow_control`) is pure and unit-tested; opening a nonexistent port
   returns Err, never panics.
 
+## Two layers: profile (byte stream) vs link (port API)
+
+| Layer | Owns | Live change touches |
+|---|---|---|
+| **Profile** | How bytes are shaped for the session: input mode, Enter terminator, output newline (`NewlineFilter`) | Frontend input handler + pump filter only. **No** baud / flow / RTS / DTR / DCB. |
+| **Link** | How the port is opened and driven: baud, flow control, RTS, DTR | `serial_set_baud` / `serial_set_flow_control` / `serial_set_rts` / `serial_set_dtr` (and Windows DCB helpers) |
+
+A live profile switch must not call any link API. Custom profiles may still
+store `flowControl` as an **open-time default** only; switching profile on a
+running session ignores that field.
+
 ## Profiles: named session behavior
 
 Session behavior is a named **profile**, stored in `serial-profiles.json`
-(raw I/O in Rust via `read_serial_profiles` / `write_serial_profiles`,
-parsing in `src/config/serial-profiles.ts`). config.json keeps only
-`serialBaud` (global default) and `serialProfile` (Settings → Serial
-default for new tabs — a live quick-panel switch does not persist).
+(raw I/O in Rust via `read_config_file` / `write_config_file` with name
+`serial-profiles`; parsing in `src/config/serial-profiles.ts`). config.json
+keeps only `serialBaud` (global default) and `serialProfile` (Settings →
+Serial default for new tabs — a live quick-panel switch does not persist).
 Built-ins:
 
 | Profile | Behavior |
@@ -40,13 +50,11 @@ Built-ins:
 | **AT** | modem-style: line-by-line editing with local echo, Enter sends CRLF, lone LF in output gains a CR |
 
 Custom profiles are duplicates of any profile, like custom themes; the
-picker groups Built-in vs Custom. `TabManager.setSerialProfile(tabId, name)`
-applies a profile to a RUNNING session: input mode + Enter terminator
-(frontend input handler) and output newline (backend
-`serial_set_output_newline`). Baud and flow control stay separate — they
-are physical link parameters (PuTTY/Tabby keep RTS/CTS with the
-connection, not with newline/echo mode). A live profile switch must not
-call `serial_set_flow_control`.
+picker groups Built-in vs Custom. Live apply is `setSerialProfile` in
+`src/terminal/serialctl.ts` (TabManager exposes a thin wrapper): input mode
++ Enter terminator (frontend) and output newline (backend
+`serial_set_output_newline`). Baud and flow stay on the link layer
+(PuTTY/Tabby keep RTS/CTS with the connection, not with newline/echo mode).
 
 Opening a port applies the profile's byte-stream settings
 (`createSerialTab`): `outputNewline` rides `serial_spawn` (the backend
@@ -56,7 +64,8 @@ not field assignment, because the input handler hooked in the TerminalTab
 constructor captures mode + terminator by value and must be re-hooked.
 `flowControl` is still sent at spawn as the open-time default (all
 built-ins are `none`); custom profiles may store a different default.
-Regression coverage: `tests/serial-open-profile.test.ts`.
+Regression coverage: `tests/serial-open-profile.test.ts`,
+`tests/serialctl.test.ts`.
 
 ## Newline handling (device → terminal)
 
@@ -109,7 +118,7 @@ pair with a DTR drop into the ESP32 USB-Serial/JTAG reset. DTR is not
 part of RTS/CTS and stays `DTR_CONTROL_ENABLE` (Pico/TinyUSB still
 gates traffic on it). `serialport`'s Hardware mapping is only
 `RTS_CONTROL_ENABLE` (RTS pinned high); Windows therefore patches the
-DCB after open and on a live switch.
+DCB after open and on a live switch (`src-tauri/src/serial_win.rs`).
 `serial_line_status` returns `{ rts, cts, dtr, dsr, supported }` —
 `supported: false` when the driver can't report modem lines, and the
 block greys out. Under hardware flow, `rts` is reported as asserted
@@ -128,11 +137,11 @@ RTS=1, then restores DTR (and RTS if we were driving it).
 ## Quick panel & auto-reconnect
 
 The tab-bar quick panel for a serial tab offers: profile switch (applies
-live), baud select, the profile's parameter rows, flow-control block, and
-an auto-reconnect toggle. While auto-reconnect is on, a dead session
-retries the open on a timer without Enter — for serial sessions a failed
-open simply means the device is still unplugged, so this IS the
-unplug/replug detection.
+live on the byte-stream layer only), baud select, the profile's parameter
+rows, flow-control block, and an auto-reconnect toggle. While
+auto-reconnect is on, a dead session retries the open on a timer without
+Enter — for serial sessions a failed open simply means the device is
+still unplugged, so this IS the unplug/replug detection.
 
 ## Mock ports (debug builds)
 
@@ -149,8 +158,11 @@ xterm) with zero release-build code (cfg-gated `MockSerialPort` in
 ## Testing
 
 - Rust unit tests: parameter mapping (valid/invalid), nonexistent port
-  errors gracefully, newline state-machine boundary cases.
-- Vitest: menu/profile/quick-panel behavior with mocked invoke.
+  errors gracefully, newline state-machine boundary cases, Windows PuTTY
+  DCB bitfield helpers (`serial_win`). Counts: `cargo test` output.
+- Vitest: menu/profile/quick-panel behavior with mocked invoke;
+  `serialctl` asserts live profile switch never calls
+  `serial_set_flow_control`.
 - E2E via the mock ports (e.g. open MOCK-LOOP, type, assert echo). Real
   hardware checks (hot-plug enumeration, TX-RX loopback, unplug
   mid-session, occupied-port error readability) are a manual checklist.
