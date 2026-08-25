@@ -49,6 +49,11 @@ describe("hysteresis (general)", () => {
     expect(hysteresis(-10, 5, COL_LO, COL_HI)).toBe(2);
   });
 
+  it("returns min when metrics are non-finite", () => {
+    expect(hysteresis(Number.NaN, 80, COL_LO, COL_HI)).toBe(2);
+    expect(hysteresis(80, Number.POSITIVE_INFINITY, COL_LO, COL_HI)).toBe(2);
+  });
+
   it("respects a custom min", () => {
     expect(hysteresis(0.4, 5, COL_LO, COL_HI, 10)).toBe(10);
   });

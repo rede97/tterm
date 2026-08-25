@@ -92,7 +92,7 @@ src-tauri/src/
 
 - `terminal/tab.ts` must NEVER import `terminal/tabmanager.ts` (circular dependency). `fitDeferred()` uses `this` only. `contextmenu.ts` is dynamically imported to avoid cycles.
 - All user-facing errors go through `showToast(message, "error")` (`src/ui/toast.ts`). Settings panels keep their inline feedback elements.
-- Window state save/restore is handled entirely by `tauri-plugin-window-state`. Do NOT write custom save/restore code.
+- Window state save/restore is handled entirely by `tauri-plugin-window-state`. Do NOT write custom save/restore code. After restore, `window::enforce_min_size` re-applies `minWidth`/`minHeight` (logical 800×600) because the plugin's `set_size` bypasses the OS min-track.
 
 ### Frontend discipline (TypeScript & DOM)
 

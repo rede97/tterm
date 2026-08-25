@@ -105,6 +105,17 @@ pub fn run() {
         )
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .on_window_event(|window, event| {
+            // window-state restore calls set_size with PhysicalSize from
+            // disk and bypasses minWidth/minHeight. Re-clamp on every
+            // size/DPI change so a bad `.window-state.json` cannot stick.
+            if matches!(
+                event,
+                tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. }
+            ) {
+                window::enforce_min_size(window);
+            }
+        })
         .setup(|app| {
             // verify PTY system is available
             let _pty_sys = portable_pty::native_pty_system();

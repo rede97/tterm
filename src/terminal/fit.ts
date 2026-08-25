@@ -27,6 +27,17 @@ export function computeGrid(
   const ps = getComputedStyle(parent);
   const parentH = parseFloat(ps.height);
   const parentW = parseFloat(ps.width);
+  if (!Number.isFinite(parentW) || !Number.isFinite(parentH) || parentW <= 0 || parentH <= 0) {
+    return null;
+  }
+  if (
+    !Number.isFinite(charWidth) ||
+    !Number.isFinite(charHeight) ||
+    charWidth <= 0 ||
+    charHeight <= 0
+  ) {
+    return null;
+  }
 
   const termEl = terminal.element;
   if (!termEl) return null;
@@ -39,6 +50,7 @@ export function computeGrid(
 
   const floatCols = (parentW - padH) / charWidth;
   const floatRows = (parentH - padV) / charHeight;
+  if (!Number.isFinite(floatCols) || !Number.isFinite(floatRows)) return null;
 
   return {
     cols: hysteresis(floatCols, terminal.cols, 0.8, 0.9),

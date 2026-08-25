@@ -27,7 +27,7 @@ pub struct InstallResult {
 }
 
 fn ssh_dir() -> Option<PathBuf> {
-    crate::ssh::ssh_config_path().and_then(|p| p.parent().map(|d| d.to_path_buf()))
+    crate::ssh::ssh_dir()
 }
 
 /// Infallible CSPRNG over the OS RNG. ssh-key wants `CryptoRng` (i.e.

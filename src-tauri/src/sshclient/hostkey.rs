@@ -101,6 +101,9 @@ impl client::Handler for SshHandler {
                 if !self.prompter.confirm_host_key(prompt(false)).await {
                     return Ok(false);
                 }
+                if let Some(dir) = path.parent() {
+                    let _ = crate::ssh::ensure_ssh_dir_at(dir);
+                }
                 Ok(russh::keys::known_hosts::learn_known_hosts_path(
                     &self.host, self.port, key, &path,
                 )
@@ -112,6 +115,9 @@ impl client::Handler for SshHandler {
                 }
                 if remove_known_host(&path, &self.host, self.port).is_err() {
                     return Ok(false);
+                }
+                if let Some(dir) = path.parent() {
+                    let _ = crate::ssh::ensure_ssh_dir_at(dir);
                 }
                 Ok(russh::keys::known_hosts::learn_known_hosts_path(
                     &self.host, self.port, key, &path,

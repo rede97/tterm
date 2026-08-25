@@ -19,6 +19,13 @@ Fixes
   toggle greys out and `serial_set_rts` is ignored so SETRTS cannot fight
   handshake or reset ESP32 USB-Serial/JTAG. DTR is independent of that
   handshake and stays software-controlled (Pico/TinyUSB still need it)
+- **SSH config save creates ~/.ssh when missing** — a machine with no
+  `.ssh` directory failed `ssh_save_config` (and first-connect known_hosts
+  learn) because the write had nowhere to go
+- **Restored window size cannot shrink below 800×600** — window-state
+  writes physical pixels and `set_size` bypasses the configured min; a
+  corrupt JSON or DPI mismatch used to leave a tiny window. Resize now
+  re-asserts the logical floor
 
 ## v2.2.5-2 (beta 2)
 

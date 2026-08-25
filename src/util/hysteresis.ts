@@ -15,6 +15,7 @@ export function hysteresis(
   th_high: number,
   min = 2,
 ): number {
+  if (!Number.isFinite(floatVal) || !Number.isFinite(current)) return min;
   const lo = Math.max(min, Math.floor(floatVal + (1.0 - th_low)));
   const hi = Math.ceil(floatVal - th_high);
   return Math.max(min, Math.min(hi, Math.max(lo, current)));
