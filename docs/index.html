@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TTerm UI drafts</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: #0a0a0a;
+    color: #c8c8c8;
+    font: 14px/1.5 Inter, "Segoe UI", system-ui, sans-serif;
+  }
+
+  .topnav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 44px;
+    padding: 0 20px;
+    background: rgba(14, 14, 14, 0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .topnav .brand {
+    margin-right: 16px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #888;
+    text-decoration: none;
+  }
+  .topnav a {
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 999px;
+    color: #9a9a9a;
+    text-decoration: none;
+    font-size: 13px;
+  }
+  .topnav a:hover { color: #f2f2f2; background: rgba(255,255,255,0.06); }
+  .topnav a[aria-current="page"] {
+    color: #0a0a0a;
+    background: #f2f2f2;
+    font-weight: 550;
+  }
+
+  .main {
+    padding: 40px 40px 64px;
+    max-width: 960px;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    color: #f2f2f2;
+    margin-bottom: 8px;
+  }
+  .lead {
+    color: #8a8a8a;
+    margin-bottom: 28px;
+    max-width: 40em;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px;
+  }
+  a.card {
+    display: block;
+    padding: 18px;
+    background: #141414;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    color: inherit;
+    text-decoration: none;
+    transition: border-color 120ms ease, background 120ms ease;
+  }
+  a.card:hover {
+    border-color: rgba(255,255,255,0.28);
+    background: #1a1a1a;
+  }
+  .card .kicker {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #666;
+    margin-bottom: 10px;
+  }
+  .card h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #f2f2f2;
+    margin-bottom: 6px;
+  }
+  .card p { font-size: 12.5px; color: #8a8a8a; line-height: 1.45; }
+  .card ul {
+    margin: 10px 0 0;
+    padding-left: 16px;
+    display: grid;
+    gap: 4px;
+    font-size: 12px;
+    color: #9a9a9a;
+    line-height: 1.4;
+  }
+  .card ul strong { color: #c8c8c8; font-weight: 550; }
+  .card .go {
+    display: inline-block;
+    margin-top: 14px;
+    font-size: 12px;
+    color: #f2f2f2;
+  }
+
+  .ux-log {
+    margin-top: 36px;
+    padding-top: 28px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .ux-log h2 {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 14px;
+  }
+  .ux-log dl {
+    display: grid;
+    gap: 14px;
+  }
+  .ux-log dt {
+    font-size: 13px;
+    font-weight: 550;
+    color: #f2f2f2;
+    margin-bottom: 4px;
+  }
+  .ux-log dt a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .ux-log dt a:hover { text-decoration: underline; }
+  .ux-log dd {
+    font-size: 12.5px;
+    color: #8a8a8a;
+    line-height: 1.5;
+    padding-left: 0;
+  }
+  .ux-log dd code {
+    font: 11.5px/1 "JetBrains Mono", Consolas, monospace;
+    color: #aaa;
+    background: #141414;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+</style>
+</head>
+<body>
+  <nav class="topnav" aria-label="Design drafts">
+    <a class="brand" href="/">TTerm drafts</a>
+    <a href="/" aria-current="page">Overview</a>
+    <a href="/docs/settings-preview.html">Settings</a>
+    <a href="/docs/tabbar-preview.html">Tab bar</a>
+    <a href="/docs/quickpanel-preview.html">Quick panel</a>
+    <a href="/docs/command-palette-preview.html">Palette</a>
+  </nav>
+
+  <main class="main">
+    <h1>Design drafts</h1>
+    <p class="lead">预览稿总览。菜单 / UX 专项变动在卡片要点与下方「Menus &amp; UX」中标注；点卡片进入对应稿。</p>
+
+    <div class="cards">
+      <a class="card" href="/docs/settings-preview.html">
+        <div class="kicker">Chrome · Apply</div>
+        <h2>Settings</h2>
+        <p>双皮肤、footer dirty/Apply、SSH 统一写盘、左下 toast。</p>
+        <ul>
+          <li><strong>字重</strong>：标题 / 按钮 / 数字 / 下拉项统一 <code>--set-title-weight</code></li>
+          <li><strong>等宽按钮</strong>：<code>--set-btn-width: 148px</code>（Add Host、Homepage、Copy…）</li>
+          <li><strong>文案</strong>：密钥行 Copy Public Key → Copy</li>
+          <li><strong>Color scheme</strong>：New Theme 磁贴 + Theme Editor 对话框（预览）</li>
+          <li><strong>Serial</strong>：Named profiles 画廊 + Profile 编辑器（对齐 <code>serial.ts</code>）</li>
+        </ul>
+        <span class="go">Open →</span>
+      </a>
+      <a class="card" href="/docs/tabbar-preview.html">
+        <div class="kicker">Fixed dark chrome</div>
+        <h2>Tab bar</h2>
+        <p>均分压缩 → 滚动、+N、拖拽安全区、窗口控件。</p>
+        <ul>
+          <li><strong>Profiles ▾</strong>：三列 Local / SSH / Serial；等宽列；Mono 标题</li>
+          <li><strong>右键 tab</strong>：首项 Duplicate；色带 + 颜色预览；无 Port Forward</li>
+          <li><strong>右键终端</strong>：跟 tab chrome（非 Settings）；Duplicate Tab + 图标</li>
+          <li><strong>关 tab</strong>：× 下确认条；Shift+× 跳过</li>
+          <li><strong>字体</strong>：title/小标 Mono；title 600 / badge 600</li>
+        </ul>
+        <span class="go">Open →</span>
+      </a>
+      <a class="card" href="/docs/quickpanel-preview.html">
+        <div class="kicker">Session panel</div>
+        <h2>Quick panel</h2>
+        <p>Cursor / VS Code skin、glass、SSH / Serial 控件。</p>
+        <ul>
+          <li><strong>字重</strong>：UI 文案 <code>--qp-weight: 500</code></li>
+          <li><strong>CONNECTED</strong>：Cursor 绿 <code>#22c55e</code>（≠ Share teal）</li>
+        </ul>
+        <span class="go">Open →</span>
+      </a>
+      <a class="card" href="/docs/command-palette-preview.html">
+        <div class="kicker">Ctrl+P · Ctrl+Shift+P</div>
+        <h2>Command palette</h2>
+        <p>Go to Tab + <code>&gt;</code> 命令面；SSH 转发 / Serial 参数二级选择。</p>
+        <ul>
+          <li><strong>Ctrl+P</strong>：编号 / 标题过滤跳 Tab</li>
+          <li><strong>Ctrl+Shift+P</strong>：<code>&gt;</code> 前缀命令（New Window / Tab / QP / Share）</li>
+          <li><strong>Serial / SSH</strong>：波特率 · Profile · 流控 · Port Forward；临时 SSH（user@host，不写配置）</li>
+        </ul>
+        <span class="go">Open →</span>
+      </a>
+    </div>
+
+    <section class="ux-log" aria-labelledby="ux-log-title">
+      <h2 id="ux-log-title">Menus &amp; UX — 本轮标注</h2>
+      <dl>
+        <dt><a href="/docs/tabbar-preview.html">Tab bar · 菜单</a></dt>
+        <dd>
+          Profiles 下拉三列等宽；hover 用 tab 色非主题蓝。Tab 右键去掉 New / Port Forwarding，首项 Duplicate，Change Tab Color 带当前色预览与左侧色带。
+          终端右键菜单 chrome 跟随 tab 栏（<code>#252526</code>），不跟 Settings；New Tab 改为 Duplicate Tab 并带图标行，与 tab 菜单字体对齐。
+        </dd>
+        <dt><a href="/docs/tabbar-preview.html">Tab bar · 关标签 UX</a></dt>
+        <dd>
+          点 × 在正下方出矮确认条（无 Cancel，点空白 / Esc 取消）；<code>Shift+×</code> 直接关。确认条无投影。
+        </dd>
+        <dt><a href="/docs/settings-preview.html">Settings · 控件体系统一</a></dt>
+        <dd>
+          标题与按钮字重、数字输入 / 下拉选项字重对齐；行尾实心按钮与 Homepage / Check for Updates / toolbar 共用 <code>--set-btn-width</code>。
+        </dd>
+        <dt><a href="/docs/settings-preview.html">Settings · Serial profiles</a></dt>
+        <dd>
+          Defaults 为波特率 + 默认 profile；Built-in / Custom 卡片画廊；New / Duplicate / Edit 打开 Profile 编辑器（input mode、Enter、output newlines、flow）；Save 进 Custom 并 dirty。
+        </dd>
+        <dt><a href="/docs/settings-preview.html">Settings · Theme editor</a></dt>
+        <dd>
+          Color scheme：redesigned New Theme tile + Theme Editor dialog（name、live preview、Core+Palette、Save 插入自定义卡片）。
+        </dd>
+        <dt><a href="/docs/quickpanel-preview.html">Quick panel · 状态色</a></dt>
+        <dd>
+          CONNECTED 固定 Cursor 绿，与 SHARING teal 区分；两套 skin 一致。
+        </dd>
+        <dt><a href="/docs/command-palette-preview.html">Palette · Ctrl+P / Ctrl+Shift+P</a></dt>
+        <dd>
+          VS Code 模型：Ctrl+P 找 Tab；Ctrl+Shift+P 固定 <code>&gt;</code> 命令面。含 New Window / New Tab、Quick Panel、Share、<strong>SSH: Temporary Connect…</strong>（user@host，不写配置）、Port Forwards、Serial Profile·波特率·流控；Baud / Profile / Flow / 临时 SSH 均为同面板二级输入。
+        </dd>
+      </dl>
+    </section>
+  </main>
+</body>
+</html>
