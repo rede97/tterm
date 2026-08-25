@@ -9,6 +9,11 @@ Changes
 
 Fixes
 
+- **Opening Settings no longer eats the 2px terminal gutter** — a
+  `:has(> .settings-page)` rule zeroed container padding whenever the
+  settings node was in the tree, including after a tab switch left it
+  `display:none`. Settings now overlays the pane like the welcome
+  backdrop; the 2px inset stays
 - **Ctrl+Shift+P no longer opens the WebView print dialog** — that Chromium
   chrome shortcut is blocked; use the OS print path only if you ever need it
   outside the app

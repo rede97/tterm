@@ -933,10 +933,6 @@ body {
   color: #ffffff;
 }
 
-#terminal-container:has(> .settings-page) {
-  padding: 0;
-}
-
 #terminal-container {
   flex: 1;
   /* flex items default to min-height:auto (min-content), which pins the
@@ -1472,11 +1468,14 @@ body {
 /* -- settings page -- */
 
 .settings-page {
-  width: 100%;
-  height: 100%;
+  /* Overlay the pane (padding box) like #welcome. Do NOT zero
+     #terminal-container padding while this node is in the tree:
+     :has(> .settings-page) still matches a display:none suspend, which
+     grew the content box and let fit() eat the 2px gutter. */
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: row;
-  position: relative;
   z-index: 1; /* above the #welcome backdrop */
   background: #1e1e1e;
   overflow: hidden;
