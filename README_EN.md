@@ -53,7 +53,7 @@ Remote hosts and hardware devices are not add-ons in TTerm. They are environment
 
 ### Remote Linux development
 
-TTerm reads `~/.ssh/config`, turning existing hosts into ready-to-use profiles. Its built-in SSH client supports passwords, keys, host-key verification, and local, remote, and SOCKS5 forwarding. Short transport interruptions can reconnect without losing scrollback.
+TTerm reads `~/.ssh/config`, turning existing hosts into ready-to-use profiles. Its built-in SSH client collects passwords and key passphrases in the tab (OpenSSH-style), confirms host keys in a dialog, and supports local, remote, and SOCKS5 forwarding. Short transport interruptions can reconnect without losing scrollback.
 
 ### Embedded and serial debugging
 
@@ -78,7 +78,7 @@ Chinese is the first priority. Japanese, Korean, and other CJK composition workf
 ## One window for the development environment
 
 - **Local projects:** Windows Terminal profiles and shells launched directly in a selected directory
-- **SSH:** existing OpenSSH configuration, host-key verification, keys, and port forwarding
+- **SSH:** existing OpenSSH configuration; passwords typed in the tab; host-key verification, keys, and port forwarding
 - **Serial:** automatic discovery and named session profiles (input / newline modes; baud and flow stay with the link)
 - **Session recovery:** silent reattachment after sleep or short transport interruptions
 - **Low overhead:** Tauri + xterm.js, sub-second cold start, ~7 MB installer, and under 30 MB idle memory

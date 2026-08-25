@@ -212,7 +212,7 @@ Backend-managed and in-band (`deadmode.rs` + relay dead mode): on byte-stream en
 
 ## Keyboard shortcuts
 
-- Command registry + combo parsing + global dispatcher: `core/keymap.ts`. One window-level **capture-phase** keydown listener intercepts bound combos before xterm's textarea eats them (Ctrl+W, Ctrl+Tab are terminal input otherwise). Handlers are injected from `main.ts` (`initKeymap`) — keymap never imports TabManager.
+- Command registry + combo parsing + global dispatcher: `core/keymap.ts`. One window-level **capture-phase** keydown listener intercepts bound combos before xterm's textarea eats them (Ctrl+W, Ctrl+Tab are terminal input otherwise). `BLOCKED_BROWSER_COMBOS` (Ctrl+Shift+P = Print) is suppressed even while keymap is suspended for capture. Handlers are injected from `main.ts` (`initKeymap`) — keymap never imports TabManager.
 - User overrides persist to **keybindings.json** (VS Code parity) via configStore's `keybindings` key (`{commandId: combo}`, `""` = unbind); effective = registry defaults merged with overrides (`resolveKeybindings`). Combo grammar: lowercase, `ctrl+alt+shift+meta` order, e.g. `ctrl+shift+tab`. Legacy `keybindings` inside config.json is migrated to the file on first load.
 - Defaults: Ctrl+P quick open, Ctrl+Tab / Ctrl+Shift+Tab MRU switching, Ctrl+W close tab, F11 browser-style fullscreen (covers the taskbar), Shift+F11 zen mode (maximized); **Terminal: Clear ships unbound**. Ctrl+D is deliberately NOT captured — it reaches the shell and ends the session (see clean-exit auto-close above).
 - Tab switcher overlay: `ui/tabswitcher.ts`. Ctrl+P = input + numbered list (digit query = tab number, else label substring); MRU mode = no input, each keydown steps, commit on release of the LAST binding modifier (derived from the next/prev-tab bindings, not hardcoded Ctrl), Escape cancels, window blur commits.
@@ -222,7 +222,7 @@ Backend-managed and in-band (`deadmode.rs` + relay dead mode): on byte-stream en
 
 ## Fit & hysteresis
 
-`TerminalTab.fit()` uses `hysteresis(floatVal, current, th_low, th_high, min=2)` (`util/hysteresis.ts`) — cols grow only past 90% of a char, rows never grow past floor. Pure function; avoids oscillation from intermediate resize frames. `fitDeferred()` uses double-rAF and aborts if hidden.
+`TerminalTab.fit()` uses `hysteresis(floatVal, current, th_low, th_high, min=2)` (`util/hysteresis.ts`) — cols grow only past 90% of a char, rows never grow past floor. Pure function; avoids oscillation from intermediate resize frames. `fitDeferred()` uses double-rAF and aborts if hidden. Available area is `#terminal-container`'s content box (fixed **2px** padding). Settings overlays that pane with `position: absolute; inset: 0` like `#welcome` — do **not** add `:has(> .settings-page) { padding: 0 }`; it still matches a `display:none` suspended settings page and lets `fit()` eat the gutter.
 
 ## Font system
 

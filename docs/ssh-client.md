@@ -11,8 +11,10 @@ client" toggle, default on).
   local/remote/SOCKS5 forwardings at runtime through direct API calls. With
   the spawned binary this needs the fragile `~C` escape console or an
   external ControlMaster socket.
-- **Auth UX under our control** — password / key-passphrase prompts and
-  host-key confirmation are proper dialogs, not ConPTY stdin fights.
+- **Auth UX under our control** — password and key-passphrase prompts
+  happen in the SSH tab (OpenSSH-style, no echo); host-key confirmation is
+  a dialog. Settings key-install (no tab) still uses the password modal.
+  Not ConPTY stdin fights.
 - **Key management** — generate key pairs and install public keys
   (ssh-copy-id) without leaving the app.
 - No dependency on the presence/version of the system OpenSSH client.
