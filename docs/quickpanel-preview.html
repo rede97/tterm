@@ -4,164 +4,23 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>TTerm Quick Panel — preview</title>
+<link rel="stylesheet" href="/docs/ui/tokens.css" />
+<link rel="stylesheet" href="/docs/ui/preview-chrome.css" />
 <style>
-  /* ------------------------------------------------------------------
-     Shared layout (new design). Skins only swap tokens below.
-     data-skin="cursor" | "vscode"
-     ------------------------------------------------------------------ */
-  :root,
-  body[data-skin="cursor"] {
-    --term-bg: #1e1e1e;
-    --chrome: #252526;
-
-    --qp-bg: #141414;
-    --qp-well: #1a1a1a;
-    --qp-inset: #0f0f0f;
-    --qp-hover: rgba(255, 255, 255, 0.05);
-
-    --qp-line: rgba(255, 255, 255, 0.08);
-    --qp-line-strong: rgba(255, 255, 255, 0.14);
-
-    --qp-text: #f2f2f2;
-    --qp-muted: #8a8a8a;
-    --qp-faint: #5c5c5c;
-
-    --qp-ok: #22c55e;       /* Cursor green — connected (≠ share teal) */
-    --qp-bad: #ef4444;
-    --qp-share: #4ec9b0;    /* AI share — teal, distinct from connected */
-    --qp-bolt: #3794ff;
-    --qp-accent: #ffffff;
-    --qp-accent-fill: rgba(255, 255, 255, 0.1);
-    --qp-focus: rgba(255, 255, 255, 0.4);
-
-    /* Switch: Cursor = white track when on */
-    --qp-switch-off: #2a2a2a;
-    --qp-switch-off-border: rgba(255, 255, 255, 0.1);
-    --qp-switch-on: #ffffff;
-    --qp-switch-on-border: #ffffff;
-    --qp-knob-off: #e8e8e8;
-    --qp-knob-on: #0a0a0a;
-
-    --qp-radius: 12px;
-    --qp-radius-sm: 8px;
-    --qp-radius-ctrl: 7px;
-    --qp-radius-opt: 5px;
-    --qp-width: 328px;
-    --qp-ctrl: 148px;
-    --qp-ctrl-h: 28px;
-    --qp-conn-w: 108px;
-    --qp-share-w: 78px;
-    --qp-led-w: 56px;
-
-    --qp-ui: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
-    --qp-mono: "JetBrains Mono", Consolas, ui-monospace, monospace;
-    /* UI copy weight (labels / controls) */
-    --qp-weight: 500;
-  }
-
-  /* VS Code Dark — same layout; blue accent, tighter radius, classic toggle. */
-  body[data-skin="vscode"] {
-    --qp-bg: #252526;
-    --qp-well: #2d2d30;
-    --qp-inset: #1e1e1e;
-    --qp-hover: rgba(255, 255, 255, 0.06);
-
-    --qp-line: #3e3e42;
-    --qp-line-strong: #3e3e42;
-
-    --qp-text: #cccccc;
-    --qp-muted: #888888;
-    --qp-faint: #6a6a6a;
-
-    --qp-ok: #22c55e;       /* keep Cursor green so CONNECTED ≠ SHARING teal */
-    --qp-bad: #f14c4c;
-    --qp-share: #4ec9b0;
-    --qp-bolt: #3794ff;
-    --qp-accent: #3794ff;
-    --qp-accent-fill: #094771;
-    --qp-focus: #007fd4;
-
-    --qp-switch-off: #1e1e1e;
-    --qp-switch-off-border: #3e3e42;
-    --qp-switch-on: #094771;
-    --qp-switch-on-border: #094771;
-    --qp-knob-off: #888888;
-    --qp-knob-on: #ffffff;
-
-    --qp-radius: 6px;
-    --qp-radius-sm: 4px;
-    --qp-radius-ctrl: 3px;
-    --qp-radius-opt: 3px;
-  }
-
-  /* Frosted glass — translucency only; skin colors still apply. */
-  body.qp-glass[data-skin="cursor"] {
-    --qp-bg: rgba(28, 28, 30, 0.62);
-    --qp-well: rgba(44, 44, 46, 0.45);
-    --qp-inset: rgba(0, 0, 0, 0.35);
-    --qp-hover: rgba(255, 255, 255, 0.07);
-    --qp-line: rgba(255, 255, 255, 0.1);
-    --qp-line-strong: rgba(255, 255, 255, 0.18);
-  }
-  body.qp-glass[data-skin="vscode"] {
-    --qp-bg: rgba(37, 37, 38, 0.72);
-    --qp-well: rgba(45, 45, 48, 0.55);
-    --qp-inset: rgba(30, 30, 30, 0.55);
-    --qp-hover: rgba(255, 255, 255, 0.06);
-    --qp-line: rgba(62, 62, 66, 0.85);
-    --qp-line-strong: rgba(62, 62, 66, 0.95);
-  }
-
+  /* Page layout only — skins from docs/ui/tokens.css */
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   html, body {
     height: 100%;
     background: #0a0a0a;
-    color: #c8c8c8;
+    color: var(--tt-text);
     font: 13px/1.45 var(--qp-ui);
     -webkit-font-smoothing: antialiased;
   }
 
-  .draft-nav {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    height: 40px;
-    padding: 0 16px;
-    background: rgba(14, 14, 14, 0.94);
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-  }
-  .draft-nav a {
-    display: inline-flex;
-    align-items: center;
-    height: 26px;
-    padding: 0 11px;
-    border-radius: 999px;
-    color: #9a9a9a;
-    text-decoration: none;
-    font-size: 12.5px;
-  }
-  .draft-nav a:hover { color: #f2f2f2; background: rgba(255,255,255,0.06); }
-  .draft-nav a[aria-current="page"] {
-    color: #0a0a0a;
-    background: #f2f2f2;
-    font-weight: 550;
-  }
-  .draft-nav .brand {
-    margin-right: 10px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: #666;
-  }
-
   /* ---- preview chrome (not part of the panel) ---- */
   .stage {
-    min-height: calc(100% - 40px);
+    min-height: calc(100% - 44px);
     display: grid;
     grid-template-columns: 1fr 280px;
   }

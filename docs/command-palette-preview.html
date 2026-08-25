@@ -4,60 +4,10 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>TTerm Command Palette — preview</title>
+<link rel="stylesheet" href="/docs/ui/tokens.css" />
+<link rel="stylesheet" href="/docs/ui/preview-chrome.css" />
 <style>
-  /* ------------------------------------------------------------------
-     Ctrl+P Quick Open + Ctrl+Shift+P Command Palette (VS Code model).
-     data-skin="cursor" | "vscode"
-     ------------------------------------------------------------------ */
-  :root,
-  body[data-skin="cursor"] {
-    --term-bg: #1e1e1e;
-    --chrome: #252526;
-    --chrome-hover: #2a2a2a;
-
-    --pal-bg: #1a1a1a;
-    --pal-input: #0f0f0f;
-    --pal-hover: rgba(255, 255, 255, 0.06);
-    --pal-selected: rgba(255, 255, 255, 0.1);
-    --pal-line: rgba(255, 255, 255, 0.1);
-    --pal-text: #f2f2f2;
-    --pal-muted: #8a8a8a;
-    --pal-faint: #5c5c5c;
-    --pal-accent: #ffffff;
-    --pal-badge: #2a2a2a;
-    --pal-badge-sel: rgba(255, 255, 255, 0.16);
-    --pal-ok: #22c55e;
-    --pal-share: #4ec9b0;
-    --pal-radius: 10px;
-    --pal-radius-sm: 6px;
-    --pal-scroll-track: transparent;
-    --pal-scroll-thumb: rgba(255, 255, 255, 0.14);
-    --pal-scroll-thumb-hover: rgba(255, 255, 255, 0.24);
-
-    --ui: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
-    --mono: "JetBrains Mono", Consolas, ui-monospace, monospace;
-    --weight: 500;
-  }
-
-  body[data-skin="vscode"] {
-    --pal-bg: #252526;
-    --pal-input: #3c3c3c;
-    --pal-hover: rgba(255, 255, 255, 0.06);
-    --pal-selected: #094771;
-    --pal-line: #3e3e42;
-    --pal-text: #cccccc;
-    --pal-muted: #888888;
-    --pal-faint: #6a6a6a;
-    --pal-accent: #3794ff;
-    --pal-badge: #3c3c3c;
-    --pal-badge-sel: rgba(255, 255, 255, 0.15);
-    --pal-radius: 6px;
-    --pal-radius-sm: 3px;
-    --pal-scroll-track: #1e1e1e;
-    --pal-scroll-thumb: #424242;
-    --pal-scroll-thumb-hover: #555555;
-  }
-
+  /* Page layout — skins from docs/ui/tokens.css */
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
@@ -65,45 +15,6 @@
     background: #0a0a0a;
     color: #c8c8c8;
     overflow: hidden;
-  }
-
-  .draft-nav {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    height: 44px;
-    padding: 0 20px;
-    background: rgba(14, 14, 14, 0.92);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-  }
-  .draft-nav .brand {
-    margin-right: 16px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: #888;
-    text-decoration: none;
-  }
-  .draft-nav a {
-    display: inline-flex;
-    align-items: center;
-    height: 28px;
-    padding: 0 12px;
-    border-radius: 999px;
-    color: #9a9a9a;
-    text-decoration: none;
-    font-size: 13px;
-  }
-  .draft-nav a:hover { color: #f2f2f2; background: rgba(255,255,255,0.06); }
-  .draft-nav a[aria-current="page"] {
-    color: #0a0a0a;
-    background: #f2f2f2;
-    font-weight: 550;
   }
 
   .stage {

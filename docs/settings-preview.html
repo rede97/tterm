@@ -4,152 +4,21 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>TTerm Settings — preview</title>
+<link rel="stylesheet" href="/docs/ui/tokens.css" />
+<link rel="stylesheet" href="/docs/ui/preview-chrome.css" />
 <style>
-  /* ------------------------------------------------------------------
-     Shared layout. Skins only swap tokens.
-     data-skin="cursor" | "vscode"
-     ------------------------------------------------------------------ */
-  :root,
-  body[data-skin="cursor"] {
-    --term-bg: #1e1e1e;
-    --tab-bar-bg: #252526;
-    --tab-active: #2d2d2d;
-
-    --set-page: #0f0f0f;
-    --set-sidebar: #141414;
-    --set-body: #0f0f0f;
-    --set-well: #1a1a1a;
-    --set-inset: #121212;
-    --set-hover: rgba(255, 255, 255, 0.05);
-    --set-line: rgba(255, 255, 255, 0.08);
-    --set-line-strong: rgba(255, 255, 255, 0.14);
-
-    --set-text: #f2f2f2;
-    --set-muted: #8a8a8a;
-    --set-faint: #5c5c5c;
-
-    --set-accent: #ffffff;
-    --set-accent-fill: #ffffff;
-    --set-accent-text: #0a0a0a;
-    --set-nav-bar: #ffffff;
-    --set-focus: rgba(255, 255, 255, 0.4);
-    --set-warn: #e8a33d;
-    --set-ok: #22c55e;
-    --set-bad: #ef4444;
-    --set-bolt: #3794ff;
-
-    --set-switch-off: #2a2a2a;
-    --set-switch-off-border: rgba(255, 255, 255, 0.1);
-    --set-switch-on: #ffffff;
-    --set-switch-on-border: #ffffff;
-    --set-knob-off: #e8e8e8;
-    --set-knob-on: #0a0a0a;
-
-    --set-radius: 12px;
-    --set-radius-sm: 8px;
-    --set-radius-ctrl: 7px;
-
-    --set-scroll-track: transparent;
-    --set-scroll-thumb: rgba(255, 255, 255, 0.14);
-    --set-scroll-thumb-hover: rgba(255, 255, 255, 0.28);
-
-    --ui: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
-    --mono: "JetBrains Mono", Consolas, ui-monospace, monospace;
-    /* Shared control/title weight — buttons + labels */
-    --set-title-weight: 550;
-    /* Equal-width action buttons + row trailing controls
-       (fits “Check for Updates” / “Reload from disk”) */
-    --set-btn-width: 148px;
-  }
-
-  body[data-skin="vscode"] {
-    --set-page: #1e1e1e;
-    --set-sidebar: #252526;
-    --set-body: #1e1e1e;
-    --set-well: #252526;
-    --set-inset: #1e1e1e;
-    --set-hover: rgba(255, 255, 255, 0.06);
-    --set-line: #3e3e42;
-    --set-line-strong: #3e3e42;
-
-    --set-text: #cccccc;
-    --set-muted: #888888;
-    --set-faint: #6a6a6a;
-
-    --set-accent: #3794ff;
-    --set-accent-fill: #0e639c;
-    --set-accent-text: #ffffff;
-    --set-nav-bar: #0078d4;
-    --set-focus: #007fd4;
-    --set-warn: #e8a33d;
-    --set-ok: #4ec9b0;
-    --set-bad: #f14c4c;
-
-    --set-switch-off: #1e1e1e;
-    --set-switch-off-border: #3e3e42;
-    --set-switch-on: #094771;
-    --set-switch-on-border: #094771;
-    --set-knob-off: #888888;
-    --set-knob-on: #ffffff;
-
-    --set-radius: 6px;
-    --set-radius-sm: 4px;
-    --set-radius-ctrl: 3px;
-
-    --set-scroll-track: #1e1e1e;
-    --set-scroll-thumb: #424242;
-    --set-scroll-thumb-hover: #555555;
-  }
-
+  /* Page layout only — skins come from docs/ui/tokens.css */
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
   html, body {
     height: 100%;
     background: #0a0a0a;
-    color: #c8c8c8;
-    font: 13px/1.45 var(--ui);
+    color: var(--tt-text);
+    font: 13px/1.45 var(--tt-ui);
     -webkit-font-smoothing: antialiased;
   }
 
-  .draft-nav {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    height: 40px;
-    padding: 0 16px;
-    background: rgba(14, 14, 14, 0.94);
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-  }
-  .draft-nav a {
-    display: inline-flex;
-    align-items: center;
-    height: 26px;
-    padding: 0 11px;
-    border-radius: 999px;
-    color: #9a9a9a;
-    text-decoration: none;
-    font-size: 12.5px;
-  }
-  .draft-nav a:hover { color: #f2f2f2; background: rgba(255,255,255,0.06); }
-  .draft-nav a[aria-current="page"] {
-    color: #0a0a0a;
-    background: #f2f2f2;
-    font-weight: 550;
-  }
-  .draft-nav .brand {
-    margin-right: 10px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: #666;
-  }
-
   .stage {
-    min-height: calc(100% - 40px);
+    min-height: calc(100% - 44px);
     display: grid;
     grid-template-columns: minmax(520px, 1fr) 300px;
   }

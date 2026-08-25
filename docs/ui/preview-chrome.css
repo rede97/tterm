@@ -1,0 +1,47 @@
+/**
+ * Shared preview chrome — draft top nav + page shell.
+ * Depends on docs/ui/tokens.css (--tt-*).
+ */
+
+.draft-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 44px;
+  padding: 0 20px;
+  background: rgba(14, 14, 14, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--tt-line, rgba(255, 255, 255, 0.08));
+  font-family: var(--tt-ui, Inter, "Segoe UI", system-ui, sans-serif);
+}
+.draft-nav .brand {
+  margin-right: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #888;
+  text-decoration: none;
+}
+.draft-nav a {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: #9a9a9a;
+  text-decoration: none;
+  font-size: 13px;
+}
+.draft-nav a:hover {
+  color: #f2f2f2;
+  background: rgba(255, 255, 255, 0.06);
+}
+.draft-nav a[aria-current="page"] {
+  color: #0a0a0a;
+  background: #f2f2f2;
+  font-weight: 550;
+}

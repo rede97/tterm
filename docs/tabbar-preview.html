@@ -4,25 +4,10 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>TTerm Tab Bar — preview</title>
+<link rel="stylesheet" href="/docs/ui/tokens.css" />
+<link rel="stylesheet" href="/docs/ui/preview-chrome.css" />
 <style>
-  :root {
-    --term-bg: #1e1e1e;
-    /* Fixed dark chrome — never follow terminal (white/blue themes break UI). */
-    --tab-bar-bg: #252526;
-    --tab-idle: #252526;      /* unselected = same as bar */
-    --tab-active: #2d2d2d;    /* selected = one step lighter */
-    --tab-hover: #2a2a2a;
-    --tab-border: #1e1e1e;
-    --chrome-text: #cccccc;
-    --chrome-muted: #888;
-    --ok: #22c55e;
-    --bad: #ef4444;
-    --share: #4ec9b0;
-    --bolt: #3794ff;
-    --ui: Inter, "Segoe UI", system-ui, sans-serif;
-    --mono: "JetBrains Mono", Consolas, monospace;
-  }
-
+  /* Page layout — chrome colors from docs/ui/tokens.css */
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   html, body {
@@ -33,45 +18,8 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  .draft-nav {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    height: 40px;
-    padding: 0 16px;
-    background: rgba(14, 14, 14, 0.94);
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-  }
-  .draft-nav a {
-    display: inline-flex;
-    align-items: center;
-    height: 26px;
-    padding: 0 11px;
-    border-radius: 999px;
-    color: #9a9a9a;
-    text-decoration: none;
-    font-size: 12.5px;
-  }
-  .draft-nav a:hover { color: #f2f2f2; background: rgba(255,255,255,0.06); }
-  .draft-nav a[aria-current="page"] {
-    color: #0a0a0a;
-    background: #f2f2f2;
-    font-weight: 550;
-  }
-  .draft-nav .brand {
-    margin-right: 10px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: #666;
-  }
-
   .stage {
-    min-height: calc(100% - 40px);
+    min-height: calc(100% - 44px);
     display: grid;
     grid-template-columns: 1fr 300px;
   }

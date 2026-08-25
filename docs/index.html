@@ -175,7 +175,7 @@
 
   <main class="main">
     <h1>Design drafts</h1>
-    <p class="lead">预览稿总览。菜单 / UX 专项变动在卡片要点与下方「Menus &amp; UX」中标注；点卡片进入对应稿。</p>
+    <p class="lead">预览稿总览。皮肤 / 字重 / 色板以 <a href="/docs/ui/README.md" style="color:#ccc">docs/ui/tokens.css</a> 为唯一事实源；点卡片进入对应稿。</p>
 
     <div class="cards">
       <a class="card" href="/docs/settings-preview.html">
@@ -255,9 +255,9 @@
         <dd>
           CONNECTED 固定 Cursor 绿，与 SHARING teal 区分；两套 skin 一致。
         </dd>
-        <dt><a href="/docs/command-palette-preview.html">Palette · Ctrl+P / Ctrl+Shift+P</a></dt>
+        <dt><a href="/docs/ui/README.md">Design tokens · 事实源</a></dt>
         <dd>
-          VS Code 模型：Ctrl+P 找 Tab；Ctrl+Shift+P 固定 <code>&gt;</code> 命令面。含 New Window / New Tab、Quick Panel、Share、<strong>SSH: Temporary Connect…</strong>（user@host，不写配置）、Port Forwards、Serial Profile·波特率·流控；Baud / Profile / Flow / 临时 SSH 均为同面板二级输入。
+          各 Preview 共用 <code>docs/ui/tokens.css</code>（<code>--tt-*</code>）与 <code>preview-chrome.css</code>；皮肤 / CONNECTED 绿 / Share teal / 字重 / 半径从此改，禁止在各稿内再抄一份 hex。
         </dd>
       </dl>
     </section>

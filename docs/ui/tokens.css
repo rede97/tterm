@@ -1,0 +1,285 @@
+/**
+ * TTerm UI design tokens — single source of truth for docs/*-preview.html
+ *
+ * Skins: body[data-skin="cursor" | "vscode"]
+ * Previews must NOT redefine these hex values locally; map feature aliases
+ * (--set-*, --qp-*, --pal-*) onto --tt-* only.
+ *
+ * Fixed chrome (tab bar) never follows terminal theme colors.
+ */
+
+:root,
+body[data-skin="cursor"] {
+  /* ---- Surfaces ---- */
+  --tt-page: #0f0f0f;
+  --tt-sidebar: #141414;
+  --tt-body: #0f0f0f;
+  --tt-well: #1a1a1a;
+  --tt-inset: #121212;
+  --tt-hover: rgba(255, 255, 255, 0.05);
+  --tt-line: rgba(255, 255, 255, 0.08);
+  --tt-line-strong: rgba(255, 255, 255, 0.14);
+
+  /* ---- Text ---- */
+  --tt-text: #f2f2f2;
+  --tt-muted: #8a8a8a;
+  --tt-faint: #5c5c5c;
+
+  /* ---- Accent (Cursor = white CTA) ---- */
+  --tt-accent: #ffffff;
+  --tt-accent-fill: #ffffff;
+  --tt-accent-text: #0a0a0a;
+  --tt-nav-bar: #ffffff;
+  --tt-focus: rgba(255, 255, 255, 0.4);
+  --tt-selected: rgba(255, 255, 255, 0.1);
+
+  /* ---- Status (CONNECTED green ≠ SHARE teal) ---- */
+  --tt-ok: #22c55e;
+  --tt-share: #4ec9b0;
+  --tt-bad: #ef4444;
+  --tt-warn: #e8a33d;
+  --tt-bolt: #3794ff;
+
+  /* ---- Switch ---- */
+  --tt-switch-off: #2a2a2a;
+  --tt-switch-off-border: rgba(255, 255, 255, 0.1);
+  --tt-switch-on: #ffffff;
+  --tt-switch-on-border: #ffffff;
+  --tt-knob-off: #e8e8e8;
+  --tt-knob-on: #0a0a0a;
+
+  /* ---- Radius / type / controls ---- */
+  --tt-radius: 12px;
+  --tt-radius-sm: 8px;
+  --tt-radius-ctrl: 7px;
+  --tt-radius-opt: 5px;
+  --tt-title-weight: 550;
+  --tt-ui-weight: 500;
+  --tt-btn-width: 148px;
+  --tt-ctrl-h: 28px;
+
+  --tt-ui: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+  --tt-mono: "JetBrains Mono", Consolas, ui-monospace, monospace;
+
+  /* ---- Scroll (prefer CSS scrollbar-*; avoid ::-webkit width on Windows) ---- */
+  --tt-scroll-track: transparent;
+  --tt-scroll-thumb: rgba(255, 255, 255, 0.14);
+  --tt-scroll-thumb-hover: rgba(255, 255, 255, 0.28);
+
+  /* ---- Fixed window chrome (never theme with terminal) ---- */
+  --tt-term-bg: #1e1e1e;
+  --tt-chrome: #252526;
+  --tt-chrome-hover: #2a2a2a;
+  --tt-tab-active: #2d2d2d;
+  --tt-chrome-text: #cccccc;
+  --tt-chrome-muted: #888888;
+
+  /* ---- Feature sizes (quick panel) ---- */
+  --tt-qp-width: 328px;
+  --tt-qp-conn-w: 108px;
+  --tt-qp-share-w: 78px;
+  --tt-qp-led-w: 56px;
+}
+
+body[data-skin="vscode"] {
+  --tt-page: #1e1e1e;
+  --tt-sidebar: #252526;
+  --tt-body: #1e1e1e;
+  --tt-well: #252526;
+  --tt-inset: #1e1e1e;
+  --tt-hover: rgba(255, 255, 255, 0.06);
+  --tt-line: #3e3e42;
+  --tt-line-strong: #3e3e42;
+
+  --tt-text: #cccccc;
+  --tt-muted: #888888;
+  --tt-faint: #6a6a6a;
+
+  --tt-accent: #3794ff;
+  --tt-accent-fill: #0e639c;
+  --tt-accent-text: #ffffff;
+  --tt-nav-bar: #0078d4;
+  --tt-focus: #007fd4;
+  --tt-selected: #094771;
+
+  /* CONNECTED stays Cursor green; share stays teal */
+  --tt-ok: #22c55e;
+  --tt-share: #4ec9b0;
+  --tt-bad: #f14c4c;
+  --tt-warn: #e8a33d;
+  --tt-bolt: #3794ff;
+
+  --tt-switch-off: #1e1e1e;
+  --tt-switch-off-border: #3e3e42;
+  --tt-switch-on: #094771;
+  --tt-switch-on-border: #094771;
+  --tt-knob-off: #888888;
+  --tt-knob-on: #ffffff;
+
+  --tt-radius: 6px;
+  --tt-radius-sm: 4px;
+  --tt-radius-ctrl: 3px;
+  --tt-radius-opt: 3px;
+
+  --tt-scroll-track: #1e1e1e;
+  --tt-scroll-thumb: #424242;
+  --tt-scroll-thumb-hover: #555555;
+
+  /* chrome stays fixed dark even on vscode skin */
+  --tt-term-bg: #1e1e1e;
+  --tt-chrome: #252526;
+  --tt-chrome-hover: #2a2a2a;
+  --tt-tab-active: #2d2d2d;
+}
+
+/* Frosted glass — translucency only; skin colors still apply */
+body.qp-glass[data-skin="cursor"] {
+  --tt-sidebar: rgba(28, 28, 30, 0.62);
+  --tt-well: rgba(44, 44, 46, 0.45);
+  --tt-inset: rgba(0, 0, 0, 0.35);
+  --tt-hover: rgba(255, 255, 255, 0.07);
+  --tt-line: rgba(255, 255, 255, 0.1);
+  --tt-line-strong: rgba(255, 255, 255, 0.18);
+}
+body.qp-glass[data-skin="vscode"] {
+  --tt-sidebar: rgba(37, 37, 38, 0.72);
+  --tt-well: rgba(45, 45, 48, 0.55);
+  --tt-inset: rgba(30, 30, 30, 0.55);
+  --tt-hover: rgba(255, 255, 255, 0.06);
+  --tt-line: rgba(62, 62, 66, 0.85);
+  --tt-line-strong: rgba(62, 62, 66, 0.95);
+}
+
+/* ------------------------------------------------------------------
+   Feature aliases — keep existing preview CSS working unchanged.
+   New rules should prefer --tt-* directly.
+   ------------------------------------------------------------------ */
+
+body {
+  --ui: var(--tt-ui);
+  --mono: var(--tt-mono);
+  --term-bg: var(--tt-term-bg);
+  --chrome: var(--tt-chrome);
+  --tab-bar-bg: var(--tt-chrome);
+  --tab-active: var(--tt-tab-active);
+  --tab-idle: var(--tt-chrome);
+  --tab-hover: var(--tt-chrome-hover);
+  --tab-border: var(--tt-term-bg);
+  --chrome-text: var(--tt-chrome-text);
+  --chrome-muted: var(--tt-chrome-muted);
+  --ok: var(--tt-ok);
+  --bad: var(--tt-bad);
+  --share: var(--tt-share);
+  --bolt: var(--tt-bolt);
+
+  /* Settings */
+  --set-page: var(--tt-page);
+  --set-sidebar: var(--tt-sidebar);
+  --set-body: var(--tt-body);
+  --set-well: var(--tt-well);
+  --set-inset: var(--tt-inset);
+  --set-hover: var(--tt-hover);
+  --set-line: var(--tt-line);
+  --set-line-strong: var(--tt-line-strong);
+  --set-text: var(--tt-text);
+  --set-muted: var(--tt-muted);
+  --set-faint: var(--tt-faint);
+  --set-accent: var(--tt-accent);
+  --set-accent-fill: var(--tt-accent-fill);
+  --set-accent-text: var(--tt-accent-text);
+  --set-nav-bar: var(--tt-nav-bar);
+  --set-focus: var(--tt-focus);
+  --set-warn: var(--tt-warn);
+  --set-ok: var(--tt-ok);
+  --set-bad: var(--tt-bad);
+  --set-bolt: var(--tt-bolt);
+  --set-switch-off: var(--tt-switch-off);
+  --set-switch-off-border: var(--tt-switch-off-border);
+  --set-switch-on: var(--tt-switch-on);
+  --set-switch-on-border: var(--tt-switch-on-border);
+  --set-knob-off: var(--tt-knob-off);
+  --set-knob-on: var(--tt-knob-on);
+  --set-radius: var(--tt-radius);
+  --set-radius-sm: var(--tt-radius-sm);
+  --set-radius-ctrl: var(--tt-radius-ctrl);
+  --set-scroll-track: var(--tt-scroll-track);
+  --set-scroll-thumb: var(--tt-scroll-thumb);
+  --set-scroll-thumb-hover: var(--tt-scroll-thumb-hover);
+  --set-title-weight: var(--tt-title-weight);
+  --set-btn-width: var(--tt-btn-width);
+
+  /* Quick panel */
+  --qp-bg: var(--tt-sidebar);
+  --qp-well: var(--tt-well);
+  --qp-inset: var(--tt-inset);
+  --qp-hover: var(--tt-hover);
+  --qp-line: var(--tt-line);
+  --qp-line-strong: var(--tt-line-strong);
+  --qp-text: var(--tt-text);
+  --qp-muted: var(--tt-muted);
+  --qp-faint: var(--tt-faint);
+  --qp-ok: var(--tt-ok);
+  --qp-bad: var(--tt-bad);
+  --qp-share: var(--tt-share);
+  --qp-bolt: var(--tt-bolt);
+  --qp-accent: var(--tt-accent);
+  --qp-accent-fill: var(--tt-selected);
+  --qp-focus: var(--tt-focus);
+  --qp-switch-off: var(--tt-switch-off);
+  --qp-switch-off-border: var(--tt-switch-off-border);
+  --qp-switch-on: var(--tt-switch-on);
+  --qp-switch-on-border: var(--tt-switch-on-border);
+  --qp-knob-off: var(--tt-knob-off);
+  --qp-knob-on: var(--tt-knob-on);
+  --qp-radius: var(--tt-radius);
+  --qp-radius-sm: var(--tt-radius-sm);
+  --qp-radius-ctrl: var(--tt-radius-ctrl);
+  --qp-radius-opt: var(--tt-radius-opt);
+  --qp-width: var(--tt-qp-width);
+  --qp-ctrl: var(--tt-btn-width);
+  --qp-ctrl-h: var(--tt-ctrl-h);
+  --qp-conn-w: var(--tt-qp-conn-w);
+  --qp-share-w: var(--tt-qp-share-w);
+  --qp-led-w: var(--tt-qp-led-w);
+  --qp-ui: var(--tt-ui);
+  --qp-mono: var(--tt-mono);
+  --qp-weight: var(--tt-ui-weight);
+
+  /* Command palette */
+  --pal-bg: var(--tt-well);
+  --pal-input: var(--tt-inset);
+  --pal-hover: var(--tt-hover);
+  --pal-selected: var(--tt-selected);
+  --pal-line: var(--tt-line-strong);
+  --pal-text: var(--tt-text);
+  --pal-muted: var(--tt-muted);
+  --pal-faint: var(--tt-faint);
+  --pal-accent: var(--tt-accent);
+  --pal-badge: var(--tt-switch-off);
+  --pal-badge-sel: rgba(255, 255, 255, 0.16);
+  --pal-ok: var(--tt-ok);
+  --pal-share: var(--tt-share);
+  --pal-radius: var(--tt-radius-sm);
+  --pal-radius-sm: var(--tt-radius-ctrl);
+  --pal-scroll-track: var(--tt-scroll-track);
+  --pal-scroll-thumb: var(--tt-scroll-thumb);
+  --pal-scroll-thumb-hover: var(--tt-scroll-thumb-hover);
+  --weight: var(--tt-ui-weight);
+}
+
+body[data-skin="vscode"] {
+  --qp-accent-fill: var(--tt-selected);
+  --qp-well: #2d2d30; /* QP well one step above chrome — intentional */
+  --pal-input: #3c3c3c; /* VS Code quick-input field */
+  --pal-badge: #3c3c3c;
+  --pal-badge-sel: rgba(255, 255, 255, 0.15);
+}
+
+body.qp-glass {
+  --qp-bg: var(--tt-sidebar);
+  --qp-well: var(--tt-well);
+  --qp-inset: var(--tt-inset);
+  --qp-hover: var(--tt-hover);
+  --qp-line: var(--tt-line);
+  --qp-line-strong: var(--tt-line-strong);
+}
