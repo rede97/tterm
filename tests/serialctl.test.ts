@@ -1,6 +1,6 @@
 // Quick-panel serial controls are strictly session-only: switching the
 // profile in the quick panel must apply live (input mode, Enter terminator,
-// output newline, flow control) but NEVER touch the global default profile
+// output newline) but NEVER touch flow control or the global default profile
 // — defaults change only in Settings → Serial. A silent persistence there
 // made every later tab inherit a profile the user only meant for one
 // session.
@@ -48,10 +48,16 @@ describe("quick-panel serial controls are session-only", () => {
       id: "tab-1",
       mode: "cr-in-lf",
     });
-    expect(invokeMock).toHaveBeenCalledWith("serial_set_flow_control", {
-      id: "tab-1",
-      flow: "none",
-    });
+    expect(invokeMock).not.toHaveBeenCalledWith("serial_set_flow_control", expect.anything());
+    expect(invokeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("setSerialProfile does not change this session's flow control", async () => {
+    const tab = fakeSerialTab();
+    tab.flowControl = "hardware";
+    await setSerialProfile(tab, "AT");
+    expect(tab.flowControl).toBe("hardware");
+    expect(invokeMock).not.toHaveBeenCalledWith("serial_set_flow_control", expect.anything());
   });
 
   it("setSerialProfile does NOT change the global default profile", async () => {

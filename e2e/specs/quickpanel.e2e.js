@@ -221,15 +221,35 @@ describe("Quick-status button and panel", () => {
     expect(signals.toggleLabels).toEqual(["RTS", "DTR"]);
     expect(signals.text).toContain("CTS");
     expect(signals.text).toContain("DSR");
+    expect(signals.text).toContain("RTS is driver-managed");
 
-    // RTS toggle round-trips through the backend without error.
-    await browser.execute(() => {
+    // Hardware flow: RTS switch is disabled; DTR stays clickable.
+    const hwSwitches = await browser.execute(() => {
       const rows = [...document.querySelectorAll(".quick-panel .qp-signals .qp-toggle-row")];
-      rows
-        .find((r) => r.textContent.includes("RTS"))
-        .querySelector(".qp-switch")
-        .click();
+      const btn = (label) =>
+        rows.find((r) => r.textContent.includes(label)).querySelector(".qp-switch");
+      return {
+        rtsDisabled: btn("RTS").disabled,
+        dtrDisabled: btn("DTR").disabled,
+      };
     });
+    expect(hwSwitches.rtsDisabled).toBe(true);
+    expect(hwSwitches.dtrDisabled).toBe(false);
+
+    // Debug inject: even a direct serial_set_rts IPC must be ignored by
+    // the pump, while serial_set_dtr still applies.
+    const lines = await browser.executeAsync((done) => {
+      (async () => {
+        const id = window.__tterm.mgr.activeTabId;
+        const invoke = window.__TAURI_INTERNALS__.invoke;
+        await invoke("serial_set_rts", { id, on: false });
+        await invoke("serial_set_dtr", { id, on: false });
+        const st = await invoke("serial_line_status", { id });
+        done(st);
+      })();
+    });
+    expect(lines.rts).toBe(true);
+    expect(lines.dtr).toBe(false);
 
     // Auto-reconnect toggle persists in the backend.
     await browser.execute(() => {

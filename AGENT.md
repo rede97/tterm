@@ -292,15 +292,18 @@ auto-reconnect + inline port forwards (embedded client only, compact
 single-line table), serial adds
 auto-reconnect + profile/baud/newline selects + an always-visible
 modem-line block (RTS/DTR toggles, live CTS/DSR status).
-**Modem-line policy**: `open_serial` asserts DTR at open (PuTTY / Tabby /
-pyserial behavior — Pico/TinyUSB-class CDC devices gate ALL traffic on
-DTR and stay silent without it) but NEVER touches RTS: RTS belongs to
-hardware flow control (driver-managed when the user enables it), and
-ESP32-C3/S3 devkits wire RTS → EN, so asserting it holds the chip in
-reset (verified, rst:0x15). DTR → IO0 on those boards only matters at
-reset time; a mid-session reboot with DTR held can land in download mode
-— accepted, standard terminals behave the same. Lines otherwise move
-only via the toggles or the driver under hardware flow control.
+**Modem-line policy**: open asserts DTR (PuTTY / Tabby / pyserial — Pico
+and other CDC devices gate traffic on it) and leaves RTS deasserted.
+ESP32-C3/S3 USB-Serial/JTAG (TRM CDC-ACM table) resets **only** on
+`RTS=1` and `DTR=0` (`rst:0x15`), including a DTR falling edge while RTS
+is asserted. `RTS=1` with `DTR=1` is idle; DTR edges with `RTS=0` only
+set/clear the download-mode flag. Do not pass through `(RTS=1, DTR=0)`
+except when the user explicitly toggles it. Windows `SetCommState` (live
+baud / flow change) drops DTR, so the pump deasserts RTS first, then
+restores DTR (then RTS if we were driving it). Hardware RTS/CTS: the
+driver owns RTS — software `SetRts` is ignored and the quick-panel RTS
+toggle is disabled; DTR stays software-controlled. A live **profile**
+switch is byte-stream only and must not call `serial_set_flow_control`.
 
 ## System tray (park window)
 

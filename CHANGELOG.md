@@ -1,3 +1,25 @@
+## Unreleased
+
+Fixes
+
+- **Changing baud or switching serial profile no longer silences DTR-gated
+  devices** — a live baud or flow-control change on Windows was rewriting
+  the port config and dropping DTR, so Pico/TinyUSB-class boards went
+  quiet after a setting tweak even though the session still looked
+  connected. Driven modem lines are now restored after those changes, and
+  switching a profile only updates input/newline behavior — hardware flow
+  control stays with the connection, like other serial terminals
+- **ESP32 USB-Serial/JTAG reset is only RTS=1 with DTR falling** — the
+  previous "don't drive RTS because it holds EN" reading was too broad.
+  The chip resets solely on that pair (`rst:0x15`); open still raises DTR
+  and leaves RTS off, and a baud/flow rewrite drops RTS before DTR can
+  fall so the pair never appears unless the user toggles it
+- **Hardware flow control disables software RTS, not DTR** — RTS/CTS
+  holds RTS via the driver (`RTS_CONTROL_ENABLE`); the quick-panel RTS
+  toggle greys out and `serial_set_rts` is ignored so SETRTS cannot fight
+  handshake or reset ESP32 USB-Serial/JTAG. DTR is independent of that
+  handshake and stays software-controlled (Pico/TinyUSB still need it)
+
 ## v2.2.5-2 (beta 2)
 
 Changes

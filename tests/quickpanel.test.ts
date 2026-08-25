@@ -290,9 +290,14 @@ describe("quick panel — serial tab", () => {
     });
     expect(rowOf(sec, "DSR")!.querySelector(".qp-line-val")!.textContent).toBe("asserted");
 
-    // RTS/DTR toggles default from the queried line state (mock: on).
-    switchOf(rowOf(sec, "RTS")!).click();
-    expect(invokeMock).toHaveBeenCalledWith("serial_set_rts", { id: "tab-7", on: false });
+    // Hardware RTS/CTS: RTS is driver-owned (toggle disabled, no IPC).
+    // DTR is not part of that handshake and stays software-controlled.
+    const rtsSwitch = switchOf(rowOf(sec, "RTS")!) as HTMLButtonElement;
+    expect(rtsSwitch.disabled).toBe(true);
+    expect(sec.textContent).toContain("RTS is driver-managed");
+    invokeMock.mockClear();
+    rtsSwitch.click();
+    expect(invokeMock).not.toHaveBeenCalledWith("serial_set_rts", expect.anything());
     switchOf(rowOf(sec, "DTR")!).click();
     expect(invokeMock).toHaveBeenCalledWith("serial_set_dtr", { id: "tab-7", on: false });
   });

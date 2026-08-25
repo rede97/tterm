@@ -96,10 +96,11 @@ pub struct SerialLineState {
 pub enum SerialCtl {
     SetBaud(u32),
     SetOutputNewline(NewlineMode),
-    // Drive the RTS modem line (never asserted at open; driver-managed
-    // under hardware flow control).
+    // Drive the RTS modem line (never asserted at open). Ignored while
+    // hardware RTS/CTS is on — the driver owns RTS then.
     SetRts(bool),
     // Drive the DTR modem line (default asserted at open).
+    // ESP32 USB-Serial/JTAG resets only on RTS=1 + DTR=0.
     SetDtr(bool),
     // Switch flow control live: "none" | "software" | "hardware".
     SetFlowControl(String),

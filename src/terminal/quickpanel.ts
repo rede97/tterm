@@ -144,16 +144,26 @@ function sectionTemplate(title: string, key: string, body: unknown): TemplateRes
 
 // Switch row (RTS/DTR, share, auto-reconnect). The visual state comes from
 // the model/state on every render — async corrections are just re-renders.
-function qpToggle(label: string, on: boolean, onFlip: (on: boolean) => void): TemplateResult {
+function qpToggle(
+  label: string,
+  on: boolean,
+  onFlip: (on: boolean) => void,
+  opts?: { disabled?: boolean },
+): TemplateResult {
+  const disabled = opts?.disabled ?? false;
   // Compact single-line template: e2e and tests assert the row's full
   // textContent ("RTS"), which newline/indent text nodes would break.
-  return html`<div class="qp-row qp-toggle-row"><span class="qp-label">${label}</span><button
+  return html`<div class="qp-row qp-toggle-row ${disabled ? "qp-disabled" : ""}"><span class="qp-label">${label}</span><button
       type="button"
       class="qp-switch ${on ? "on" : ""}"
       role="switch"
       aria-label=${label}
       aria-checked=${on ? "true" : "false"}
-      @click=${() => onFlip(!on)}
+      aria-disabled=${disabled ? "true" : "false"}
+      ?disabled=${disabled}
+      @click=${() => {
+        if (!disabled) onFlip(!on);
+      }}
     ><span class="qp-knob"></span></button></div>`;
 }
 
@@ -359,17 +369,20 @@ function serialProfileTemplate(tab: TerminalTab, st: QuickPanelState): TemplateR
   </div>`;
 }
 
-// Flow control + modem signal lines. The signal block is always visible
-// (open no longer drives any modem line, so the toggles are the ONLY way
-// to raise DTR for CDC-ACM devices that gate TX on it): RTS/DTR are ours
-// to drive (toggles), CTS/DSR are the device's answer (read-only status).
-// Ports whose driver can't report modem lines (or a failed status query)
-// grey the whole control out. Line values live in panel state — the
-// status read re-renders instead of rebuilding rows.
+// Flow control + modem signal lines. Flow control is a link setting
+// (like baud), independent of the session profile. Open asserts DTR
+// (PuTTY/Tabby/pyserial); RTS is left deasserted so ESP32 USB-Serial/JTAG
+// cannot see RTS=1 with a DTR falling edge (the only pair that resets).
+// Hardware RTS/CTS: driver owns RTS (toggle disabled, SetRts ignored);
+// DTR stays software-controlled. Ports whose driver can't report modem
+// lines (or a failed status query) grey the whole control out. Line
+// values live in panel state — the status read re-renders instead of
+// rebuilding rows.
 function serialFlowTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResult {
   const flow = tab.flowControl ?? "none";
   const supported = st.linesSupported;
   const lines = st.lines;
+  const hw = flow === "hardware";
   return html`<div class="qp-flow">
     ${qpSelectRow(
       "Flow control",
@@ -391,13 +404,18 @@ function serialFlowTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResu
       ${
         supported
           ? html`
-            ${qpToggle("RTS", lines?.rts ?? false, (on) => {
-              if (st.lines) st.lines = { ...st.lines, rts: on };
-              renderPanel(tab);
-              invoke("serial_set_rts", { id: tab.id, on }).catch((e) =>
-                showToast(`RTS: ${e}`, "error"),
-              );
-            })}
+            ${qpToggle(
+              "RTS",
+              hw ? true : (lines?.rts ?? false),
+              (on) => {
+                if (st.lines) st.lines = { ...st.lines, rts: on };
+                renderPanel(tab);
+                invoke("serial_set_rts", { id: tab.id, on }).catch((e) =>
+                  showToast(`RTS: ${e}`, "error"),
+                );
+              },
+              { disabled: hw },
+            )}
             ${qpToggle("DTR", lines?.dtr ?? false, (on) => {
               if (st.lines) st.lines = { ...st.lines, dtr: on };
               renderPanel(tab);
@@ -421,6 +439,9 @@ function serialFlowTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResu
           `
           : nothing
       }
+    </div>
+    <div class="qp-hint" style=${supported && hw ? "" : "display:none"}>
+      RTS is driver-managed under hardware flow control; DTR stays software-controlled
     </div>
   </div>`;
 }

@@ -144,18 +144,53 @@ fn open_serial(
         .timeout(std::time::Duration::from_millis(20))
         .open()
         .map_err(|e| serial_open_error(port_name, &e))?;
-    // Assert DTR at open like every mainstream serial terminal (PuTTY /
-    // Tabby / pyserial): many CDC-ACM devices (Pico/TinyUSB, debug probes,
-    // Arduino-class boards) gate ALL traffic on DTR and stay silent until
-    // it is raised. RTS is deliberately NOT touched here — it belongs to
-    // hardware flow control (driver-managed when the user enables it), and
-    // ESP32-C3/S3 devkits wire RTS → EN, so asserting it holds the chip in
-    // reset (verified on an ESP32-C3 devkit, rst:0x15). DTR → IO0 on those
-    // boards only matters at reset time; a mid-session reboot while DTR is
-    // held can land in download mode — accepted tradeoff, standard terminals
-    // behave the same.
+    // Assert DTR at open like PuTTY / Tabby / pyserial: CDC-ACM devices
+    // (Pico/TinyUSB, debug probes, Arduino-class) gate traffic on DTR.
+    // RTS is left alone (stays deasserted under FlowControl::None).
+    //
+    // ESP32-C3/S3 USB-Serial/JTAG (TRM CDC-ACM table): only RTS=1 AND
+    // DTR=0 resets the chip (rst:0x15). That includes a DTR falling edge
+    // while RTS is asserted. RTS=1 with DTR=1 is idle; DTR edges with
+    // RTS=0 only set/clear the download-mode flag. Open therefore must
+    // not pass through (RTS=1, DTR=0) — raising DTR first, never RTS, is
+    // enough. Live DCB writes that drop DTR go through
+    // release_rts_before_dcb_write so the same pair cannot appear later.
     let _ = port.write_data_terminal_ready(true);
     Ok(port)
+}
+
+fn is_hardware_flow(flow: &str) -> bool {
+    matches!(
+        map_flow_control(flow).ok(),
+        Some(serialport::FlowControl::Hardware)
+    )
+}
+
+// Windows SetCommState reapplies fDtrControl=Disable and drops DTR.
+// USB-Serial/JTAG resets on RTS=1 + DTR=0, so drop RTS first: the DTR
+// falling edge then happens at RTS=0 (clear download flag, no reset).
+fn release_rts_before_dcb_write(
+    port: &mut dyn serialport::SerialPort,
+    rts: bool,
+    hardware_flow: bool,
+) {
+    if rts || hardware_flow {
+        let _ = port.write_request_to_send(false);
+    }
+}
+
+// Restore lines after a DCB write. DTR first, then RTS: (0,0)→(0,1)→(1,1)
+// never passes through (1,0).
+fn restore_driven_lines(
+    port: &mut dyn serialport::SerialPort,
+    rts: bool,
+    dtr: bool,
+    hardware_flow: bool,
+) {
+    let _ = port.write_data_terminal_ready(dtr);
+    if !hardware_flow {
+        let _ = port.write_request_to_send(rts);
+    }
 }
 
 // Read adapter: device output channel -> relay read loop.
@@ -222,12 +257,13 @@ pub(crate) fn serial_io_loop(
     ctl: std::sync::mpsc::Receiver<SerialCtl>,
     cancel: Arc<AtomicBool>,
     mut newline_filter: NewlineFilter,
+    mut hardware_flow: bool,
 ) {
     let mut buf = [0u8; 16384];
     // Write-behind buffer for bytes the device has not accepted yet.
     let mut pending: std::collections::VecDeque<u8> = std::collections::VecDeque::new();
-    // DTR is asserted at open (open_serial), RTS is not; tracked here
-    // because the lines cannot be read back from the device.
+    // DTR is asserted at open, RTS is not. USB-Serial/JTAG resets only on
+    // RTS=1 with DTR=0; live DCB writes drop RTS before DTR can fall.
     let mut rts = false;
     let mut dtr = true;
     'outer: loop {
@@ -238,13 +274,18 @@ pub(crate) fn serial_io_loop(
         while let Ok(msg) = ctl.try_recv() {
             match msg {
                 SerialCtl::SetBaud(baud) => {
+                    release_rts_before_dcb_write(&mut *port, rts, hardware_flow);
                     let _ = port.set_baud_rate(baud);
+                    restore_driven_lines(&mut *port, rts, dtr, hardware_flow);
                 }
                 SerialCtl::SetOutputNewline(mode) => {
                     newline_filter.set_mode(mode);
                 }
                 SerialCtl::SetRts(on) => {
-                    if port.write_request_to_send(on).is_ok() {
+                    // Hardware RTS/CTS: the driver owns RTS (RTS_CONTROL_ENABLE
+                    // holds it asserted). Software SETRTS would fight handshake
+                    // and, with DTR falling, reset ESP32 USB-Serial/JTAG.
+                    if !hardware_flow && port.write_request_to_send(on).is_ok() {
                         rts = on;
                     }
                 }
@@ -255,7 +296,10 @@ pub(crate) fn serial_io_loop(
                 }
                 SerialCtl::SetFlowControl(flow) => {
                     if let Ok(mode) = map_flow_control(&flow) {
+                        release_rts_before_dcb_write(&mut *port, rts, hardware_flow);
+                        hardware_flow = mode == serialport::FlowControl::Hardware;
                         let _ = port.set_flow_control(mode);
+                        restore_driven_lines(&mut *port, rts, dtr, hardware_flow);
                     }
                 }
                 SerialCtl::QueryLines(reply) => {
@@ -265,7 +309,10 @@ pub(crate) fn serial_io_loop(
                     // the panel greys the flow-control block.
                     let supported = cts.is_ok() && dsr.is_ok();
                     let _ = reply.send(crate::state::SerialLineState {
-                        rts,
+                        // Under hardware flow the driver asserts RTS; our
+                        // tracker is the last software-driven value (used
+                        // when leaving hardware mode).
+                        rts: if hardware_flow { true } else { rts },
                         cts: cts.unwrap_or(false),
                         dtr,
                         dsr: dsr.unwrap_or(false),
@@ -374,6 +421,7 @@ pub(crate) fn spawn_serial_session(
 fn start_pump(
     port: Box<dyn serialport::SerialPort>,
     nl_mode: NewlineMode,
+    hardware_flow: bool,
 ) -> (
     SerialIoReader,
     SerialIoWriter,
@@ -394,6 +442,7 @@ fn start_pump(
                 ctl_rx,
                 cancel,
                 NewlineFilter::new(nl_mode),
+                hardware_flow,
             )
         }
     });
@@ -465,7 +514,8 @@ fn serial_hooks(
                     flow_control,
                 )?,
             };
-            let (reader, writer, cancel, ctl) = start_pump(port, nl_mode);
+            let (reader, writer, cancel, ctl) =
+                start_pump(port, nl_mode, is_hardware_flow(flow_control));
             serial_sessions.lock().map_err(|e| e.to_string())?.insert(
                 id.clone(),
                 SerialSession {
@@ -498,7 +548,14 @@ pub(crate) fn start_serial_session(
             _ => None,
         })
         .unwrap_or(NewlineMode::Keep);
-    let (reader, writer, cancel, ctl_tx) = start_pump(port, nl_mode);
+    let hardware_flow = spec
+        .as_ref()
+        .and_then(|s| match s {
+            SpawnSpec::Serial { flow_control, .. } => Some(is_hardware_flow(flow_control)),
+            _ => None,
+        })
+        .unwrap_or(false);
+    let (reader, writer, cancel, ctl_tx) = start_pump(port, nl_mode, hardware_flow);
     let hooks = spec.clone().map(|s| {
         let auto = state.register_auto_reconnect(&id);
         serial_hooks(app.clone(), id.clone(), s, auto)
@@ -909,6 +966,11 @@ mod tests {
         fatal: bool,
         written: std::sync::Arc<parking_lot::Mutex<Vec<u8>>>,
         read_rx: Option<std::sync::mpsc::Receiver<Vec<u8>>>,
+        // When set, set_baud_rate / set_flow_control deassert DTR (Windows
+        // SetCommState + DTR_CONTROL_DISABLE) so restore_driven_lines can
+        // be asserted.
+        dtr_line: Option<std::sync::Arc<parking_lot::Mutex<bool>>>,
+        rts_line: Option<std::sync::Arc<parking_lot::Mutex<bool>>>,
     }
 
     impl std::io::Read for BackpressurePort {
@@ -973,12 +1035,18 @@ mod tests {
             Duration::from_millis(1)
         }
         fn set_baud_rate(&mut self, _: u32) -> serialport::Result<()> {
+            if let Some(dtr) = &self.dtr_line {
+                *dtr.lock() = false;
+            }
             Ok(())
         }
         fn set_data_bits(&mut self, _: serialport::DataBits) -> serialport::Result<()> {
             Ok(())
         }
         fn set_flow_control(&mut self, _: serialport::FlowControl) -> serialport::Result<()> {
+            if let Some(dtr) = &self.dtr_line {
+                *dtr.lock() = false;
+            }
             Ok(())
         }
         fn set_parity(&mut self, _: serialport::Parity) -> serialport::Result<()> {
@@ -990,10 +1058,16 @@ mod tests {
         fn set_timeout(&mut self, _: Duration) -> serialport::Result<()> {
             Ok(())
         }
-        fn write_request_to_send(&mut self, _: bool) -> serialport::Result<()> {
+        fn write_request_to_send(&mut self, level: bool) -> serialport::Result<()> {
+            if let Some(rts) = &self.rts_line {
+                *rts.lock() = level;
+            }
             Ok(())
         }
-        fn write_data_terminal_ready(&mut self, _: bool) -> serialport::Result<()> {
+        fn write_data_terminal_ready(&mut self, level: bool) -> serialport::Result<()> {
+            if let Some(dtr) = &self.dtr_line {
+                *dtr.lock() = level;
+            }
             Ok(())
         }
         fn read_clear_to_send(&mut self) -> serialport::Result<bool> {
@@ -1041,6 +1115,20 @@ mod tests {
         Arc<AtomicBool>,
         std::thread::JoinHandle<()>,
     ) {
+        spawn_pump_hw(port, nl_mode, false)
+    }
+
+    fn spawn_pump_hw(
+        port: BackpressurePort,
+        nl_mode: crate::newline::NewlineMode,
+        hardware_flow: bool,
+    ) -> (
+        std::sync::mpsc::Sender<Vec<u8>>,
+        std::sync::mpsc::Sender<SerialCtl>,
+        std::sync::mpsc::Receiver<Vec<u8>>,
+        Arc<AtomicBool>,
+        std::thread::JoinHandle<()>,
+    ) {
         let (out_tx, out_rx) = std::sync::mpsc::channel();
         let (in_tx, in_rx) = std::sync::mpsc::channel();
         let (ctl_tx, ctl_rx) = std::sync::mpsc::channel();
@@ -1054,6 +1142,7 @@ mod tests {
                 ctl_rx,
                 cancel2,
                 NewlineFilter::new(nl_mode),
+                hardware_flow,
             )
         });
         (in_tx, ctl_tx, out_rx, cancel, handle)
@@ -1067,6 +1156,8 @@ mod tests {
             fatal: false,
             written: written.clone(),
             read_rx: None,
+            dtr_line: None,
+            rts_line: None,
         };
         let (in_tx, _ctl, _out, cancel, handle) =
             spawn_pump(port, crate::newline::NewlineMode::Keep);
@@ -1100,6 +1191,8 @@ mod tests {
             fatal: true,
             written,
             read_rx: None,
+            dtr_line: None,
+            rts_line: None,
         };
         let (in_tx, _ctl, _out, _cancel, handle) =
             spawn_pump(port, crate::newline::NewlineMode::Keep);
@@ -1114,6 +1207,101 @@ mod tests {
         );
         handle.join().unwrap();
     }
+
+    fn wait_dtr(line: &std::sync::Arc<parking_lot::Mutex<bool>>, want: bool) -> bool {
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        while std::time::Instant::now() < deadline {
+            if *line.lock() == want {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        false
+    }
+
+    // Windows SetCommState (baud / flow change) deasserts DTR; the pump
+    // must write it back so Pico-class CDC devices stay alive.
+    #[test]
+    fn pump_restores_dtr_after_baud_change() {
+        let dtr_line = std::sync::Arc::new(parking_lot::Mutex::new(false));
+        let port = BackpressurePort {
+            timeouts_left: 0,
+            fatal: false,
+            written: std::sync::Arc::new(parking_lot::Mutex::new(Vec::new())),
+            read_rx: None,
+            dtr_line: Some(dtr_line.clone()),
+            rts_line: None,
+        };
+        let (_in, ctl, _out, cancel, handle) = spawn_pump(port, crate::newline::NewlineMode::Keep);
+        ctl.send(SerialCtl::SetBaud(9600)).unwrap();
+        assert!(
+            wait_dtr(&dtr_line, true),
+            "DTR must be restored after set_baud_rate"
+        );
+        cancel.store(true, Ordering::Relaxed);
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn pump_restores_dtr_after_flow_control_change() {
+        let dtr_line = std::sync::Arc::new(parking_lot::Mutex::new(false));
+        let port = BackpressurePort {
+            timeouts_left: 0,
+            fatal: false,
+            written: std::sync::Arc::new(parking_lot::Mutex::new(Vec::new())),
+            read_rx: None,
+            dtr_line: Some(dtr_line.clone()),
+            rts_line: None,
+        };
+        let (_in, ctl, _out, cancel, handle) = spawn_pump(port, crate::newline::NewlineMode::Keep);
+        ctl.send(SerialCtl::SetFlowControl("none".into())).unwrap();
+        assert!(
+            wait_dtr(&dtr_line, true),
+            "DTR must be restored after set_flow_control"
+        );
+        cancel.store(true, Ordering::Relaxed);
+        handle.join().unwrap();
+    }
+
+    // Hardware RTS/CTS owns RTS; software SetRts must not fight the
+    // driver. DTR is not part of that handshake and stays writable.
+    #[test]
+    fn pump_ignores_software_rts_under_hardware_flow() {
+        let rts_line = std::sync::Arc::new(parking_lot::Mutex::new(false));
+        let dtr_line = std::sync::Arc::new(parking_lot::Mutex::new(true));
+        let port = BackpressurePort {
+            timeouts_left: 0,
+            fatal: false,
+            written: std::sync::Arc::new(parking_lot::Mutex::new(Vec::new())),
+            read_rx: None,
+            dtr_line: Some(dtr_line.clone()),
+            rts_line: Some(rts_line.clone()),
+        };
+        let (_in, ctl, _out, cancel, handle) =
+            spawn_pump_hw(port, crate::newline::NewlineMode::Keep, true);
+        ctl.send(SerialCtl::SetRts(true)).unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_millis(200);
+        while std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert!(
+            !*rts_line.lock(),
+            "software SETRTS must not reach the port under hardware flow"
+        );
+        ctl.send(SerialCtl::SetDtr(false)).unwrap();
+        assert!(
+            wait_dtr(&dtr_line, false),
+            "DTR stays software-controlled under hardware flow"
+        );
+        let (reply_tx, reply_rx) = std::sync::mpsc::channel();
+        ctl.send(SerialCtl::QueryLines(reply_tx)).unwrap();
+        let st = reply_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert!(st.rts, "query reports driver-owned RTS as asserted");
+        assert!(!st.dtr, "query reflects the software DTR we just drove");
+        cancel.store(true, Ordering::Relaxed);
+        handle.join().unwrap();
+    }
+
     // -- I/O pump output newline mode (profile contract) --
 
     fn collect_until(
@@ -1143,6 +1331,8 @@ mod tests {
             fatal: false,
             written: std::sync::Arc::new(parking_lot::Mutex::new(Vec::new())),
             read_rx: Some(dev_rx),
+            dtr_line: None,
+            rts_line: None,
         };
         let (_in_tx, _ctl, out_rx, cancel, handle) =
             spawn_pump(port, crate::newline::NewlineMode::CrInLf);
@@ -1170,6 +1360,8 @@ mod tests {
             fatal: false,
             written: std::sync::Arc::new(parking_lot::Mutex::new(Vec::new())),
             read_rx: Some(dev_rx),
+            dtr_line: None,
+            rts_line: None,
         };
         let (_in_tx, ctl, out_rx, cancel, handle) =
             spawn_pump(port, crate::newline::NewlineMode::Keep);

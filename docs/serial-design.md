@@ -29,7 +29,8 @@ xterm.js <─AttachAddon─> ws://127.0.0.1:<port> <─tokio─> serial port (CO
 Session behavior is a named **profile**, stored in `serial-profiles.json`
 (raw I/O in Rust via `read_serial_profiles` / `write_serial_profiles`,
 parsing in `src/config/serial-profiles.ts`). config.json keeps only
-`serialBaud` (global default) and `serialProfile` (last-selected name).
+`serialBaud` (global default) and `serialProfile` (Settings → Serial
+default for new tabs — a live quick-panel switch does not persist).
 Built-ins:
 
 | Profile | Behavior |
@@ -41,17 +42,20 @@ Built-ins:
 Custom profiles are duplicates of any profile, like custom themes; the
 picker groups Built-in vs Custom. `TabManager.setSerialProfile(tabId, name)`
 applies a profile to a RUNNING session: input mode + Enter terminator
-(frontend input handler), output newline (backend
-`serial_set_output_newline`), flow control (backend
-`serial_set_flow_control`). Baud stays separate — it is a physical link
-parameter, not a mode.
+(frontend input handler) and output newline (backend
+`serial_set_output_newline`). Baud and flow control stay separate — they
+are physical link parameters (PuTTY/Tabby keep RTS/CTS with the
+connection, not with newline/echo mode). A live profile switch must not
+call `serial_set_flow_control`.
 
-Opening a port applies the whole profile too (`createSerialTab`):
-`flowControl` + `outputNewline` ride the `serial_spawn` args (the backend
+Opening a port applies the profile's byte-stream settings
+(`createSerialTab`): `outputNewline` rides `serial_spawn` (the backend
 newline converter starts in the profile's mode — there is no second
 "apply" call), and `inputMode`/`enterNewline` go through the tab SETTERS,
 not field assignment, because the input handler hooked in the TerminalTab
 constructor captures mode + terminator by value and must be re-hooked.
+`flowControl` is still sent at spawn as the open-time default (all
+built-ins are `none`); custom profiles may store a different default.
 Regression coverage: `tests/serial-open-profile.test.ts`.
 
 ## Newline handling (device → terminal)
@@ -93,18 +97,30 @@ Per profile: **Normal** (direct), **Echo** (local echo), **Line-by-line**
 
 ## Flow control & modem lines
 
-Flow control (none / software XON-XOFF / hardware RTS-CTS) is a profile
-option, switchable live via `serial_set_flow_control` (no reopen). The
-quick panel's signal block is always visible: RTS/DTR toggles (ours to
-drive, `serial_set_rts` / `serial_set_dtr`) and CTS/DSR live status (the
-device's answers). `serial_line_status` returns
-`{ rts, cts, dtr, dsr, supported }` — `supported: false` when the driver
-can't report modem lines, and the block greys out. At open, `open_serial`
-drives NO modem line: ESP32-C3/S3 USB-Serial/JTAG devkits wire RTS → EN
-(chip held in reset) and DTR → IO0 (mid-session reboot lands in download
-mode) through the auto-reset circuit, so asserting either presented as a
-silent terminal. Lines move only on demand — the toggles, or the driver
-itself under hardware flow control.
+Flow control (none / software XON-XOFF / hardware RTS-CTS) is a **link**
+setting like baud, switchable live via `serial_set_flow_control` (no
+reopen) from the quick panel — not from a live profile switch. The
+signal block is always visible: RTS/DTR toggles (ours to drive,
+`serial_set_rts` / `serial_set_dtr`) and CTS/DSR live status (the
+device's answers). Under **hardware** RTS/CTS the driver owns RTS
+(`RTS_CONTROL_ENABLE`); the RTS toggle is disabled and `SetRts` is a
+no-op so software SETRTS cannot fight handshake or pair with a DTR drop
+into the ESP32 USB-Serial/JTAG reset. DTR is not part of RTS/CTS and
+stays software-controlled (Pico/TinyUSB still gates traffic on it).
+`serial_line_status` returns `{ rts, cts, dtr, dsr, supported }` —
+`supported: false` when the driver can't report modem lines, and the
+block greys out. Under hardware flow, `rts` is reported as asserted
+(driver-owned) regardless of the last software toggle.
+
+At open, `open_serial` asserts DTR like PuTTY / Tabby / pyserial
+(Pico/TinyUSB-class CDC devices gate traffic on DTR) and leaves RTS
+deasserted. ESP32-C3/S3 USB-Serial/JTAG resets **only** on RTS=1 and
+DTR=0 (TRM CDC-ACM table, `rst:0x15`) — a DTR falling edge while RTS is
+asserted is that same pair. Other combinations do not reset: RTS=1 with
+DTR=1 is idle; DTR toggling with RTS=0 only sets/clears the download
+flag. On Windows, `SetCommState` (live baud or flow change) drops DTR;
+the pump deasserts RTS first so that falling edge cannot coincide with
+RTS=1, then restores DTR (and RTS if we were driving it).
 
 ## Quick panel & auto-reconnect
 

@@ -488,6 +488,11 @@ body {
   background: #ffffff;
 }
 
+.qp-switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .qp-share-url-row {
   gap: 6px;
 }

@@ -1,7 +1,9 @@
 // Serial profiles — named session modes (input mode, Enter terminator,
-// output newline conversion, flow control). Persisted in their OWN file
+// output newline conversion). Persisted in their OWN file
 // (serial-profiles.json in the app config dir), NOT config.json. Rust does
 // raw file I/O; parsing/validation lives here. Mirrors custom-themes.ts.
+// Flow control is stored as an open-time default on custom profiles only;
+// a live switch does not apply it.
 
 import { invoke } from "@tauri-apps/api/core";
 import { logError } from "../core/errorlog";

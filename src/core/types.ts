@@ -53,8 +53,10 @@ export interface SerialParams {
 
 export type SerialFlowControl = "none" | "software" | "hardware";
 
-// A named serial session mode (built-in or user-defined). Baud is NOT part
-// of the profile — it's a physical link parameter, configured separately.
+// A named serial session mode (built-in or user-defined). Baud and live
+// flow control are link parameters, not session modes: a running session's
+// profile switch must not touch them. flowControl is stored for custom
+// profiles as the open-time default only.
 export interface SerialProfile {
   name: string;
   inputMode: SerialInputMode;

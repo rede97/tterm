@@ -19,8 +19,11 @@ function serialTab(tab: TerminalTab | undefined): TerminalTab | undefined {
 }
 
 // Apply a profile to a live serial session: input mode + Enter terminator
-// (frontend input handler), output newline + flow control (backend). The
-// backend keeps the session spec in sync, so an in-band reconnect of THIS
+// (frontend input handler) and output newline (backend). Flow control is
+// a link setting like baud — the dedicated quick-panel control owns it,
+// and a live profile switch must not touch it (PuTTY/Tabby keep RTS/CTS
+// with the connection, not with newline/echo mode). The backend keeps the
+// session spec in sync for output newline, so an in-band reconnect of THIS
 // tab preserves the switch — but the global default profile is untouched
 // (quick-panel changes never persist; defaults change in Settings only).
 export async function setSerialProfile(tab: TerminalTab | undefined, name: string): Promise<void> {
@@ -30,9 +33,7 @@ export async function setSerialProfile(tab: TerminalTab | undefined, name: strin
   t.setSerialInputMode(profile.inputMode);
   t.setSerialEnterNewline(profile.enterNewline);
   await invoke("serial_set_output_newline", { id: t.id, mode: profile.outputNewline });
-  await invoke("serial_set_flow_control", { id: t.id, flow: profile.flowControl });
   t.outputNewline = profile.outputNewline;
-  t.flowControl = profile.flowControl;
   t.serialProfile = profile.name;
 }
 
