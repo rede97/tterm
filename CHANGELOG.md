@@ -1,3 +1,28 @@
+## v2.2.5-2 (beta 2)
+
+Changes
+
+- **Serial works out of the box on DTR-gated CDC devices** — open now
+  asserts DTR like every mainstream terminal (PuTTY / Tabby / pyserial);
+  Pico/TinyUSB-class devices gate all traffic on DTR and previously
+  stayed silent until the quick-panel toggle. RTS remains untouched at
+  open: it belongs to hardware flow control (driver-managed when
+  enabled), and ESP32-C3/S3 devkits map RTS → EN (chip held in reset)
+- **Serial sessions no longer die when typing to a device that never
+  reads** — USB CDC firmware that ignores host data (and CTS-held hardware
+  flow control) exerts backpressure that surfaced as a write timeout
+  (`ERROR_SEM_TIMEOUT`) and killed the I/O pump on the second keystroke,
+  presenting as an instant "Session ended". Timed-out bytes are now
+  deferred and retried every pump cycle, so the session stays alive and
+  buffered input reaches the device in order once it drains (deferred
+  bytes are capped at 1 MiB, past which the session is treated as dead)
+- **Quick-panel serial profile switch no longer leaks into the global
+  default** — picking a profile in the quick panel used to silently
+  overwrite the Settings default, so every later tab inherited it. The
+  quick panel is now strictly session-only; defaults change in Settings →
+  Serial only. (An in-band reconnect of the same tab still preserves the
+  switched profile, as before)
+
 ## v2.2.5-1 (beta 1)
 
 Changes
