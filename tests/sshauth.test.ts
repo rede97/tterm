@@ -11,7 +11,13 @@ vi.mock("@tauri-apps/api/event", () => ({
 }));
 
 import { invoke } from "@tauri-apps/api/core";
-import { initSshAuthDialogs } from "../src/terminal/sshauth";
+import {
+  cancelSshSecretPromptFor,
+  initSshAuthDialogs,
+  type SecretPromptTarget,
+  setSshAuthTabLookup,
+  setSshSecretPromptTab,
+} from "../src/terminal/sshauth";
 
 describe("SSH auth dialogs", () => {
   beforeAll(() => {
@@ -24,6 +30,8 @@ describe("SSH auth dialogs", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    setSshSecretPromptTab(null);
+    setSshAuthTabLookup(null);
     document.querySelectorAll(".sshauth-overlay").forEach((el) => {
       el.remove();
     });
@@ -149,5 +157,148 @@ describe("SSH auth dialogs", () => {
     overlay.querySelector<HTMLButtonElement>(".sshauth-btn-cancel")!.click();
     pressEscape();
     expect(invoke).toHaveBeenCalledTimes(1);
+  });
+});
+
+function fakeSecretTab(id = "pending-ssh-1"): {
+  tab: SecretPromptTarget;
+  writes: string[];
+  send: (data: string) => void;
+} {
+  const writes: string[] = [];
+  let dataCb: ((data: string) => void) | undefined;
+  const tab: SecretPromptTarget = {
+    id,
+    terminal: {
+      write: (data: string) => {
+        writes.push(data);
+      },
+      focus: vi.fn(),
+      onData: (cb: (data: string) => void) => {
+        dataCb = cb;
+        return {
+          dispose: () => {
+            dataCb = undefined;
+          },
+        };
+      },
+    },
+  };
+  return {
+    tab,
+    writes,
+    send: (data: string) => {
+      dataCb?.(data);
+    },
+  };
+}
+
+describe("SSH in-terminal secret prompts", () => {
+  beforeAll(() => {
+    initSshAuthDialogs();
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setSshSecretPromptTab(null);
+    setSshAuthTabLookup(null);
+    document.querySelectorAll(".sshauth-overlay").forEach((el) => {
+      el.remove();
+    });
+  });
+
+  const fireAuth = (payload: unknown) => listeners.get("ssh-auth-request")!({ payload });
+  const fireHostkey = (payload: unknown) => listeners.get("ssh-hostkey-request")!({ payload });
+
+  it("collects the password in xterm with no echo and submits on Enter", () => {
+    const fake = fakeSecretTab();
+    setSshSecretPromptTab(fake.tab);
+    fireAuth({
+      reqId: 50,
+      kind: "password",
+      prompt: "user@host's password:",
+      sessionId: fake.tab.id,
+    });
+
+    expect(document.querySelector(".sshauth-overlay")).toBeNull();
+    expect(fake.writes.join("")).toContain("user@host's password:");
+
+    fake.send("s3cret");
+    expect(fake.writes.join("")).not.toContain("s3cret");
+    fake.send("\r");
+
+    expect(invoke).toHaveBeenCalledWith("ssh_auth_response", { reqId: 50, secret: "s3cret" });
+    expect(fake.writes.at(-1)).toBe("\r\n");
+  });
+
+  it("backspace edits the buffer without echoing", () => {
+    const fake = fakeSecretTab();
+    setSshSecretPromptTab(fake.tab);
+    fireAuth({ reqId: 51, kind: "password", prompt: "pw:", sessionId: fake.tab.id });
+    fake.send("abx");
+    fake.send("\x7f");
+    fake.send("c");
+    fake.send("\n");
+    expect(invoke).toHaveBeenCalledWith("ssh_auth_response", { reqId: 51, secret: "abc" });
+    expect(fake.writes.join("")).not.toMatch(/abx|abc/);
+  });
+
+  it("Ctrl+C and bare Escape cancel; CSI sequences do not", () => {
+    const fake = fakeSecretTab();
+    setSshSecretPromptTab(fake.tab);
+    fireAuth({ reqId: 52, kind: "password", prompt: "pw:", sessionId: fake.tab.id });
+    fake.send("\x1b[A");
+    expect(invoke).not.toHaveBeenCalled();
+    fake.send("\x03");
+    expect(invoke).toHaveBeenCalledWith("ssh_auth_response", { reqId: 52, secret: null });
+
+    const fake2 = fakeSecretTab("pending-ssh-2");
+    setSshSecretPromptTab(fake2.tab);
+    fireAuth({ reqId: 53, kind: "passphrase", prompt: "passphrase:", sessionId: fake2.tab.id });
+    fake2.send("\x1b");
+    expect(invoke).toHaveBeenCalledWith("ssh_auth_response", { reqId: 53, secret: null });
+  });
+
+  it("closing the tab answers null", () => {
+    const fake = fakeSecretTab();
+    setSshSecretPromptTab(fake.tab);
+    fireAuth({ reqId: 54, kind: "password", prompt: "pw:", sessionId: fake.tab.id });
+    cancelSshSecretPromptFor(fake.tab.id);
+    expect(invoke).toHaveBeenCalledWith("ssh_auth_response", { reqId: 54, secret: null });
+  });
+
+  it("reconnect uses sessionId lookup when no pending prompt tab is set", () => {
+    const fake = fakeSecretTab("tab-9");
+    setSshAuthTabLookup((id) => (id === "tab-9" ? fake.tab : undefined));
+    fireAuth({ reqId: 55, kind: "password", prompt: "pw:", sessionId: "tab-9" });
+    expect(document.querySelector(".sshauth-overlay")).toBeNull();
+    fake.send("x");
+    fake.send("\r");
+    expect(invoke).toHaveBeenCalledWith("ssh_auth_response", { reqId: 55, secret: "x" });
+  });
+
+  it("Settings key-install (no sessionId) still uses the password modal", () => {
+    const fake = fakeSecretTab();
+    setSshSecretPromptTab(fake.tab);
+    fireAuth({ reqId: 56, kind: "password", prompt: "pw:" });
+    const overlay = document.querySelector(".sshauth-overlay")!;
+    expect(overlay).toBeTruthy();
+    overlay.querySelector<HTMLButtonElement>(".sshauth-btn-ok")!.click();
+    expect(invoke).toHaveBeenCalledWith("ssh_auth_response", { reqId: 56, secret: "" });
+  });
+
+  it("host-key confirmation stays a modal even when a tab is collecting secrets", () => {
+    const fake = fakeSecretTab();
+    setSshSecretPromptTab(fake.tab);
+    fireHostkey({
+      reqId: 57,
+      host: "example.com",
+      port: 22,
+      keyType: "ssh-ed25519",
+      fingerprint: "SHA256:abc",
+      mismatch: false,
+    });
+    expect(document.querySelector(".sshauth-overlay")).toBeTruthy();
+    expect(fake.writes.join("")).not.toContain("Trust");
   });
 });

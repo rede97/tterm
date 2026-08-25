@@ -90,6 +90,8 @@ export class TerminalTab {
   private cursorFilter = new CursorPositionFilter();
   private onRenderDisposable?: IDisposable;
   private attachAddon?: BatchAttachAddon;
+  // When true, BatchAttachAddon ignores keystrokes (SSH secret collect).
+  private inputMuted = false;
   // IME freeze proxy handle (see util/imefreeze.ts) — disposed on destroy.
   private _imeFreeze?: FreezeHandle;
 
@@ -302,7 +304,9 @@ export class TerminalTab {
         this.serialSocket = socket;
         this.attachAddon = new BatchAttachAddon(socket, this.terminal, { bidirectional: false });
       } else {
-        this.attachAddon = new BatchAttachAddon(socket, this.terminal);
+        this.attachAddon = new BatchAttachAddon(socket, this.terminal, {
+          shouldSend: () => !this.inputMuted,
+        });
       }
     });
 
@@ -355,6 +359,10 @@ export class TerminalTab {
   setSerialEnterNewline(mode: SerialEnterNewline): void {
     this.enterNewline = mode;
     if (this.type === "serial") this._hookSerialInput();
+  }
+
+  muteInput(muted: boolean): void {
+    this.inputMuted = muted;
   }
 
   // Mark the session dead/alive (driven by the backend "session-state"

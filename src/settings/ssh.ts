@@ -153,7 +153,7 @@ function sshTemplate(panel: HTMLElement) {
       html`
         ${itemRow(
           "Built-in SSH Client",
-          "Use TTerm's integrated SSH client — password dialogs, host-key confirmation, and dynamic port forwarding (tab right-click menu). Off: spawn the system ssh command instead.",
+          "Use TTerm's integrated SSH client — in-terminal password prompts, host-key confirmation, and dynamic port forwarding (tab right-click menu). Off: spawn the system ssh command instead.",
           toggle(
             st.embedded,
             (v) => {

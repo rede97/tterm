@@ -3,7 +3,7 @@
 //
 // The private key never leaves this machine: install uploads the PUBLIC
 // key to the target's authorized_keys. Auth during install reuses the
-// global password/host-key dialogs (ssh-auth-request events).
+// global password/host-key dialogs when there is no SSH tab (ssh-auth-request).
 
 import { invoke } from "@tauri-apps/api/core";
 import { esc } from "../core/common";

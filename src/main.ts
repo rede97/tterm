@@ -36,6 +36,7 @@ import {
   initQuickPanelWiring,
   initSearchWiring,
   initShortcutsWiring,
+  initSshAuthWiring,
 } from "./wiring";
 
 // -- DOM refs ---
@@ -154,6 +155,7 @@ tabManager.initNewTabButton();
 initSearchBar();
 initProfileMenu();
 initSshAuthDialogs();
+initSshAuthWiring();
 
 // Feature wiring lives in ./wiring (composition root for handler injection).
 initShortcutsWiring();

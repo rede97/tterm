@@ -31,6 +31,7 @@ import {
   setSerialProfile,
 } from "./serialctl";
 import { SettingsShell } from "./settingsshell";
+import { cancelSshSecretPromptFor, setSshSecretPromptTab } from "./sshauth";
 import { TerminalTab } from "./tab";
 import {
   clearTab as actionClearTab,
@@ -73,6 +74,7 @@ export class TabManager {
   readonly terminalContainer: HTMLElement;
 
   private _resizeTimer: ReturnType<typeof setTimeout> | null = null;
+  private _nextPendingSsh = 1;
 
   constructor(
     tabsContainer: HTMLElement | null = null,
@@ -196,11 +198,9 @@ export class TabManager {
   // Rebuild the tabs Map in DOM order after a drag reorder.
   private _syncTabOrderFromDom(): void {
     const ordered = new Map<string, TerminalTab>();
-    for (const el of this.tabsContainer.querySelectorAll<HTMLElement>(
-      '.tab[data-tab-id^="tab-"]',
-    )) {
+    for (const el of this.tabsContainer.querySelectorAll<HTMLElement>(".tab[data-tab-id]")) {
       const id = el.dataset.tabId;
-      if (!id) continue;
+      if (!id || id === "#settings") continue;
       const tab = this.tabs.get(id);
       if (tab) ordered.set(tab.id, tab);
     }
@@ -262,52 +262,104 @@ export class TabManager {
   }
 
   async createSshTab(host: SshHost): Promise<TerminalTab | null> {
+    if (configStore.get("sshEmbedded")) {
+      return this._createEmbeddedSshTab(host);
+    }
     let result: WsConnectResult;
-    // The embedded connect can block for many seconds (TCP + handshake +
-    // auth dialog) with no tab on screen yet — keep a pending toast up for
-    // the whole attempt so the click doesn't feel lost.
-    let pending: { dismiss(): void } | null = null;
     try {
-      if (configStore.get("sshEmbedded")) {
-        const target = `${hostProp(host, "user") || "root"}@${hostProp(host, "hostname") || host.name}`;
-        pending = showToast(`Connecting to ${target}…`, "info", 60000);
-        // Built-in client: password/key prompts and host-key confirmation
-        // come up as dialogs; port forwarding is available on the tab menu.
-        result = await invoke("ssh_spawn_embedded", {
-          spec: {
-            hostname: hostProp(host, "hostname") || host.name,
-            port: parseInt(hostProp(host, "port") || "22", 10),
-            user: hostProp(host, "user") || "root",
-            identityFile: hostProp(host, "identityfile") || null,
-          },
-        });
-      } else {
-        result = await invoke("pty_spawn_ssh", {
+      result = await invoke("pty_spawn_ssh", {
+        hostname: hostProp(host, "hostname") || host.name,
+        port: parseInt(hostProp(host, "port") || "22", 10),
+        user: hostProp(host, "user") || "root",
+      });
+    } catch (e) {
+      showToast(`Failed to start SSH session: ${e}`, "error");
+      return null;
+    }
+    const tab = this._makeTab(result, "ssh", host.name);
+    if (!tab) return null;
+    tab.sshHost = host;
+    tab.sshEmbedded = false;
+    return this._finalizeTab(tab, result);
+  }
+
+  // Built-in client: open the tab first so password/passphrase can be
+  // typed in xterm (OpenSSH-style). Host-key confirmation stays a modal.
+  private async _createEmbeddedSshTab(host: SshHost): Promise<TerminalTab | null> {
+    const target = `${hostProp(host, "user") || "root"}@${hostProp(host, "hostname") || host.name}`;
+    const tab = await this._openPendingSshTab(host, target);
+    if (!tab) return null;
+    setSshSecretPromptTab(tab);
+    let result: WsConnectResult;
+    try {
+      result = await invoke("ssh_spawn_embedded", {
+        spec: {
           hostname: hostProp(host, "hostname") || host.name,
           port: parseInt(hostProp(host, "port") || "22", 10),
           user: hostProp(host, "user") || "root",
-        });
-      }
+          identityFile: hostProp(host, "identityfile") || null,
+        },
+        promptTabId: tab.id,
+      });
     } catch (e) {
-      // A cancelled password/host-key prompt is a deliberate abort, not a
-      // failure — close the attempt quietly.
+      cancelSshSecretPromptFor(tab.id);
+      if (this.tabs.has(tab.id)) await this.closeTab(tab.id);
       if (!String(e).toLowerCase().includes("cancelled")) {
         showToast(`Failed to start SSH session: ${e}`, "error");
       }
       return null;
     } finally {
-      pending?.dismiss();
+      setSshSecretPromptTab(null);
     }
-    const tab = this._makeTab(result, "ssh", host.name);
-    if (!tab) return null;
+    // Closed while handshake was in flight: the pending id has no backend
+    // session; kill the real one that just came back.
+    if (!this.tabs.has(tab.id) || this._closing.has(tab.id)) {
+      invoke("pty_kill", { id: result.id }).catch(logCatch("session.killOrphan"));
+      return null;
+    }
+    this._bindSshSession(tab, result);
+    this._applyConfigForwards(result.id, host);
+    return tab;
+  }
+
+  private async _openPendingSshTab(host: SshHost, target: string): Promise<TerminalTab | null> {
+    const id = `pending-ssh-${this._nextPendingSsh++}`;
+    let tab: TerminalTab;
+    try {
+      tab = new TerminalTab(id, "ssh", host.name, this.terminalContainer);
+    } catch (e) {
+      showToast(`Failed to start terminal: ${e}`, "error");
+      return null;
+    }
     tab.sshHost = host;
-    tab.sshEmbedded = configStore.get("sshEmbedded");
-    const finalized = await this._finalizeTab(tab, result);
-    // Persisted host forwards (LocalForward / RemoteForward in ssh config)
-    // are applied on connect for the embedded client; the system-ssh path
-    // gets them from OpenSSH itself.
-    if (finalized && tab.sshEmbedded) this._applyConfigForwards(result.id, host);
-    return finalized;
+    tab.sshEmbedded = true;
+    const tabEl = this._createTabElement(tab);
+    this.tabsContainer.insertBefore(tabEl, document.getElementById(DOM_ID.newTabGroup));
+    this.tabs.set(tab.id, tab);
+    await this._ensureFontsReady(tab);
+    this.switchTo(tab.id);
+    tab.fit();
+    tab.terminal.write(`Connecting to ${target}…\r\n`);
+    this.refreshBadges();
+    return tab;
+  }
+
+  private _bindSshSession(tab: TerminalTab, result: WsConnectResult): void {
+    const oldId = tab.id;
+    const newId = result.id;
+    if (oldId !== newId) {
+      this.tabs.delete(oldId);
+      tab.id = newId;
+      tab.tabElement.dataset.tabId = newId;
+      this.tabs.set(newId, tab);
+      if (this.activeTabId === oldId) this.activeTabId = newId;
+      this._mru = this._mru.map((x) => (x === oldId ? newId : x));
+    }
+    tab.onSocketClosed = () => this._onSessionClosed(tab.id);
+    tab.attachSocket(result.port, result.token);
+    tab.fitDeferred();
+    this.refreshBadges();
+    notifyTrayTabs();
   }
 
   // Fire-and-forget: each failure toasts individually (addForward), the
@@ -518,9 +570,13 @@ export class TabManager {
     if (!tab || this._closing.has(id)) return;
     this._closing.add(id);
     try {
+      cancelSshSecretPromptFor(tab.id);
       if (tab.shared) invoke("share_revoke", { id }).catch(swallow);
-      // UI close must not depend on the backend ack.
-      await invoke("pty_kill", { id }).catch(swallow);
+      // Pending SSH tabs have no backend session yet. UI close must not
+      // depend on the backend ack for live sessions.
+      if (!id.startsWith("pending-")) {
+        await invoke("pty_kill", { id }).catch(swallow);
+      }
 
       // Panels bound to the dying tab must not outlive it.
       closeQuickPanelForTab(id);

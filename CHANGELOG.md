@@ -1,3 +1,18 @@
+## Unreleased
+
+Changes
+
+- **SSH passwords are typed in the terminal, like OpenSSH** — the embedded
+  client opens the tab first and collects password/passphrase there (no
+  echo). Host-key confirmation stays a dialog. Settings key-install (no
+  tab) still uses the password modal
+
+Fixes
+
+- **Ctrl+Shift+P no longer opens the WebView print dialog** — that Chromium
+  chrome shortcut is blocked; use the OS print path only if you ever need it
+  outside the app
+
 ## v2.2.6
 
 Fixes

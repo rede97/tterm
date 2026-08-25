@@ -40,7 +40,7 @@ xterm ──WS──► relay hub ──mpsc──► tokio task ──channel.d
 xterm ◄─WS── relay hub ◄─Read adapter◄─ ChannelMsg::Data ◄──────┘
 ```
 
-- `ssh_spawn_embedded(spec)` — full lifecycle: TCP connect (15 s timeout)
+- `ssh_spawn_embedded(spec, promptTabId?)` — full lifecycle: TCP connect (15 s timeout)
   → handshake with host-key check → auth chain → `channel_open_session` →
   `request_pty(xterm-256color)` → `request_shell` → bridge tasks → relay
   registration with dead-mode hooks.
@@ -65,13 +65,16 @@ xterm ◄─WS── relay hub ◄─Read adapter◄─ ChannelMsg::Data ◄─�
 1. Pageant agent (Windows) — try each identity;
 2. `IdentityFile` from the resolved ssh config (else `~/.ssh/id_ed25519`,
    `id_ecdsa`, `id_rsa`); encrypted keys prompt for a passphrase (3 tries);
-3. password dialog (3 tries).
+3. password prompt (3 tries).
 
-Dialogs are event-driven: backend emits `ssh-auth-request` `{reqId, kind,
-prompt}` and parks on a oneshot; the frontend (global listeners in
-`src/terminal/sshauth.ts`) answers with `ssh_auth_response`. A password
+Secret prompts are event-driven: backend emits `ssh-auth-request` `{reqId,
+kind, prompt, sessionId?}` and parks on a oneshot; the frontend
+(`src/terminal/sshauth.ts`) answers with `ssh_auth_response`. When
+`sessionId` matches an on-screen embedded SSH tab, the secret is collected
+**in that tab's xterm** (no echo; Enter submits; Esc/Ctrl+C cancel). No
+tab (Settings key-install) falls back to the password modal. A password
 that worked is cached **in memory only** so dead-mode reconnect re-auths
-without re-prompting.
+without re-prompting. Host-key confirmation stays a modal.
 
 ## Port forwarding
 
@@ -139,11 +142,13 @@ host is optional everywhere and defaults to 127.0.0.1.
 
 ## Frontend
 
-- `src/terminal/sshauth.ts` — global event listeners + modal dialogs
-  (password/passphrase; host-key confirm). Started in `main.ts` — prompts
-  work app-wide, including key installs triggered from Settings.
-- `tabmanager.createSshTab` — with `sshEmbedded` on, resolves the host via
-  the frontend ssh-config parser (single source of truth — **no second
+- `src/terminal/sshauth.ts` — global event listeners. Password/passphrase
+  for an on-screen embedded SSH tab is collected in that tab's xterm;
+  Settings key-install (no tab) uses the password modal. Host-key confirm
+  is always a modal. Started in `main.ts` — prompts work app-wide.
+- `tabmanager.createSshTab` — with `sshEmbedded` on, opens the tab first
+  (so the prompt has somewhere to go), then resolves the host via the
+  frontend ssh-config parser (single source of truth — **no second
   parser**) and calls `ssh_spawn_embedded`. Off → `pty_spawn_ssh`.
 - Settings → SSH: host editor modal (`sshhosteditor.ts`), key section
   (`sshkeys.ts`: generate/list/copy/install modals), per-host "Upload SSH
@@ -159,8 +164,8 @@ host is optional everywhere and defaults to 127.0.0.1.
   keygen (loadable, permissions, passphrase round-trip), install probing
   against simulated posix/cmd/powershell shells with the sshd message
   ordering. No external SSH server needed.
-- Frontend: sshauth dialogs, forwarding dialog, quick-panel table,
-  settings key UI (mocked invoke/events).
+- Frontend: sshauth dialogs + in-terminal secret collect, forwarding dialog,
+  quick-panel table, settings key UI (mocked invoke/events).
 - Real-host smoke (connectivity, `-L` banner read, key install + cleanup)
   is a manual checklist against a throwaway VM.
 

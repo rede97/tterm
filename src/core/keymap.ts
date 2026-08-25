@@ -15,6 +15,10 @@
 //
 // Combo grammar: lowercase, modifiers first in ctrl+alt+shift+meta order,
 // key last: "ctrl+shift+p", "f11", "ctrl+tab". "" means unbound.
+//
+// WebView2/Chromium also ships document chrome shortcuts (Print, etc.). Those
+// are never useful in a terminal and are blocked even when unbound — otherwise
+// Ctrl+Shift+P opens the system print dialog.
 
 import { configStore } from "./store";
 
@@ -69,6 +73,11 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
     default: "",
   },
 ];
+
+/** Chromium/WebView2 chrome shortcuts that must never reach the host. */
+export const BLOCKED_BROWSER_COMBOS: ReadonlySet<string> = new Set([
+  "ctrl+shift+p", // Print
+]);
 
 // ---- Combo parsing / formatting ----
 
@@ -276,16 +285,28 @@ export function initKeymap(handlers: KeymapHandlers): void {
   window.addEventListener(
     "keydown",
     (e) => {
-      if (_suspended > 0 || e.isComposing) return;
+      if (e.isComposing) return;
       const combo = comboFromEvent(e);
       if (!combo) return;
+      const blocked = BLOCKED_BROWSER_COMBOS.has(combo);
+      // Settings key-capture suspends command dispatch but still wants the
+      // OS print dialog suppressed if the user presses Ctrl+Shift+P.
+      if (_suspended > 0) {
+        if (blocked) e.preventDefault();
+        return;
+      }
       const id = _lookup.get(combo);
-      if (!id) return;
-      const handler = _handlers[id];
-      if (!handler) return;
-      e.preventDefault();
-      e.stopPropagation();
-      handler();
+      const handler = id ? _handlers[id] : undefined;
+      if (handler) {
+        e.preventDefault();
+        e.stopPropagation();
+        handler();
+        return;
+      }
+      if (blocked) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
     },
     true,
   );

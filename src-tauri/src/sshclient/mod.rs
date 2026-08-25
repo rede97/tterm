@@ -6,8 +6,9 @@
 //! reconnect, and AI sharing work unchanged. Auth secrets and host-key
 //! confirmations reach the frontend through events + response commands
 //! (the `Prompter` seam below); tests inject an auto-approving prompter.
+//! Secrets are collected in the SSH tab; host-key confirmation stays a modal.
 //!
-//! Module map: `prompter` (frontend dialogs), `hostkey` (known_hosts +
+//! Module map: `prompter` (frontend prompts), `hostkey` (known_hosts +
 //! russh handler), `session` (connect/auth + relay bridge + lifecycle),
 //! `forward` (port forwarding + SOCKS5), `keys` (keygen/list),
 //! `install` (ssh-copy-id equivalent). Shared session-state types live here.

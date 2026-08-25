@@ -25,8 +25,9 @@ pub struct HostKeyPrompt {
     pub mismatch: bool,
 }
 
-/// User interaction needed mid-handshake. Production: frontend dialogs.
-/// Tests: auto-approve.
+/// User interaction needed mid-handshake. Production: frontend collects
+/// secrets in the SSH tab (or a modal when there is no tab) and confirms
+/// host keys in a modal. Tests: auto-approve.
 pub trait Prompter: Send + Sync {
     /// Ask for a password/passphrase. None = user cancelled (abort connect).
     fn ask_secret(&self, kind: &str, prompt: String) -> BoxFuture<Option<String>>;
@@ -53,11 +54,27 @@ const PROMPT_TIMEOUT: Duration = Duration::from_secs(300);
 pub struct FrontendPrompter {
     hub: Arc<WsHub>,
     pending: PendingPrompts,
+    /// Frontend tab id that should collect secrets in-terminal. Absent
+    /// (key-install from Settings) → password modal. For first connect this
+    /// is the pending tab id; for dead-mode reconnect it is the live session id.
+    session_id: Option<String>,
 }
 
 impl FrontendPrompter {
     pub fn new(hub: Arc<WsHub>, pending: PendingPrompts) -> Self {
-        Self { hub, pending }
+        Self {
+            hub,
+            pending,
+            session_id: None,
+        }
+    }
+
+    pub fn for_session(hub: Arc<WsHub>, pending: PendingPrompts, session_id: String) -> Self {
+        Self {
+            hub,
+            pending,
+            session_id: Some(session_id),
+        }
     }
 
     fn park<T: Send + 'static>(
@@ -73,6 +90,9 @@ impl FrontendPrompter {
         }
         let mut body = payload;
         body["reqId"] = serde_json::json!(req_id);
+        if let Some(id) = &self.session_id {
+            body["sessionId"] = serde_json::json!(id);
+        }
         let sent = self.hub.emit(event, body).is_ok();
         let pending = self.pending.clone();
         Box::pin(async move {

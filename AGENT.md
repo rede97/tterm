@@ -255,9 +255,10 @@ Operation feedback must go through the shared components — never hand-roll a
 one-off prompt for a single feature. Four pieces cover every case:
 
 - **Transient notice** → `showToast` (`src/ui/toast.ts`), the ONLY toast.
-  Long-running operations (SSH connect, update download) keep a toast up and
-  clear it with the returned `ToastHandle.dismiss()`. A user *aborting* their
-  own action (e.g. cancelling the SSH password prompt — backend marks it
+  Long-running operations (update download) keep a toast up and clear it
+  with the returned `ToastHandle.dismiss()`. Embedded SSH connect writes
+  "Connecting…" into the new tab instead. A user *aborting* their own
+  action (e.g. cancelling the SSH password prompt — backend marks it
   "cancelled") is NOT an error: no error toast.
 - **Modal dialog** → `createModal` (`src/ui/modal.ts`): overlay + Escape +
   backdrop dismissal + singleton-per-class. Every dismissal path must run

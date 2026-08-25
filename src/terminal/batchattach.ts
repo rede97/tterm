@@ -39,14 +39,20 @@ export class BatchAttachAddon {
   constructor(
     private socket: WebSocket,
     private terminal: Terminal,
-    options?: { bidirectional?: boolean },
+    options?: { bidirectional?: boolean; shouldSend?: () => boolean },
   ) {
     socket.binaryType = "arraybuffer";
     this.disposables.push(listen(socket, "message", (ev) => this._onMessage(ev)));
     this.disposables.push(listen(socket, "close", () => this.dispose()));
     this.disposables.push(listen(socket, "error", () => this.dispose()));
     if (options?.bidirectional !== false) {
-      this.disposables.push(terminal.onData((d) => this._sendText(d)));
+      const shouldSend = options?.shouldSend;
+      this.disposables.push(
+        terminal.onData((d) => {
+          if (shouldSend && !shouldSend()) return;
+          this._sendText(d);
+        }),
+      );
       this.disposables.push(terminal.onBinary((d) => this._sendBinary(d)));
     }
   }

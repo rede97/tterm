@@ -359,9 +359,10 @@ pub(crate) async fn connect_session_with(
 fn ssh_hooks(app: tauri::AppHandle, id: String, auto_retry: Arc<AtomicBool>) -> ReconnectHooks {
     let state = app.state::<AppState>();
     let ssh_sessions = state.ssh_sessions.clone();
-    let prompter: Arc<dyn Prompter> = Arc::new(FrontendPrompter::new(
+    let prompter: Arc<dyn Prompter> = Arc::new(FrontendPrompter::for_session(
         state.hub.clone(),
         state.pending_prompts.clone(),
+        id.clone(),
     ));
     ReconnectHooks {
         auto_retry: Some(auto_retry),
@@ -412,6 +413,7 @@ pub async fn ssh_spawn_embedded(
     state: tauri::State<'_, AppState>,
     app: tauri::AppHandle,
     spec: EmbeddedSshSpec,
+    prompt_tab_id: Option<String>,
 ) -> Result<WsConnectResult, String> {
     let id = {
         let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
@@ -431,9 +433,11 @@ pub async fn ssh_spawn_embedded(
         next_forward: Arc::new(AtomicU64::new(1)),
     };
 
-    let prompter: Arc<dyn Prompter> = Arc::new(FrontendPrompter::new(
+    let prompt_id = prompt_tab_id.unwrap_or_else(|| id.clone());
+    let prompter: Arc<dyn Prompter> = Arc::new(FrontendPrompter::for_session(
         state.hub.clone(),
         state.pending_prompts.clone(),
+        prompt_id,
     ));
     let (reader, writer) = connect_session(&session, prompter).await?;
 

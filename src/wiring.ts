@@ -2,7 +2,7 @@
 //
 // Feature modules (quickpanel / contextmenu / keymap / tabswitcher) never
 // import TabManager — main-adjacent WIRING binds their handler slots to the
-// manager here, keeping the module graph acyclic. main.ts calls these three
+// manager here, keeping the module graph acyclic. main.ts calls these
 // functions at startup instead of carrying the inline blocks.
 
 import { invoke } from "@tauri-apps/api/core";
@@ -11,6 +11,7 @@ import { initKeymap } from "./core/keymap";
 import { setDirMenuHandlers } from "./terminal/dirmenu";
 import { pasteIntoTerminal } from "./terminal/paste";
 import { setSearchHandlers } from "./terminal/search";
+import { setSshAuthTabLookup } from "./terminal/sshauth";
 import type { TerminalTab } from "./terminal/tab";
 import { tabManager } from "./terminal/tabmanager";
 import { openQuickOpen, setTabSwitcherHandlers, stepMruSwitcher } from "./ui/tabswitcher";
@@ -126,5 +127,14 @@ export function initDirMenuWiring(): void {
   setDirMenuHandlers({
     defaultLocalProfile: () => tabManager.defaultLocalProfile(),
     createLocalTab: (command, label, cwd) => tabManager.createLocalTab(command, label, cwd),
+  });
+}
+
+export function initSshAuthWiring(): void {
+  setSshAuthTabLookup((sessionId) => {
+    if (!sessionId) return undefined;
+    const t = tabManager.get(sessionId);
+    if (t && t.type === "ssh" && t.sshEmbedded) return t;
+    return undefined;
   });
 }

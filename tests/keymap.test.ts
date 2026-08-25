@@ -221,6 +221,23 @@ describe("keymap dispatcher", () => {
     dispatch({ key: "w", ctrlKey: true });
     expect(fired).toEqual(["workbench.action.closeTab"]);
   });
+
+  it("blocks WebView print (Ctrl+Shift+P) even when unbound", () => {
+    const e = dispatch({ key: "P", ctrlKey: true, shiftKey: true });
+    expect(fired).toEqual([]);
+    expect(e.defaultPrevented).toBe(true);
+  });
+
+  it("still blocks print while keymap is suspended for capture", () => {
+    suspendKeymap();
+    try {
+      const e = dispatch({ key: "P", ctrlKey: true, shiftKey: true });
+      expect(fired).toEqual([]);
+      expect(e.defaultPrevented).toBe(true);
+    } finally {
+      resumeKeymap();
+    }
+  });
 });
 
 describe("command registry", () => {
