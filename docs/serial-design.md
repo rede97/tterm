@@ -103,10 +103,13 @@ reopen) from the quick panel — not from a live profile switch. The
 signal block is always visible: RTS/DTR toggles (ours to drive,
 `serial_set_rts` / `serial_set_dtr`) and CTS/DSR live status (the
 device's answers). Under **hardware** RTS/CTS the driver owns RTS
-(`RTS_CONTROL_ENABLE`); the RTS toggle is disabled and `SetRts` is a
-no-op so software SETRTS cannot fight handshake or pair with a DTR drop
-into the ESP32 USB-Serial/JTAG reset. DTR is not part of RTS/CTS and
-stays software-controlled (Pico/TinyUSB still gates traffic on it).
+(`RTS_CONTROL_HANDSHAKE`, matching PuTTY); the RTS toggle is disabled
+and `SetRts` is a no-op so software SETRTS cannot fight handshake or
+pair with a DTR drop into the ESP32 USB-Serial/JTAG reset. DTR is not
+part of RTS/CTS and stays `DTR_CONTROL_ENABLE` (Pico/TinyUSB still
+gates traffic on it). `serialport`'s Hardware mapping is only
+`RTS_CONTROL_ENABLE` (RTS pinned high); Windows therefore patches the
+DCB after open and on a live switch.
 `serial_line_status` returns `{ rts, cts, dtr, dsr, supported }` —
 `supported: false` when the driver can't report modem lines, and the
 block greys out. Under hardware flow, `rts` is reported as asserted

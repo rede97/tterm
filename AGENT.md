@@ -300,10 +300,11 @@ is asserted. `RTS=1` with `DTR=1` is idle; DTR edges with `RTS=0` only
 set/clear the download-mode flag. Do not pass through `(RTS=1, DTR=0)`
 except when the user explicitly toggles it. Windows `SetCommState` (live
 baud / flow change) drops DTR, so the pump deasserts RTS first, then
-restores DTR (then RTS if we were driving it). Hardware RTS/CTS: the
-driver owns RTS — software `SetRts` is ignored and the quick-panel RTS
-toggle is disabled; DTR stays software-controlled. A live **profile**
-switch is byte-stream only and must not call `serial_set_flow_control`.
+restores DTR (then RTS if we were driving it). Hardware RTS/CTS: Windows
+matches PuTTY (`RTS_CONTROL_HANDSHAKE` + CTS gating, DTR stays ENABLE);
+software `SetRts` is ignored and the quick-panel RTS toggle is disabled.
+A live **profile** switch is byte-stream only and must not call
+`serial_set_flow_control`.
 
 ## System tray (park window)
 

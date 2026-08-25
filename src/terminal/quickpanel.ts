@@ -373,8 +373,8 @@ function serialProfileTemplate(tab: TerminalTab, st: QuickPanelState): TemplateR
 // (like baud), independent of the session profile. Open asserts DTR
 // (PuTTY/Tabby/pyserial); RTS is left deasserted so ESP32 USB-Serial/JTAG
 // cannot see RTS=1 with a DTR falling edge (the only pair that resets).
-// Hardware RTS/CTS: driver owns RTS (toggle disabled, SetRts ignored);
-// DTR stays software-controlled. Ports whose driver can't report modem
+// Hardware RTS/CTS: driver owns RTS (PuTTY HANDSHAKE, toggle disabled,
+// SetRts ignored); DTR stays software-controlled. Ports whose driver
 // lines (or a failed status query) grey the whole control out. Line
 // values live in panel state — the status read re-renders instead of
 // rebuilding rows.

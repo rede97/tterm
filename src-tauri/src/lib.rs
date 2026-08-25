@@ -8,6 +8,8 @@ mod newline;
 mod pty;
 mod relay;
 mod serial;
+#[cfg(windows)]
+mod serial_win;
 mod share;
 mod ssh;
 mod sshclient;

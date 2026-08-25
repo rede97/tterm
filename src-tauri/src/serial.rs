@@ -8,6 +8,7 @@ use tauri::{Emitter, Manager};
 use crate::newline::{NewlineFilter, NewlineMode};
 use crate::relay::{register_session, ReconnectHooks};
 use crate::state::{AppState, SerialCtl, SerialSession, SessionState, SpawnSpec, WsConnectResult};
+use serialport::SerialPort;
 
 #[derive(Clone, Serialize)]
 pub struct SerialPortInfo {
@@ -133,30 +134,49 @@ fn open_serial(
     parity: &str,
     stop_bits: u8,
     flow_control: &str,
-) -> Result<Box<dyn serialport::SerialPort>, String> {
-    let mut port = serialport::new(port_name, baud_rate)
-        .data_bits(map_data_bits(data_bits)?)
-        .parity(map_parity(parity)?)
-        .stop_bits(map_stop_bits(stop_bits)?)
-        .flow_control(map_flow_control(flow_control)?)
-        // Short read timeout: the I/O pump polls writes and cancel each cycle.
-        // 20ms keeps keystroke echo latency imperceptible.
-        .timeout(std::time::Duration::from_millis(20))
-        .open()
-        .map_err(|e| serial_open_error(port_name, &e))?;
-    // Assert DTR at open like PuTTY / Tabby / pyserial: CDC-ACM devices
-    // (Pico/TinyUSB, debug probes, Arduino-class) gate traffic on DTR.
-    // RTS is left alone (stays deasserted under FlowControl::None).
-    //
-    // ESP32-C3/S3 USB-Serial/JTAG (TRM CDC-ACM table): only RTS=1 AND
-    // DTR=0 resets the chip (rst:0x15). That includes a DTR falling edge
-    // while RTS is asserted. RTS=1 with DTR=1 is idle; DTR edges with
-    // RTS=0 only set/clear the download-mode flag. Open therefore must
-    // not pass through (RTS=1, DTR=0) — raising DTR first, never RTS, is
-    // enough. Live DCB writes that drop DTR go through
-    // release_rts_before_dcb_write so the same pair cannot appear later.
-    let _ = port.write_data_terminal_ready(true);
-    Ok(port)
+) -> Result<(Box<dyn serialport::SerialPort>, Option<isize>), String> {
+    let hardware = is_hardware_flow(flow_control);
+    // Windows hardware: open with flow none, then apply PuTTY's
+    // RTS_CONTROL_HANDSHAKE DCB. serialport's Hardware is RTS_CONTROL_ENABLE
+    // (RTS pinned high) and would both mismatch PuTTY and pass through
+    // (RTS=1, DTR=0) on the first SetCommState.
+    let builder_flow = if cfg!(windows) && hardware {
+        serialport::FlowControl::None
+    } else {
+        map_flow_control(flow_control)?
+    };
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::AsRawHandle;
+        let mut port = serialport::new(port_name, baud_rate)
+            .data_bits(map_data_bits(data_bits)?)
+            .parity(map_parity(parity)?)
+            .stop_bits(map_stop_bits(stop_bits)?)
+            .flow_control(builder_flow)
+            .timeout(std::time::Duration::from_millis(20))
+            .open_native()
+            .map_err(|e| serial_open_error(port_name, &e))?;
+        let handle = port.as_raw_handle();
+        let _ = port.write_data_terminal_ready(true);
+        if hardware {
+            crate::serial_win::apply_putty_hardware_dcb(handle)?;
+        }
+        Ok((Box::new(port), Some(handle as isize)))
+    }
+    #[cfg(not(windows))]
+    {
+        let mut port = serialport::new(port_name, baud_rate)
+            .data_bits(map_data_bits(data_bits)?)
+            .parity(map_parity(parity)?)
+            .stop_bits(map_stop_bits(stop_bits)?)
+            .flow_control(builder_flow)
+            .timeout(std::time::Duration::from_millis(20))
+            .open()
+            .map_err(|e| serial_open_error(port_name, &e))?;
+        let _ = port.write_data_terminal_ready(true);
+        let _ = hardware;
+        Ok((Box::new(port), None))
+    }
 }
 
 fn is_hardware_flow(flow: &str) -> bool {
@@ -191,6 +211,24 @@ fn restore_driven_lines(
     if !hardware_flow {
         let _ = port.write_request_to_send(rts);
     }
+}
+
+fn apply_flow_control(
+    port: &mut dyn serialport::SerialPort,
+    mode: serialport::FlowControl,
+    hardware_flow: bool,
+    comm: Option<isize>,
+) {
+    #[cfg(windows)]
+    if hardware_flow {
+        if let Some(h) = comm {
+            let _ = crate::serial_win::apply_putty_hardware_dcb(h as _);
+            return;
+        }
+    }
+    let _ = port.set_flow_control(mode);
+    let _ = hardware_flow;
+    let _ = comm;
 }
 
 // Read adapter: device output channel -> relay read loop.
@@ -258,6 +296,7 @@ pub(crate) fn serial_io_loop(
     cancel: Arc<AtomicBool>,
     mut newline_filter: NewlineFilter,
     mut hardware_flow: bool,
+    comm: Option<isize>,
 ) {
     let mut buf = [0u8; 16384];
     // Write-behind buffer for bytes the device has not accepted yet.
@@ -282,9 +321,10 @@ pub(crate) fn serial_io_loop(
                     newline_filter.set_mode(mode);
                 }
                 SerialCtl::SetRts(on) => {
-                    // Hardware RTS/CTS: the driver owns RTS (RTS_CONTROL_ENABLE
-                    // holds it asserted). Software SETRTS would fight handshake
-                    // and, with DTR falling, reset ESP32 USB-Serial/JTAG.
+                    // Hardware RTS/CTS: the driver owns RTS
+                    // (RTS_CONTROL_HANDSHAKE, matching PuTTY). Software SETRTS
+                    // would fight handshake and, with DTR falling, reset
+                    // ESP32 USB-Serial/JTAG.
                     if !hardware_flow && port.write_request_to_send(on).is_ok() {
                         rts = on;
                     }
@@ -298,7 +338,7 @@ pub(crate) fn serial_io_loop(
                     if let Ok(mode) = map_flow_control(&flow) {
                         release_rts_before_dcb_write(&mut *port, rts, hardware_flow);
                         hardware_flow = mode == serialport::FlowControl::Hardware;
-                        let _ = port.set_flow_control(mode);
+                        apply_flow_control(&mut *port, mode, hardware_flow, comm);
                         restore_driven_lines(&mut *port, rts, dtr, hardware_flow);
                     }
                 }
@@ -396,7 +436,7 @@ pub(crate) fn spawn_serial_session(
     flow_control: &str,
     output_newline: &str,
 ) -> Result<(), String> {
-    let port = open_serial(
+    let (port, comm) = open_serial(
         port_name,
         baud_rate,
         data_bits,
@@ -413,7 +453,7 @@ pub(crate) fn spawn_serial_session(
         flow_control: flow_control.to_string(),
         output_newline: output_newline.to_string(),
     };
-    start_serial_session(state, app, id, port, Some(spec))
+    start_serial_session(state, app, id, port, Some(spec), comm)
 }
 
 // Start the I/O pump thread for an open port; returns the relay-facing
@@ -422,6 +462,7 @@ fn start_pump(
     port: Box<dyn serialport::SerialPort>,
     nl_mode: NewlineMode,
     hardware_flow: bool,
+    comm: Option<isize>,
 ) -> (
     SerialIoReader,
     SerialIoWriter,
@@ -443,6 +484,7 @@ fn start_pump(
                 cancel,
                 NewlineFilter::new(nl_mode),
                 hardware_flow,
+                comm,
             )
         }
     });
@@ -504,7 +546,7 @@ fn serial_hooks(
             #[cfg(not(debug_assertions))]
             let mock: Option<Box<dyn serialport::SerialPort>> = None;
             let port = match mock {
-                Some(p) => p,
+                Some(p) => (p, None),
                 None => open_serial(
                     port_name,
                     *baud_rate,
@@ -515,7 +557,7 @@ fn serial_hooks(
                 )?,
             };
             let (reader, writer, cancel, ctl) =
-                start_pump(port, nl_mode, is_hardware_flow(flow_control));
+                start_pump(port.0, nl_mode, is_hardware_flow(flow_control), port.1);
             serial_sessions.lock().map_err(|e| e.to_string())?.insert(
                 id.clone(),
                 SerialSession {
@@ -540,6 +582,7 @@ pub(crate) fn start_serial_session(
     id: String,
     port: Box<dyn serialport::SerialPort>,
     spec: Option<SpawnSpec>,
+    comm: Option<isize>,
 ) -> Result<(), String> {
     let nl_mode = spec
         .as_ref()
@@ -555,7 +598,7 @@ pub(crate) fn start_serial_session(
             _ => None,
         })
         .unwrap_or(false);
-    let (reader, writer, cancel, ctl_tx) = start_pump(port, nl_mode, hardware_flow);
+    let (reader, writer, cancel, ctl_tx) = start_pump(port, nl_mode, hardware_flow, comm);
     let hooks = spec.clone().map(|s| {
         let auto = state.register_auto_reconnect(&id);
         serial_hooks(app.clone(), id.clone(), s, auto)
@@ -613,7 +656,7 @@ pub fn serial_spawn(
             flow_control: flow_control.clone(),
             output_newline: nl.to_string(),
         };
-        start_serial_session(&state, &app, id.clone(), mock, Some(spec))?;
+        start_serial_session(&state, &app, id.clone(), mock, Some(spec), None)?;
         return Ok(state.ws_result(id));
     }
 
@@ -1143,6 +1186,7 @@ mod tests {
                 cancel2,
                 NewlineFilter::new(nl_mode),
                 hardware_flow,
+                None,
             )
         });
         (in_tx, ctl_tx, out_rx, cancel, handle)

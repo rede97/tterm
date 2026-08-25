@@ -47,6 +47,7 @@ windows = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
     "Win32_System_Threading",
+    "Win32_Devices_Communication",
 ] }
 base64 = "0.23.1"
 russh = { version = "0.62", default-features = false, features = ["ring", "rsa", "flate2"] }

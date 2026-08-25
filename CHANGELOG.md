@@ -15,7 +15,7 @@ Fixes
   and leaves RTS off, and a baud/flow rewrite drops RTS before DTR can
   fall so the pair never appears unless the user toggles it
 - **Hardware flow control disables software RTS, not DTR** — RTS/CTS
-  holds RTS via the driver (`RTS_CONTROL_ENABLE`); the quick-panel RTS
+  holds RTS via the driver (`RTS_CONTROL_HANDSHAKE`); the quick-panel RTS
   toggle greys out and `serial_set_rts` is ignored so SETRTS cannot fight
   handshake or reset ESP32 USB-Serial/JTAG. DTR is independent of that
   handshake and stays software-controlled (Pico/TinyUSB still need it)
@@ -26,6 +26,10 @@ Fixes
   writes physical pixels and `set_size` bypasses the configured min; a
   corrupt JSON or DPI mismatch used to leave a tiny window. Resize now
   re-asserts the logical floor
+- **Hardware RTS/CTS matches PuTTY's handshake DCB** — `serialport` only
+  pins RTS high (`RTS_CONTROL_ENABLE`); Windows now sets
+  `RTS_CONTROL_HANDSHAKE` + `fOutxCtsFlow` and keeps DTR ENABLE, like
+  PuTTY. The RTS toggle stays greyed out; DTR remains software-controlled
 
 ## v2.2.5-2 (beta 2)
 
