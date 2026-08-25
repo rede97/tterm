@@ -1,19 +1,17 @@
-## Unreleased
+## v2.2.7
 
 Changes
 
 - **SSH passwords are typed in the terminal, like OpenSSH** — the embedded
-  client opens the tab first and collects password/passphrase there (no
-  echo). Host-key confirmation stays a dialog. Settings key-install (no
-  tab) still uses the password modal
+  client opens the tab first and collects password and passphrase there (no
+  echo). Host-key confirmation stays a dialog. Uploading a key from Settings
+  still uses the password dialog
 
 Fixes
 
-- **Opening Settings no longer eats the 2px terminal gutter** — a
-  `:has(> .settings-page)` rule zeroed container padding whenever the
-  settings node was in the tree, including after a tab switch left it
-  `display:none`. Settings now overlays the pane like the welcome
-  backdrop; the 2px inset stays
+- **Opening Settings no longer eats the 2px gap around the terminal** —
+  switching to Settings (or away from it) used to drop that inset, so the
+  grid grew flush with the window edge
 - **Ctrl+Shift+P no longer opens the WebView print dialog** — that Chromium
   chrome shortcut is blocked; use the OS print path only if you ever need it
   outside the app
