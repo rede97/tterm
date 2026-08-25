@@ -15,6 +15,7 @@ import {
   createSshPanel,
   isSshConfigDirty,
   resetSshConfigDirty,
+  saveSshConfigToDisk,
   syncSshHostOrder,
 } from "../src/settings/ssh";
 
@@ -317,8 +318,7 @@ describe("settings — SSH host list order & detail", () => {
 });
 
 describe("settings — SSH config dirty state", () => {
-  it("clean initially, dirty after Delete, clean again after Save", async () => {
-    vi.stubGlobal("confirm", () => true);
+  it("clean initially, dirty after Delete, clean again after Apply writes the file", async () => {
     invokeMock.mockImplementation((cmd: string) => {
       if (cmd === "ssh_save_config") return Promise.resolve("Saved to ~/.ssh/config");
       if (cmd === "ssh_read_config_raw") return Promise.resolve("");
@@ -332,15 +332,12 @@ describe("settings — SSH config dirty state", () => {
     panel.querySelector<HTMLButtonElement>(".ssh-btn-delete")!.click();
     expect(isSshConfigDirty()).toBe(true);
 
-    panel.querySelector<HTMLButtonElement>("#set-save-ssh-config")!.click();
-    // Save now goes through confirmDialog — approve the overwrite.
-    await vi.waitFor(() => {
-      expect(document.body.querySelector(".confirm-overlay")).toBeTruthy();
-    });
-    document.body
-      .querySelector<HTMLButtonElement>(".confirm-overlay .sshauth-footer .sshauth-btn:last-child")!
-      .click();
-    await vi.waitFor(() => expect(isSshConfigDirty()).toBe(false));
+    // No separate Save button anymore — the shell's Apply writes
+    // ~/.ssh/config (no confirmation dialog; the backend keeps a backup).
+    expect(panel.querySelector("#set-save-ssh-config")).toBeNull();
+    await saveSshConfigToDisk(panel);
+    expect(invokeMock).toHaveBeenCalledWith("ssh_save_config", expect.anything());
+    expect(isSshConfigDirty()).toBe(false);
   });
 
   it("drag reorder marks dirty and fires tterm-ssh-dirty (bubbles)", () => {

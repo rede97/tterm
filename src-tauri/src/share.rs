@@ -1171,6 +1171,7 @@ mod tests {
                     port: 22,
                     user: "u".into(),
                     identity_file: None,
+                    password: None,
                 },
                 cached_password: Arc::new(Mutex::new(None)),
                 forwards: Arc::new(Mutex::new(std::collections::HashMap::new())),

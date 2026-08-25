@@ -8,6 +8,7 @@ export const DOM_ID = {
   settingsBtn: "settings-btn",
   tabs: "tabs",
   newTabGroup: "new-tab-group",
+  tabOverflowCount: "tab-overflow-count",
   newTab: "new-tab",
   newTabMenuBtn: "new-tab-menu-btn",
   dragSpacer: "drag-spacer",

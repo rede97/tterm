@@ -278,6 +278,7 @@ fn test_session(port: u16) -> SshSession {
             port,
             user: "u".into(),
             identity_file: Some("definitely/does/not/exist".into()),
+            password: None,
         },
         cached_password: Arc::new(Mutex::new(None)),
         forwards: Arc::new(Mutex::new(HashMap::new())),
@@ -1033,6 +1034,7 @@ fn live_install_pubkey() {
             port,
             user: user.to_string(),
             identity_file: None, // mirror the app: probe default ~/.ssh keys first
+            password: None,
         };
         let kh = temp_known_hosts("live");
         let _ = std::fs::remove_file(&kh);

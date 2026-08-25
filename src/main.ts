@@ -87,6 +87,17 @@ tabManager.setSettingsFactory(async () => {
   return m.createSettingsContent();
 });
 
+/** Apply chrome skin + quick-panel glass to <body>. Skin drives Settings /
+ *  menus / quick panel via --tt-* tokens; the tab bar stays fixed dark and
+ *  terminal schemes stay independent (see src/ui/tokens.css). */
+function applyChromeSkin(): void {
+  document.body.dataset.skin = configStore.get("chromeSkin");
+  document.body.classList.toggle("qp-glass", configStore.get("quickPanelGlass"));
+}
+
+// Skin defaults to Cursor Mono before config resolves; load() re-applies.
+applyChromeSkin();
+
 const settingsBtn = mustGetById(DOM_ID.settingsBtn);
 settingsBtn.appendChild(createElement(Cog, { stroke: "currentColor", width: 16, height: 16 }));
 settingsBtn.addEventListener("click", () => {
@@ -95,6 +106,9 @@ settingsBtn.addEventListener("click", () => {
 
 // Subscribe to config changes — update all open terminals when relevant keys change
 configStore.subscribe((keys) => {
+  if (keys.includes("chromeSkin") || keys.includes("quickPanelGlass")) {
+    applyChromeSkin();
+  }
   if (keys.some((k) => ["fontFamily", "fontSize", "scrollback", "themeName"].includes(k))) {
     const theme = findTheme(configStore.get("themeName")).theme;
     // The whole terminal chrome (active tab, container frame, xterm edge
@@ -226,6 +240,7 @@ configStore
   .load()
   .then(async () => {
     updateFontStack(parseFontFamily(configStore.get("fontFamily")));
+    applyChromeSkin();
     // Terminal chrome background tracks the active theme from the start.
     applyTerminalBackground(findTheme(configStore.get("themeName")).theme);
 

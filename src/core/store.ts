@@ -25,6 +25,11 @@ export interface ConfigState {
   fontSize: number;
   scrollback: number;
   themeName: string;
+  // Chrome skin for Settings / menus / quick panel ("cursor" | "vscode").
+  // Tab bar stays fixed dark regardless; terminal schemes are independent.
+  chromeSkin: string;
+  // Frosted translucency for the quick panel only (window stays opaque).
+  quickPanelGlass: boolean;
   renderer: string;
   terminalBell: boolean;
   pasteWarning: boolean;
@@ -80,6 +85,11 @@ const SCHEMA = {
   fontSize: { default: 14, validate: isNumber(10, 32) },
   scrollback: { default: 20000, validate: isNumber(100, 100000) },
   themeName: { default: DEFAULT_THEME_NAME, validate: isString },
+  chromeSkin: {
+    default: "cursor",
+    validate: (v: unknown): v is string => v === "cursor" || v === "vscode",
+  },
+  quickPanelGlass: { default: false, validate: isBoolean },
   renderer: { default: "webgl", validate: isString },
   terminalBell: { default: false, validate: isBoolean },
   pasteWarning: { default: true, validate: isBoolean },

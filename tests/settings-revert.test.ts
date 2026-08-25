@@ -73,8 +73,8 @@ describe("settings — Revert", () => {
 
     revertButton(root).click();
     await vi.waitFor(() => {
-      expect(root.querySelector(".settings-feedback")!.textContent).toBe(
-        "Reverted to saved config",
+      expect(document.querySelector("#toast-container")?.textContent).toContain(
+        "Reverted to saved settings",
       );
     });
 
@@ -109,11 +109,10 @@ describe("settings — Revert", () => {
     for (let i = 0; i < 2; i++) {
       revertButton(root).click();
       await vi.waitFor(() => {
-        expect(root.querySelector(".settings-feedback")!.textContent).toBe(
-          "Reverted to saved config",
+        expect(document.querySelector("#toast-container")?.textContent).toContain(
+          "Reverted to saved settings",
         );
       });
-      // feedback clears after 2s; don't wait, just proceed
     }
 
     expect(root.querySelectorAll(".settings-nav-item")).toHaveLength(6);
@@ -122,22 +121,22 @@ describe("settings — Revert", () => {
   });
 });
 
-describe("settings — footer SSH dirty hint", () => {
+describe("settings — footer dirty hint", () => {
   it("hidden when clean, appears in real time on a working-copy edit", () => {
     const root = createSettingsContent();
     document.body.appendChild(root);
-    const hint = root.querySelector<HTMLElement>("#ssh-dirty-hint")!;
-    expect(hint.textContent).toContain("SSH Config");
-    expect(hint.style.display).toBe("none");
+    const hint = root.querySelector<HTMLElement>("#dirty-hint")!;
+    expect(hint.classList.contains("on")).toBe(false);
 
     // Delete a host via the embedded ssh panel → footer hint appears,
-    // without any panel switch or save.
+    // without any panel switch or Apply.
     root.querySelector<HTMLButtonElement>(".ssh-btn-delete")!.click();
-    expect(hint.style.display).toBe("");
+    expect(hint.classList.contains("on")).toBe(true);
+    expect(hint.textContent).toBe("SSH config will be written on Apply");
   });
 
   it("reflects a dirty state left over from a previous settings visit", () => {
-    // Simulate: user edited, closed settings without saving. The flag
+    // Simulate: user edited, closed settings without applying. The flag
     // survives (module state), so the next settings page opens with the
     // hint already showing.
     const first = createSettingsContent();
@@ -147,6 +146,8 @@ describe("settings — footer SSH dirty hint", () => {
 
     const reopened = createSettingsContent();
     document.body.appendChild(reopened);
-    expect(reopened.querySelector<HTMLElement>("#ssh-dirty-hint")!.style.display).toBe("");
+    const hint = reopened.querySelector<HTMLElement>("#dirty-hint")!;
+    expect(hint.classList.contains("on")).toBe(true);
+    expect(hint.textContent).toContain("SSH config");
   });
 });

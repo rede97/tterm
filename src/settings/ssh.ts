@@ -15,8 +15,6 @@ import { hostProp } from "../core/common";
 import { logCatch, logError } from "../core/errorlog";
 import { type ConfigState, configStore } from "../core/store";
 import type { SshHost } from "../core/types";
-import { confirmDialog } from "../ui/confirm";
-import { html as domHtml, setHtml } from "../ui/dom";
 import { html, infoRow, itemRow, linkBtn, render, repeat, section, toggle } from "../ui/lit";
 import { showToast } from "../ui/toast";
 import { showSshHostEditor } from "./sshhosteditor";
@@ -153,7 +151,7 @@ function sshTemplate(panel: HTMLElement) {
       html`
         ${itemRow(
           "Built-in SSH Client",
-          "Use TTerm's integrated SSH client — in-terminal password prompts, host-key confirmation, and dynamic port forwarding (tab right-click menu). Off: spawn the system ssh command instead.",
+          "Use TTerm's integrated SSH client — in-terminal password prompts, host-key confirmation, and dynamic port forwarding (quick panel). Off: spawn the system ssh command instead.",
           toggle(
             st.embedded,
             (v) => {
@@ -164,7 +162,7 @@ function sshTemplate(panel: HTMLElement) {
         )}
         ${itemRow(
           "SSH Config File",
-          "Hosts are read from your OpenSSH config file. Check to show in new-tab menu. Changes to the host list are pending until saved.",
+          "Hosts are read from your OpenSSH config file. Check to show in new-tab menu. Edits join the same Apply as app settings — writing the file is silent (a config.tt.bak backup is kept).",
           html`<div class="ssh-host-actions">
             ${linkBtn(
               "Open File",
@@ -174,7 +172,7 @@ function sshTemplate(panel: HTMLElement) {
               { id: "set-open-ssh-config" },
             )}
             ${linkBtn(
-              "Reload",
+              "Reload from disk",
               async () => {
                 const reloaded = await loadSshHosts();
                 configStore.set({ sshHosts: reloaded });
@@ -214,12 +212,6 @@ function sshTemplate(panel: HTMLElement) {
         id: "set-gen-ssh-key",
       }),
     )}
-    <div class="settings-section ssh-save-row">
-      <div class="settings-item-desc ssh-save-hint">Saving will overwrite ~/.ssh/config. A backup is saved to config.tt.bak.</div>
-      <button id="set-save-ssh-config" class="settings-btn" @click=${() => saveConfig(panel)}>
-        Save SSH Config
-      </button>
-    </div>
   `;
 }
 
@@ -299,19 +291,14 @@ function hostCard(panel: HTMLElement, st: SshPanelState, h: SshHost, hidden: str
             try {
               const result: string = await invoke("ssh_clear_known_hosts", { hostname });
               const detail = result.trim();
-              showFeedback(
-                panel,
-                `Cleared known hosts for ${hostname}`,
-                detail || "No output",
-                true,
+              showToast(
+                detail
+                  ? `Cleared known hosts for ${hostname} — ${detail}`
+                  : `Cleared known hosts for ${hostname}`,
+                "info",
               );
             } catch (err) {
-              showFeedback(
-                panel,
-                `Failed to clear known hosts for ${hostname}`,
-                String(err),
-                false,
-              );
+              showToast(`Failed to clear known hosts for ${hostname}: ${String(err)}`, "error");
             }
           },
           { cls: "ssh-card-btn ssh-btn-clear" },
@@ -342,7 +329,7 @@ function keyList(st: SshPanelState) {
       </div>
       <div class="settings-item-control">
         ${linkBtn(
-          "Copy Public Key",
+          "Copy",
           async () => {
             await navigator.clipboard
               .writeText(k.publicKey)
@@ -358,7 +345,7 @@ function keyList(st: SshPanelState) {
 
 // ---- Actions -----------------------------------------------------------
 
-/// Add/Edit result lands in the working copy (pending until Save SSH Config).
+/// Add/Edit result lands in the working copy (pending until the shell's Apply).
 function saveHost(panel: HTMLElement) {
   return (host: SshHost, originalName?: string) => {
     const hosts = configStore.get("sshHosts");
@@ -371,42 +358,19 @@ function saveHost(panel: HTMLElement) {
   };
 }
 
-async function saveConfig(panel: HTMLElement): Promise<void> {
-  const confirmed = await confirmDialog({
-    title: "Overwrite SSH config?",
-    message: "This will overwrite ~/.ssh/config. A backup will be saved to config.tt.bak.",
-    okLabel: "Overwrite",
-    danger: true,
-  });
-  if (!confirmed) return;
+/// Write the sshHosts working copy to ~/.ssh/config (backend keeps a
+/// config.tt.bak backup), then reload so the panel reflects what is
+/// actually on disk. Called by the settings shell's Apply — there is no
+/// separate Save anymore. Throws on failure: the shell reports and the
+/// dirty flag stays set.
+export async function saveSshConfigToDisk(from: HTMLElement): Promise<void> {
   const content = generateSshConfig(configStore.get("sshHosts"));
-  try {
-    const result = await invoke<string>("ssh_save_config", { content });
-    const hosts = await loadSshHosts();
-    configStore.set({ sshHosts: hosts });
-    setSshConfigDirty(false, panel); // written to disk
-    renderSshPanel(panel);
-    const detail = result.trim();
-    showFeedback(panel, detail.split("\n")[0] || detail, detail, true);
-  } catch (err) {
-    showFeedback(panel, "Failed to save SSH config", String(err), false);
-  }
-}
-
-/// The footer's feedback span, looked up via the settings page root.
-/// Null-safe: closing the Settings tab mid-invoke must not throw.
-function showFeedback(panel: HTMLElement, title: string, detail: string, ok: boolean): void {
-  const fb = panel.closest(".settings-page")?.querySelector<HTMLElement>(".settings-feedback");
-  if (!fb?.isConnected) return;
-  setHtml(
-    fb,
-    domHtml`<div>${title}</div>
-    <div style="font-size:12px;color:${ok ? "#888" : "#c44"};">${detail}</div>`,
-  );
-  fb.className = `settings-feedback ${ok ? "settings-feedback-ok" : "settings-feedback-info"}`;
-  setTimeout(() => {
-    fb.textContent = "";
-  }, 5000);
+  await invoke<string>("ssh_save_config", { content });
+  const hosts = await loadSshHosts();
+  configStore.set({ sshHosts: hosts });
+  setSshConfigDirty(false, from); // written to disk
+  const panel = from.querySelector<HTMLElement>('.settings-panel-content[data-panel="ssh"]');
+  if (panel?.isConnected) renderSshPanel(panel);
 }
 
 export function collectSshSettings(root: HTMLElement): Partial<ConfigState> {

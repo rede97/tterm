@@ -72,6 +72,80 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
     desc: "Clear the terminal screen and scrollback. Unbound by default.",
     default: "",
   },
+  {
+    id: "workbench.action.showCommands",
+    title: "Show Command Palette…",
+    desc: "Open the > command palette (New Tab, SSH, Serial, Share, and other actions).",
+    default: "ctrl+shift+p",
+  },
+  {
+    id: "workbench.action.newTab",
+    title: "View: New Tab",
+    desc: "Open a new local tab with the default profile.",
+    default: "ctrl+t",
+  },
+  {
+    id: "workbench.action.openSettings",
+    title: "Preferences: Open Settings",
+    desc: "Open the Settings tab.",
+    default: "ctrl+,",
+  },
+  // Palette-first commands: no default binding — the command palette is
+  // their visible entry point (UX-02); users may bind keys in Settings.
+  {
+    id: "tterm.newTabPicker",
+    title: "File: New Tab…",
+    desc: "Pick Local / SSH / Serial, then a profile, host, or port.",
+    default: "",
+  },
+  {
+    id: "tterm.newWindow",
+    title: "File: New Window",
+    desc: "Open a new TTerm window.",
+    default: "",
+  },
+  {
+    id: "tterm.toggleQuickPanel",
+    title: "Session: Toggle Quick Panel",
+    desc: "Open the session quick panel (share, reconnect, parameters).",
+    default: "",
+  },
+  {
+    id: "tterm.toggleShare",
+    title: "Session: Share with AI",
+    desc: "Start or stop sharing the active session with the AI hub.",
+    default: "",
+  },
+  {
+    id: "tterm.tempSsh",
+    title: "SSH: Temporary Connect…",
+    desc: "Connect to a host without writing ~/.ssh/config (host, then password — empty for agent/key).",
+    default: "",
+  },
+  {
+    id: "tterm.portForwards",
+    title: "SSH: Port Forwarding…",
+    desc: "Manage port forwards for the active embedded-SSH session.",
+    default: "",
+  },
+  {
+    id: "tterm.serialProfile",
+    title: "Serial: Session Profile…",
+    desc: "Switch the active serial session's profile (input mode, newlines, flow).",
+    default: "",
+  },
+  {
+    id: "tterm.serialBaud",
+    title: "Serial: Baud Rate…",
+    desc: "Change the active serial session's baud rate.",
+    default: "",
+  },
+  {
+    id: "tterm.serialFlow",
+    title: "Serial: Flow Control…",
+    desc: "Change the active serial session's flow control.",
+    default: "",
+  },
 ];
 
 /** Chromium/WebView2 chrome shortcuts that must never reach the host. */
@@ -274,6 +348,12 @@ export function resetKeymapForTests(): void {
   _handlers = {};
   _suspended = 0;
   rebuildLookup();
+}
+
+/** Run a registered command by id — the command palette's entry point.
+ *  No-op for unknown ids or commands without an injected handler. */
+export function runCommand(id: string): void {
+  _handlers[id]?.();
 }
 
 export function initKeymap(handlers: KeymapHandlers): void {

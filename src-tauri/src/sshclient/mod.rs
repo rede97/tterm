@@ -65,6 +65,11 @@ pub struct EmbeddedSshSpec {
     pub port: u16,
     pub user: String,
     pub identity_file: Option<String>,
+    /// Pre-seeded password (command-palette Temporary Connect). Skips the
+    /// password prompt; agent/identity-file auth still runs first, and a
+    /// stale value falls through to the normal prompt. Never persisted.
+    #[serde(default)]
+    pub password: Option<String>,
 }
 
 #[derive(Clone, Serialize)]

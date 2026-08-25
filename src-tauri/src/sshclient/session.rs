@@ -427,8 +427,10 @@ pub async fn ssh_spawn_embedded(
         close_notify: Arc::new(tokio::sync::Notify::new()),
         live: Arc::new(tokio::sync::Mutex::new(None)),
         size: Arc::new(Mutex::new((80, 24))),
+        // A pre-seeded password (palette Temporary Connect) authenticates
+        // without prompting; agent/identity files are still tried first.
+        cached_password: Arc::new(Mutex::new(spec.password.clone())),
         spec,
-        cached_password: Arc::new(Mutex::new(None)),
         forwards: Arc::new(Mutex::new(HashMap::new())),
         next_forward: Arc::new(AtomicU64::new(1)),
     };

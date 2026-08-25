@@ -3,6 +3,7 @@
 
 import { loadAllWtData } from "../config/wt-profiles";
 import { configStore } from "../core/store";
+import { showToast } from "../ui/toast";
 import { parseFontFamily, updateFontStack } from "../util/fontconfig";
 import { setWtThemes } from "../util/themes";
 import {
@@ -15,7 +16,13 @@ import { collectGeneralSettings, createGeneralPanel, refreshGeneralPanel } from 
 import { collectProfileSettings, createProfilePanel, refreshProfilePanel } from "./profile";
 import { collectSerialSettings, createSerialPanel, refreshSerialPanel } from "./serial";
 import { collectShortcutsSettings, createShortcutsPanel, refreshShortcutsPanel } from "./shortcuts";
-import { collectSshSettings, createSshPanel, isSshConfigDirty, refreshSshPanel } from "./ssh";
+import {
+  collectSshSettings,
+  createSshPanel,
+  isSshConfigDirty,
+  refreshSshPanel,
+  saveSshConfigToDisk,
+} from "./ssh";
 
 export function createSettingsContent(): HTMLElement {
   const root = document.createElement("div");
@@ -68,21 +75,28 @@ export function createSettingsContent(): HTMLElement {
   body.appendChild(panelShortcuts);
 
   // -- Footer --
+  // Design (docs/settings-preview.html): the footer carries ONLY the dirty
+  // hint + Revert + Apply; success/failure feedback goes to the bottom-left
+  // toast. SSH edits join the same Apply — one click writes app config and
+  // ~/.ssh/config together.
   const footer = document.createElement("div");
   footer.className = "settings-footer";
 
-  const feedback = document.createElement("span");
-  feedback.className = "settings-feedback";
-  footer.appendChild(feedback);
+  let appDirty = false;
+  let sshDirty = isSshConfigDirty();
+  const dirtyHint = document.createElement("span");
+  dirtyHint.id = "dirty-hint";
+  footer.appendChild(dirtyHint);
 
-  // Persistent SSH-config dirty hint in the footer bar, next to the
-  // transient feedback — visible in real time no matter which panel is
-  // active. Driven by the ssh panel's tterm-ssh-dirty events.
-  const sshDirty = document.createElement("span");
-  sshDirty.id = "ssh-dirty-hint";
-  sshDirty.style.cssText = `color:#e8a33d;margin-right:10px;${isSshConfigDirty() ? "" : "display:none;"}`;
-  sshDirty.textContent = "● SSH Config edited — unsaved";
-  footer.appendChild(sshDirty);
+  const syncDirty = (): void => {
+    dirtyHint.classList.toggle("on", appDirty || sshDirty);
+    dirtyHint.textContent = sshDirty
+      ? appDirty
+        ? "Unsaved changes · SSH config will be written"
+        : "SSH config will be written on Apply"
+      : "Unsaved changes";
+  };
+  syncDirty();
 
   const spacer = document.createElement("div");
   spacer.style.flex = "1";
@@ -100,11 +114,10 @@ export function createSettingsContent(): HTMLElement {
     configStore.set({ localProfiles: wt.profiles, vsInstalls: wt.vsInstalls });
     updateFontStack(parseFontFamily(configStore.get("fontFamily")));
     refreshAll(root);
-    feedback.textContent = "Reverted to saved config";
-    feedback.className = "settings-feedback settings-feedback-info";
-    setTimeout(() => {
-      feedback.textContent = "";
-    }, 2000);
+    appDirty = false;
+    applyBtn.classList.add("applied");
+    syncDirty();
+    showToast("Reverted to saved settings", "info");
   });
   footer.appendChild(revertBtn);
 
@@ -114,12 +127,22 @@ export function createSettingsContent(): HTMLElement {
   applyBtn.textContent = "Apply";
   applyBtn.addEventListener("click", async () => {
     await applySettings(root);
+    // SSH host edits write ~/.ssh/config in the same Apply. On failure the
+    // app settings stay applied; the SSH dirty flag is kept and reported.
+    let sshWrote = false;
+    if (isSshConfigDirty()) {
+      try {
+        await saveSshConfigToDisk(root);
+        sshWrote = true;
+      } catch (err) {
+        showToast(`Failed to write SSH config: ${String(err)}`, "error");
+      }
+    }
+    appDirty = false;
     applyBtn.classList.add("applied");
-    feedback.textContent = "Config saved";
-    feedback.className = "settings-feedback settings-feedback-ok";
-    setTimeout(() => {
-      feedback.textContent = "";
-    }, 2500);
+    sshDirty = isSshConfigDirty();
+    syncDirty();
+    showToast(sshWrote ? "Settings applied · SSH config written" : "Settings applied", "info");
   });
   footer.appendChild(applyBtn);
 
@@ -134,6 +157,8 @@ export function createSettingsContent(): HTMLElement {
     root.addEventListener(ev, (e) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) {
         applyBtn.classList.remove("applied");
+        appDirty = true;
+        syncDirty();
       }
     });
   }
@@ -160,23 +185,25 @@ export function createSettingsContent(): HTMLElement {
   // Handle reset event from General panel
   panelGeneral.addEventListener("tterm-settings-reset", () => {
     refreshAll(root);
-    feedback.textContent = "All settings cleared";
-    feedback.className = "settings-feedback settings-feedback-info";
-    setTimeout(() => {
-      feedback.textContent = "";
-    }, 2000);
+    appDirty = false;
+    applyBtn.classList.add("applied");
+    syncDirty();
+    showToast("All settings cleared", "info");
   });
 
   // Panels with non-native edits (font picker, keybinding capture) signal
   // dirty state with this bubbling event — any panel, one listener.
   root.addEventListener("tterm-settings-changed", () => {
     applyBtn.classList.remove("applied");
+    appDirty = true;
+    syncDirty();
   });
 
   // SSH config dirty state — pushed by the ssh panel (Add/Edit/Delete/
-  // drag/Save/Reload), shown persistently in the footer.
+  // drag/Apply/Reload), folded into the single footer dirty hint.
   root.addEventListener("tterm-ssh-dirty", (e) => {
-    sshDirty.style.display = (e as CustomEvent).detail ? "" : "none";
+    sshDirty = (e as CustomEvent<boolean>).detail;
+    syncDirty();
   });
 
   return root;

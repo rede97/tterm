@@ -1,3 +1,41 @@
+## Unreleased
+
+Changes
+
+- **UI redesign: chrome tokens and skins** — Settings, menus, the quick
+  panel, and the command palette are now driven by one token sheet
+  (`--tt-*`). New Appearance → Chrome Skin picker (Cursor Mono default /
+  VS Code Dark) and a Frosted-glass quick panel option. The tab bar stays
+  fixed dark; terminal color schemes are unaffected
+- **Command palette (Ctrl+Shift+P)** — `>` commands: New Tab… (Local / SSH
+  / Serial → target), Temporary SSH Connect… (host → password, writes
+  nothing to `~/.ssh/config`; empty password uses agent/keys), Port
+  Forwarding…, Share, Serial profile / baud / flow. Ctrl+P Go to Tab flips
+  into commands with `>`; Esc steps back one level. All palette commands
+  appear in Settings → Keyboard and can be rebound
+- **Closing a tab via × asks first** — a small strip under the tab
+  (outside click / Esc cancels; Shift+× closes immediately). Ctrl+W and
+  the context menus still close directly
+- **Tab strip overflow shows a fade and a +N count** of hidden tabs
+  instead of shadows; the active tab is now lighter than the bar with a
+  top highlight (was darker)
+- **SSH host edits apply with everything else** — the separate "Save SSH
+  Config" button is gone; footer Apply writes app config and
+  `~/.ssh/config` together (backup kept as config.tt.bak). Footer shows a
+  single dirty hint; success/failure feedback moved to bottom-left toasts
+- **Context menus reshuffled** — tab menu leads with Duplicate Tab and
+  drops New Tab / Port Forwarding (both live in the + / ▾ buttons, quick
+  panel, and palette); Change Tab Color previews the current color; the
+  terminal menu gains icons and a Duplicate Tab row
+- **Quick panel status colors split** — CONNECTED is green (#22c55e),
+  sharing is teal (#4ec9b0), shown as separate badges
+
+Fixes
+
+- **Stale theme e2e assertions** — the Settings overlay keeps the 2px
+  terminal gutter (v2.2.7), and the active-tab color assertion now matches
+  the redesigned chrome
+
 ## v2.2.7
 
 Changes

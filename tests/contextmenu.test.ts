@@ -30,6 +30,7 @@ const handlers: ContextMenuHandlers = {
   newWindow: vi.fn(),
   getTabLabel: vi.fn(),
   setTabColor: vi.fn(),
+  getTabColor: vi.fn(),
   renameTab: vi.fn(),
   duplicateTab: vi.fn(),
   closeTab: vi.fn(),
@@ -106,7 +107,7 @@ describe("context menu — semantics and keyboard model", () => {
   it("open focuses the first entry; arrows skip hidden entries", () => {
     showTabContextMenu("tab-1", 100, 100);
     const visible = [...menu().querySelectorAll<HTMLElement>('[data-group="tab"] .menu-item')];
-    expect(document.activeElement).toBe(visible[0]); // New Tab
+    expect(document.activeElement).toBe(visible[0]); // Duplicate Tab
     pressKey("ArrowDown");
     expect(document.activeElement).toBe(visible[1]); // Open in New Window
     pressKey("ArrowDown");
@@ -117,8 +118,8 @@ describe("context menu — semantics and keyboard model", () => {
 
   it("Enter executes the focused entry and closes the menu", () => {
     showTabContextMenu("tab-1", 100, 100);
-    pressKey("Enter"); // New Tab
-    expect(handlers.createLocalTab).toHaveBeenCalledTimes(1);
+    pressKey("Enter"); // Duplicate Tab
+    expect(handlers.duplicateTab).toHaveBeenCalledTimes(1);
     expect(menu().classList.contains("open")).toBe(false);
   });
 

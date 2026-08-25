@@ -27,6 +27,13 @@ Preview HTML under `docs/*-preview.html` shares **one token sheet**:
 - `body[data-skin="vscode"]` — blue accent, tighter radius  
 - `body.qp-glass` — frosted translucency for Quick panel only  
 
-## Out of scope
+## Production status
 
-Production `src/styles.css` is not yet driven by this sheet. Porting app chrome to `--tt-*` is a separate change after the drafts settle.
+Migrated (branch `feat/ui-redesign-migration`): `src/ui/tokens.css` is the
+production copy of this sheet (skins only — the `--set-*` / `--qp-*` /
+`--pal-*` alias layer stays preview-only; production CSS uses `--tt-*`
+directly). Skin comes from `chromeSkin` config → `body[data-skin]`, glass
+from `quickPanelGlass` → `body.qp-glass`. One intentional divergence:
+`--term-bg` is NOT aliased to `--tt-term-bg` in production — the app's
+`--term-bg` is JS-written per terminal scheme (terminal seam), while
+`--tt-term-bg` stays fixed for chrome.

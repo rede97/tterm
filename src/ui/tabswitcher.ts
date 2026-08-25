@@ -26,6 +26,9 @@ export interface TabSwitcherHandlers {
   // Tab-strip order (quick open) or MRU order (switcher) — caller decides.
   listTabs: (mode: "quick" | "mru") => SwitcherItem[];
   switchTo: (id: string) => void;
+  // Typing ">" in quick open flips into the command palette (VS Code
+  // model). Injected by wiring so this module never imports the palette.
+  onCommandFlip?: (query: string) => void;
 }
 
 let _handlers: TabSwitcherHandlers | null = null;
@@ -130,8 +133,18 @@ function open(nextMode: "quick" | "mru", startSelected: number): void {
   if (mode === "quick") {
     inputEl = document.createElement("input");
     inputEl.className = "tab-switcher-input";
-    inputEl.placeholder = "Go to tab — type a number or name";
+    inputEl.placeholder = "Go to tab — type a number or name; > for commands";
     inputEl.addEventListener("input", () => {
+      // ">" prefix flips into the command palette, carrying the query.
+      const v = inputEl?.value ?? "";
+      if (v.startsWith(">")) {
+        const flip = _handlers?.onCommandFlip;
+        if (flip) {
+          close();
+          flip(v.slice(1));
+          return;
+        }
+      }
       selected = 0;
       renderList();
     });
@@ -202,12 +215,17 @@ function onQuickKeydown(e: KeyboardEvent): void {
   }
 }
 
-export function openQuickOpen(): void {
-  if (mode === "quick") {
+export function openQuickOpen(query?: string): void {
+  if (mode === "quick" && query === undefined) {
     close();
     return;
   } // toggle, like VS Code
   open("quick", 0);
+  if (query && inputEl) {
+    inputEl.value = query;
+    inputEl.setSelectionRange(query.length, query.length);
+    renderList();
+  }
 }
 
 // -- MRU switcher --

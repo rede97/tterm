@@ -7,22 +7,25 @@ import {
   writeText as clipboardWriteText,
 } from "@tauri-apps/plugin-clipboard-manager";
 import {
-  ArrowLeftRight,
   ArrowRightToLine,
   CircleX,
+  ClipboardPaste,
+  Code,
   Copy,
   createElement,
+  Eraser,
   ExternalLink,
+  FileDown,
   Link,
   Palette,
   Pencil,
   Plus,
+  Search,
   Share2,
   Unlink,
   X,
 } from "lucide";
 import { logCatch } from "../core/errorlog";
-import { showPortForwardingDialog } from "../ui/forwarding";
 import { handleMenuKeydown, menuItems, restoreFocus } from "../ui/menukeys";
 import { showToast } from "../ui/toast";
 import { openFind } from "./search";
@@ -33,6 +36,7 @@ export interface ContextMenuHandlers {
   createLocalTab: () => void;
   getTabLabel: (tabId: string) => string;
   setTabColor: (tabId: string, color: string | undefined) => void;
+  getTabColor: (tabId: string) => string | undefined;
   renameTab: (tabId: string) => void;
   duplicateTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
@@ -48,9 +52,6 @@ export interface ContextMenuHandlers {
   shareTab: (tabId: string) => void;
   isTabShared: (tabId: string) => boolean;
   getShareUrl: (tabId: string) => string | undefined;
-  // Optional: true when the tab is a built-in-client SSH session; gates the
-  // "Port Forwarding…" tab-menu item.
-  isEmbeddedSshTab?: (tabId: string) => boolean;
 }
 
 let _handlers: ContextMenuHandlers | null = null;
@@ -136,11 +137,14 @@ function mkSeparator(): HTMLElement {
 }
 
 // -- Tab context menu group --
+// Design (docs/tabbar-preview.html): Duplicate first; "New Tab" lives on
+// the + / ▾ buttons, Port Forwarding lives in the quick panel — neither
+// repeats here. The color row carries a live preview of the tab's color.
 const tabMenuGroup = document.createElement("div");
 tabMenuGroup.dataset.group = "tab";
 tabMenuGroup.style.display = "none";
 
-tabMenuGroup.appendChild(mkItem("New Tab", "new-tab", Plus));
+tabMenuGroup.appendChild(mkItem("Duplicate Tab", "duplicate", Copy));
 tabMenuGroup.appendChild(mkItem("Open in New Window", "new-window", ExternalLink));
 tabMenuGroup.appendChild(mkSeparator());
 
@@ -163,6 +167,11 @@ const arrow = document.createElement("span");
 arrow.className = "menu-arrow";
 arrow.textContent = "\u203a";
 colorItem.appendChild(arrow);
+// Live preview of the tab's current color; hidden while the tab is uncolored.
+const colorPreview = document.createElement("span");
+colorPreview.className = "menu-color-preview";
+colorPreview.style.display = "none";
+colorItem.appendChild(colorPreview);
 colorItemWrap.appendChild(colorItem);
 tabMenuGroup.appendChild(colorItemWrap);
 
@@ -216,7 +225,6 @@ colorItemWrap.addEventListener("mouseleave", () => {
 });
 
 tabMenuGroup.appendChild(mkItem("Rename", "rename", Pencil));
-tabMenuGroup.appendChild(mkItem("Duplicate Tab", "duplicate", Copy));
 // Share state decides which of these three is visible (showTabContextMenu).
 const shareItem = mkItem("Share with AI", "share", Share2);
 const copyShareItem = mkItem("Copy Share Link", "copy-share", Link);
@@ -224,10 +232,6 @@ const stopShareItem = mkItem("Stop Sharing", "share", Unlink);
 tabMenuGroup.appendChild(shareItem);
 tabMenuGroup.appendChild(copyShareItem);
 tabMenuGroup.appendChild(stopShareItem);
-// Visible only for embedded-SSH tabs (see showTabContextMenu).
-const portForwardItem = mkItem("Port Forwarding…", "port-forward", ArrowLeftRight);
-portForwardItem.style.display = "none";
-tabMenuGroup.appendChild(portForwardItem);
 tabMenuGroup.appendChild(mkSeparator());
 tabMenuGroup.appendChild(mkItem("Close", "close", X));
 tabMenuGroup.appendChild(mkItem("Close Right", "close-right", ArrowRightToLine));
@@ -242,16 +246,18 @@ termMenuGroup.style.display = "none";
 
 // Serial baud/newline controls moved to the quick-status panel (quickpanel.ts).
 
-termMenuGroup.appendChild(mkItem("Copy", "copy"));
-termMenuGroup.appendChild(mkItem("Copy as HTML", "copy-html"));
-termMenuGroup.appendChild(mkItem("Paste", "paste"));
+termMenuGroup.appendChild(mkItem("Copy", "copy", Copy));
+termMenuGroup.appendChild(mkItem("Copy as HTML", "copy-html", Code));
+termMenuGroup.appendChild(mkItem("Paste", "paste", ClipboardPaste));
 termMenuGroup.appendChild(mkSeparator());
-termMenuGroup.appendChild(mkItem("Clear", "clear"));
-termMenuGroup.appendChild(mkItem("Find", "find"));
-termMenuGroup.appendChild(mkItem("Export Text", "export"));
+termMenuGroup.appendChild(mkItem("Clear", "clear", Eraser));
+termMenuGroup.appendChild(mkItem("Find", "find", Search));
+termMenuGroup.appendChild(mkItem("Export Text", "export", FileDown));
 termMenuGroup.appendChild(mkSeparator());
-termMenuGroup.appendChild(mkItem("New Tab", "new-tab"));
-termMenuGroup.appendChild(mkItem("Open in New Window", "new-window"));
+termMenuGroup.appendChild(mkItem("New Tab", "new-tab", Plus));
+termMenuGroup.appendChild(mkItem("Open in New Window", "new-window", ExternalLink));
+// Same shape as the tab menu: duplicate the current session, last row.
+termMenuGroup.appendChild(mkItem("Duplicate Tab", "duplicate", Copy));
 
 contextMenu.appendChild(termMenuGroup);
 
@@ -393,9 +399,6 @@ function dispatch(action: string) {
     case "export":
       h.exportTab(tabId);
       break;
-    case "port-forward":
-      showPortForwardingDialog(tabId);
-      break;
   }
 }
 
@@ -407,7 +410,13 @@ export function showTabContextMenu(tabId: string, x: number, y: number) {
   shareItem.style.display = shared ? "none" : "";
   copyShareItem.style.display = shared ? "" : "none";
   stopShareItem.style.display = shared ? "" : "none";
-  portForwardItem.style.display = (_handlers?.isEmbeddedSshTab?.(tabId) ?? false) ? "" : "none";
+  // Color row: live preview of the tab's current color + the swatch marker.
+  const tabColor = _handlers?.getTabColor(tabId);
+  colorPreview.style.display = tabColor ? "" : "none";
+  if (tabColor) colorPreview.style.background = tabColor;
+  for (const swatch of colorGrid.querySelectorAll<HTMLElement>(".color-swatch")) {
+    swatch.classList.toggle("current", swatch.dataset.color === tabColor);
+  }
   tabMenuGroup.style.display = "";
   termMenuGroup.style.display = "none";
   showAt(x, y);

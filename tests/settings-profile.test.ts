@@ -51,7 +51,7 @@ describe("settings — profile panel", () => {
     )!;
     applyBtn.click();
     await vi.waitFor(() => {
-      expect(root.querySelector(".settings-feedback")!.textContent).toBe("Config saved");
+      expect(document.querySelector("#toast-container")?.textContent).toContain("Settings applied");
     });
     // Regression: an unrelated Apply used to rewrite defaultLocalProfile
     // to the first profile because the select was never initialized.

@@ -222,7 +222,14 @@ describe("keymap dispatcher", () => {
     expect(fired).toEqual(["workbench.action.closeTab"]);
   });
 
-  it("blocks WebView print (Ctrl+Shift+P) even when unbound", () => {
+  it("Ctrl+Shift+P runs the command palette by default", () => {
+    const e = dispatch({ key: "P", ctrlKey: true, shiftKey: true });
+    expect(fired).toEqual(["workbench.action.showCommands"]);
+    expect(e.defaultPrevented).toBe(true);
+  });
+
+  it("blocks WebView print (Ctrl+Shift+P) when the palette is unbound", () => {
+    configStore.set({ keybindings: { "workbench.action.showCommands": "" } });
     const e = dispatch({ key: "P", ctrlKey: true, shiftKey: true });
     expect(fired).toEqual([]);
     expect(e.defaultPrevented).toBe(true);

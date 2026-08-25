@@ -11,7 +11,16 @@
 
 import { dedupeThemeName } from "../config/custom-themes";
 import { type ConfigState, configStore } from "../core/store";
-import { html, itemRow, nothing, render, repeat, section, type TemplateResult } from "../ui/lit";
+import {
+  html,
+  itemRow,
+  nothing,
+  render,
+  repeat,
+  section,
+  type TemplateResult,
+  toggle,
+} from "../ui/lit";
 import { attachStepper } from "../ui/stepper";
 import { buildFontFamily, updateFontStack } from "../util/fontconfig";
 import { allThemes, DEFAULT_THEME_NAME, findTheme, type ThemeDef } from "../util/themes";
@@ -26,6 +35,9 @@ interface AppearancePanelState {
   // Pending gallery selection (applied by the shell's Apply; dropped on
   // Revert). null = follow the store. Replaces root.dataset.themeName.
   pendingThemeName: string | null;
+  // Pending chrome skin / glass picks (same Apply/Revert lifecycle).
+  pendingSkin: string | null;
+  pendingGlass: boolean | null;
 }
 
 const panelStates = new WeakMap<HTMLElement, AppearancePanelState>();
@@ -33,7 +45,7 @@ const panelStates = new WeakMap<HTMLElement, AppearancePanelState>();
 function stateOf(panel: HTMLElement): AppearancePanelState {
   let st = panelStates.get(panel);
   if (!st) {
-    st = { pendingThemeName: null };
+    st = { pendingThemeName: null, pendingSkin: null, pendingGlass: null };
     panelStates.set(panel, st);
   }
   return st;
@@ -72,6 +84,8 @@ export function refreshAppearancePanel(root: HTMLElement): void {
   const panel = appearancePanel(root);
   if (!panel) return;
   stateOf(panel).pendingThemeName = null; // Revert drops the pending selection
+  stateOf(panel).pendingSkin = null;
+  stateOf(panel).pendingGlass = null;
   renderPanel(panel);
   // The size input is user-editable DOM: when the store value equals the last
   // rendered value lit leaves it alone, so reset it explicitly (Revert).
@@ -87,6 +101,10 @@ export function collectAppearanceSettings(root: HTMLElement): Partial<ConfigStat
   partial.themeName = panel
     ? pendingThemeName(panel)
     : root.dataset.themeName || configStore.get("themeName");
+  if (panel) {
+    partial.chromeSkin = stateOf(panel).pendingSkin ?? configStore.get("chromeSkin");
+    partial.quickPanelGlass = stateOf(panel).pendingGlass ?? configStore.get("quickPanelGlass");
+  }
   return partial;
 }
 
@@ -106,7 +124,50 @@ function renderPanel(panel: HTMLElement): void {
 
 function appearanceTemplate(panel: HTMLElement): TemplateResult {
   const current = pendingThemeName(panel);
+  const skin = stateOf(panel).pendingSkin ?? configStore.get("chromeSkin");
+  const skinCard = (id: string, title: string, desc: string): TemplateResult => html`
+    <div
+      class="skin-card ${skin === id ? "selected" : ""}"
+      data-skin=${id}
+      role="radio"
+      aria-checked=${skin === id ? "true" : "false"}
+      tabindex="0"
+      @click=${() => selectSkin(panel, id)}
+      @keydown=${(e: KeyboardEvent) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          selectSkin(panel, id);
+        }
+      }}
+    >
+      <div class="skin-card-title">${title}</div>
+      <div class="skin-card-desc">${desc}</div>
+    </div>
+  `;
   return html`
+    ${section(
+      "Chrome Skin",
+      html`
+        <div class="settings-item-desc" style="margin-bottom:6px">
+          Drives Settings / menus / quick panel. The tab bar stays fixed dark;
+          terminal color schemes stay independent.
+        </div>
+        <div class="skin-grid" role="radiogroup" aria-label="Chrome skin">
+          ${skinCard("cursor", "Cursor Mono", "Near-black, white CTA, soft radius")}
+          ${skinCard("vscode", "VS Code Dark", "Blue accent, tighter chrome")}
+        </div>
+      `,
+    )}
+    ${section(
+      "Quick Panel",
+      itemRow(
+        "Frosted glass",
+        "Blur the terminal behind the panel only — the window stays opaque.",
+        toggle(stateOf(panel).pendingGlass ?? configStore.get("quickPanelGlass"), (on) => {
+          stateOf(panel).pendingGlass = on;
+        }),
+      ),
+    )}
     ${section(
       "Font",
       html`
@@ -253,6 +314,12 @@ function selectTheme(panel: HTMLElement, name: string): void {
   renderPanel(panel);
   // The settings shell listens on the settings-page root; a bubbling event
   // from the panel reaches it and enables the footer Apply.
+  panel.dispatchEvent(new CustomEvent("tterm-settings-changed", { bubbles: true }));
+}
+
+function selectSkin(panel: HTMLElement, id: string): void {
+  stateOf(panel).pendingSkin = id;
+  renderPanel(panel);
   panel.dispatchEvent(new CustomEvent("tterm-settings-changed", { bubbles: true }));
 }
 

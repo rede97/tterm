@@ -6,14 +6,18 @@
 // functions at startup instead of carrying the inline blocks.
 
 import { invoke } from "@tauri-apps/api/core";
+import { loadSerialPorts } from "./config/wt-profiles";
 import { logCatch } from "./core/errorlog";
 import { initKeymap } from "./core/keymap";
+import { configStore } from "./core/store";
 import { setDirMenuHandlers } from "./terminal/dirmenu";
 import { pasteIntoTerminal } from "./terminal/paste";
 import { setSearchHandlers } from "./terminal/search";
 import { setSshAuthTabLookup } from "./terminal/sshauth";
 import type { TerminalTab } from "./terminal/tab";
 import { tabManager } from "./terminal/tabmanager";
+import { showPortForwardingDialog } from "./ui/forwarding";
+import { openCommandPalette, openPaletteFlow, setPaletteHandlers } from "./ui/palette";
 import { openQuickOpen, setTabSwitcherHandlers, stepMruSwitcher } from "./ui/tabswitcher";
 import { toggleFullscreenMode, toggleZenMode } from "./ui/window";
 
@@ -41,6 +45,35 @@ export function initShortcutsWiring(): void {
       return entries.map((e, i) => toItem(e, i));
     },
     switchTo: (id) => tabManager.switchTo(id),
+    onCommandFlip: (query) => openCommandPalette(query),
+  });
+  setPaletteHandlers({
+    listLocalProfiles: () =>
+      configStore
+        .get("localProfiles")
+        .filter((p) => !configStore.get("hiddenProfiles").includes(p.name)),
+    listSshHosts: () =>
+      configStore
+        .get("sshHosts")
+        .filter((h) => !configStore.get("hiddenSshHosts").includes(h.name)),
+    listSerialPorts: () => loadSerialPorts(),
+    openLocalTab: (command, label) => void tabManager.createLocalTab(command, label),
+    openSshTab: (host, password) => void tabManager.createSshTab(host, password),
+    openSerialTab: (port) => void tabManager.createSerialTab(port),
+    getActiveTab: () => {
+      const t = tabManager.settingsOpen ? null : tabManager.activeTab;
+      return t ? { id: t.id, type: t.type } : null;
+    },
+    setSerialBaud: (id, baud) => tabManager.setSerialBaud(id, baud),
+    setSerialProfile: (id, name) => tabManager.setSerialProfile(id, name),
+    setSerialFlow: (id, flow) => {
+      const t = tabManager.get(id);
+      if (!t) return;
+      t.flowControl = flow;
+      invoke("serial_set_flow_control", { id, flow }).catch(logCatch("serial.setFlow"));
+    },
+    showPortForwards: (tabId) => showPortForwardingDialog(tabId),
+    flipToQuickOpen: (query) => openQuickOpen(query),
   });
   initKeymap({
     "workbench.action.quickOpen": () => openQuickOpen(),
@@ -67,6 +100,24 @@ export function initShortcutsWiring(): void {
       const t = tabManager.activeTab;
       if (t) t.terminal.clear();
     },
+    "workbench.action.showCommands": () => openCommandPalette(),
+    "workbench.action.newTab": () => void tabManager.createLocalTab(),
+    "workbench.action.openSettings": () => tabManager.toggleSettings(),
+    "tterm.newTabPicker": () => openPaletteFlow("newTab"),
+    "tterm.newWindow": () => invoke("open_new_window").catch(logCatch("window.openNew")),
+    "tterm.toggleQuickPanel": () => {
+      document.getElementById("quick-status")?.click();
+    },
+    "tterm.toggleShare": () => {
+      if (tabManager.activeTabId) tabManager.shareTab(tabManager.activeTabId);
+    },
+    "tterm.tempSsh": () => openPaletteFlow("tempSsh"),
+    "tterm.portForwards": () => {
+      if (tabManager.activeTabId) showPortForwardingDialog(tabManager.activeTabId);
+    },
+    "tterm.serialProfile": () => openPaletteFlow("serialProfile"),
+    "tterm.serialBaud": () => openPaletteFlow("serialBaud"),
+    "tterm.serialFlow": () => openPaletteFlow("serialFlow"),
   });
 }
 
@@ -110,10 +161,7 @@ export function initContextMenuWiring(): void {
       shareTab: (id) => tabManager.shareTab(id),
       isTabShared: (id) => tabManager.get(id)?.shared ?? false,
       getShareUrl: (id) => tabManager.get(id)?.shareUrl,
-      isEmbeddedSshTab: (id) => {
-        const t = tabManager.get(id);
-        return !!t && t.type === "ssh" && t.sshEmbedded === true;
-      },
+      getTabColor: (id) => tabManager.get(id)?.color,
     });
     m.initContextMenu();
   });

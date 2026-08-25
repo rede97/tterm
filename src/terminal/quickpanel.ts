@@ -549,6 +549,11 @@ function panelTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResult {
     <div class="qp-header">
       <span class="qp-title">${tab.label}</span>
       <span class="qp-state qp-state-${state}">${state}</span>
+      ${
+        // Connection state and share authorization are separate dimensions
+        // (UX-03): the teal sharing badge never replaces the green/red one.
+        tab.shared ? html`<span class="qp-state qp-state-shared">sharing</span>` : nothing
+      }
     </div>
     ${shareTemplate(tab)}
     ${tab.type === "ssh" ? sshTemplate(tab, st) : nothing}

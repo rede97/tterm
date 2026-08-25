@@ -21,6 +21,7 @@ import type {
 import { mustGetById } from "../ui/dom";
 import { addForward, type NewForward } from "../ui/forwarding";
 import { showToast } from "../ui/toast";
+import { showTabCloseConfirm } from "./closetab";
 import { closeQuickPanel, closeQuickPanelForTab, updateQuickButton } from "./quickpanel";
 import { closeFindForTab } from "./search";
 import {
@@ -45,12 +46,33 @@ import {
 
 /// Toggle the strip's layout-state classes from live metrics:
 /// `overflowing` (strip scrolls → +/dropdown pin), `can-scroll-left`
-/// (tabs occluded on the left → left edge shadow) and `can-scroll-right`
-/// (more tabs off-screen right → right edge shadow).
+/// (tabs occluded on the left → left edge fade) and `can-scroll-right`
+/// (more tabs off-screen right → right edge fade + "+N" count badge).
 export function syncTabStripState(el: HTMLElement): void {
-  el.classList.toggle("overflowing", el.scrollWidth > el.clientWidth + 1);
+  const overflowing = el.scrollWidth > el.clientWidth + 1;
+  el.classList.toggle("overflowing", overflowing);
   el.classList.toggle("can-scroll-left", el.scrollLeft > 1);
   el.classList.toggle("can-scroll-right", el.scrollWidth - el.clientWidth - el.scrollLeft > 1);
+
+  // "+N" = tabs fully beyond the right edge of the scrollport. The sticky
+  // new-tab group overlays the right edge while overflowing, so its width
+  // shrinks the visible region. Badge/children are optional: the jsdom
+  // contract tests stub metrics on a childless strip.
+  const badge = el.querySelector<HTMLElement>(`#${DOM_ID.tabOverflowCount}`);
+  if (!badge) return;
+  if (!overflowing) {
+    badge.textContent = "";
+    badge.classList.remove("on");
+    return;
+  }
+  const group = el.querySelector<HTMLElement>(`#${DOM_ID.newTabGroup}`);
+  const rightEdge = el.scrollLeft + el.clientWidth - (group?.offsetWidth ?? 0);
+  let hidden = 0;
+  for (const tab of el.querySelectorAll<HTMLElement>(".tab[data-tab-id]")) {
+    if (tab.offsetLeft >= rightEdge - 1) hidden++;
+  }
+  badge.textContent = hidden > 0 ? `+${hidden}` : "";
+  badge.classList.toggle("on", hidden > 0);
 }
 
 export class TabManager {
@@ -178,9 +200,16 @@ export class TabManager {
     closeBtn.className = "tab-close";
     closeBtn.textContent = "×";
     closeBtn.setAttribute("aria-label", `Close ${tab.label}`);
+    closeBtn.title = "Close tab (Shift-click skips confirmation)";
     closeBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      this.closeTab(tab.id);
+      // Design: × asks via a small anchored strip; Shift+× closes at once.
+      // Other paths (Ctrl+W, context menu, session exit) never confirm.
+      if (e.shiftKey) {
+        void this.closeTab(tab.id);
+        return;
+      }
+      showTabCloseConfirm(el, tab.label, () => void this.closeTab(tab.id));
     });
     el.appendChild(closeBtn);
 
@@ -261,9 +290,9 @@ export class TabManager {
     return this._finalizeTab(tab, result);
   }
 
-  async createSshTab(host: SshHost): Promise<TerminalTab | null> {
+  async createSshTab(host: SshHost, password?: string): Promise<TerminalTab | null> {
     if (configStore.get("sshEmbedded")) {
-      return this._createEmbeddedSshTab(host);
+      return this._createEmbeddedSshTab(host, password);
     }
     let result: WsConnectResult;
     try {
@@ -285,7 +314,12 @@ export class TabManager {
 
   // Built-in client: open the tab first so password/passphrase can be
   // typed in xterm (OpenSSH-style). Host-key confirmation stays a modal.
-  private async _createEmbeddedSshTab(host: SshHost): Promise<TerminalTab | null> {
+  // A pre-seeded password (palette Temporary Connect) skips the password
+  // prompt; a wrong one falls back to prompting (backend clears stale).
+  private async _createEmbeddedSshTab(
+    host: SshHost,
+    password?: string,
+  ): Promise<TerminalTab | null> {
     const target = `${hostProp(host, "user") || "root"}@${hostProp(host, "hostname") || host.name}`;
     const tab = await this._openPendingSshTab(host, target);
     if (!tab) return null;
@@ -298,6 +332,7 @@ export class TabManager {
           port: parseInt(hostProp(host, "port") || "22", 10),
           user: hostProp(host, "user") || "root",
           identityFile: hostProp(host, "identityfile") || null,
+          password: password || null,
         },
         promptTabId: tab.id,
       });

@@ -2,8 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="stylesheet" href="/src/styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/src/ui/tokens.css" />
+    <link rel="stylesheet" href="/src/styles.css" />
     <title>tterm</title>
     <script type="module" src="/src/main.ts" defer></script>
   </head>
@@ -16,6 +17,7 @@
              the right edge when the tab strip overflows and scrolls.
              New tab elements are inserted before this group. -->
         <div id="new-tab-group">
+          <span id="tab-overflow-count" aria-hidden="true"></span>
           <button id="new-tab" aria-label="New tab" title="New tab"><span class="plus">+</span></button>
           <button id="new-tab-menu-btn" aria-label="New tab options">
             <svg width="8" height="8" viewBox="0 0 8 8">

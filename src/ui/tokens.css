@@ -1,0 +1,154 @@
+/**
+ * TTerm UI design tokens — production copy of docs/ui/tokens.css.
+ *
+ * Skins: body[data-skin="cursor" | "vscode"] (set from config `chromeSkin`).
+ * Fixed chrome (tab bar) never follows terminal theme colors.
+ *
+ * NOTE: the preview alias layer (--set-*, --qp-*, --pal-*) is intentionally
+ * NOT ported — production CSS uses --tt-* directly. Also NOT ported: the
+ * `--term-bg: var(--tt-term-bg)` alias. In the app, --term-bg is written by
+ * applyTerminalBackground() to follow the terminal scheme (it paints the
+ * 2px seam around xterm); --tt-term-bg stays fixed #1e1e1e for chrome.
+ */
+
+:root,
+body[data-skin="cursor"] {
+  /* ---- Surfaces ---- */
+  --tt-page: #0f0f0f;
+  --tt-sidebar: #141414;
+  --tt-body: #0f0f0f;
+  --tt-well: #1a1a1a;
+  --tt-inset: #121212;
+  --tt-hover: rgba(255, 255, 255, 0.05);
+  --tt-line: rgba(255, 255, 255, 0.08);
+  --tt-line-strong: rgba(255, 255, 255, 0.14);
+
+  /* ---- Text ---- */
+  --tt-text: #f2f2f2;
+  --tt-muted: #8a8a8a;
+  --tt-faint: #5c5c5c;
+
+  /* ---- Accent (Cursor = white CTA) ---- */
+  --tt-accent: #ffffff;
+  --tt-accent-fill: #ffffff;
+  --tt-accent-text: #0a0a0a;
+  --tt-nav-bar: #ffffff;
+  --tt-focus: rgba(255, 255, 255, 0.4);
+  --tt-selected: rgba(255, 255, 255, 0.1);
+
+  /* ---- Status (CONNECTED green ≠ SHARE teal) ---- */
+  --tt-ok: #22c55e;
+  --tt-share: #4ec9b0;
+  --tt-bad: #ef4444;
+  --tt-warn: #e8a33d;
+  --tt-bolt: #3794ff;
+
+  /* ---- Switch ---- */
+  --tt-switch-off: #2a2a2a;
+  --tt-switch-off-border: rgba(255, 255, 255, 0.1);
+  --tt-switch-on: #ffffff;
+  --tt-switch-on-border: #ffffff;
+  --tt-knob-off: #e8e8e8;
+  --tt-knob-on: #0a0a0a;
+
+  /* ---- Radius / type / controls ---- */
+  --tt-radius: 12px;
+  --tt-radius-sm: 8px;
+  --tt-radius-ctrl: 7px;
+  --tt-radius-opt: 5px;
+  --tt-title-weight: 550;
+  --tt-ui-weight: 500;
+  --tt-btn-width: 148px;
+  --tt-ctrl-h: 28px;
+
+  --tt-ui: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+  --tt-mono: "JetBrains Mono", Consolas, ui-monospace, monospace;
+
+  /* ---- Scroll ---- */
+  --tt-scroll-track: transparent;
+  --tt-scroll-thumb: rgba(255, 255, 255, 0.14);
+  --tt-scroll-thumb-hover: rgba(255, 255, 255, 0.28);
+
+  /* ---- Fixed window chrome (never themes with terminal) ---- */
+  --tt-term-bg: #1e1e1e;
+  --tt-chrome: #252526;
+  --tt-chrome-hover: #2a2a2a;
+  --tt-tab-active: #2d2d2d;
+  --tt-chrome-text: #cccccc;
+  --tt-chrome-muted: #888888;
+
+  /* ---- Feature sizes (quick panel) ---- */
+  --tt-qp-width: 328px;
+  --tt-qp-conn-w: 108px;
+  --tt-qp-share-w: 78px;
+  --tt-qp-led-w: 56px;
+}
+
+body[data-skin="vscode"] {
+  --tt-page: #1e1e1e;
+  --tt-sidebar: #252526;
+  --tt-body: #1e1e1e;
+  --tt-well: #252526;
+  --tt-inset: #1e1e1e;
+  --tt-hover: rgba(255, 255, 255, 0.06);
+  --tt-line: #3e3e42;
+  --tt-line-strong: #3e3e42;
+
+  --tt-text: #cccccc;
+  --tt-muted: #888888;
+  --tt-faint: #6a6a6a;
+
+  --tt-accent: #3794ff;
+  --tt-accent-fill: #0e639c;
+  --tt-accent-text: #ffffff;
+  --tt-nav-bar: #0078d4;
+  --tt-focus: #007fd4;
+  --tt-selected: #094771;
+
+  /* CONNECTED stays Cursor green; share stays teal */
+  --tt-ok: #22c55e;
+  --tt-share: #4ec9b0;
+  --tt-bad: #f14c4c;
+  --tt-warn: #e8a33d;
+  --tt-bolt: #3794ff;
+
+  --tt-switch-off: #1e1e1e;
+  --tt-switch-off-border: #3e3e42;
+  --tt-switch-on: #094771;
+  --tt-switch-on-border: #094771;
+  --tt-knob-off: #888888;
+  --tt-knob-on: #ffffff;
+
+  --tt-radius: 6px;
+  --tt-radius-sm: 4px;
+  --tt-radius-ctrl: 3px;
+  --tt-radius-opt: 3px;
+
+  --tt-scroll-track: #1e1e1e;
+  --tt-scroll-thumb: #424242;
+  --tt-scroll-thumb-hover: #555555;
+
+  /* chrome stays fixed dark even on vscode skin */
+  --tt-term-bg: #1e1e1e;
+  --tt-chrome: #252526;
+  --tt-chrome-hover: #2a2a2a;
+  --tt-tab-active: #2d2d2d;
+}
+
+/* Frosted glass — translucency only; skin colors still apply */
+body.qp-glass[data-skin="cursor"] {
+  --tt-qp-sidebar: rgba(28, 28, 30, 0.62);
+  --tt-qp-well: rgba(44, 44, 46, 0.45);
+  --tt-qp-inset: rgba(0, 0, 0, 0.35);
+  --tt-qp-hover: rgba(255, 255, 255, 0.07);
+  --tt-qp-line: rgba(255, 255, 255, 0.1);
+  --tt-qp-line-strong: rgba(255, 255, 255, 0.18);
+}
+body.qp-glass[data-skin="vscode"] {
+  --tt-qp-sidebar: rgba(37, 37, 38, 0.72);
+  --tt-qp-well: rgba(45, 45, 48, 0.55);
+  --tt-qp-inset: rgba(30, 30, 30, 0.55);
+  --tt-qp-hover: rgba(255, 255, 255, 0.06);
+  --tt-qp-line: rgba(62, 62, 66, 0.85);
+  --tt-qp-line-strong: rgba(62, 62, 66, 0.95);
+}
