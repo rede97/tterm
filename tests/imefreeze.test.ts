@@ -126,4 +126,18 @@ describe("imefreeze geometry guards", () => {
     expect(fakeTa.style.top).toBe("24px");
     handle.dispose();
   });
+
+  it("blur mid-composition clears the freeze when compositionend never arrives", () => {
+    const element = sizedElement(800, 600);
+    const handle = patchImeFreeze(terminal, element, { position: () => null });
+    compositionStart();
+    fakeTa.el.style.left = "999px";
+    expect(fakeTa.style.left).toBe("80px");
+    fakeTa.el.dispatchEvent(new FocusEvent("blur"));
+    vi.advanceTimersByTime(0);
+    // Freeze dropped: subsequent xterm writes pass through.
+    fakeTa.el.style.left = "42px";
+    expect(fakeTa.style.left).toBe("42px");
+    handle.dispose();
+  });
 });

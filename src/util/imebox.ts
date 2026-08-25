@@ -104,6 +104,7 @@ export class ImeBox {
   private lingerTimer: number | null = null;
   private fadeTimer: number | null = null;
   private placeRaf: number | null = null;
+  private blurHideTimer: number | null = null;
 
   constructor(
     private parent: HTMLElement,
@@ -125,10 +126,31 @@ export class ImeBox {
     getPos: () => CursorPos,
     shouldMirror: () => boolean = () => true,
   ): void {
-    textarea.addEventListener("focus", () => trace("textarea focus"));
-    textarea.addEventListener("blur", () => trace("textarea BLUR (composition would cancel)"));
+    textarea.addEventListener("focus", () => {
+      trace("textarea focus");
+      // Focus returned before a deferred blur-hide ran (e.g. IME candidate
+      // click briefly stole focus) — keep the in-flight mirror.
+      this._cancelBlurHide();
+    });
+    // Focus left mid-composition: WebView2/TSF often cancels without a
+    // reliable compositionend, leaving the mirror stuck until the next
+    // compositionstart. Defer a tick so a same-turn compositionend / focus
+    // return (candidate-window click) can cancel the hide.
+    textarea.addEventListener("blur", () => {
+      trace("textarea BLUR");
+      if (!this.active) return;
+      this._cancelBlurHide();
+      this.blurHideTimer = window.setTimeout(() => {
+        this.blurHideTimer = null;
+        if (!this.active) return;
+        trace("blur-hide (composition cancelled without end)");
+        this._cancelTimers();
+        this._hide();
+      }, 0);
+    });
     textarea.addEventListener("compositionstart", () => {
       trace("compositionstart");
+      this._cancelBlurHide();
       if (!shouldMirror()) return;
       this._cancelTimers();
       this.anchor = getPos();
@@ -140,6 +162,7 @@ export class ImeBox {
     });
     textarea.addEventListener("compositionupdate", (e: CompositionEvent) => {
       trace(`compositionupdate "${e.data ?? ""}"`);
+      this._cancelBlurHide();
       if (!this.active) return;
       this.el.textContent = e.data ?? "";
       // Empty composition (all pinyin deleted / IME cleared the string):
@@ -159,12 +182,14 @@ export class ImeBox {
     });
     textarea.addEventListener("compositionend", (e: CompositionEvent) => {
       trace(`compositionend "${(e as CompositionEvent).data ?? ""}"`);
+      this._cancelBlurHide();
       if (!this.active) return;
       this.active = false;
       const committed = (e as CompositionEvent).data ?? "";
-      // Cancelled composition (Esc): nothing committed and nothing shown —
-      // skip the linger, disappear immediately.
-      if (!committed && !this.el.textContent) {
+      // Cancelled (Esc / focus loss with empty commit): drop the preedit
+      // immediately — linger is only for bridging the echo gap after a
+      // successful commit.
+      if (!committed) {
         this._hide();
         return;
       }
@@ -202,9 +227,18 @@ export class ImeBox {
     this.anchor = null;
     this.el.classList.remove("fading");
     this.el.style.display = "none";
+    this.el.textContent = "";
+  }
+
+  private _cancelBlurHide(): void {
+    if (this.blurHideTimer !== null) {
+      clearTimeout(this.blurHideTimer);
+      this.blurHideTimer = null;
+    }
   }
 
   private _cancelTimers(): void {
+    this._cancelBlurHide();
     if (this.lingerTimer !== null) {
       clearTimeout(this.lingerTimer);
       this.lingerTimer = null;

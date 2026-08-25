@@ -20,7 +20,7 @@ v2.2.5-beta.1 已上线保守修复的细节：`docs/ime-anchor-stability.md`。
 
 ### 已确认的问题（仍待修）
 
-- **组词中途失焦，镜像不消失**：正在输入拼音时，用户把焦点点到别处（其他 UI / 另一标签 / 窗口外），浮动组合镜像仍停在原锚点，无法自行消除；只有再次开始打字（新一轮 composition）才会清掉。预期：失焦或 composition 被取消时镜像应立即隐藏。
+- ~~**组词中途失焦，镜像不消失**~~：**已修（待真人验收）** — `ImeBox` 在 textarea `blur` 后延后一拍隐藏；空 `compositionend`（取消）立即清掉 preedit，不再走 linger。`imefreeze` 同步在 blur 时解除冻结，避免无 `compositionend` 时锚点钉死。自动化：`tests/imebox.test.ts`、`tests/imefreeze.test.ts`。
 
 ### Beta 已做的保守修复（代码已合，验收未关）
 
@@ -32,7 +32,7 @@ v2.2.5-beta.1 已上线保守修复的细节：`docs/ime-anchor-stability.md`。
 - [ ] 反色扫描置信度：多反色格 / 扫描失败时保持上一锚点，避免误选 spinner。
 - [ ] 重审 200ms re-anchor 默认策略（是否回到 compositionstart 单次锚定）。
 - [ ] 远端 SSH / 多窗口场景的额外回归矩阵。
-- [ ] 组词中途失焦时强制隐藏镜像（textarea `blur` / composition 取消路径）。
+- [x] 组词中途失焦时强制隐藏镜像（textarea `blur` / composition 取消路径）— 代码已合，待真人 IME 勾选确认。
 
 ### 专项测试清单（关闭本项前勾完）
 
@@ -42,7 +42,8 @@ v2.2.5-beta.1 已上线保守修复的细节：`docs/ime-anchor-stability.md`。
 - [ ] 隐藏光标 fixture / Agent TUI 备选屏：镜像出现在输入点附近，候选窗不跟真光标跑到角落。
 - [ ] **持续刷新的 Agent TUI 中连续组词**：候选窗是否仍跳 `(0,0)`、镜像是否消失、是否冒出原生框。
 - [ ] composition 中途：resize、切 tab、开关 quick panel / 设置。
-- [ ] **组词中途失焦**：点到标签栏 / 设置 / 其他窗口后，镜像应立即消失，无需再打字。
+- [ ] **组词中途失焦**：点到标签栏 / 设置 / 其他窗口后，镜像应立即消失，无需再打字。（代码已修，请重点验）
+- [ ] 点选 IME 候选词时镜像不应被误杀（blur 延后一拍，focus/compositionend 可取消隐藏）。
 - [ ] Esc 取消组词；上屏即隐。
 - [ ] 模式 `auto` / `always` / `off`（`setImeMirrorMode`）。
 - [ ] 若仍复发：控制台 `__tterm.imeDebug({ reanchor: false })`、`__tterm.imeTrace(true)`，记下场景（输出风暴 / resize / 切 tab）与 trace。

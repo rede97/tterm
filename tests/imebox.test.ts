@@ -61,6 +61,56 @@ describe("ImeBox", () => {
     expect(box.isVisible).toBe(false); // no linger, no fade
   });
 
+  it("empty compositionend hides immediately even if preedit text remains", () => {
+    const { textarea, box } = setup();
+    box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }));
+    composition(textarea, "compositionstart");
+    composition(textarea, "compositionupdate", "nihao");
+    expect(box.isVisible).toBe(true);
+    composition(textarea, "compositionend", ""); // cancel without clearing update
+    expect(box.isVisible).toBe(false);
+    expect(box.isComposing).toBe(false);
+  });
+
+  it("blur mid-composition hides the mirror without waiting for compositionend", () => {
+    const { textarea, box } = setup();
+    box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }));
+    composition(textarea, "compositionstart");
+    composition(textarea, "compositionupdate", "ni");
+    expect(box.isVisible).toBe(true);
+    textarea.dispatchEvent(new FocusEvent("blur"));
+    // deferred one tick — compositionend never arrives
+    expect(box.isVisible).toBe(true);
+    vi.advanceTimersByTime(0);
+    expect(box.isVisible).toBe(false);
+    expect(box.isComposing).toBe(false);
+  });
+
+  it("blur hide is cancelled if focus returns in the same turn", () => {
+    const { textarea, box } = setup();
+    box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }));
+    composition(textarea, "compositionstart");
+    composition(textarea, "compositionupdate", "ni");
+    textarea.dispatchEvent(new FocusEvent("blur"));
+    textarea.dispatchEvent(new FocusEvent("focus")); // candidate-window click
+    vi.advanceTimersByTime(0);
+    expect(box.isVisible).toBe(true);
+    expect(box.text).toBe("ni");
+  });
+
+  it("blur hide is cancelled if compositionend arrives in the same turn", () => {
+    const { textarea, box } = setup();
+    box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }));
+    composition(textarea, "compositionstart");
+    composition(textarea, "compositionupdate", "ni");
+    textarea.dispatchEvent(new FocusEvent("blur"));
+    composition(textarea, "compositionend", "你"); // successful commit after blur
+    vi.advanceTimersByTime(0); // blur hide must not clobber linger
+    expect(box.isVisible).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(box.isVisible).toBe(false);
+  });
+
   it("hides while the composition string is empty, reappears on new input", () => {
     const { textarea, box } = setup();
     box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }));

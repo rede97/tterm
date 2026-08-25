@@ -114,11 +114,35 @@ export function patchImeFreeze(
     }
   };
 
+  let blurClearTimer: number | null = null;
+  const clearFreeze = () => {
+    if (blurClearTimer !== null) {
+      clearTimeout(blurClearTimer);
+      blurClearTimer = null;
+    }
+    left = null;
+    top = null;
+    stopRefresh();
+    // Reset horizontal scroll drift: in cursor-hidden TUI apps (htop/btop)
+    // the cursor is parked at a fixed position, often the end of a line. IME
+    // composition positions the textarea there, which can trigger xterm.js to
+    // scroll the viewport right. On compositionend the scroll should reset,
+    // but cursor-hidden mode + the frozen-textarea Proxy can prevent xterm.js's
+    // own reset from firing — leaving scrollLeft > 0 and clipping the leftmost
+    // column.
+    const vp = element.querySelector(".xterm-viewport") as HTMLElement | null;
+    if (vp && vp.scrollLeft !== 0) vp.scrollLeft = 0;
+  };
+
   // compositionstart/end: capture the frozen anchor position. These fire on
   // the hidden textarea and bubble through document. dispose() removes them —
   // an anonymous listener would leak the whole tab via its closure.
   const onCompStart = (e: CompositionEvent) => {
     if (e.target !== ta) return; // only this tab's textarea
+    if (blurClearTimer !== null) {
+      clearTimeout(blurClearTimer);
+      blurClearTimer = null;
+    }
     const p = pxPos();
     if (p) {
       left = p.x;
@@ -141,28 +165,36 @@ export function patchImeFreeze(
 
   const onCompEnd = (e: CompositionEvent) => {
     if (e.target !== ta) return;
-    left = null;
-    top = null;
-    stopRefresh();
-    // Reset horizontal scroll drift: in cursor-hidden TUI apps (htop/btop)
-    // the cursor is parked at a fixed position, often the end of a line. IME
-    // composition positions the textarea there, which can trigger xterm.js to
-    // scroll the viewport right. On compositionend the scroll should reset,
-    // but cursor-hidden mode + the frozen-textarea Proxy can prevent xterm.js's
-    // own reset from firing — leaving scrollLeft > 0 and clipping the leftmost
-    // column.
-    const vp = element.querySelector(".xterm-viewport") as HTMLElement | null;
-    if (vp && vp.scrollLeft !== 0) vp.scrollLeft = 0;
+    clearFreeze();
+  };
+
+  // Focus left mid-composition: compositionend is not always delivered
+  // (same gap as the floating mirror). Drop the freeze so a later style
+  // write is not pinned to a stale anchor.
+  const onBlur = () => {
+    if (left === null && top === null) return;
+    if (blurClearTimer !== null) clearTimeout(blurClearTimer);
+    // Defer one tick so a same-turn compositionend can clear first.
+    blurClearTimer = window.setTimeout(() => {
+      blurClearTimer = null;
+      if (left !== null || top !== null) clearFreeze();
+    }, 0);
   };
 
   document.addEventListener("compositionstart", onCompStart, true);
   document.addEventListener("compositionend", onCompEnd, true);
+  ta.addEventListener("blur", onBlur);
 
   return {
     dispose() {
+      if (blurClearTimer !== null) {
+        clearTimeout(blurClearTimer);
+        blurClearTimer = null;
+      }
       stopRefresh();
       document.removeEventListener("compositionstart", onCompStart, true);
       document.removeEventListener("compositionend", onCompEnd, true);
+      ta.removeEventListener("blur", onBlur);
     },
   };
 }

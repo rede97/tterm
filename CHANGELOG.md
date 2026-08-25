@@ -2,6 +2,19 @@
 
 Fixes
 
+- **IME composition mirror no longer sticks after focus leaves mid-pinyin** —
+  clicking away from the terminal while composing used to leave the floating
+  preedit box on screen until the next composition started. The mirror (and
+  the textarea freeze) now clear on blur; a cancelled composition with an
+  empty commit also hides immediately instead of lingering on stale preedit
+- **Maximize works again after the min-size clamp** — re-applying
+  `set_min_size` on every resize aborted Windows maximize on the undecorated
+  frame (window grew but did not maximize). Clamp now runs once after
+  window-state restore instead
+- **First launch opens at ~61.8% of the screen** — with no saved
+  `.window-state.json`, the window is sized to the monitor × (1/φ) and
+  centered (then floored at 800×600); later launches still restore the
+  last geometry
 - **Changing baud or switching serial profile no longer silences DTR-gated
   devices** — a live baud or flow-control change on Windows was rewriting
   the port config and dropping DTR, so Pico/TinyUSB-class boards went

@@ -107,17 +107,6 @@ pub fn run() {
         )
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .on_window_event(|window, event| {
-            // window-state restore calls set_size with PhysicalSize from
-            // disk and bypasses minWidth/minHeight. Re-clamp on every
-            // size/DPI change so a bad `.window-state.json` cannot stick.
-            if matches!(
-                event,
-                tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. }
-            ) {
-                window::enforce_min_size(window);
-            }
-        })
         .setup(|app| {
             // verify PTY system is available
             let _pty_sys = portable_pty::native_pty_system();
@@ -145,6 +134,27 @@ pub fn run() {
                 initial_cwd: pty::launch_working_directory(),
                 hub,
             });
+
+            // window-state restore uses PhysicalSize via SetWindowPos and
+            // bypasses minWidth/minHeight. After restore settles: first launch
+            // (no usable `.window-state.json`) gets screen×(1/φ) centered;
+            // everyone gets a one-shot min-size clamp. Do NOT hook every
+            // Resized — set_min_size/set_size mid-maximize aborts WS_MAXIMIZE
+            // on undecorated Windows.
+            {
+                use tauri::Manager;
+                let first_launch = !window::has_saved_window_geometry(app.handle());
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(300));
+                    for win in handle.webview_windows().into_values() {
+                        if first_launch {
+                            window::apply_golden_default_size(&win);
+                        }
+                        window::enforce_min_size(&win);
+                    }
+                });
+            }
 
             Ok(())
         })
