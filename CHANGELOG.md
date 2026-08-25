@@ -1,4 +1,4 @@
-## Unreleased
+## v2.2.5-3 (beta 3)
 
 Fixes
 
