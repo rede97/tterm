@@ -292,11 +292,15 @@ auto-reconnect + inline port forwards (embedded client only, compact
 single-line table), serial adds
 auto-reconnect + profile/baud/newline selects + an always-visible
 modem-line block (RTS/DTR toggles, live CTS/DSR status).
-**Modem-line policy**: `open_serial` drives NO line at open —
-ESP32-C3/S3 USB-Serial/JTAG devkits wire RTS → EN (chip held in reset)
-and DTR → IO0 (mid-session reboot lands in download mode), so asserting
-either presents as a silent terminal. Lines move only via the toggles or
-the driver under hardware flow control.
+**Modem-line policy**: `open_serial` asserts DTR at open (PuTTY / Tabby /
+pyserial behavior — Pico/TinyUSB-class CDC devices gate ALL traffic on
+DTR and stay silent without it) but NEVER touches RTS: RTS belongs to
+hardware flow control (driver-managed when the user enables it), and
+ESP32-C3/S3 devkits wire RTS → EN, so asserting it holds the chip in
+reset (verified, rst:0x15). DTR → IO0 on those boards only matters at
+reset time; a mid-session reboot with DTR held can land in download mode
+— accepted, standard terminals behave the same. Lines otherwise move
+only via the toggles or the driver under hardware flow control.
 
 ## System tray (park window)
 

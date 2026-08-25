@@ -134,7 +134,7 @@ fn open_serial(
     stop_bits: u8,
     flow_control: &str,
 ) -> Result<Box<dyn serialport::SerialPort>, String> {
-    let port = serialport::new(port_name, baud_rate)
+    let mut port = serialport::new(port_name, baud_rate)
         .data_bits(map_data_bits(data_bits)?)
         .parity(map_parity(parity)?)
         .stop_bits(map_stop_bits(stop_bits)?)
@@ -144,13 +144,17 @@ fn open_serial(
         .timeout(std::time::Duration::from_millis(20))
         .open()
         .map_err(|e| serial_open_error(port_name, &e))?;
-    // Modem lines are left untouched at open: the user drives them
-    // explicitly from the quick panel (or implicitly via hardware flow
-    // control, where the driver manages RTS). Asserting lines here is
-    // actively harmful on ESP32-C3/S3 native USB-Serial/JTAG devkits —
-    // their auto-reset circuit maps RTS → EN (chip held in reset) and
-    // DTR → IO0 (a mid-session reboot lands in download mode); both
-    // present as a silent terminal (verified on an ESP32-C3 devkit).
+    // Assert DTR at open like every mainstream serial terminal (PuTTY /
+    // Tabby / pyserial): many CDC-ACM devices (Pico/TinyUSB, debug probes,
+    // Arduino-class boards) gate ALL traffic on DTR and stay silent until
+    // it is raised. RTS is deliberately NOT touched here — it belongs to
+    // hardware flow control (driver-managed when the user enables it), and
+    // ESP32-C3/S3 devkits wire RTS → EN, so asserting it holds the chip in
+    // reset (verified on an ESP32-C3 devkit, rst:0x15). DTR → IO0 on those
+    // boards only matters at reset time; a mid-session reboot while DTR is
+    // held can land in download mode — accepted tradeoff, standard terminals
+    // behave the same.
+    let _ = port.write_data_terminal_ready(true);
     Ok(port)
 }
 
@@ -180,6 +184,8 @@ impl Read for SerialIoReader {
 // exited. serial_reconnect matches on it to detect "dead-mode Enter watcher
 // not installed yet" (the write hit the dead session's orphaned writer).
 const PUMP_GONE: &str = "serial I/O pump gone";
+// Cap on deferred (not yet device-accepted) write bytes per session.
+const MAX_PENDING_WRITE: usize = 1024 * 1024;
 
 // Write adapter: relay write path -> device input channel.
 struct SerialIoWriter {
@@ -203,6 +209,12 @@ impl Write for SerialIoWriter {
 // try_clone design blocked keystroke writes behind the pending read (up to
 // 100ms). This pump avoids concurrent handle I/O entirely:
 // drain pending writes first, then read with a short timeout.
+//
+// A write TIMEOUT is not fatal: USB CDC devices whose firmware never reads
+// (and CTS-held hardware flow control) exert backpressure until the driver
+// buffer drains, surfacing as ERROR_SEM_TIMEOUT once the 20ms write timeout
+// lapses. Such bytes are deferred to `pending` and retried every cycle —
+// only other write errors end the session.
 pub(crate) fn serial_io_loop(
     mut port: Box<dyn serialport::SerialPort>,
     out: std::sync::mpsc::Sender<Vec<u8>>,
@@ -212,10 +224,12 @@ pub(crate) fn serial_io_loop(
     mut newline_filter: NewlineFilter,
 ) {
     let mut buf = [0u8; 16384];
-    // Neither line is driven at open (open_serial); tracked here because
-    // the lines cannot be read back from the device.
+    // Write-behind buffer for bytes the device has not accepted yet.
+    let mut pending: std::collections::VecDeque<u8> = std::collections::VecDeque::new();
+    // DTR is asserted at open (open_serial), RTS is not; tracked here
+    // because the lines cannot be read back from the device.
     let mut rts = false;
-    let mut dtr = false;
+    let mut dtr = true;
     'outer: loop {
         if cancel.load(Ordering::Relaxed) {
             break;
@@ -261,11 +275,36 @@ pub(crate) fn serial_io_loop(
                 SerialCtl::SetSize(..) => {} // meaningless for real serial ports
             }
         }
-        // 1. Drain all pending writes immediately (keystrokes -> device)
+        // 1. Drain all pending writes immediately (keystrokes -> device):
+        // deferred bytes first, then new input. Write timeouts defer into
+        // `pending` (retried next cycle); other write errors are fatal.
+        while !pending.is_empty() {
+            match port.write(pending.as_slices().0) {
+                Ok(0) => break, // no progress — retry after the read poll
+                Ok(n) => {
+                    pending.drain(..n);
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::TimedOut => break,
+                Err(_) => break 'outer,
+            }
+        }
         loop {
             match input.try_recv() {
                 Ok(data) => {
-                    if port.write_all(&data).is_err() {
+                    if pending.is_empty() {
+                        match port.write(&data) {
+                            Ok(n) => pending.extend(data[n..].iter().copied()),
+                            Err(e) if e.kind() == std::io::ErrorKind::TimedOut => {
+                                pending.extend(data.iter().copied());
+                            }
+                            Err(_) => break 'outer,
+                        }
+                    } else {
+                        pending.extend(data.iter().copied());
+                    }
+                    // A device that NEVER accepts data must not grow this
+                    // without bound; past the cap the session is truly dead.
+                    if pending.len() > MAX_PENDING_WRITE {
                         break 'outer;
                     }
                 }
@@ -859,6 +898,300 @@ mod tests {
     fn open_serial_invalid_params_rejected_before_open() {
         let result = open_serial("\\\\.\\COM254", 115200, 9, "none", 1, "none");
         assert!(result.err().unwrap().contains("data bits"));
+    }
+    // -- I/O pump write backpressure (CDC devices that never read) --
+
+    // Port whose writes return TimedOut while `timeouts_left` > 0
+    // (or fail fatally when `fatal` is set). Reads come from `read_rx`
+    // when set (simulating device output), otherwise always time out.
+    struct BackpressurePort {
+        timeouts_left: usize,
+        fatal: bool,
+        written: std::sync::Arc<parking_lot::Mutex<Vec<u8>>>,
+        read_rx: Option<std::sync::mpsc::Receiver<Vec<u8>>>,
+    }
+
+    impl std::io::Read for BackpressurePort {
+        fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+            if let Some(rx) = &self.read_rx {
+                if let Ok(data) = rx.recv_timeout(Duration::from_millis(20)) {
+                    let n = data.len().min(out.len());
+                    out[..n].copy_from_slice(&data[..n]);
+                    return Ok(n);
+                }
+            }
+            Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "mock read timeout",
+            ))
+        }
+    }
+
+    impl std::io::Write for BackpressurePort {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            if self.fatal {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "mock fatal write",
+                ));
+            }
+            if self.timeouts_left > 0 {
+                self.timeouts_left -= 1;
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "mock write timeout",
+                ));
+            }
+            self.written.lock().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl serialport::SerialPort for BackpressurePort {
+        fn name(&self) -> Option<String> {
+            Some("MOCK-BACKPRESSURE".into())
+        }
+        fn baud_rate(&self) -> serialport::Result<u32> {
+            Ok(115200)
+        }
+        fn data_bits(&self) -> serialport::Result<serialport::DataBits> {
+            Ok(serialport::DataBits::Eight)
+        }
+        fn flow_control(&self) -> serialport::Result<serialport::FlowControl> {
+            Ok(serialport::FlowControl::None)
+        }
+        fn parity(&self) -> serialport::Result<serialport::Parity> {
+            Ok(serialport::Parity::None)
+        }
+        fn stop_bits(&self) -> serialport::Result<serialport::StopBits> {
+            Ok(serialport::StopBits::One)
+        }
+        fn timeout(&self) -> Duration {
+            Duration::from_millis(1)
+        }
+        fn set_baud_rate(&mut self, _: u32) -> serialport::Result<()> {
+            Ok(())
+        }
+        fn set_data_bits(&mut self, _: serialport::DataBits) -> serialport::Result<()> {
+            Ok(())
+        }
+        fn set_flow_control(&mut self, _: serialport::FlowControl) -> serialport::Result<()> {
+            Ok(())
+        }
+        fn set_parity(&mut self, _: serialport::Parity) -> serialport::Result<()> {
+            Ok(())
+        }
+        fn set_stop_bits(&mut self, _: serialport::StopBits) -> serialport::Result<()> {
+            Ok(())
+        }
+        fn set_timeout(&mut self, _: Duration) -> serialport::Result<()> {
+            Ok(())
+        }
+        fn write_request_to_send(&mut self, _: bool) -> serialport::Result<()> {
+            Ok(())
+        }
+        fn write_data_terminal_ready(&mut self, _: bool) -> serialport::Result<()> {
+            Ok(())
+        }
+        fn read_clear_to_send(&mut self) -> serialport::Result<bool> {
+            Ok(true)
+        }
+        fn read_data_set_ready(&mut self) -> serialport::Result<bool> {
+            Ok(true)
+        }
+        fn read_ring_indicator(&mut self) -> serialport::Result<bool> {
+            Ok(false)
+        }
+        fn read_carrier_detect(&mut self) -> serialport::Result<bool> {
+            Ok(true)
+        }
+        fn bytes_to_read(&self) -> serialport::Result<u32> {
+            Ok(0)
+        }
+        fn bytes_to_write(&self) -> serialport::Result<u32> {
+            Ok(0)
+        }
+        fn clear(&self, _: serialport::ClearBuffer) -> serialport::Result<()> {
+            Ok(())
+        }
+        fn try_clone(&self) -> serialport::Result<Box<dyn serialport::SerialPort>> {
+            Err(serialport::Error::new(
+                serialport::ErrorKind::NoDevice,
+                "no clone",
+            ))
+        }
+        fn set_break(&self) -> serialport::Result<()> {
+            Ok(())
+        }
+        fn clear_break(&self) -> serialport::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn spawn_pump(
+        port: BackpressurePort,
+        nl_mode: crate::newline::NewlineMode,
+    ) -> (
+        std::sync::mpsc::Sender<Vec<u8>>,
+        std::sync::mpsc::Sender<SerialCtl>,
+        std::sync::mpsc::Receiver<Vec<u8>>,
+        Arc<AtomicBool>,
+        std::thread::JoinHandle<()>,
+    ) {
+        let (out_tx, out_rx) = std::sync::mpsc::channel();
+        let (in_tx, in_rx) = std::sync::mpsc::channel();
+        let (ctl_tx, ctl_rx) = std::sync::mpsc::channel();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let cancel2 = cancel.clone();
+        let handle = std::thread::spawn(move || {
+            serial_io_loop(
+                Box::new(port),
+                out_tx,
+                in_rx,
+                ctl_rx,
+                cancel2,
+                NewlineFilter::new(nl_mode),
+            )
+        });
+        (in_tx, ctl_tx, out_rx, cancel, handle)
+    }
+
+    #[test]
+    fn pump_survives_write_timeouts_and_preserves_order() {
+        let written = std::sync::Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let port = BackpressurePort {
+            timeouts_left: 5,
+            fatal: false,
+            written: written.clone(),
+            read_rx: None,
+        };
+        let (in_tx, _ctl, _out, cancel, handle) =
+            spawn_pump(port, crate::newline::NewlineMode::Keep);
+        in_tx.send(b"abc".to_vec()).unwrap();
+        in_tx.send(b"def".to_vec()).unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        while std::time::Instant::now() < deadline {
+            if written.lock().as_slice() == b"abcdef" {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert_eq!(
+            written.lock().as_slice(),
+            b"abcdef",
+            "deferred bytes must reach the device in order"
+        );
+        assert!(
+            !handle.is_finished(),
+            "write timeouts must not kill the pump"
+        );
+        cancel.store(true, Ordering::Relaxed);
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn pump_still_dies_on_fatal_write_error() {
+        let written = std::sync::Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let port = BackpressurePort {
+            timeouts_left: 0,
+            fatal: true,
+            written,
+            read_rx: None,
+        };
+        let (in_tx, _ctl, _out, _cancel, handle) =
+            spawn_pump(port, crate::newline::NewlineMode::Keep);
+        in_tx.send(b"x".to_vec()).unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        while std::time::Instant::now() < deadline && !handle.is_finished() {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert!(
+            handle.is_finished(),
+            "non-timeout write errors must remain fatal"
+        );
+        handle.join().unwrap();
+    }
+    // -- I/O pump output newline mode (profile contract) --
+
+    fn collect_until(
+        out_rx: &std::sync::mpsc::Receiver<Vec<u8>>,
+        expected: &[u8],
+        deadline: Duration,
+    ) -> Vec<u8> {
+        let mut got = Vec::new();
+        let end = std::time::Instant::now() + deadline;
+        while std::time::Instant::now() < end && got.len() < expected.len() {
+            match out_rx.recv_timeout(Duration::from_millis(50)) {
+                Ok(chunk) => got.extend_from_slice(&chunk),
+                Err(_) => {}
+            }
+        }
+        got
+    }
+
+    // The profile's mode is baked into the filter at pump start (spawn):
+    // the very first device bytes are already converted, no manual switch
+    // needed. Guards the "profile applies at open" contract end to end.
+    #[test]
+    fn pump_applies_spawn_newline_mode_from_first_byte() {
+        let (dev_tx, dev_rx) = std::sync::mpsc::channel();
+        let port = BackpressurePort {
+            timeouts_left: 0,
+            fatal: false,
+            written: std::sync::Arc::new(parking_lot::Mutex::new(Vec::new())),
+            read_rx: Some(dev_rx),
+        };
+        let (_in_tx, _ctl, out_rx, cancel, handle) =
+            spawn_pump(port, crate::newline::NewlineMode::CrInLf);
+        // ESP32-C3 app output is LF-only (verified on hardware).
+        dev_tx
+            .send(b"[WiFi] connected\n[Clock] ready\n".to_vec())
+            .unwrap();
+        let got = collect_until(
+            &out_rx,
+            b"[WiFi] connected\r\n[Clock] ready\r\n",
+            Duration::from_secs(2),
+        );
+        cancel.store(true, Ordering::Relaxed);
+        handle.join().unwrap();
+        assert_eq!(got, b"[WiFi] connected\r\n[Clock] ready\r\n");
+    }
+
+    // A live mode switch (quick panel / profile change) reaches the pump
+    // via SerialCtl and converts subsequent output only.
+    #[test]
+    fn pump_applies_live_newline_switch() {
+        let (dev_tx, dev_rx) = std::sync::mpsc::channel();
+        let port = BackpressurePort {
+            timeouts_left: 0,
+            fatal: false,
+            written: std::sync::Arc::new(parking_lot::Mutex::new(Vec::new())),
+            read_rx: Some(dev_rx),
+        };
+        let (_in_tx, ctl, out_rx, cancel, handle) =
+            spawn_pump(port, crate::newline::NewlineMode::Keep);
+        dev_tx.send(b"a\n".to_vec()).unwrap();
+        assert_eq!(
+            collect_until(&out_rx, b"a\n", Duration::from_secs(2)),
+            b"a\n",
+            "keep mode must pass LF through"
+        );
+        ctl.send(SerialCtl::SetOutputNewline(
+            crate::newline::NewlineMode::CrInLf,
+        ))
+        .unwrap();
+        std::thread::sleep(Duration::from_millis(100)); // let a pump cycle apply it
+        dev_tx.send(b"b\n".to_vec()).unwrap();
+        assert_eq!(
+            collect_until(&out_rx, b"b\r\n", Duration::from_secs(2)),
+            b"b\r\n",
+            "switched mode must convert subsequent output"
+        );
+        cancel.store(true, Ordering::Relaxed);
+        handle.join().unwrap();
     }
 
     // -- serial open error mapping --

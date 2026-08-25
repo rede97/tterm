@@ -96,7 +96,8 @@ pub struct SerialLineState {
 pub enum SerialCtl {
     SetBaud(u32),
     SetOutputNewline(NewlineMode),
-    // Drive the RTS modem line (default asserted at open).
+    // Drive the RTS modem line (never asserted at open; driver-managed
+    // under hardware flow control).
     SetRts(bool),
     // Drive the DTR modem line (default asserted at open).
     SetDtr(bool),
