@@ -1,7 +1,8 @@
-// Command palette (Ctrl+Shift+P): opens with the ">" prefix, lists
-// commands, runs one with Enter, and flips back to quick open when the
-// ">" is deleted. Page-stack flows (New Tab… → kind → target) and the
-// temporary-SSH password step are covered by tests/palette.test.ts.
+// Command palette (Ctrl+Shift+P): opens with a fixed chrome ">" prefix,
+// lists commands, runs one with Enter, and flips back to quick open when
+// Backspace is pressed on an empty field. Page-stack flows (New Tab… →
+// kind → target) and the temporary-SSH password step are covered by
+// tests/palette.test.ts.
 
 describe("TTerm command palette", () => {
   before(async () => {
@@ -19,26 +20,33 @@ describe("TTerm command palette", () => {
     await browser.pause(500);
   });
 
-  it("Ctrl+Shift+P opens the palette and Enter runs a command", async () => {
+  it("Ctrl+Shift+P opens the palette and New Tab… creates a tab", async () => {
     await browser.keys(["Control", "Shift", "p"]);
-    const input = await $(".pal-panel .tab-switcher-input");
+    const input = await $(".pal-panel .pal-input");
     await input.waitForExist({ timeout: 5000 });
-    expect(await input.getValue()).toBe(">");
+    // Draft: ">" is chrome (.pal-prefix), not part of the input value.
+    expect(await input.getValue()).toBe("");
+    expect(await $(".pal-prefix.on").isExisting()).toBe(true);
 
-    // Command rows render, grouped, with default keybinding chips.
+    // Command rows render, grouped, with draft titles.
     const rows = await $$(".pal-row");
     expect(rows.length).toBeGreaterThan(5);
     const text = await $(".pal-panel").getText();
     expect(text).toContain("New Tab…");
     expect(text).toContain("Temporary Connect");
+    expect(text).toContain("WINDOW");
 
-    // Run "View: New Tab" from the palette.
-    await input.click(); // belt: the settled terminal must not own focus
+    // New Tab… → Local → first profile (draft picker path).
+    await input.click();
     await browser.keys("new tab");
     await browser.pause(200);
     const before = await browser.execute(() => window.__tterm.mgr.tabs.size);
-    await browser.keys("Enter");
-    await browser.waitUntil(async () => !(await $(".tab-switcher-overlay").isExisting()), {
+    await browser.keys("Enter"); // New Tab…
+    await browser.pause(200);
+    await browser.keys("Enter"); // Local
+    await browser.pause(200);
+    await browser.keys("Enter"); // first local profile
+    await browser.waitUntil(async () => !(await $(".pal-overlay").isExisting()), {
       timeout: 5000,
       timeoutMsg: "palette did not close after Enter",
     });
@@ -48,16 +56,16 @@ describe("TTerm command palette", () => {
     );
   });
 
-  it("deleting the > flips back to quick open (tabs)", async () => {
+  it("Backspace on empty flips back to quick open (tabs)", async () => {
     await browser.keys(["Control", "Shift", "p"]);
-    const input = await $(".pal-panel .tab-switcher-input");
+    const input = await $(".pal-panel .pal-input");
     await input.waitForExist({ timeout: 5000 });
-    await browser.keys("Backspace"); // remove the ">"
+    await browser.keys("Backspace"); // empty field + chrome ">" → quick open
     await browser.waitUntil(
       async () =>
         (await browser.execute(
-          () => document.querySelector(".tab-switcher-input")?.placeholder ?? "",
-        )) === "Go to tab — type a number or name; > for commands",
+          () => document.querySelector(".pal-input")?.placeholder ?? "",
+        )) === "Go to tab — number or name; > for commands",
       { timeout: 5000, timeoutMsg: "did not flip back to quick open" },
     );
     await browser.keys("Escape");

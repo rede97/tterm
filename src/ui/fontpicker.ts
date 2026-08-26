@@ -75,8 +75,8 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
         </div>
       </div>
       <div class="font-picker-footer">
-        <button type="button" class="btn btn-ghost fp-btn-cancel">Cancel</button>
-        <button type="button" class="btn btn-primary fp-btn-apply">Apply</button>
+        <button type="button" class="tt-btn tt-btn-ghost fp-btn-cancel">Cancel</button>
+        <button type="button" class="tt-btn tt-btn-primary fp-btn-apply">Apply</button>
       </div>
     </div>
   `;

@@ -149,7 +149,7 @@ function sectionTemplate(title: string, key: string, body: unknown): TemplateRes
 
 // Switch row (RTS/DTR, share, auto-reconnect). The visual state comes from
 // the model/state on every render — async corrections are just re-renders.
-// .qp-switch is the unified switch control — settings (ui/lit toggle) uses
+// .tt-switch is the unified switch control — settings (ui/lit toggle) uses
 // the same classes and transitions (docs/quickpanel-preview.html).
 function qpToggle(
   label: string,
@@ -162,7 +162,7 @@ function qpToggle(
   // textContent ("RTS"), which newline/indent text nodes would break.
   return html`<div class="qp-row qp-toggle-row ${disabled ? "qp-disabled" : ""}"><span class="qp-label">${label}</span><button
       type="button"
-      class="qp-switch ${on ? "on" : ""}"
+      class="tt-switch ${on ? "on" : ""}"
       role="switch"
       aria-label=${label}
       aria-checked=${on ? "true" : "false"}
@@ -171,7 +171,7 @@ function qpToggle(
       @click=${() => {
         if (!disabled) onFlip(!on);
       }}
-    ><span class="qp-knob"></span></button></div>`;
+    ><span class="tt-knob"></span></button></div>`;
 }
 
 // The custom select lives in ui/select.ts (shared with Settings).
@@ -190,9 +190,9 @@ function qpSelectRow(
     ${ttSelect(label, options, current, onPick, opts)}
   </div>`;
   if (!opts?.descs) return row;
-  return html`<div class="qp-select-wrap">
+  return html`<div class="tt-select-wrap">
     ${row}
-    <div class="qp-hint qp-select-hint">${opts.descs[current] ?? ""}</div>
+    <div class="qp-hint tt-select-hint">${opts.descs[current] ?? ""}</div>
   </div>`;
 }
 
@@ -224,7 +224,7 @@ function shareTemplate(tab: TerminalTab): TemplateResult {
           <span class="qp-share-url" title=${url ?? ""}>${url ?? ""}</span>
           <button
             type="button"
-            class="qp-mini-btn"
+            class="tt-btn tt-btn-solid"
             @click=${(e: Event) => {
               if (!url) return;
               // In-place feedback (design): Copied for ~900ms, then back.
@@ -343,7 +343,7 @@ function connectionTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResu
     <span class="qp-label">Connection</span>
     <button
       type="button"
-      class="qp-mini-btn qp-connect-btn"
+      class="tt-btn tt-btn-solid qp-connect-btn"
       data-kind=${reconnecting ? "reconnect" : "disconnect"}
       @click=${() => {
         // Busy guard lives in the handler, not the disabled attribute: the
@@ -722,7 +722,7 @@ export function initQuickPanel(): void {
       // An open select menu collapses on any outside click, even inside
       // the panel (design behavior).
       if (target instanceof Node) {
-        const inSelect = target instanceof Element ? target.closest(".qp-select") : null;
+        const inSelect = target instanceof Element ? target.closest(".tt-select") : null;
         if (!inSelect) closeAllSelects();
       }
     }

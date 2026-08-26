@@ -1,0 +1,181 @@
+/* Command palette / tab quick-open / MRU — shared `.pal-*` surface.
+   App + docs/command-palette-preview.html both load this file.
+   Tokens: --tt-* only (preview --pal-* aliases are not used here). */
+
+.pal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.28);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 10vh;
+  z-index: 1000;
+  box-sizing: border-box;
+}
+
+.pal-panel {
+  width: min(560px, calc(100% - 32px));
+  max-width: 90vw;
+  background: var(--tt-well);
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius-sm);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  color: var(--tt-text);
+}
+
+.pal-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--tt-inset);
+  border-bottom: 1px solid var(--tt-line-strong);
+}
+
+.pal-prefix {
+  flex: 0 0 auto;
+  padding: 0 0 0 12px;
+  font: var(--tt-fs-body) / 1 var(--tt-mono);
+  font-weight: var(--tt-title-weight);
+  color: var(--tt-accent);
+  display: none;
+  user-select: none;
+}
+
+.pal-prefix.on {
+  display: block;
+}
+
+.pal-input {
+  width: 100%;
+  padding: 11px 12px;
+  background: var(--tt-inset);
+  border: none;
+  border-bottom: 1px solid var(--tt-line-strong);
+  color: var(--tt-text);
+  font: inherit;
+  font-size: var(--tt-fs-body);
+  font-weight: var(--tt-ui-weight);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.pal-input-wrap .pal-input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  background: transparent;
+  border-bottom: none;
+}
+
+.pal-input::placeholder {
+  color: var(--tt-faint);
+}
+
+.pal-mru-hint {
+  padding: 11px 12px;
+  font-size: var(--tt-fs-caption);
+  color: var(--tt-muted);
+}
+
+.pal-list {
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.pal-group {
+  padding: 8px 12px 4px;
+  font-size: var(--tt-fs-caption);
+  font-weight: var(--tt-title-weight);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tt-faint);
+}
+
+.pal-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  cursor: pointer;
+  color: var(--tt-text);
+  font-size: var(--tt-fs-body);
+  font-weight: var(--tt-ui-weight);
+}
+
+.pal-row:hover {
+  background: var(--tt-hover);
+}
+
+.pal-row.selected {
+  background: var(--tt-selected);
+  color: var(--tt-text);
+}
+
+.pal-badge {
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tt-switch-off);
+  border-radius: var(--tt-radius-ctrl);
+  font: var(--tt-fs-caption) / 1 var(--tt-mono);
+  color: var(--tt-muted);
+  flex-shrink: 0;
+}
+
+.pal-row.selected .pal-badge {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--tt-text);
+}
+
+.pal-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pal-row.is-tab .pal-label {
+  font-family: var(--tt-mono);
+  font-weight: var(--tt-ui-weight);
+}
+
+.pal-label.disconnected {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.pal-kbd {
+  flex-shrink: 0;
+  font: var(--tt-fs-caption) / 1 var(--tt-mono);
+  color: var(--tt-faint);
+  letter-spacing: 0.02em;
+}
+
+.pal-row.selected .pal-kbd {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.pal-meta {
+  flex-shrink: 0;
+  font-size: var(--tt-fs-caption);
+  color: var(--tt-muted);
+  font-family: var(--tt-mono);
+}
+
+.pal-row.selected .pal-meta {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.pal-empty {
+  padding: 16px 12px;
+  font-size: var(--tt-fs-label);
+  color: var(--tt-muted);
+  text-align: center;
+}

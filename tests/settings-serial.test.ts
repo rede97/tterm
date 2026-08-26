@@ -46,9 +46,9 @@ describe("settings — Serial panel defaults", () => {
   // Custom listbox picks: open the trigger, click the option (open menus
   // are portaled to <body>).
   function pick(sel: HTMLElement, value: string): void {
-    sel.querySelector<HTMLElement>(".qp-select-trigger")!.click();
+    sel.querySelector<HTMLElement>(".tt-select-trigger")!.click();
     document
-      .querySelector<HTMLElement>(`body > .qp-select-menu .qp-option[data-value="${value}"]`)!
+      .querySelector<HTMLElement>(`body > .tt-select-menu .tt-option[data-value="${value}"]`)!
       .click();
   }
 
@@ -64,15 +64,15 @@ describe("settings — Serial panel defaults", () => {
   it("default profile select lists built-in profiles and is collected on Apply", () => {
     const panel = openPanel();
     const sel = panel.querySelector<HTMLElement>("#set-serial-profile")!;
-    const options = [...sel.querySelectorAll<HTMLElement>(".qp-option")].map(
+    const options = [...sel.querySelectorAll<HTMLElement>(".tt-option")].map(
       (o) => o.dataset.value,
     );
     expect(options).toEqual(expect.arrayContaining(["Normal", "Log", "AT"]));
     // Built-in profiles live in their own optgroup
-    expect(sel.querySelector(".qp-optgroup")!.textContent).toBe("Built-in");
+    expect(sel.querySelector(".tt-optgroup")!.textContent).toBe("Built-in");
     expect(options.slice(0, 3)).toEqual(["Normal", "Log", "AT"]);
     expect(sel.dataset.current).toBe("Normal");
-    expect(sel.querySelector('.qp-option[aria-selected="true"]')!.dataset.value).toBe("Normal");
+    expect(sel.querySelector('.tt-option[aria-selected="true"]')!.dataset.value).toBe("Normal");
 
     pick(sel, "AT");
     expect(collectSerialSettings(panel).serialProfile).toBe("AT");
@@ -126,11 +126,11 @@ describe("settings — Serial profile gallery", () => {
     expect(overlay, "profile editor modal").toBeTruthy();
     expect(overlay!.querySelector<HTMLInputElement>(".sp-name")!.value).toBe("AT Copy");
     expect(
-      overlay!.querySelector<HTMLElement>('.sp-select-slot[data-field="inputMode"] .qp-select')!
+      overlay!.querySelector<HTMLElement>('.sp-select-slot[data-field="inputMode"] .tt-select')!
         .dataset.current,
     ).toBe("line");
     expect(
-      overlay!.querySelector<HTMLElement>('.sp-select-slot[data-field="enterNewline"] .qp-select')!
+      overlay!.querySelector<HTMLElement>('.sp-select-slot[data-field="enterNewline"] .tt-select')!
         .dataset.current,
     ).toBe("crlf");
     // No summary preview in the editor (removed by design).
@@ -143,21 +143,21 @@ describe("settings — Serial profile gallery", () => {
     const overlay = document.body.querySelector(".sp-overlay")!;
 
     const sel = overlay.querySelector<HTMLElement>(
-      '.sp-select-slot[data-field="outputNewline"] .qp-select',
+      '.sp-select-slot[data-field="outputNewline"] .tt-select',
     )!;
     const hint = overlay.querySelector<HTMLElement>(".sp-hint")!;
     // AT profile is out=cr-in-lf: hint explains the current selection.
     expect(sel.dataset.current).toBe("cr-in-lf");
     expect(hint.textContent).toBe("Lone \\n → \\r\\n");
     // Every option carries its description as a hover tooltip.
-    for (const opt of sel.querySelectorAll<HTMLElement>(".qp-option")) {
+    for (const opt of sel.querySelectorAll<HTMLElement>(".tt-option")) {
       expect((opt.title || "").length).toBeGreaterThan(0);
     }
     // Switching the select updates the hint to the new mode's description.
     function pick(value: string): void {
-      sel.querySelector<HTMLElement>(".qp-select-trigger")!.click();
+      sel.querySelector<HTMLElement>(".tt-select-trigger")!.click();
       document
-        .querySelector<HTMLElement>(`body > .qp-select-menu .qp-option[data-value="${value}"]`)!
+        .querySelector<HTMLElement>(`body > .tt-select-menu .tt-option[data-value="${value}"]`)!
         .click();
     }
     pick("keep");
@@ -193,7 +193,7 @@ describe("settings — Serial profile gallery", () => {
     // The new profile is also selectable as the default.
     const sel = panel.querySelector<HTMLElement>("#set-serial-profile")!;
     expect(
-      [...sel.querySelectorAll<HTMLElement>(".qp-option")].map((o) => o.dataset.value),
+      [...sel.querySelectorAll<HTMLElement>(".tt-option")].map((o) => o.dataset.value),
     ).toContain("AT Copy");
   });
 
@@ -238,10 +238,10 @@ describe("settings — Serial profile gallery", () => {
       overlay.querySelector<HTMLButtonElement>(".sp-delete")!.click();
       // Delete now goes through confirmDialog — approve it.
       await vi.waitFor(() => {
-        expect(document.body.querySelector(".confirm-overlay")).toBeTruthy();
+        expect(document.body.querySelector(".cf-overlay")).toBeTruthy();
       });
       document.body
-        .querySelector<HTMLButtonElement>(".confirm-overlay .cf-footer .cf-btn:last-child")!
+        .querySelector<HTMLButtonElement>(".cf-overlay .cf-footer .tt-btn:last-child")!
         .click();
 
       await vi.waitFor(() => {

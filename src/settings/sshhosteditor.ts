@@ -93,8 +93,8 @@ export function showSshHostEditor(opts: SshHostEditorOptions): void {
       <div class="she-table-slot"></div>
       <div class="she-footer">
         <span class="she-spacer"></span>
-        <button class="sp-btn she-cancel" type="button">Cancel</button>
-        <button class="sp-btn sp-save she-save" type="button">${base ? "Save" : "Add Host"}</button>
+        <button class="tt-btn tt-btn-ghost she-cancel" type="button">Cancel</button>
+        <button class="tt-btn tt-btn-primary she-save" type="button">${base ? "Save" : "Add Host"}</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);

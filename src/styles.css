@@ -1,3 +1,6 @@
+@import "./ui/kit/controls.css";
+@import "./ui/kit/palette.css";
+
 * {
   margin: 0;
   padding: 0;
@@ -348,7 +351,7 @@ body {
   width: var(--tt-qp-width);
   max-height: calc(100% - 48px);
   /* Content may scroll when Serial + modem + forwards stack is tall.
-     Select menus are position:fixed (see .qp-select-menu) so opening a
+     Select menus are position:fixed (see .tt-select-menu) so opening a
      dropdown NEVER grows scrollHeight / never forces a classic bar. */
   overflow-x: hidden;
   overflow-y: auto;
@@ -396,14 +399,14 @@ body.qp-glass .qp-section {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-body.qp-glass .qp-select-menu {
+body.qp-glass .tt-select-menu {
   -webkit-backdrop-filter: saturate(160%) blur(20px);
   backdrop-filter: saturate(160%) blur(20px);
   background: rgba(22, 22, 24, 0.72);
 }
 
-body.qp-glass .qp-select-trigger,
-body.qp-glass .qp-mini-btn:not(.qp-connect-btn[data-kind="reconnect"]),
+body.qp-glass .tt-select-trigger,
+body.qp-glass .tt-btn.tt-btn-solid:not(.qp-connect-btn[data-kind="reconnect"]),
 body.qp-glass .qp-share-url {
   background: rgba(0, 0, 0, 0.28);
 }
@@ -615,257 +618,8 @@ body.qp-glass .qp-sharing {
   font-weight: var(--tt-ui-weight);
 }
 
-/* -- custom select (no OS menu) -- */
-.qp-select {
-  position: relative;
-  width: var(--tt-btn-width);
-  height: var(--tt-ctrl-h);
-  flex-shrink: 0;
-}
-
-.qp-select-trigger {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 100%;
-  height: 100%;
-  padding: 0 26px 0 10px;
-  color: var(--tt-text);
-  background: var(--tt-inset);
-  border: 1px solid var(--tt-line-strong);
-  border-radius: var(--tt-radius-ctrl);
-  font-family: var(--tt-ui);
-  font-size: var(--tt-fs-label);
-  font-weight: var(--tt-ui-weight);
-  line-height: 1;
-  text-align: left;
-  cursor: pointer;
-  outline: none;
-}
-
-.qp-select-trigger::after {
-  content: "";
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  width: 12px;
-  height: 12px;
-  transform: translateY(-50%);
-  background:
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>")
-    center / contain no-repeat;
-  pointer-events: none;
-}
-
-.qp-select-trigger:hover {
-  border-color: rgba(255, 255, 255, 0.22);
-}
-
-.qp-select.open .qp-select-trigger,
-.qp-select-trigger:focus-visible {
-  border-color: var(--tt-focus);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tt-focus) 35%, transparent);
-}
-
-/* Settings selects match draft: 12.5px / weight 550 / centered label. */
-.settings-page .qp-select-trigger {
-  justify-content: center;
-  text-align: center;
-  padding: 0 26px;
-  font-size: var(--tt-fs-ctrl);
-  font-weight: var(--tt-title-weight);
-}
-
-.qp-select-value {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Floating listbox: fixed to the viewport AND portaled to <body> (a
-   backdrop-filtered glass panel would otherwise trap it as its fixed
-   containing block) — so it never contributes to .quick-panel
-   scrollHeight. top/left/width/bottom are set in JS (placeSelectMenu);
-   data-drop only documents intent. z sits above every modal overlay
-   (sshauth z-1100) since settings editors use the same control. */
-.qp-select-menu {
-  position: fixed;
-  z-index: 1200;
-  max-height: 220px;
-  overflow: auto;
-  padding: 4px;
-  background: #161616;
-  border: 1px solid var(--tt-line-strong);
-  border-radius: var(--tt-radius-sm);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
-  display: none;
-  box-sizing: border-box;
-}
-
-/* While portaled to <body> the menu is outside .qp-select — it carries
-   its own .open there. */
-.qp-select.open .qp-select-menu,
-.qp-select-menu.open {
-  display: block;
-}
-
-.qp-optgroup {
-  padding: 6px 8px 3px;
-  font-size: var(--tt-fs-caption);
-  font-weight: var(--tt-ui-weight);
-  color: var(--tt-faint);
-  letter-spacing: 0.02em;
-}
-
-.qp-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 8px;
-  border: 0;
-  border-radius: var(--tt-radius-opt);
-  background: transparent;
-  color: var(--tt-text);
-  font-family: var(--tt-ui);
-  font-size: var(--tt-fs-label);
-  font-weight: var(--tt-ui-weight);
-  line-height: 1.3;
-  text-align: left;
-  cursor: pointer;
-}
-
-.qp-option:hover,
-.qp-option.active,
-.qp-option[aria-selected="true"]:hover {
-  background: var(--tt-hover);
-  color: var(--tt-text);
-}
-
-.qp-option[aria-selected="true"] {
-  background: var(--tt-selected);
-  color: var(--tt-text);
-}
-
-.qp-option[aria-selected="true"]::after {
-  content: "";
-  width: 12px;
-  height: 12px;
-  flex-shrink: 0;
-  background:
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23f2f2f2' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6 9 17l-5-5'/></svg>")
-    center / contain no-repeat;
-}
-
-.qp-select-wrap {
-  padding-bottom: 2px;
-}
-
-.qp-hint {
-  font-size: var(--tt-fs-caption);
-  color: var(--tt-faint);
-  padding: 0 12px 6px;
-  line-height: 1.4;
-}
-
-.qp-select-hint {
-  padding-top: 0;
-}
-
-.qp-row.qp-disabled,
-.qp-select.qp-disabled {
-  opacity: 0.45;
-  pointer-events: none;
-}
-
-/* -- switch: the unified toggle control (settings uses the same classes);
-   animated; colors from skin tokens -- */
-.qp-switch {
-  position: relative;
-  width: 28px;
-  height: 16px;
-  border-radius: 99px;
-  background: var(--tt-switch-off);
-  border: 1px solid var(--tt-switch-off-border);
-  cursor: pointer;
-  flex-shrink: 0;
-  padding: 0;
-  transition:
-    background 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    border-color 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.qp-knob {
-  position: absolute;
-  top: 1px;
-  left: 1px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--tt-knob-off);
-  transition:
-    left 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    background 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.qp-switch:active .qp-knob {
-  transform: scaleX(1.15);
-  transform-origin: left center;
-}
-
-.qp-switch.on:active .qp-knob {
-  transform-origin: right center;
-}
-
-.qp-switch.on {
-  background: var(--tt-switch-on);
-  border-color: var(--tt-switch-on-border);
-}
-
-.qp-switch.on .qp-knob {
-  left: 13px;
-  background: var(--tt-knob-on);
-}
-
-.qp-switch:focus-visible {
-  outline: 2px solid var(--tt-focus);
-  outline-offset: 2px;
-}
-
-/* Settings context: same control, settings-preview dimensions
-   (36×20, 14px knob, 160ms ease — docs/settings-preview.html .toggle). */
-.settings-page .qp-switch {
-  width: 36px;
-  height: 20px;
-  transition:
-    background 160ms ease,
-    border-color 160ms ease;
-}
-
-.settings-page .qp-switch .qp-knob {
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  transition:
-    left 160ms ease,
-    background 160ms ease,
-    transform 160ms ease;
-}
-
-.settings-page .qp-switch.on .qp-knob {
-  left: 18px;
-}
-
-.qp-switch:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 /* -- buttons: same footprint as selects -- */
-.qp-mini-btn {
+.tt-btn.tt-btn-solid {
   width: var(--tt-btn-width);
   height: var(--tt-ctrl-h);
   padding: 0 10px;
@@ -882,7 +636,7 @@ body.qp-glass .qp-sharing {
   text-align: center;
 }
 
-.qp-mini-btn:hover {
+.tt-btn.tt-btn-solid:hover {
   border-color: color-mix(in srgb, var(--tt-text) 35%, transparent);
   background: color-mix(in srgb, var(--tt-inset) 80%, #fff);
   color: var(--tt-text);
@@ -973,7 +727,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   white-space: nowrap;
 }
 
-.qp-share-url-row .qp-mini-btn {
+.qp-share-url-row .tt-btn.tt-btn-solid {
   /* Fixed width for Copy ↔ Copied so the URL field doesn't reflow. */
   width: 68px;
   min-width: 68px;
@@ -1005,7 +759,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   min-height: 28px;
 }
 
-.qp-signals .qp-switch,
+.qp-signals .tt-switch,
 .qp-signals .qp-led {
   justify-self: start;
 }
@@ -1682,7 +1436,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 .settings-panel-content,
 .font-picker-body,
 .fp-list,
-.tab-switcher-list {
+.pal-list {
   scrollbar-gutter: auto;
 }
 
@@ -1694,7 +1448,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   .settings-panel-content,
   .font-picker-body,
   .fp-list,
-  .tab-switcher-list {
+  .pal-list {
     scrollbar-width: thin;
     scrollbar-color: var(--tt-scroll-thumb) transparent;
   }
@@ -2179,7 +1933,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 
 /* -- body -- */
 
-.settings-body {
+.settings-main {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -2212,11 +1966,11 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   padding: 20px 24px 28px;
 }
 
-.settings-section {
+.section {
   margin-bottom: 28px;
 }
 
-.settings-section-title {
+.section-title {
   font-size: var(--tt-fs-caption);
   font-weight: var(--tt-title-weight);
   text-transform: uppercase;
@@ -2238,22 +1992,22 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   margin-bottom: 10px;
 }
 
-.settings-item {
+.row-block {
   margin-bottom: 18px;
 }
 
-.settings-item-title {
+.row-title {
   font-size: var(--tt-fs-body);
   font-weight: var(--tt-title-weight);
   color: var(--tt-text);
   margin-bottom: 0;
 }
 
-.settings-item-row .settings-item-title {
+.row .row-title {
   margin-bottom: 0;
 }
 
-.settings-item-desc {
+.row-desc {
   font-size: var(--tt-fs-desc);
   color: var(--tt-muted);
   margin-top: 2px;
@@ -2261,7 +2015,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   line-height: 1.45;
 }
 
-.settings-item-row .settings-item-desc {
+.row .row-desc {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2276,7 +2030,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 
 /* Row wells (design: every settings row is a bordered well, not a bare
    flex line). */
-.settings-item-row {
+.row {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -2288,12 +2042,12 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   margin-bottom: 8px;
 }
 
-.settings-item-info {
+.row-info {
   flex: 1;
   min-width: 0;
 }
 
-.settings-item-control {
+.row-control {
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -2351,16 +2105,49 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   font-variant-numeric: tabular-nums;
 }
 
-.settings-item-row > .settings-input-narrow,
-.settings-item-control > .settings-input-narrow {
+.row > .settings-input-narrow,
+.row-control > .settings-input-narrow {
+  width: var(--tt-btn-width);
+  min-width: var(--tt-btn-width);
+  max-width: var(--tt-btn-width);
+}
+
+/* Draft Settings text fields (docs/settings-preview.html .input) */
+.input {
+  height: var(--tt-ctrl-h);
+  padding: 0 10px;
+  min-width: 140px;
+  box-sizing: border-box;
+  background: var(--tt-inset);
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius-ctrl);
+  color: var(--tt-text);
+  font: inherit;
+  font-size: var(--tt-fs-ctrl);
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--tt-focus);
+}
+
+.input-narrow {
+  min-width: 72px;
+  width: 72px;
+  text-align: center;
+  font-weight: var(--tt-title-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+.row > .input.input-narrow {
   width: var(--tt-btn-width);
   min-width: var(--tt-btn-width);
   max-width: var(--tt-btn-width);
 }
 
 /* Number inputs: native spinner buttons render with the platform look and
-   clash with the app chrome — hidden globally; settings number fields get
-   the shared stepper (src/ui/stepper.ts) instead. */
+   clash with the app chrome — hidden globally; settings number fields that
+   need ± use the shared stepper (src/ui/stepper.ts). */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -2369,38 +2156,6 @@ input[type="number"]::-webkit-inner-spin-button {
 
 input[type="number"] {
   appearance: textfield;
-}
-
-.stepper {
-  display: flex;
-  align-items: stretch;
-  gap: 4px;
-}
-
-.stepper .settings-input-narrow {
-  width: 52px;
-  min-width: 52px;
-  max-width: 52px;
-  text-align: center;
-}
-
-.stepper-btn {
-  width: 28px;
-  background: var(--tt-inset);
-  border: 1px solid var(--tt-line-strong);
-  border-radius: var(--tt-radius-ctrl);
-  color: var(--tt-muted);
-  font-size: var(--tt-fs-md);
-  line-height: 1;
-  cursor: pointer;
-  outline: none;
-  padding: 0;
-}
-
-.stepper-btn:hover {
-  background: var(--tt-hover);
-  border-color: color-mix(in srgb, var(--tt-muted) 45%, transparent);
-  color: var(--tt-text);
 }
 
 /* theme gallery cards (Appearance > Color Scheme) */
@@ -2750,7 +2505,6 @@ input[type="number"] {
   flex: 1;
 }
 
-/* Theme editor footer buttons → Button design language (.te-btn / .te-save / .te-delete). */
 
 /* theme preview swatches */
 .theme-preview {
@@ -2920,7 +2674,7 @@ input[type="number"] {
 
 /* Visibility lists (LOCKED L3): multi-item "show in new-tab menu" lists
    use LEFT checkboxes, never toggles — docs/settings-preview.html
-   .check-row. Single on/off features keep the right-side .qp-switch. */
+   .check-row. Single on/off features keep the right-side .tt-switch. */
 .check-row {
   display: flex;
   align-items: flex-start;
@@ -3050,228 +2804,11 @@ body[data-skin="cursor"] .check-box:checked::after {
   flex-wrap: wrap;
 }
 
-.host-toolbar .btn {
+.host-toolbar .tt-btn {
   width: var(--tt-btn-width);
   min-width: var(--tt-btn-width);
   box-sizing: border-box;
   justify-content: center;
-}
-
-/* ===== Button design language (Settings / modals / confirm) =====
-   Tokens: --tt-btn-width · --tt-ctrl-h · --tt-btn-solid-bg · accent/* · bad
-   Variants (do not invent new skins):
-     primary     Apply / Save / Add Host / Generate / Install
-     ghost       Cancel / Revert / Reload / Open File
-     solid       Configure / Homepage / Copy / Check for Updates (148×28)
-     danger      Delete (outline)
-     danger-fill confirm destructive OK
-     link        text affordance ("Generate one…")
-   Legacy class names below are aliases of those variants. */
-
-.btn,
-.te-btn,
-.sp-btn,
-.fp-btn,
-.settings-btn,
-.settings-btn-revert,
-.cf-btn {
-  height: var(--tt-ctrl-h);
-  min-width: var(--tt-btn-width);
-  padding: 0 14px;
-  box-sizing: border-box;
-  border: 1px solid var(--tt-line-strong);
-  border-radius: var(--tt-radius-ctrl);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-family: var(--tt-ui);
-  font-size: var(--tt-fs-ctrl);
-  font-weight: var(--tt-title-weight);
-  line-height: 1;
-  background: var(--tt-well);
-  color: var(--tt-text);
-  outline: none;
-}
-
-/* Confirm dialog keeps a tighter min-width. */
-.cf-btn {
-  min-width: 88px;
-  padding: 0 16px;
-  font-weight: var(--tt-ui-weight);
-}
-
-/* Cancel is a ghost (design: primary / ghost / danger-fill). */
-.cf-btn.cf-cancel {
-  background: transparent;
-}
-
-.cf-btn.cf-cancel:hover {
-  background: var(--tt-hover);
-}
-
-.btn:hover,
-.te-btn:hover,
-.sp-btn:hover,
-.fp-btn:hover,
-.settings-btn-revert:hover,
-.cf-btn:hover {
-  background: var(--tt-hover);
-  filter: none;
-}
-
-.cf-btn:focus-visible {
-  outline: 2px solid var(--tt-focus);
-  outline-offset: 2px;
-}
-
-/* --- primary --- */
-.btn-primary,
-.te-save,
-.sp-save,
-.fp-btn-apply,
-.settings-btn:not(.settings-btn-revert),
-.cf-btn-ok {
-  background: var(--tt-accent-fill);
-  border-color: var(--tt-accent-fill);
-  color: var(--tt-accent-text);
-}
-
-.btn-primary:hover,
-.te-save:hover,
-.sp-save:hover,
-.fp-btn-apply:hover,
-.settings-btn:not(.settings-btn-revert):hover,
-.cf-btn-ok:hover {
-  background: var(--tt-accent);
-  border-color: var(--tt-accent);
-  filter: none;
-}
-
-body[data-skin="vscode"] .cf-btn-ok:hover {
-  filter: none;
-  background: var(--tt-accent);
-}
-
-.settings-btn.applied {
-  background: var(--tt-faint);
-  border-color: transparent;
-  color: var(--tt-muted);
-  cursor: default;
-}
-
-/* --- ghost --- */
-.btn-ghost,
-.settings-btn-revert,
-.te-cancel,
-.sp-cancel,
-.fp-btn-cancel,
-.cf-cancel {
-  background: transparent;
-  border-color: transparent;
-  color: var(--tt-muted);
-}
-
-.btn-ghost:hover,
-.settings-btn-revert:hover,
-.te-cancel:hover,
-.sp-cancel:hover,
-.fp-btn-cancel:hover,
-.cf-cancel:hover {
-  color: var(--tt-text);
-  background: var(--tt-hover);
-  filter: none;
-}
-
-/* --- solid (secondary CTA, always 148×28) --- */
-.settings-link-btn.solid {
-  width: var(--tt-btn-width);
-  min-width: var(--tt-btn-width);
-  height: var(--tt-ctrl-h);
-  padding: 0 12px;
-  box-sizing: border-box;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: none;
-  border-radius: var(--tt-radius-ctrl);
-  background: var(--tt-btn-solid-bg);
-  color: var(--tt-text);
-  font-family: var(--tt-ui);
-  font-size: var(--tt-fs-ctrl);
-  font-weight: var(--tt-title-weight);
-  text-decoration: none;
-  cursor: pointer;
-  outline: none;
-}
-
-.settings-link-btn.solid:hover {
-  background: var(--tt-btn-solid-bg);
-  color: var(--tt-text);
-  filter: brightness(1.1);
-}
-
-/* --- danger (outline) --- */
-.te-delete,
-.sp-delete,
-.btn-danger {
-  background: transparent;
-  border-color: color-mix(in srgb, var(--tt-bad) 45%, transparent);
-  color: var(--tt-bad);
-}
-
-.te-delete:hover,
-.sp-delete:hover,
-.btn-danger:hover {
-  background: color-mix(in srgb, var(--tt-bad) 14%, transparent);
-  color: var(--tt-bad);
-  filter: none;
-}
-
-/* --- danger-fill (confirm destructive) --- */
-.cf-btn-danger {
-  background: var(--tt-bad);
-  border-color: var(--tt-bad);
-  color: var(--tt-text);
-}
-
-.cf-btn-danger:hover {
-  filter: brightness(1.08);
-}
-
-/* --- link (text) --- */
-.settings-link-btn:not(.solid) {
-  padding: 6px 12px;
-  height: auto;
-  min-width: 0;
-  background: transparent;
-  border: none;
-  border-radius: var(--tt-radius-ctrl);
-  color: var(--tt-accent);
-  font-size: var(--tt-fs-body);
-  font-family: var(--tt-ui);
-  font-weight: var(--tt-title-weight);
-  cursor: pointer;
-  outline: none;
-  display: inline-flex;
-  align-items: center;
-}
-
-.settings-link-btn:not(.solid):hover {
-  background: var(--tt-hover);
-  color: var(--tt-accent);
-}
-
-.settings-link-btn-danger {
-  color: var(--tt-bad);
-}
-
-.settings-link-btn-danger:hover {
-  background: var(--tt-hover);
-  color: var(--tt-bad);
 }
 
 /* Section intro under a section-title (SSH Hosts / Keys, Profile, …). */
@@ -3462,8 +2999,6 @@ textarea.cf-preview:focus {
   border-top: 1px solid var(--tt-line);
 }
 
-/* Confirm footer buttons → Button design language (.cf-btn / .cf-btn-ok / .cf-btn-danger). */
-
 /* "New …" tile (design .theme-new): "+ New Theme" / "+ New Profile" — no separate + circle. */
 .theme-new {
   display: flex;
@@ -3509,7 +3044,7 @@ textarea.cf-preview:focus {
 
 /* ===== Settings — SSH host list ===== */
 
-.settings-section-title-row {
+.section-title-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3935,11 +3470,10 @@ textarea.cf-preview:focus {
   gap: 8px;
 }
 
-/* Font-picker footer buttons → Button design language (.fp-btn / .fp-btn-apply). */
-
 /* ===== SSH Auth Dialogs ===== */
 
-.sshauth-overlay {
+.sshauth-overlay,
+.cf-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
@@ -4121,6 +3655,11 @@ textarea.cf-preview:focus {
   max-width: 92vw;
   max-height: 86vh;
   overflow-y: auto;
+}
+
+/* Keygen / upload — draft .skg/.ski width */
+.she-dialog--sm {
+  width: min(420px, calc(100% - 40px));
 }
 
 .she-header {
@@ -4335,12 +3874,19 @@ textarea.cf-preview:focus {
 }
 
 /* Serial profile cards (gallery reuses .theme-card/.theme-grid).
-   Shorter than theme cards — no preview swatch strip. */
+   Shorter than theme cards — no preview swatch strip; name/summary share
+   one well (draft: transparent name strip — no second tone). */
 .sp-card.theme-card {
   height: 72px;
   min-height: 72px;
   max-height: 72px;
 }
+
+.sp-card .theme-card-name {
+  padding-top: 12px;
+  background: transparent;
+}
+
 #set-serial-profile-new.theme-new {
   height: 72px;
   min-height: 72px;
@@ -4349,12 +3895,14 @@ textarea.cf-preview:focus {
 }
 
 .sp-card-summary {
-  padding: 0 10px 6px;
+  padding: 0 10px 10px;
   font-size: var(--tt-fs-caption);
+  font-family: var(--tt-mono);
   color: var(--tt-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  background: transparent;
 }
 
 /* Serial profile editor modal (mirrors .te-* theme editor) */
@@ -4423,15 +3971,15 @@ textarea.cf-preview:focus {
   white-space: nowrap;
 }
 
-/* Shared ttSelect (qp-select) in the serial profile editor. */
+/* Shared ttSelect (tt-select) in the serial profile editor. */
 .sp-select-slot {
   flex: 1.4;
   min-width: 0;
 }
-.sp-select-slot .qp-select {
+.sp-select-slot .tt-select {
   width: 100%;
 }
-.sp-select-slot .qp-select-trigger {
+.sp-select-slot .tt-select-trigger {
   height: var(--tt-ctrl-h);
   font-size: var(--tt-fs-ctrl);
   font-weight: var(--tt-title-weight);
@@ -4453,153 +4001,6 @@ textarea.cf-preview:focus {
 
 .sp-spacer {
   flex: 1;
-}
-
-/* Serial / SSH modal footer buttons → Button design language (.sp-btn / .sp-save / .sp-delete). */
-
-/* ---- Tab switcher overlay (Ctrl+P quick open / Ctrl+Tab MRU) ---- */
-
-.tab-switcher-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.25);
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  z-index: 1000;
-}
-
-.tab-switcher-panel {
-  margin-top: 12vh;
-  width: 480px;
-  max-width: 90vw;
-  background: var(--tt-well);
-  border: 1px solid var(--tt-line);
-  border-radius: 6px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
-  overflow: hidden;
-}
-
-.tab-switcher-input {
-  width: 100%;
-  padding: 9px 12px;
-  background: var(--tt-inset);
-  border: none;
-  border-bottom: 1px solid var(--tt-line);
-  color: var(--tt-text);
-  font-size: var(--tt-fs-body);
-  outline: none;
-  box-sizing: border-box;
-}
-
-.tab-switcher-hint {
-  padding: 7px 12px;
-  font-size: var(--tt-fs-caption);
-  color: var(--tt-muted);
-  border-bottom: 1px solid var(--tt-line);
-}
-
-.tab-switcher-list {
-  max-height: 50vh;
-  overflow-y: auto;
-  padding: 4px 0;
-}
-
-.tab-switcher-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 12px;
-  cursor: pointer;
-  color: var(--tt-text);
-  font-size: var(--tt-fs-body);
-}
-
-.tab-switcher-row.selected {
-  background: var(--tt-selected);
-  color: var(--tt-text);
-}
-
-.tab-switcher-badge {
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--tt-well);
-  border-radius: 3px;
-  font-size: var(--tt-fs-caption);
-  color: var(--tt-muted);
-  flex-shrink: 0;
-}
-
-.tab-switcher-row.selected .tab-switcher-badge {
-  background: rgba(255, 255, 255, 0.15);
-  color: var(--tt-text);
-}
-
-.tab-switcher-label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tab-switcher-label.disconnected {
-  text-decoration: line-through;
-  opacity: 0.6;
-}
-
-/* -- command palette (shares the switcher shell) -- */
-
-.pal-cat {
-  padding: 6px 12px 2px;
-  font-size: var(--tt-fs-caption);
-  font-weight: var(--tt-title-weight);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--tt-faint);
-}
-
-.pal-kbd {
-  flex-shrink: 0;
-  padding: 1px 6px;
-  border-radius: var(--tt-radius-opt);
-  background: var(--tt-switch-off);
-  border: 1px solid var(--tt-switch-off-border);
-  font-family: var(--tt-mono);
-  font-size: var(--tt-fs-caption);
-  color: var(--tt-muted);
-}
-
-.tab-switcher-row.selected .pal-kbd {
-  background: rgba(255, 255, 255, 0.15);
-  color: var(--tt-text);
-}
-
-.pal-detail {
-  flex-shrink: 0;
-  max-width: 45%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--tt-fs-caption);
-  color: var(--tt-muted);
-}
-
-.tab-switcher-current {
-  font-size: var(--tt-fs-caption);
-  color: var(--tt-muted);
-  flex-shrink: 0;
-}
-
-.tab-switcher-empty {
-  padding: 12px;
-  font-size: var(--tt-fs-label);
-  color: var(--tt-muted);
-  text-align: center;
 }
 
 /* ---- Settings: Keyboard panel ---- */

@@ -59,8 +59,8 @@ Constraints: vite pinned `127.0.0.1:1420` strictPort (HMR 1421; never `localhost
 - **Settings panels**: `const panelStates = new WeakMap<HTMLElement, XxxPanelState>()` + `stateOf(panel)`; templates pure functions of store+state; `repeat(items, key, tpl)`; export `create/refresh/collect`.
 - **Errors**: `.catch(logCatch("domain.action"))`, `swallow()` only for provably-ignorable, `showToast(msg, "error")` for user-facing. Bare `catch{}` banned (grit). Native `alert/confirm/prompt` banned (grit) — use `ui/confirm.ts`/`modal.ts`/`toast.ts` (every dismissal resolves false).
 - **Async guards**: monotonic tokens (`socketGen`), re-entry sets (`_closing`), in-handler busy flags over disabled attributes.
-- **Shared controls**: `ui/lit.ts toggle` (qp-switch), `ui/select.ts ttSelect` (custom listbox, no OS menus; menu portals to `<body>` with own `.open`), `ui/stepper.ts`, `ui/overlay-scroll.ts` (true overlay scrollbar — Chromium has none; webkit width = classic gutter).
-- **Design tokens**: `--tt-*` in `src/ui/tokens.css` (skins `body[data-skin]`, `body.qp-glass`). `--term-bg` is JS-written per terminal scheme (2px seam) — NOT a `--tt-*` token. Tab chrome stays fixed dark. Settings is strictly 1:1 with `docs/settings-preview.html` (148px `--tt-btn-width`, row wells, visibility = LEFT checkbox `.check-row`, toggles only for single on/off).
+- **Shared controls**: `ui/kit/` (`controls.css` + `select.ts` `.tt-select`, `lit.ts` `.tt-switch` / `.section`/`.row` / `.tt-btn*`, `stepper.ts`, `modal.ts`); menu portals to `<body>`; `ui/overlay-scroll.ts` (true overlay scrollbar — Chromium has none; webkit width = classic gutter).
+- **Design tokens**: `--tt-*` in `src/ui/tokens.css` (skins `body[data-skin]`, `body.qp-glass`). `--term-bg` is JS-written per terminal scheme (2px seam) — NOT a `--tt-*` token. Tab chrome stays fixed dark. Settings is strictly 1:1 with `docs/settings-preview.html` (148px `--tt-btn-width`, row wells `.row`, visibility = LEFT checkbox `.check-row`, toggles only for single on/off).
 - **Style**: Biome 2-space, lineWidth 100, organized imports, no `any`/non-null assertions (errors), no import cycles. `cargo fmt` after Rust edits.
 
 **Non-obvious invariants** (breaking these breaks things):
@@ -88,7 +88,7 @@ Constraints: vite pinned `127.0.0.1:1420` strictPort (HMR 1421; never `localhost
 
 ## Testing & QA
 
-- **Vitest** (`tests/*.test.ts`, happy-dom): mock IPC by hoisting `invokeMock` via `vi.hoisted()` + `vi.mock("@tauri-apps/api/core")` BEFORE importing src (module singletons). Reset `document.body.innerHTML` per test. Stub layout metrics via `Object.defineProperty` (happy-dom computes none). Fake tabs: cast `as unknown as TerminalTab`. Settings tests: `openPanel()` + DOM contracts (e.g. `dataset.themeName`, `aria-checked`, `data-current` on custom selects; portaled menus queried at `body > .qp-select-menu`).
+- **Vitest** (`tests/*.test.ts`, happy-dom): mock IPC by hoisting `invokeMock` via `vi.hoisted()` + `vi.mock("@tauri-apps/api/core")` BEFORE importing src (module singletons). Reset `document.body.innerHTML` per test. Stub layout metrics via `Object.defineProperty` (happy-dom computes none). Fake tabs: cast `as unknown as TerminalTab`. Settings tests: `openPanel()` + DOM contracts (e.g. `dataset.themeName`, `aria-checked`, `data-current` on custom selects; portaled menus queried at `body > .tt-select-menu`).
 - **E2E** (`e2e/specs/*.e2e.js`): debug exe + vite dev + tauri-driver; introspect via `window.__tterm` (DEV hook). Always wait for app init first (`__tterm` exists + `tabs.size >= 1` — cold vite transform races). Serial fixture: MOCK-LOOP/MOCK-NL ports (debug). `qpPick` helper for custom selects. Self-clean state (see theme.e2e.js `E2E Custom`).
 - **Rust**: colocated `cargo test` (132 tests incl. sshclient).
 - **Manual**: real-IME acceptance checklist in `docs/backlog.md` — synthetic events/e2e cannot replace real TSF input; required before closing IME items.

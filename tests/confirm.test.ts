@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { confirmDialog } from "../src/ui/confirm";
 
 function dialog(): HTMLElement {
-  return document.querySelector(".confirm-overlay .cf-dialog")!;
+  return document.querySelector(".cf-overlay .cf-dialog")!;
 }
 
 beforeEach(() => {
@@ -21,20 +21,20 @@ describe("confirmDialog", () => {
     const d = dialog();
     expect(d.querySelector(".cf-header")!.textContent).toBe("Update Available");
     expect(d.querySelector(".confirm-text")!.textContent).toBe("line one\n\nline two");
-    const btns = [...d.querySelectorAll<HTMLButtonElement>(".cf-btn")];
+    const btns = [...d.querySelectorAll<HTMLButtonElement>(".cf-footer .tt-btn")];
     expect(btns.map((b) => b.textContent)).toEqual(["Later", "Update"]);
   });
 
   it("resolves true on OK, false on Cancel", async () => {
     const p1 = confirmDialog({ title: "t", message: "m" });
-    dialog().querySelector<HTMLButtonElement>(".cf-btn-ok")!.click();
+    dialog().querySelector<HTMLButtonElement>(".tt-btn-primary")!.click();
     await expect(p1).resolves.toBe(true);
-    expect(document.querySelector(".confirm-overlay")).toBeNull();
+    expect(document.querySelector(".cf-overlay")).toBeNull();
 
     const p2 = confirmDialog({ title: "t", message: "m" });
     dialog().querySelector<HTMLButtonElement>(".cf-cancel")!.click();
     await expect(p2).resolves.toBe(false);
-    expect(document.querySelector(".confirm-overlay")).toBeNull();
+    expect(document.querySelector(".cf-overlay")).toBeNull();
   });
 
   it("resolves false on Escape and backdrop click (dismissal never confirms)", async () => {
@@ -43,7 +43,7 @@ describe("confirmDialog", () => {
     await expect(p1).resolves.toBe(false);
 
     const p2 = confirmDialog({ title: "t", message: "m" });
-    const overlay = document.querySelector<HTMLElement>(".confirm-overlay")!;
+    const overlay = document.querySelector<HTMLElement>(".cf-overlay")!;
     overlay.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await expect(p2).resolves.toBe(false);
   });
@@ -52,7 +52,7 @@ describe("confirmDialog", () => {
     confirmDialog({ title: "t", message: "m", danger: true });
     const d = dialog();
     expect(d.classList.contains("warn")).toBe(true);
-    expect(d.querySelector(".cf-btn-danger")).not.toBeNull();
+    expect(d.querySelector(".tt-btn-danger-fill")).not.toBeNull();
   });
 
   it("renders optional meta and mono preview blocks", () => {

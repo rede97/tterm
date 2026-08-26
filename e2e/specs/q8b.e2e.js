@@ -42,7 +42,7 @@ describe("q8b overlay scrollbar", () => {
     const flowRight = () =>
       browser.execute(() =>
         document
-          .querySelector('.qp-select[aria-label="Flow control"] .qp-select-trigger')
+          .querySelector('.tt-select[aria-label="Flow control"] .tt-select-trigger')
           .getBoundingClientRect()
           .right.toFixed(1),
       );

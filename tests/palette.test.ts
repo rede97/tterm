@@ -46,6 +46,7 @@ const handlers: PaletteHandlers = {
   setSerialBaud: (id, baud) => serialCalls.push(`baud:${id}:${baud}`),
   setSerialProfile: (id, name) => serialCalls.push(`profile:${id}:${name}`),
   setSerialFlow: (id, flow) => serialCalls.push(`flow:${id}:${flow}`),
+  setSerialInputMode: (id, mode) => serialCalls.push(`input:${id}:${mode}`),
   flipToQuickOpen: (q) => {
     flippedTo = q;
   },
@@ -53,10 +54,10 @@ const handlers: PaletteHandlers = {
 setPaletteHandlers(handlers);
 
 function input(): HTMLInputElement {
-  return document.querySelector<HTMLInputElement>(".pal-panel .tab-switcher-input")!;
+  return document.querySelector<HTMLInputElement>(".pal-panel .pal-input")!;
 }
 function rowTexts(): string[] {
-  return [...document.querySelectorAll<HTMLElement>(".pal-row .tab-switcher-label")].map(
+  return [...document.querySelectorAll<HTMLElement>(".pal-row .pal-label")].map(
     (r) => r.textContent ?? "",
   );
 }
@@ -78,7 +79,7 @@ beforeEach(() => {
   flippedTo = null;
   activeTab = { id: "tab-1", type: "local" };
   configStore.set({ keybindings: {} });
-  document.querySelector(".tab-switcher-overlay")?.remove();
+  document.querySelector(".pal-overlay")?.remove();
 });
 
 describe("command palette — root", () => {
@@ -86,18 +87,20 @@ describe("command palette — root", () => {
     openCommandPalette();
     await vi.waitFor(() => expect(rowTexts().length).toBeGreaterThan(0));
     expect(paletteOpen()).toBe(true);
-    expect(input().value).toBe(">");
-    // kbd chip shows the effective default combo.
-    expect(rowFullTexts().some((t) => t.includes("Ctrl+Shift+P"))).toBe(true);
-    // Palette-only commands are listed even with no binding.
+    // Draft: fixed chrome ">" — not part of the input value.
+    expect(input().value).toBe("");
+    expect(document.querySelector(".pal-prefix.on")?.textContent).toBe(">");
+    // Draft order/groups: New Tab… carries Ctrl+T; Show Palette is Settings-only.
+    expect(rowFullTexts().some((t) => t.includes("Ctrl+T"))).toBe(true);
+    expect(document.querySelector(".pal-group")?.textContent).toBe("Tab");
     expect(rowTexts().some((t) => t.includes("Temporary Connect"))).toBe(true);
   });
 
   it("filters by title and runs the selected command with Enter", async () => {
     openCommandPalette();
     await vi.waitFor(() => expect(rowTexts().length).toBeGreaterThan(0));
-    type(">baud");
-    await vi.waitFor(() => expect(rowTexts()).toEqual(["Baud Rate…"]));
+    type("baud");
+    await vi.waitFor(() => expect(rowTexts()).toEqual(["Serial: Set Baud Rate…"]));
     key("Enter");
     // The command dispatches through the keymap handler table and closes.
     expect(fired).toEqual(["tterm.serialBaud"]);
@@ -107,18 +110,18 @@ describe("command palette — root", () => {
   it("serial setter refuses a non-serial active tab with an explanation", async () => {
     openPaletteFlow("serialBaud"); // active tab is local
     await vi.waitFor(() => expect(rowTexts()).toContain("115200"));
-    type(">115200");
+    type("115200");
     await vi.waitFor(() => expect(rowTexts()).toEqual(["115200"]));
     key("Enter");
     expect(serialCalls).toEqual([]);
     expect(document.querySelector("#toast-container")?.textContent).toContain("not a serial");
   });
 
-  it("Escape closes at the root; deleting > flips back to quick open", async () => {
+  it("Escape closes at the root; Backspace on empty flips back to quick open", async () => {
     openCommandPalette();
     await vi.waitFor(() => expect(rowTexts().length).toBeGreaterThan(0));
-    type("pi"); // no leading >
-    expect(flippedTo).toBe("pi");
+    key("Backspace");
+    expect(flippedTo).toBe("");
     expect(paletteOpen()).toBe(false);
   });
 });
@@ -130,12 +133,15 @@ describe("command palette — two-level flows", () => {
 
     key("ArrowDown");
     key("Enter"); // SSH
-    await vi.waitFor(() => expect(rowTexts()[0]).toContain("Temporary Connect"));
-    expect(rowTexts()).toContain("pi");
+    await vi.waitFor(() => expect(rowTexts()).toContain("pi"));
+    expect(rowTexts()).toContain("Temporary Connect…");
 
-    key("Enter"); // Temporary Connect…
+    // Draft order: saved hosts first, Temporary Connect… last.
+    type("Temporary");
+    await vi.waitFor(() => expect(rowTexts()[0]).toContain("Temporary Connect"));
+    key("Enter");
     await vi.waitFor(() => expect(input().placeholder).toContain("user@host"));
-    type("deploy@10.0.0.8:2222"); // text pages take free-form input, no ">"
+    type("deploy@10.0.0.8:2222"); // text pages take free-form input, no chrome ">"
     key("Enter");
 
     // Password page masks input.
@@ -174,7 +180,7 @@ describe("command palette — two-level flows", () => {
     activeTab = { id: "tab-9", type: "serial" };
     openPaletteFlow("serialBaud");
     await vi.waitFor(() => expect(rowTexts()).toContain("115200"));
-    type(">115200");
+    type("115200");
     await vi.waitFor(() => expect(rowTexts()).toEqual(["115200"]));
     key("Enter");
     expect(serialCalls).toEqual(["baud:tab-9:115200"]);

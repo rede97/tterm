@@ -234,9 +234,9 @@ describe("settings — SSH key management", () => {
     const installBtn = overlay.querySelector<HTMLButtonElement>(".ski-install")!;
     await vi.waitFor(() => expect(installBtn.disabled).toBe(false));
     // Target system is a custom listbox now: trigger → option.
-    overlay.querySelector<HTMLElement>("#ski-os .qp-select-trigger")!.click();
+    overlay.querySelector<HTMLElement>("#ski-os .tt-select-trigger")!.click();
     document
-      .querySelector<HTMLElement>('body > .qp-select-menu .qp-option[data-value="linux"]')!
+      .querySelector<HTMLElement>('body > .tt-select-menu .tt-option[data-value="linux"]')!
       .click();
     installBtn.click();
     await vi.waitFor(() => {

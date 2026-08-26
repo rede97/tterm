@@ -1,10 +1,10 @@
 // Shared custom select (design: no OS menu; one control family across the
-// quick panel and Settings — docs/quickpanel-preview.html .qp-select,
-// docs/settings-preview.html .set-select is the same control).
+// quick panel and Settings — docs/quickpanel-preview.html .tt-select,
+// docs/settings-preview.html .tt-select is the same control).
 //
-// Structure: [data-select] root > trigger(.qp-select-value) + menu
-// (role=listbox, .qp-option[role=option][data-value][aria-selected],
-// .qp-optgroup headers). Open/close state is DOM-only (the .open class) so
+// Structure: [data-select] root > trigger(.tt-select-value) + menu
+// (role=listbox, .tt-option[role=option][data-value][aria-selected],
+// .tt-optgroup headers). Open/close state is DOM-only (the .open class) so
 // lit re-renders never collapse an open menu; the picked value is written
 // back to the trigger/aria-selected immediately, then onPick runs — any
 // later re-render re-asserts the same state from the model.
@@ -22,7 +22,7 @@ export interface TtSelectGroup {
 }
 
 export function closeAllSelects(except?: Element): void {
-  for (const root of document.querySelectorAll(".qp-select.open")) {
+  for (const root of document.querySelectorAll(".tt-select.open")) {
     if (root !== except) root.classList.remove("open");
   }
   unportalMenu();
@@ -34,7 +34,7 @@ export function closeAllSelects(except?: Element): void {
 document.addEventListener(
   "scroll",
   (e) => {
-    if (e.target instanceof Element && e.target.closest(".qp-select-menu")) return;
+    if (e.target instanceof Element && e.target.closest(".tt-select-menu")) return;
     closeAllSelects();
   },
   true,
@@ -80,7 +80,7 @@ function portalMenu(root: HTMLElement, menu: HTMLElement): void {
   const parent = menu.parentNode;
   if (!parent) return;
   portalReturn = { menu, parent, next: menu.nextSibling };
-  // On <body> the .qp-select.open descendant selector no longer matches —
+  // On <body> the .tt-select.open descendant selector no longer matches —
   // the menu carries its own .open while portaled or it stays display:none.
   menu.classList.add("open");
   document.body.appendChild(menu);
@@ -92,8 +92,8 @@ function menuOptions(root: HTMLElement): HTMLElement[] {
   const menu =
     openSelect?.root === root
       ? openSelect.menu
-      : root.querySelector<HTMLElement>(".qp-select-menu");
-  return menu ? [...menu.querySelectorAll<HTMLElement>(".qp-option")] : [];
+      : root.querySelector<HTMLElement>(".tt-select-menu");
+  return menu ? [...menu.querySelectorAll<HTMLElement>(".tt-option")] : [];
 }
 
 function placeSelectMenu(trigger: HTMLElement, menu: HTMLElement): void {
@@ -117,7 +117,7 @@ function pickOption(root: HTMLElement, opt: HTMLElement): void {
   for (const o of menuOptions(root)) {
     o.setAttribute("aria-selected", o === opt ? "true" : "false");
   }
-  const valueEl = root.querySelector(".qp-select-value");
+  const valueEl = root.querySelector(".tt-select-value");
   if (valueEl) valueEl.textContent = opt.textContent;
   // Settings panels collect from this attribute (the shell's input/change
   // delegation misses custom controls).
@@ -137,8 +137,8 @@ function onSelectTriggerClick(root: HTMLElement): void {
   closeAllSelects();
   if (!willOpen) return;
   root.classList.add("open");
-  const menu = root.querySelector<HTMLElement>(".qp-select-menu");
-  const trigger = root.querySelector<HTMLElement>(".qp-select-trigger");
+  const menu = root.querySelector<HTMLElement>(".tt-select-menu");
+  const trigger = root.querySelector<HTMLElement>(".tt-select-trigger");
   if (menu && trigger) {
     portalMenu(root, menu);
     placeSelectMenu(trigger, menu);
@@ -154,7 +154,7 @@ function onSelectKeydown(root: HTMLElement, e: KeyboardEvent): void {
     e.preventDefault();
     e.stopPropagation(); // don't close the surrounding panel/dialog
     root.classList.remove("open");
-    root.querySelector<HTMLElement>(".qp-select-trigger")?.focus();
+    root.querySelector<HTMLElement>(".tt-select-trigger")?.focus();
     return;
   }
   if (e.key === "Enter" || e.key === " ") {
@@ -190,13 +190,15 @@ export function ttSelect(
     disabled?: boolean;
     groups?: TtSelectGroup[];
     id?: string;
+    /** Extra classes on the root `.tt-select` (e.g. `tt-select--wide`). */
+    className?: string;
   },
 ): TemplateResult {
   const disabled = opts?.disabled ?? false;
   const option = ([value, text]: readonly [string, string]): TemplateResult => html`
     <button
       type="button"
-      class="qp-option"
+      class="tt-option"
       role="option"
       data-value=${value}
       title=${ifDefined(opts?.descs?.[value])}
@@ -206,10 +208,10 @@ export function ttSelect(
         // The menu may be portaled to <body>: prefer the open-select
         // back-reference over DOM ancestry.
         const opt = e.currentTarget as HTMLElement;
-        const menu = opt.closest(".qp-select-menu");
+        const menu = opt.closest(".tt-select-menu");
         const root =
           (menu && openSelect?.menu === menu ? openSelect.root : null) ??
-          opt.closest<HTMLElement>(".qp-select");
+          opt.closest<HTMLElement>(".tt-select");
         if (root) pickOption(root, opt);
       }}
     >${text}</button>
@@ -217,7 +219,7 @@ export function ttSelect(
   const menuBody = opts?.groups
     ? opts.groups.map(
         (g) => html`
-          <div class="qp-optgroup">${g.label}</div>
+          <div class="tt-optgroup">${g.label}</div>
           ${g.items.map(option)}
         `,
       )
@@ -226,9 +228,12 @@ export function ttSelect(
     options.find(([v]) => v === current)?.[1] ??
     opts?.groups?.flatMap((g) => g.items).find(([v]) => v === current)?.[1] ??
     current;
+  const rootClass = `tt-select${disabled ? " tt-disabled" : ""}${
+    opts?.className ? ` ${opts.className}` : ""
+  }`;
   return html`
     <div
-      class="qp-select ${disabled ? "qp-disabled" : ""}"
+      class=${rootClass}
       id=${ifDefined(opts?.id)}
       data-select=${ifDefined(opts?.id)}
       data-current=${current}
@@ -240,7 +245,7 @@ export function ttSelect(
     >
       <button
         type="button"
-        class="qp-select-trigger"
+        class="tt-select-trigger"
         aria-haspopup="listbox"
         ?disabled=${disabled}
         @click=${(e: Event) => {
@@ -248,8 +253,8 @@ export function ttSelect(
           const root = (e.currentTarget as HTMLElement).parentElement;
           if (!disabled && root) onSelectTriggerClick(root);
         }}
-      ><span class="qp-select-value" data-current-text=${currentText}></span></button>
-      <div class="qp-select-menu" role="listbox">
+      ><span class="tt-select-value" data-current-text=${currentText}></span></button>
+      <div class="tt-select-menu" role="listbox">
         ${menuBody}
       </div>
     </div>
@@ -258,7 +263,7 @@ export function ttSelect(
 
 /** Sync trigger texts after every render (see module header). */
 export function syncSelectTexts(root: ParentNode): void {
-  for (const span of root.querySelectorAll<HTMLElement>(".qp-select-value[data-current-text]")) {
+  for (const span of root.querySelectorAll<HTMLElement>(".tt-select-value[data-current-text]")) {
     const text = span.dataset.currentText ?? "";
     if (span.textContent !== text) span.textContent = text;
   }

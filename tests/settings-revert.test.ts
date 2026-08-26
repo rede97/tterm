@@ -27,7 +27,7 @@ beforeEach(() => {
 });
 
 function revertButton(root: HTMLElement): HTMLButtonElement {
-  const btn = root.querySelector<HTMLButtonElement>(".settings-btn-revert");
+  const btn = root.querySelector<HTMLButtonElement>(".settings-footer .tt-btn-ghost");
   expect(btn, "revert button").toBeTruthy();
   return btn!;
 }
@@ -81,9 +81,7 @@ describe("settings — Revert", () => {
     // Page chrome survives: sidebar with all six panels, footer buttons.
     expect(root.querySelectorAll(".settings-nav-item")).toHaveLength(6);
     expect(revertButton(root).textContent).toBe("Revert");
-    const footerApply = root.querySelector<HTMLButtonElement>(
-      ".settings-footer .settings-btn:not(.settings-btn-revert)",
-    );
+    const footerApply = root.querySelector<HTMLButtonElement>(".settings-footer .tt-btn-primary");
     expect(footerApply!.textContent).toBe("Apply");
 
     // Every panel still exists exactly once…

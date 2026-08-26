@@ -14,7 +14,6 @@ import { logCatch, logError, swallow } from "../core/errorlog";
 import { type ConfigState, configStore } from "../core/store";
 import { html, itemRow, linkBtn, nothing, render, section, toggle } from "../ui/lit";
 import { syncSelectTexts, ttSelect } from "../ui/select";
-import { attachStepper } from "../ui/stepper";
 
 // ---- Per-panel state -------------------------------------------------
 // Pending control values + the async version label. The store stays the
@@ -97,28 +96,25 @@ function renderGeneralPanel(panel: HTMLElement): void {
 // Full clear + rebuild. A plain diffing re-render can't reset pending DOM
 // edits: lit skips a property binding whose new value equals the last
 // committed one, even when the live DOM diverged (user edited without
-// Apply). Revert must always land the store values, so it rebuilds —
-// which also means re-attaching the stepper.
+// Apply). Revert must always land the store values, so it rebuilds.
 function rebuildGeneralPanel(panel: HTMLElement): void {
   render(nothing, panel);
   renderGeneralPanel(panel);
-  const scrollbackInput = panel.querySelector<HTMLInputElement>("#set-scrollback");
-  if (scrollbackInput) attachStepper(scrollbackInput);
 }
 
 function generalTemplate(panel: HTMLElement, st: GeneralPanelState) {
   return html`
     ${section(
       "About",
-      html`<div class="settings-item">
+      html`<div class="row-block">
         <div class="settings-about-row">
           <div>
-            <div class="settings-item-title" id="set-version">TTerm${st.version ? ` ${st.version}` : ""}</div>
-            <div class="settings-item-desc" style="margin-bottom:20px">A fast, lightweight, efficient WebView Terminal.</div>
+            <div class="row-title" id="set-version">TTerm${st.version ? ` ${st.version}` : ""}</div>
+            <div class="row-desc" style="margin-bottom:20px">A fast, lightweight, efficient WebView Terminal.</div>
           </div>
           <button
             id="set-homepage"
-            class="settings-link-btn solid"
+            class="tt-btn tt-btn-solid"
             title="Open GitHub homepage"
             @click=${(e: Event) => {
               e.preventDefault();
@@ -175,15 +171,12 @@ function generalTemplate(panel: HTMLElement, st: GeneralPanelState) {
         )}
         ${itemRow(
           "Scrollback",
-          "Maximum number of lines stored in the scrollback buffer.",
+          "Lines of history kept in the buffer.",
           html`<input
-            type="number"
             id="set-scrollback"
-            class="settings-input settings-input-narrow"
+            class="input input-narrow"
             .value=${st.scrollback}
-            min="100"
-            max="100000"
-            step="100"
+            data-dirty
             @change=${(e: Event) => (st.scrollback = (e.target as HTMLInputElement).value)}
           />`,
         )}
@@ -216,11 +209,11 @@ function generalTemplate(panel: HTMLElement, st: GeneralPanelState) {
     )}
     ${section(
       "Data",
-      html`<div class="settings-item settings-item-row">
-        <div class="settings-item-info">
-          <div class="settings-item-title">Configuration</div>
+      html`<div class="row">
+        <div class="row-info">
+          <div class="row-title">Configuration</div>
         </div>
-        <div class="settings-item-control" style="gap:8px;">
+        <div class="row-control" style="gap:8px;">
           ${linkBtn(
             "Open Directory",
             () => {

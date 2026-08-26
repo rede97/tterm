@@ -167,7 +167,7 @@ function shortcutsTemplate(panel: HTMLElement) {
   return section(
     "Keyboard Shortcuts",
     html`
-      <div class="settings-item-desc kb-hint">Click a keybinding to change it. Search matches title, description, command id, and combo. Changes join the same Apply as other settings.</div>
+      <div class="row-desc kb-hint">Click a keybinding to change it. Search matches title, description, command id, and combo. Changes join the same Apply as other settings.</div>
       <input
         type="search"
         id="kb-search"

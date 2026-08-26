@@ -90,10 +90,10 @@ export function showSerialProfileEditor(opts: SerialProfileEditorOptions): void 
         <div class="sp-select-slot" data-field="flowControl"></div>
       </div>
       <div class="sp-footer">
-        ${opts.editName ? `<button type="button" class="sp-btn sp-delete">Delete</button>` : ""}
+        ${opts.editName ? `<button type="button" class="tt-btn tt-btn-danger sp-delete">Delete</button>` : ""}
         <span class="sp-spacer"></span>
-        <button type="button" class="sp-btn sp-cancel">Cancel</button>
-        <button type="button" class="sp-btn sp-save">Save</button>
+        <button type="button" class="tt-btn tt-btn-ghost sp-cancel">Cancel</button>
+        <button type="button" class="tt-btn tt-btn-primary sp-save">Save</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);

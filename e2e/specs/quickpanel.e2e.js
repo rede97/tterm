@@ -3,15 +3,15 @@
 // the serial section (mock loopback port) with live RTS/CTS and
 // auto-reconnect IPC roundtrips.
 
-// Browser-side helper: pick an option in a design listbox (.qp-select) —
+// Browser-side helper: pick an option in a design listbox (.tt-select) —
 // the panel no longer uses native <select> (docs/quickpanel-preview.html).
 function qpPick(label, value) {
-  const root = [...document.querySelectorAll(".quick-panel .qp-select")].find(
+  const root = [...document.querySelectorAll(".quick-panel .tt-select")].find(
     (s) => s.getAttribute("aria-label") === label,
   );
   if (!root) throw new Error(`select ${label} not found`);
-  root.querySelector(".qp-select-trigger").click();
-  const opt = root.querySelector(`.qp-option[data-value="${value}"]`);
+  root.querySelector(".tt-select-trigger").click();
+  const opt = root.querySelector(`.tt-option[data-value="${value}"]`);
   if (!opt) throw new Error(`option ${value} not found in ${label}`);
   opt.click();
 }
@@ -88,7 +88,7 @@ describe("Quick-status button and panel", () => {
   it("share toggle creates a real share and shows the copyable link", async () => {
     await browser.execute(() => {
       const row = document.querySelector('.quick-panel [data-section="share"] .qp-toggle-row');
-      row.querySelector(".qp-switch").click();
+      row.querySelector(".tt-switch").click();
     });
     // The row always exists (grid-rows reveal); the URL text fills in.
     await browser.waitUntil(
@@ -116,7 +116,7 @@ describe("Quick-status button and panel", () => {
     // Toggle back off (cleanup for other specs sharing the window).
     await browser.execute(() => {
       const row = document.querySelector('.quick-panel [data-section="share"] .qp-toggle-row');
-      row.querySelector(".qp-switch").click();
+      row.querySelector(".tt-switch").click();
     });
     await browser.waitUntil(
       async () => {
@@ -155,7 +155,7 @@ describe("Quick-status button and panel", () => {
     // lines (serial-modem). Select order across the panel.
     const info = await browser.execute(() => {
       const panel = document.querySelector(".quick-panel");
-      const selects = [...panel.querySelectorAll(".qp-select")].map((s) =>
+      const selects = [...panel.querySelectorAll(".tt-select")].map((s) =>
         s.getAttribute("aria-label"),
       );
       return {
@@ -191,14 +191,14 @@ describe("Quick-status button and panel", () => {
     expect(earlySignals.leds).toBe(2);
 
     // Regression (visibility): the opened menu must be VISIBLE — portaled
-    // to <body> it sits outside the .qp-select.open descendant selector, so
+    // to <body> it sits outside the .tt-select.open descendant selector, so
     // it carries its own .open. Computed display + non-zero layout rect.
     await browser.execute(() => {
-      document.querySelector('.qp-select[aria-label="Baud rate"] .qp-select-trigger').click();
+      document.querySelector('.tt-select[aria-label="Baud rate"] .tt-select-trigger').click();
     });
     await browser.pause(200);
     const menuVis = await browser.execute(() => {
-      const menu = document.querySelector("body > .qp-select-menu");
+      const menu = document.querySelector("body > .tt-select-menu");
       if (!menu) return { found: false };
       const r = menu.getBoundingClientRect().toJSON();
       return {
@@ -222,9 +222,9 @@ describe("Quick-status button and panel", () => {
         browser.execute(() => {
           const mgr = window.__tterm.mgr;
           const tab = mgr.get(mgr.activeTabId);
-          const inputText = [...document.querySelectorAll(".quick-panel .qp-select")]
+          const inputText = [...document.querySelectorAll(".quick-panel .tt-select")]
             .find((s) => s.getAttribute("aria-label") === "Input mode")
-            ?.querySelector(".qp-select-value").textContent;
+            ?.querySelector(".tt-select-value").textContent;
           return (
             tab.serialProfile === "AT" && tab.inputMode === "line" && inputText === "Line-by-line"
           );
@@ -263,7 +263,7 @@ describe("Quick-status button and panel", () => {
     const hwSwitches = await browser.execute(() => {
       const rows = [...document.querySelectorAll(".quick-panel .qp-signals .qp-toggle-row")];
       const btn = (label) =>
-        rows.find((r) => r.textContent.includes(label)).querySelector(".qp-switch");
+        rows.find((r) => r.textContent.includes(label)).querySelector(".tt-switch");
       return {
         rtsDisabled: btn("RTS").disabled,
         dtrDisabled: btn("DTR").disabled,
@@ -294,7 +294,7 @@ describe("Quick-status button and panel", () => {
       ];
       rows
         .find((r) => r.textContent.includes("Auto-reconnect"))
-        .querySelector(".qp-switch")
+        .querySelector(".tt-switch")
         .click();
     });
     const autoOn = await browser.executeAsync((done) => {

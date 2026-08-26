@@ -65,7 +65,7 @@ export function createSettingsContent(): HTMLElement {
 
   // -- Body --
   const body = document.createElement("div");
-  body.className = "settings-body";
+  body.className = "settings-main";
 
   // Panel header (h2 + description, follows the active nav).
   const header = document.createElement("div");
@@ -131,7 +131,7 @@ export function createSettingsContent(): HTMLElement {
 
   // Revert button
   const revertBtn = document.createElement("button");
-  revertBtn.className = "settings-btn settings-btn-revert";
+  revertBtn.className = "tt-btn tt-btn-ghost";
   revertBtn.textContent = "Revert";
   revertBtn.addEventListener("click", async () => {
     await configStore.load();
@@ -150,7 +150,7 @@ export function createSettingsContent(): HTMLElement {
 
   // Apply button
   const applyBtn = document.createElement("button");
-  applyBtn.className = "settings-btn";
+  applyBtn.className = "tt-btn tt-btn-primary";
   applyBtn.textContent = "Apply";
   applyBtn.addEventListener("click", async () => {
     await applySettings(root);

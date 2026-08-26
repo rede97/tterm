@@ -30,7 +30,7 @@ describe("pasteIntoTerminal (pasteTrim / pasteWarning)", () => {
     const t = target();
     pasteIntoTerminal(t, "echo hello\n");
     expect(t.pasted).toEqual(["echo hello"]);
-    expect(document.querySelector(".confirm-overlay")).toBeNull();
+    expect(document.querySelector(".cf-overlay")).toBeNull();
   });
 
   it("multi-line paste warns; confirming pastes", async () => {
@@ -38,27 +38,23 @@ describe("pasteIntoTerminal (pasteTrim / pasteWarning)", () => {
     pasteIntoTerminal(t, "echo a\necho b");
     // Nothing pasted until the user confirms.
     expect(t.pasted).toEqual([]);
-    const overlay = document.querySelector(".confirm-overlay");
+    const overlay = document.querySelector(".cf-overlay");
     expect(overlay).toBeTruthy();
     expect(overlay!.textContent).toContain("2 lines");
-    overlay!.querySelector<HTMLButtonElement>(".cf-footer .cf-btn:last-child")!.click();
+    overlay!.querySelector<HTMLButtonElement>(".cf-footer .tt-btn:last-child")!.click();
     await flushMicrotasks();
     expect(t.pasted).toEqual(["echo a\necho b"]);
   });
   it("the preview is an editable textarea; edits are what gets pasted", async () => {
     const t = target();
     pasteIntoTerminal(t, "echo a\necho b\n");
-    const area = document.querySelector<HTMLTextAreaElement>(
-      ".confirm-overlay textarea.cf-preview",
-    )!;
+    const area = document.querySelector<HTMLTextAreaElement>(".cf-overlay textarea.cf-preview")!;
     expect(area.value).toBe("echo a\necho b"); // pasteTrim strips the trailing newline
     // Header carries the line count; no security footnote (design).
     expect(document.querySelector(".cf-header-meta")!.textContent).toContain("2");
     expect(document.querySelector(".cf-meta")).toBeNull();
     area.value = "echo edited\nrm -rf /tmp/x";
-    document
-      .querySelector<HTMLButtonElement>(".confirm-overlay .cf-footer .cf-btn:last-child")!
-      .click();
+    document.querySelector<HTMLButtonElement>(".cf-overlay .cf-footer .tt-btn:last-child")!.click();
     await flushMicrotasks();
     expect(t.pasted).toEqual(["echo edited\nrm -rf /tmp/x"]);
   });
@@ -76,7 +72,7 @@ describe("pasteIntoTerminal (pasteTrim / pasteWarning)", () => {
     const t = target();
     pasteIntoTerminal(t, "echo a\necho b");
     expect(t.pasted).toEqual(["echo a\necho b"]);
-    expect(document.querySelector(".confirm-overlay")).toBeNull();
+    expect(document.querySelector(".cf-overlay")).toBeNull();
   });
 
   it("pasteTrim off keeps trailing newline, single command still skips the warning", () => {
@@ -84,6 +80,6 @@ describe("pasteIntoTerminal (pasteTrim / pasteWarning)", () => {
     const t = target();
     pasteIntoTerminal(t, "echo hello\n");
     expect(t.pasted).toEqual(["echo hello\n"]);
-    expect(document.querySelector(".confirm-overlay")).toBeNull();
+    expect(document.querySelector(".cf-overlay")).toBeNull();
   });
 });

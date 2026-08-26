@@ -58,8 +58,8 @@ function openPanel(): HTMLElement {
 
 function switchOf(row: Element | null): HTMLElement {
   if (!row) throw new Error("switch row missing");
-  const sw = row.querySelector<HTMLElement>(".qp-switch");
-  if (!sw) throw new Error(".qp-switch missing in row");
+  const sw = row.querySelector<HTMLElement>(".tt-switch");
+  if (!sw) throw new Error(".tt-switch missing in row");
   return sw;
 }
 
@@ -152,7 +152,7 @@ describe("quick panel — local tab", () => {
     activeTab = fakeTab({ id: "tab-1", shared: true, shareUrl: "http://127.0.0.1:9/s/abc" });
     const p = openPanel();
     expect(p.querySelector(".qp-share-url")!.textContent).toBe("http://127.0.0.1:9/s/abc");
-    expect(p.querySelector(".qp-share-url-row .qp-mini-btn")!.textContent).toBe("Copy");
+    expect(p.querySelector(".qp-share-url-row .tt-btn.tt-btn-solid")!.textContent).toBe("Copy");
   });
 });
 
@@ -177,20 +177,20 @@ describe("quick panel — serial tab", () => {
 
   // -- custom select helpers (design listbox, no native <select>) --
   function selectOf(row: Element): HTMLElement {
-    const root = row.querySelector<HTMLElement>(".qp-select");
-    if (!root) throw new Error(".qp-select missing in row");
+    const root = row.querySelector<HTMLElement>(".tt-select");
+    if (!root) throw new Error(".tt-select missing in row");
     return root;
   }
   function selectText(row: Element): string {
-    return selectOf(row).querySelector(".qp-select-value")!.textContent!;
+    return selectOf(row).querySelector(".tt-select-value")!.textContent!;
   }
   function pick(row: Element, value: string): void {
     const root = selectOf(row);
-    root.querySelector<HTMLElement>(".qp-select-trigger")!.click();
+    root.querySelector<HTMLElement>(".tt-select-trigger")!.click();
     expect(root.classList.contains("open")).toBe(true);
     // Open menus are portaled to <body> (Q8).
     const opt = document.querySelector<HTMLElement>(
-      `body > .qp-select-menu .qp-option[data-value="${value}"]`,
+      `body > .tt-select-menu .tt-option[data-value="${value}"]`,
     );
     expect(opt, `option ${value}`).toBeTruthy();
     opt!.click();
@@ -221,14 +221,14 @@ describe("quick panel — serial tab", () => {
     const profileRow = rowOf(session(p), "Profile")!;
     expect(selectText(profileRow)).toBe("Normal");
     const root = selectOf(profileRow);
-    const group = root.querySelector(".qp-optgroup")!;
+    const group = root.querySelector(".tt-optgroup")!;
     expect(group.textContent).toBe("Built-in");
-    const values = [...root.querySelectorAll<HTMLElement>(".qp-option")].map(
+    const values = [...root.querySelectorAll<HTMLElement>(".tt-option")].map(
       (o) => o.dataset.value,
     );
     expect(values.slice(0, 3)).toEqual(["Normal", "Log", "AT"]);
     // The current option carries the selected marker + check.
-    const selected = root.querySelector('.qp-option[aria-selected="true"]')!;
+    const selected = root.querySelector('.tt-option[aria-selected="true"]')!;
     expect(selected.dataset.value).toBe("Normal");
   });
 
@@ -267,10 +267,10 @@ describe("quick panel — serial tab", () => {
   it("Output newlines select shows a live help line and per-option tooltips", () => {
     const p = openPanel();
     const outRow = rowOf(io(p), "Output newlines")!;
-    const hint = io(p).querySelector<HTMLElement>(".qp-select-hint")!;
+    const hint = io(p).querySelector<HTMLElement>(".tt-select-hint")!;
     // Default keep: hint explains the current selection.
     expect(hint.textContent).toContain("Pass through unchanged");
-    for (const opt of outRow.querySelectorAll<HTMLElement>(".qp-option")) {
+    for (const opt of outRow.querySelectorAll<HTMLElement>(".tt-option")) {
       expect(opt.title.length).toBeGreaterThan(0);
     }
     // Switching updates the hint; the handler still fires.
@@ -299,7 +299,7 @@ describe("quick panel — serial tab", () => {
     const sec = modem(p);
     const flowRow = rowOf(sec, "Flow control")!;
     expect(selectText(flowRow)).toBe("None");
-    expect(selectOf(flowRow).classList.contains("qp-disabled")).toBe(false);
+    expect(selectOf(flowRow).classList.contains("tt-disabled")).toBe(false);
     pick(flowRow, "hardware");
     expect(invokeMock).toHaveBeenCalledWith("serial_set_flow_control", {
       id: "tab-7",
@@ -348,7 +348,7 @@ describe("quick panel — serial tab", () => {
     const sec = modem(p);
     const flowRow = rowOf(sec, "Flow control")!;
     await vi.waitFor(() => {
-      expect(selectOf(flowRow).classList.contains("qp-disabled")).toBe(true);
+      expect(selectOf(flowRow).classList.contains("tt-disabled")).toBe(true);
     });
     expect(flowRow.classList.contains("qp-disabled")).toBe(true);
     expect(sec.textContent).toContain("not supported by this port");
@@ -367,7 +367,7 @@ describe("quick panel — serial tab", () => {
     const sec = modem(p);
     const flowRow = rowOf(sec, "Flow control")!;
     await vi.waitFor(() => {
-      expect(selectOf(flowRow).classList.contains("qp-disabled")).toBe(true);
+      expect(selectOf(flowRow).classList.contains("tt-disabled")).toBe(true);
     });
     expect(flowRow.classList.contains("qp-disabled")).toBe(true);
   });
@@ -449,8 +449,8 @@ describe("quick panel — dismissal", () => {
       serialProfile: "Normal",
     });
     const p = openPanel();
-    const root = p.querySelector<HTMLElement>('.qp-select[aria-label="Baud rate"]')!;
-    root.querySelector<HTMLElement>(".qp-select-trigger")!.click();
+    const root = p.querySelector<HTMLElement>('.tt-select[aria-label="Baud rate"]')!;
+    root.querySelector<HTMLElement>(".tt-select-trigger")!.click();
     expect(root.classList.contains("open")).toBe(true);
 
     root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));

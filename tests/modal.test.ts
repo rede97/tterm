@@ -1,5 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render } from "../src/ui/lit";
 import { createModal } from "../src/ui/modal";
+import { ttSelect } from "../src/ui/select";
 
 function escapeKey() {
   document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
@@ -49,5 +51,32 @@ describe("createModal", () => {
     second.close();
     escapeKey();
     expect(first.overlay.isConnected).toBe(false);
+  });
+
+  it("closing the modal tears down a portaled select menu (no orphan)", () => {
+    const m = createModal({ className: "sp-overlay" });
+    document.body.appendChild(m.overlay);
+    const slot = document.createElement("div");
+    m.overlay.appendChild(slot);
+    render(
+      ttSelect(
+        "Input mode",
+        [
+          ["normal", "Normal"],
+          ["line", "Line"],
+        ],
+        "normal",
+        vi.fn(),
+      ),
+      slot,
+    );
+    const root = slot.querySelector<HTMLElement>(".tt-select")!;
+    root.querySelector<HTMLElement>(".tt-select-trigger")!.click();
+    expect(document.querySelector("body > .tt-select-menu.open")).toBeTruthy();
+
+    m.close();
+    expect(m.overlay.isConnected).toBe(false);
+    expect(document.querySelector("body > .tt-select-menu.open")).toBeNull();
+    expect(document.querySelector("body > .tt-select-menu")).toBeNull();
   });
 });

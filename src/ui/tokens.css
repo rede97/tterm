@@ -1,11 +1,14 @@
 /**
- * TTerm UI design tokens — production copy of docs/ui/tokens.css.
+ * TTerm UI design tokens — production source of truth (`--tt-*`).
+ *
+ * Docs entry: `docs/ui/tokens.css` re-exports this file; preview aliases live in
+ * `docs/ui/aliases.css`. Controls: `src/ui/kit/controls.css`.
  *
  * Skins: body[data-skin="cursor" | "vscode"] (set from config `chromeSkin`).
  * Fixed chrome (tab bar) never follows terminal theme colors.
  *
  * NOTE: the preview alias layer (--set-*, --qp-*, --pal-*) is intentionally
- * NOT ported — production CSS uses --tt-* directly. Also NOT ported: the
+ * NOT inlined here — production CSS uses --tt-* directly. Also NOT ported: the
  * `--term-bg: var(--tt-term-bg)` alias. In the app, --term-bg is written by
  * applyTerminalBackground() to follow the terminal scheme (it paints the
  * 2px seam around xterm); --tt-term-bg stays fixed #1e1e1e for chrome.

@@ -57,7 +57,7 @@ describe("settings — updates", () => {
     const root = createSettingsContent();
     document.body.appendChild(root);
     autoUpdateToggle(root).click(); // flip off
-    const applyBtn = [...root.querySelectorAll<HTMLButtonElement>(".settings-btn")].find(
+    const applyBtn = [...root.querySelectorAll<HTMLButtonElement>(".tt-btn-primary")].find(
       (b) => b.textContent === "Apply",
     )!;
     applyBtn.click();

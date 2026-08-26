@@ -22,15 +22,15 @@ function mountSelect(): { host: HTMLElement; root: HTMLElement } {
     ),
     host,
   );
-  const root = host.querySelector<HTMLElement>(".qp-select")!;
+  const root = host.querySelector<HTMLElement>(".tt-select")!;
   return { host, root };
 }
 
 // An open menu is portaled to <body> (Q8) — look beyond the select root.
 const menuOf = (_root: HTMLElement) =>
-  document.querySelector<HTMLElement>("body > .qp-select-menu")!;
+  document.querySelector<HTMLElement>("body > .tt-select-menu")!;
 const openSelect = (root: HTMLElement) =>
-  root.querySelector<HTMLElement>(".qp-select-trigger")!.click();
+  root.querySelector<HTMLElement>(".tt-select-trigger")!.click();
 
 beforeEach(() => {
   document.body.innerHTML = "";
@@ -43,7 +43,7 @@ describe("custom select — floating menu (Q8)", () => {
     const menu = menuOf(root);
     expect(root.classList.contains("open")).toBe(true);
     // Regression (visibility): portaled to <body> the menu is outside the
-    // .qp-select.open descendant selector — it must carry its own .open or
+    // .tt-select.open descendant selector — it must carry its own .open or
     // it stays display:none forever.
     expect(menu.parentElement).toBe(document.body);
     expect(menu.classList.contains("open")).toBe(true);

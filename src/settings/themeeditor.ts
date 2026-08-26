@@ -84,10 +84,10 @@ export function showThemeEditor(opts: ThemeEditorOptions): void {
         <div class="te-group"><div class="te-group-title">Palette</div>${paletteRows}</div>
       </div>
       <div class="te-footer">
-        ${opts.editName ? `<button class="te-btn te-delete">Delete</button>` : ""}
+        ${opts.editName ? `<button class="tt-btn tt-btn-danger te-delete">Delete</button>` : ""}
         <span class="te-spacer"></span>
-        <button class="te-btn te-cancel">Cancel</button>
-        <button class="te-btn te-save">Save</button>
+        <button class="tt-btn tt-btn-ghost te-cancel">Cancel</button>
+        <button class="tt-btn tt-btn-primary te-save">Save</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);

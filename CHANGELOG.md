@@ -2,17 +2,24 @@
 
 Changes
 
+- **Formal UI vocab (draft + kit)** — Settings layout `.section`/`.row`;
+  controls `.tt-btn*` / `.tt-switch`; Confirm `.cf-overlay`; Palette `pal-*`;
+  legacy button/switch/row class aliases removed
+- **UI kit (app ↔ drafts)** — shared `src/ui/kit/controls.css` + `.tt-select`
+  (renamed from `.qp-select`); docs previews link the same tokens/controls.
+  Modal close clears portaled select menus
 - **UI redesign: chrome tokens and skins** — Settings, menus, the quick
   panel, and the command palette are now driven by one token sheet
   (`--tt-*`). New Appearance → Chrome Skin picker (Cursor Mono default /
   VS Code Dark) and a Frosted-glass quick panel option. The tab bar stays
   fixed dark; terminal color schemes are unaffected
-- **Command palette (Ctrl+Shift+P)** — `>` commands: New Tab… (Local / SSH
-  / Serial → target), Temporary SSH Connect… (host → password, writes
-  nothing to `~/.ssh/config`; empty password uses agent/keys), Port
-  Forwarding…, Share, Serial profile / baud / flow. Ctrl+P Go to Tab flips
-  into commands with `>`; Esc steps back one level. All palette commands
-  appear in Settings → Keyboard and can be rebound
+- **Command palette (Ctrl+Shift+P)** — draft-aligned copy/order/groups
+  (Window → Tab → View → Share → SSH → Serial → Terminal); New Tab…
+  (Ctrl+T, Local / SSH / Serial → target; Temporary Connect… last under
+  SSH), Serial Set Input Mode / Disconnect / Reconnect / Toggle
+  Auto-reconnect; Go to Tab… (Ctrl+P) flips into commands with `>`; Esc
+  steps back. Show Palette / MRU / default-profile New Tab stay in
+  Keyboard settings only. Metrics match `docs/command-palette-preview.html`
 - **Closing a tab via × asks first** — a small strip under the tab
   (outside click / Esc cancels; Shift+× closes immediately). Ctrl+W and
   the context menus still close directly

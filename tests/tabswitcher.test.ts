@@ -13,13 +13,35 @@ const mkItem = (id: string, label: string, index: number): SwitcherItem => ({
   index,
   active: false,
   disconnected: false,
+  kind: "local",
 });
 
 describe("filterSwitcherItems (Ctrl+P quick open)", () => {
   const items: SwitcherItem[] = [
-    { id: "tab-1", label: "Terminal", index: 1, active: true, disconnected: false },
-    { id: "tab-2", label: "prod-server", index: 2, active: false, disconnected: false },
-    { id: "tab-3", label: "COM3 · 115200", index: 3, active: false, disconnected: true },
+    {
+      id: "tab-1",
+      label: "Terminal",
+      index: 1,
+      active: true,
+      disconnected: false,
+      kind: "local",
+    },
+    {
+      id: "tab-2",
+      label: "prod-server",
+      index: 2,
+      active: false,
+      disconnected: false,
+      kind: "ssh",
+    },
+    {
+      id: "tab-3",
+      label: "COM3 · 115200",
+      index: 3,
+      active: false,
+      disconnected: true,
+      kind: "serial",
+    },
   ];
 
   it("empty query returns everything", () => {
@@ -31,32 +53,28 @@ describe("filterSwitcherItems (Ctrl+P quick open)", () => {
     expect(filterSwitcherItems(items, "2").map((i) => i.id)).toEqual(["tab-2"]);
   });
 
-  it("text query matches the label case-insensitively", () => {
+  it("non-numeric query is a case-insensitive label substring", () => {
     expect(filterSwitcherItems(items, "PROD").map((i) => i.id)).toEqual(["tab-2"]);
     expect(filterSwitcherItems(items, "com3").map((i) => i.id)).toEqual(["tab-3"]);
   });
 
-  it("no match yields an empty list", () => {
+  it("returns empty when nothing matches", () => {
     expect(filterSwitcherItems(items, "zzz")).toEqual([]);
   });
 });
 
-describe("stepIndex (MRU highlight)", () => {
+describe("stepIndex", () => {
   it("wraps forward and backward", () => {
-    expect(stepIndex(0, 1, 4)).toBe(1);
-    expect(stepIndex(3, 1, 4)).toBe(0);
-    expect(stepIndex(0, -1, 4)).toBe(3);
-    expect(stepIndex(1, -1, 4)).toBe(0);
-  });
-
-  it("first-press start: next tab vs wrap to least-recent", () => {
-    // Ctrl+Tab opens on the next MRU entry; Ctrl+Shift+Tab on the last one.
     expect(stepIndex(0, 1, 3)).toBe(1);
+    expect(stepIndex(2, 1, 3)).toBe(0);
     expect(stepIndex(0, -1, 3)).toBe(2);
   });
 
-  it("degenerates safely", () => {
+  it("is a no-op on an empty list", () => {
     expect(stepIndex(0, 1, 0)).toBe(0);
+  });
+
+  it("stays at 0 when length is 1", () => {
     expect(stepIndex(5, 1, 1)).toBe(0);
   });
 });
@@ -75,15 +93,15 @@ describe("overlay commit", () => {
     // Tab dies (clean exit auto-close) while the overlay shows its snapshot.
     live = [mkItem("tab-1", "one", 1)];
 
-    document.querySelector<HTMLElement>('.tab-switcher-row[data-tab-id="tab-2"]')!.click();
+    document.querySelector<HTMLElement>('.pal-row[data-tab-id="tab-2"]')!.click();
     expect(switched).toEqual([]);
     // A refused commit closes the overlay rather than silently no-oping
     // with it left open.
-    expect(document.querySelector(".tab-switcher-overlay")).toBeNull();
+    expect(document.querySelector(".pal-overlay")).toBeNull();
 
     openQuickOpen();
-    document.querySelector<HTMLElement>('.tab-switcher-row[data-tab-id="tab-1"]')!.click();
+    document.querySelector<HTMLElement>('.pal-row[data-tab-id="tab-1"]')!.click();
     expect(switched).toEqual(["tab-1"]);
-    expect(document.querySelector(".tab-switcher-overlay")).toBeNull();
+    expect(document.querySelector(".pal-overlay")).toBeNull();
   });
 });

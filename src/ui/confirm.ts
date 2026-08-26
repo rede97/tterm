@@ -35,7 +35,7 @@ export function confirmPaste(options: { lines: number; text: string }): Promise<
     resolve(v);
   };
   const modal = createModal({
-    className: "sshauth-overlay confirm-overlay",
+    className: "cf-overlay",
     onClose: () => answer(null),
   });
   const overlay = modal.overlay;
@@ -50,8 +50,8 @@ export function confirmPaste(options: { lines: number; text: string }): Promise<
         <textarea class="cf-preview tt-scroll" spellcheck="false" autocomplete="off" aria-label="Paste preview"></textarea>
       </div>
       <div class="cf-footer">
-        <button class="cf-btn cf-cancel" type="button">Cancel</button>
-        <button class="cf-btn cf-btn-ok" type="button">Paste</button>
+        <button class="tt-btn tt-btn-ghost cf-cancel" type="button">Cancel</button>
+        <button class="tt-btn tt-btn-primary" type="button">Paste</button>
       </div>
     </div>`;
   const textarea = mustQuery<HTMLTextAreaElement>(overlay, "textarea.cf-preview");
@@ -59,7 +59,7 @@ export function confirmPaste(options: { lines: number; text: string }): Promise<
   document.body.appendChild(overlay);
 
   overlay.querySelector(".cf-cancel")?.addEventListener("click", () => modal.close());
-  overlay.querySelector(".cf-btn-ok")?.addEventListener("click", () => {
+  overlay.querySelector(".tt-btn-primary")?.addEventListener("click", () => {
     answer(textarea.value);
     modal.close();
   });
@@ -79,7 +79,7 @@ export function confirmDialog(options: ConfirmOptions): Promise<boolean> {
     resolve(v);
   };
   const modal = createModal({
-    className: "sshauth-overlay confirm-overlay",
+    className: "cf-overlay",
     onClose: () => answer(false),
   });
   const overlay = modal.overlay;
@@ -93,8 +93,8 @@ export function confirmDialog(options: ConfirmOptions): Promise<boolean> {
         ${options.meta !== undefined ? `<div class="cf-meta"></div>` : ""}
       </div>
       <div class="cf-footer">
-        <button class="cf-btn cf-cancel" type="button"></button>
-        <button class="cf-btn ${options.danger ? "cf-btn-danger" : "cf-btn-ok"}" type="button"></button>
+        <button class="tt-btn tt-btn-ghost cf-cancel" type="button"></button>
+        <button class="tt-btn ${options.danger ? "tt-btn-danger-fill" : "tt-btn-primary"}" type="button"></button>
       </div>
     </div>`;
   mustQuery(overlay, ".cf-header").textContent = options.title;
@@ -107,7 +107,7 @@ export function confirmDialog(options: ConfirmOptions): Promise<boolean> {
   }
   const cancelBtn = mustQuery<HTMLButtonElement>(overlay, ".cf-cancel");
   cancelBtn.textContent = options.cancelLabel ?? "Cancel";
-  const okBtn = mustQuery<HTMLButtonElement>(overlay, ".cf-footer .cf-btn:last-child");
+  const okBtn = mustQuery<HTMLButtonElement>(overlay, ".cf-footer .tt-btn:last-child");
   okBtn.textContent = options.okLabel ?? "OK";
   document.body.appendChild(overlay);
 

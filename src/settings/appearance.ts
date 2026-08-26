@@ -142,7 +142,7 @@ function appearanceTemplate(panel: HTMLElement): TemplateResult {
     ${section(
       "Chrome Skin",
       html`
-        <div class="settings-item-desc" style="margin-bottom:6px">
+        <div class="row-desc" style="margin-bottom:6px">
           Drives Settings / menus / quick panel. The tab bar stays fixed dark;
           terminal color schemes stay independent.
         </div>
@@ -166,15 +166,15 @@ function appearanceTemplate(panel: HTMLElement): TemplateResult {
     ${section(
       "Font",
       html`
-        <div class="settings-item settings-item-row">
-          <div class="settings-item-info">
-            <div class="settings-item-title">Font Family</div>
-            <div class="settings-item-desc" id="set-font-family-desc">${configStore.get("fontFamily")}</div>
+        <div class="row">
+          <div class="row-info">
+            <div class="row-title">Font Family</div>
+            <div class="row-desc" id="set-font-family-desc">${configStore.get("fontFamily")}</div>
           </div>
-          <div class="settings-item-control">
+          <div class="row-control">
             <button
               id="set-font-config"
-              class="settings-link-btn solid"
+              class="tt-btn tt-btn-solid"
               @click=${() => openFontPicker(panel)}
             >Configure</button>
           </div>
@@ -197,7 +197,7 @@ function appearanceTemplate(panel: HTMLElement): TemplateResult {
     ${section(
       "Color Scheme",
       html`
-        <div class="settings-item-desc" style="margin-bottom:6px">
+        <div class="row-desc" style="margin-bottom:6px">
           Terminal content only — does not recolor Settings or the tab bar.
           Windows Terminal schemes are imported automatically.
         </div>

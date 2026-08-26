@@ -18,6 +18,9 @@
 // - Prefer in-handler busy guards over ?disabled on action buttons: a
 //   pre-lit rebuild reset .disabled every render, so a click landing while
 //   the button looks ready must invoke, not no-op.
+//
+// Layout classes match docs/settings-preview.html (.section / .row).
+// Controls use src/ui/kit (.tt-switch / .tt-btn*).
 
 export { html, noChange, nothing, render, type TemplateResult } from "lit-html";
 export { ifDefined } from "lit-html/directives/if-defined.js";
@@ -26,11 +29,10 @@ export { repeat } from "lit-html/directives/repeat.js";
 import { html, type TemplateResult } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 
-/** <div class="settings-section"> with a title; `titleEnd` right-aligns
- *  extra content (e.g. an "+ Add" button) inside the title row. */
+/** <div class="section"> with a title; `titleEnd` right-aligns extra content. */
 export function section(title: string, body: unknown, titleEnd?: unknown): TemplateResult {
-  return html`<div class="settings-section">
-    <div class="settings-section-title ${titleEnd !== undefined ? "settings-section-title-row" : ""}">
+  return html`<div class="section">
+    <div class="section-title ${titleEnd !== undefined ? "section-title-row" : ""}">
       <span>${title}</span>
       ${titleEnd ?? ""}
     </div>
@@ -38,26 +40,18 @@ export function section(title: string, body: unknown, titleEnd?: unknown): Templ
   </div>`;
 }
 
-/** Title + description on the left, control on the right. */
+/** Title + description on the left, control on the right (design .row well). */
 export function itemRow(title: string, desc: string, control: unknown): TemplateResult {
-  return html`<div class="settings-item settings-item-row">
-    <div class="settings-item-info">
-      <div class="settings-item-title">${title}</div>
-      <div class="settings-item-desc">${desc}</div>
+  return html`<div class="row">
+    <div class="row-info">
+      <div class="row-title">${title}</div>
+      <div class="row-desc">${desc}</div>
     </div>
-    <div class="settings-item-control">${control}</div>
+    <div class="row-control">${control}</div>
   </div>`;
 }
 
-/** The settings toggle switch — the SAME control as the quick panel's
- *  (docs/quickpanel-preview.html): .qp-switch + .qp-knob, role="switch",
- *  skin-driven colors and transitions. Click propagation is stopped so a
- *  toggle inside a clickable row (e.g. an expandable card) doesn't
- *  trigger the row's own handler.
- *
- *  State flips in the DOM immediately: several panels collect from the
- *  element (aria-checked) and not every onChange re-renders. A later
- *  render re-asserts the same state from the model. */
+/** Shared toggle — .tt-switch + .tt-knob (kit). */
 export function toggle(
   checked: boolean,
   onChange: (checked: boolean) => void,
@@ -65,7 +59,7 @@ export function toggle(
 ): TemplateResult {
   return html`<button
     type="button"
-    class="qp-switch ${checked ? "on" : ""}"
+    class="tt-switch ${checked ? "on" : ""}"
     role="switch"
     id=${ifDefined(opts?.id)}
     value=${ifDefined(opts?.value)}
@@ -78,22 +72,19 @@ export function toggle(
       btn.classList.toggle("on", next);
       btn.setAttribute("aria-checked", next ? "true" : "false");
       onChange(next);
-      // Non-native control: the settings shell tracks dirty state via this
-      // bubbling event (its input/change delegation misses buttons).
       btn.dispatchEvent(new CustomEvent("tterm-settings-changed", { bubbles: true }));
     }}
-  ><span class="qp-knob"></span></button>`;
+  ><span class="tt-knob"></span></button>`;
 }
 
-/** The flat settings button. `danger` for destructive actions; `cls` adds
- *  a feature-specific marker class (used by tests and feature CSS). */
+/** Text / danger link button (.tt-btn-link). */
 export function linkBtn(
   label: string,
   onClick: (e: MouseEvent) => void,
   opts?: { danger?: boolean; id?: string; title?: string; cls?: string },
 ): TemplateResult {
   return html`<button
-    class="settings-link-btn ${opts?.danger ? "settings-link-btn-danger" : ""} ${opts?.cls ?? ""}"
+    class="tt-btn-link ${opts?.danger ? "tt-danger" : ""} ${opts?.cls ?? ""}"
     id=${ifDefined(opts?.id)}
     title=${ifDefined(opts?.title)}
     @click=${onClick}
@@ -102,20 +93,14 @@ export function linkBtn(
   </button>`;
 }
 
-/** Plain-info settings row (description only). */
+/** Plain-info settings block (description only). */
 export function infoRow(desc: string): TemplateResult {
-  return html`<div class="settings-item">
-    <div class="settings-item-desc">${desc}</div>
+  return html`<div class="row-block">
+    <div class="row-desc">${desc}</div>
   </div>`;
 }
 
-/** <select> value binding convention. lit-html commits an element's
- * property parts BEFORE its child parts, so `.value=` on a <select> lands
- * before its <option>s exist and the browser snaps to the first option
- * (jsdom and spec-compliant browsers alike). The convention: put
- * `data-current=${value}` on the select instead of `.value=`, then call
- * syncSelectValues(root) immediately after every render(). Selects whose
- * value already matches (e.g. one with an open dropdown) are untouched. */
+/** <select> value binding convention — see module docs historically. */
 export function syncSelectValues(root: ParentNode): void {
   for (const sel of root.querySelectorAll<HTMLSelectElement>("select[data-current]")) {
     const current = sel.dataset.current ?? "";

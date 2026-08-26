@@ -55,14 +55,14 @@ function renderProfilePanel(panel: HTMLElement): void {
               // Pending lives in the DOM (data-current) until Apply —
               // same contract the native select had.
             },
-            { id: "set-default-profile" },
+            { id: "set-default-profile", className: "tt-select--wide" },
           ),
         ),
       )}
       ${section(
         "Imported from Windows Terminal",
         html`
-          <div class="settings-item-desc" style="margin-bottom:10px">
+          <div class="row-desc" style="margin-bottom:10px">
             Checkbox on the left — shown in the new-tab menu when checked (same
             pattern as SSH hosts). Pending until Apply.
           </div>

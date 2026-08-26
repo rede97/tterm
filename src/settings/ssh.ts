@@ -187,13 +187,13 @@ function sshTemplate(panel: HTMLElement) {
         <div class="host-toolbar">
           <button
             type="button"
-            class="btn btn-primary"
+            class="tt-btn tt-btn-primary"
             id="set-add-ssh-host"
             @click=${() => showSshHostEditor({ onSaved: saveHost(panel) })}
           >+ Add Host</button>
           <button
             type="button"
-            class="btn btn-ghost"
+            class="tt-btn tt-btn-ghost"
             id="set-reload-ssh"
             @click=${async () => {
               const reloaded = await loadSshHosts();
@@ -204,7 +204,7 @@ function sshTemplate(panel: HTMLElement) {
           >Reload from disk</button>
           <button
             type="button"
-            class="btn btn-ghost"
+            class="tt-btn tt-btn-ghost"
             id="set-open-ssh-config"
             @click=${() => invoke("open_ssh_config").catch(logError.bind(null, "ssh.openConfig"))}
           >Open File</button>
@@ -232,7 +232,7 @@ function sshTemplate(panel: HTMLElement) {
         <div class="host-toolbar">
           <button
             type="button"
-            class="btn btn-primary"
+            class="tt-btn tt-btn-primary"
             id="set-gen-ssh-key"
             @click=${() => showKeygenModal({ onSaved: () => loadKeys(panel) })}
           >+ Generate Key</button>
@@ -351,12 +351,12 @@ function keyList(st: SshPanelState) {
     return infoRow("No key pairs found. Generate one to enable passwordless logins.");
   }
   return st.keys.map(
-    (k) => html`<div class="settings-item settings-item-row">
-      <div class="settings-item-info">
-        <div class="settings-item-title">${k.name}</div>
-        <div class="settings-item-desc">${k.fingerprint}</div>
+    (k) => html`<div class="row">
+      <div class="row-info">
+        <div class="row-title">${k.name}</div>
+        <div class="row-desc">${k.fingerprint}</div>
       </div>
-      <div class="settings-item-control">
+      <div class="row-control">
         ${linkBtn(
           "Copy",
           async () => {

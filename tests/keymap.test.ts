@@ -222,6 +222,12 @@ describe("keymap dispatcher", () => {
     expect(fired).toEqual(["workbench.action.closeTab"]);
   });
 
+  it("Ctrl+T opens the New Tab picker by default", () => {
+    const e = dispatch({ key: "t", ctrlKey: true });
+    expect(fired).toEqual(["tterm.newTabPicker"]);
+    expect(e.defaultPrevented).toBe(true);
+  });
+
   it("Ctrl+Shift+P runs the command palette by default", () => {
     const e = dispatch({ key: "P", ctrlKey: true, shiftKey: true });
     expect(fired).toEqual(["workbench.action.showCommands"]);

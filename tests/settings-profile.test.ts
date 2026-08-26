@@ -46,9 +46,7 @@ describe("settings — profile panel", () => {
   it("Apply preserves the configured default profile", async () => {
     const root = createSettingsContent();
     document.body.appendChild(root);
-    const applyBtn = root.querySelector<HTMLButtonElement>(
-      ".settings-footer .settings-btn:not(.settings-btn-revert)",
-    )!;
+    const applyBtn = root.querySelector<HTMLButtonElement>(".settings-footer .tt-btn-primary")!;
     applyBtn.click();
     await vi.waitFor(() => {
       expect(document.querySelector("#toast-container")?.textContent).toContain("Settings applied");
@@ -60,7 +58,7 @@ describe("settings — profile panel", () => {
 
   it("refreshProfilePanel rebuilds the lists from the store (WT set changed)", () => {
     const root = createSettingsContent();
-    expect(profileSelect(root).querySelectorAll(".qp-option")).toHaveLength(2);
+    expect(profileSelect(root).querySelectorAll(".tt-option")).toHaveLength(2);
 
     configStore.set({
       localProfiles: [...PROFILES.map((p) => ({ ...p })), { name: "CMD", command: "cmd.exe" }],
@@ -70,7 +68,7 @@ describe("settings — profile panel", () => {
     refreshProfilePanel(root);
 
     const sel = profileSelect(root);
-    expect(sel.querySelectorAll(".qp-option")).toHaveLength(3);
+    expect(sel.querySelectorAll(".tt-option")).toHaveLength(3);
     expect(sel.dataset.current).toBe("CMD");
     const checks = root.querySelectorAll<HTMLInputElement>(".wt-profile-check");
     expect(checks).toHaveLength(3);

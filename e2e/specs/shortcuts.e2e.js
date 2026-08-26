@@ -26,16 +26,16 @@ describe("TTerm keyboard shortcuts", () => {
     await browser.pause(300);
 
     await browser.keys(["Control", "p"]);
-    const input = await $(".tab-switcher-input");
+    const input = await $(".pal-input");
     await input.waitForExist({ timeout: 5000 });
 
     // Rows carry the tab-strip numbers.
-    const badges = await $$(".tab-switcher-row .tab-switcher-badge");
+    const badges = await $$(".pal-row .pal-badge");
     expect(badges.length).toBeGreaterThanOrEqual(3);
 
     await browser.keys("2");
     await browser.keys("Enter");
-    await browser.waitUntil(async () => !(await $(".tab-switcher-overlay").isExisting()), {
+    await browser.waitUntil(async () => !(await $(".pal-overlay").isExisting()), {
       timeout: 5000,
       timeoutMsg: "quick open did not close after Enter",
     });
@@ -63,7 +63,7 @@ describe("TTerm keyboard shortcuts", () => {
       timeoutMsg: "Ctrl+Tab did not switch to the MRU tab",
     });
     // Overlay is gone after the commit.
-    expect(await $(".tab-switcher-overlay").isExisting()).toBe(false);
+    expect(await $(".pal-overlay").isExisting()).toBe(false);
   });
 
   it("Ctrl+Shift+Tab wraps to the least recently used tab", async () => {

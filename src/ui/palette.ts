@@ -1,11 +1,12 @@
 // Command palette (Ctrl+Shift+P) — the ">" face of the quick-open shell
 // (docs/command-palette-preview.html).
 //
-// Model: one overlay, an input whose value always starts with ">", and a
-// page STACK for two-level flows (New Tab… → kind → target; Temporary
-// Connect… → host → password). Escape pops one level; at the root it
-// closes. Deleting the ">" flips back to quick open (tabs), and typing ">"
-// there flips in — the two share one continuous input, VS Code style.
+// Model: one overlay, a fixed chrome ">" (.pal-prefix) on the command root,
+// an input that holds only the filter/query (never the ">"), and a page STACK
+// for two-level flows (New Tab… → kind → target; Temporary Connect… → host →
+// password). Escape pops one level; at the root it closes. Backspace on an
+// empty command-root input flips back to quick open (tabs); typing ">" there
+// flips in — the two share one continuous input, VS Code style.
 //
 // Commands come from KEY_COMMANDS (core/keymap): every palette action is a
 // registered command, so it appears in Settings → Keyboard and can be
@@ -19,7 +20,7 @@ import { allSerialProfiles } from "../config/serial-profiles";
 import { hostProp, SERIAL_BAUD_RATES } from "../core/common";
 import { formatCombo, KEY_COMMANDS, resolveKeybindings, runCommand } from "../core/keymap";
 import { configStore } from "../core/store";
-import type { SerialFlowControl, SerialPort, SshHost } from "../core/types";
+import type { SerialFlowControl, SerialInputMode, SerialPort, SshHost } from "../core/types";
 import { el } from "./dom";
 import {
   addForward,
@@ -43,7 +44,9 @@ export interface PaletteHandlers {
   setSerialBaud: (id: string, baud: number) => void;
   setSerialProfile: (id: string, name: string) => void;
   setSerialFlow: (id: string, flow: SerialFlowControl) => void;
-  // Deleting the ">" prefix returns to quick open with the rest as query.
+  setSerialInputMode: (id: string, mode: SerialInputMode) => void;
+  // Deleting the chrome ">" (Backspace on empty command root) returns to
+  // quick open with the rest as query.
   flipToQuickOpen: (query: string) => void;
 }
 
@@ -59,12 +62,19 @@ interface PaletteRow {
   label: string;
   detail?: string;
   kbd?: string;
+  /** Command palette section (draft .pal-group). */
+  group?: string;
   action: () => void;
 }
 
 type PalettePage =
   | { kind: "commands" }
-  | { kind: "list"; title: string; rows: () => PaletteRow[] | Promise<PaletteRow[]> }
+  | {
+      kind: "list";
+      title: string;
+      placeholder?: string;
+      rows: () => PaletteRow[] | Promise<PaletteRow[]>;
+    }
   | {
       kind: "text";
       title: string;
@@ -79,6 +89,7 @@ let rows: PaletteRow[] = [];
 let selected = 0;
 let listEl: HTMLElement | null = null;
 let inputEl: HTMLInputElement | null = null;
+let prefixEl: HTMLElement | null = null;
 // Generation guard: an async list resolve from a stale page must not render.
 let pageGen = 0;
 
@@ -93,8 +104,8 @@ function top(): PalettePage {
 function push(page: PalettePage): void {
   stack.push(page);
   selected = 0;
-  // Text pages start blank — the list filter query is not a default answer.
-  if (page.kind === "text" && inputEl) inputEl.value = "";
+  // Secondary pages start with a blank filter (draft clears the field).
+  if (inputEl && page.kind !== "commands") inputEl.value = "";
   void renderPage();
 }
 
@@ -102,10 +113,19 @@ function pop(): void {
   if (stack.length > 1) {
     stack.pop();
     selected = 0;
+    if (inputEl) inputEl.value = "";
     void renderPage();
   } else {
     close();
   }
+}
+
+function syncPrefix(): void {
+  prefixEl?.classList.toggle("on", top()?.kind === "commands");
+}
+
+function inputQuery(): string {
+  return inputEl?.value ?? "";
 }
 
 // ---- Command list ----
@@ -113,11 +133,17 @@ function pop(): void {
 function commandRows(query: string): PaletteRow[] {
   const bindings = resolveKeybindings(configStore.get("keybindings"));
   const q = query.trim().toLowerCase();
+  // Only commands with a draft `group` appear in the palette (order = registry).
   return KEY_COMMANDS.filter(
-    (c) => !q || c.title.toLowerCase().includes(q) || c.id.toLowerCase().includes(q),
+    (c) =>
+      c.group &&
+      (!q ||
+        c.title.toLowerCase().includes(q) ||
+        c.id.toLowerCase().includes(q) ||
+        c.group.toLowerCase().includes(q)),
   ).map((c) => ({
     label: c.title,
-    detail: c.desc,
+    group: c.group,
     kbd: bindings[c.id] ? formatCombo(bindings[c.id]) : undefined,
     action: () => run(() => runCommand(c.id)),
   }));
@@ -128,11 +154,12 @@ function commandRows(query: string): PaletteRow[] {
 function newTabKindPage(): PalettePage {
   return {
     kind: "list",
-    title: "New Tab…",
+    title: "Connection type",
+    placeholder: "New Tab — Local / SSH / Serial",
     rows: () => [
-      { label: "Local", detail: "Shell profile", action: () => push(newTabLocalPage()) },
-      { label: "SSH", detail: "Host from ~/.ssh/config", action: () => push(newTabSshPage()) },
-      { label: "Serial", detail: "COM port", action: () => push(newTabSerialPage()) },
+      { label: "Local", detail: "shell profiles", action: () => push(newTabLocalPage()) },
+      { label: "SSH", detail: "saved hosts", action: () => push(newTabSshPage()) },
+      { label: "Serial", detail: "COM ports", action: () => push(newTabSerialPage()) },
     ],
   };
 }
@@ -140,7 +167,8 @@ function newTabKindPage(): PalettePage {
 function newTabLocalPage(): PalettePage {
   return {
     kind: "list",
-    title: "New Tab · Local",
+    title: "Local shells",
+    placeholder: "Local shell — type to filter",
     rows: () => {
       const h = _handlers;
       if (!h) return [];
@@ -168,10 +196,11 @@ function parseTempHost(input: string): SshHost | null {
 }
 
 function tempSshPasswordPage(host: SshHost): PalettePage {
+  const who = host.user ? `${host.user}@${host.hostname || host.name}` : host.hostname || host.name;
   return {
     kind: "text",
     title: `SSH · ${host.name}`,
-    placeholder: "Password — empty for agent / key",
+    placeholder: `Password for ${who} — empty for agent / key`,
     password: true,
     submit: (value) => {
       const h = _handlers;
@@ -185,18 +214,19 @@ function tempSshPasswordPage(host: SshHost): PalettePage {
 function newTabSshPage(): PalettePage {
   return {
     kind: "list",
-    title: "New Tab · SSH",
+    title: "SSH hosts",
+    placeholder: "SSH host — type to filter",
     rows: () => {
       const h = _handlers;
       if (!h) return [];
       const temp: PaletteRow = {
         label: "Temporary Connect…",
-        detail: "No config write",
+        detail: "user@host · no config",
         action: () =>
           push({
             kind: "text",
             title: "SSH · Temporary Connect",
-            placeholder: "user@host[:port]",
+            placeholder: "user@host[:port] — temporary, not saved",
             submit: (value) => {
               const host = parseTempHost(value);
               if (!host) {
@@ -207,13 +237,14 @@ function newTabSshPage(): PalettePage {
             },
           }),
       };
+      // Draft order: saved hosts first, Temporary Connect… last.
       return [
-        temp,
         ...h.listSshHosts().map((host) => ({
           label: host.name,
           detail: `${hostProp(host, "user")}@${hostProp(host, "hostname") || host.name}`,
           action: () => run(() => h.openSshTab(host)),
         })),
+        temp,
       ];
     },
   };
@@ -222,7 +253,8 @@ function newTabSshPage(): PalettePage {
 function newTabSerialPage(): PalettePage {
   return {
     kind: "list",
-    title: "New Tab · Serial",
+    title: "Serial ports",
+    placeholder: "Serial port — type to filter",
     rows: async () => {
       const h = _handlers;
       if (!h) return [];
@@ -392,7 +424,8 @@ function withActiveSerialTab(fn: (id: string) => void): void {
 function serialProfilePage(): PalettePage {
   return {
     kind: "list",
-    title: "Serial · Session Profile",
+    title: "Serial profile",
+    placeholder: "Serial profile — type to filter",
     rows: () =>
       allSerialProfiles().map((p) => ({
         label: p.name,
@@ -406,7 +439,8 @@ function serialProfilePage(): PalettePage {
 function serialBaudPage(): PalettePage {
   return {
     kind: "list",
-    title: "Serial · Baud Rate",
+    title: "Baud rate",
+    placeholder: "Baud rate — type to filter",
     rows: () =>
       SERIAL_BAUD_RATES.map((b) => ({
         label: String(b),
@@ -418,7 +452,8 @@ function serialBaudPage(): PalettePage {
 function serialFlowPage(): PalettePage {
   return {
     kind: "list",
-    title: "Serial · Flow Control",
+    title: "Flow control",
+    placeholder: "Flow control — type to filter",
     rows: () => [
       {
         label: "None",
@@ -438,6 +473,26 @@ function serialFlowPage(): PalettePage {
   };
 }
 
+function serialInputModePage(): PalettePage {
+  return {
+    kind: "list",
+    title: "Input mode",
+    placeholder: "Input mode — type to filter",
+    rows: () =>
+      (
+        [
+          ["normal", "Normal"],
+          ["echo", "Echo"],
+          ["line", "Line by Line"],
+        ] as const
+      ).map(([mode, label]) => ({
+        label,
+        action: () =>
+          run(() => withActiveSerialTab((id) => _handlers?.setSerialInputMode(id, mode))),
+      })),
+  };
+}
+
 // ---- Overlay ----
 
 function run(action: () => void): void {
@@ -449,31 +504,27 @@ async function renderPage(): Promise<void> {
   if (!listEl || !inputEl) return;
   const page = top();
   const gen = ++pageGen;
+  syncPrefix();
 
   inputEl.placeholder =
     page.kind === "commands"
       ? "Type a command…"
       : page.kind === "text"
         ? page.placeholder
-        : `${page.title} — type to filter`;
+        : (page.placeholder ?? `${page.title} — type to filter`);
   inputEl.type = page.kind === "text" && page.password ? "password" : "text";
-  // Text pages collect free-form input (host, password): the ">" command
-  // prefix and the flip-back rule only exist on list/command pages.
-  if (page.kind === "text" && inputEl.value.startsWith(">")) {
-    inputEl.value = inputEl.value.slice(1);
-  }
 
   let pageRows: PaletteRow[];
   if (page.kind === "commands") {
-    pageRows = commandRows(inputEl.value.slice(1));
+    pageRows = commandRows(inputQuery());
   } else if (page.kind === "text") {
     pageRows = [];
   } else {
     listEl.textContent = "";
-    listEl.appendChild(el("div", "tab-switcher-empty", "Loading…"));
+    listEl.appendChild(el("div", "pal-empty", "Loading…"));
     const resolved = await page.rows();
     if (gen !== pageGen) return; // stale page
-    const q = inputEl.value.slice(1).trim().toLowerCase();
+    const q = inputQuery().trim().toLowerCase();
     pageRows = q
       ? resolved.filter(
           (r) => r.label.toLowerCase().includes(q) || (r.detail ?? "").toLowerCase().includes(q),
@@ -485,33 +536,43 @@ async function renderPage(): Promise<void> {
 
   listEl.textContent = "";
   if (page.kind === "text") {
-    listEl.appendChild(el("div", "tab-switcher-empty", "Enter to continue · Esc to go back"));
+    listEl.appendChild(
+      el(
+        "div",
+        "pal-empty",
+        page.password ? "Type password, then Enter" : "Enter user@host[:port]",
+      ),
+    );
     return;
   }
   if (rows.length === 0) {
-    listEl.appendChild(el("div", "tab-switcher-empty", "No matches"));
+    const empty =
+      page.kind === "commands"
+        ? "No matching commands"
+        : page.title === "Connection type"
+          ? "No matching kinds"
+          : page.title === "Local shells" ||
+              page.title === "SSH hosts" ||
+              page.title === "Serial ports"
+            ? "No matching targets"
+            : "No matching values";
+    listEl.appendChild(el("div", "pal-empty", empty));
     return;
   }
 
-  // Group headers: command titles carry a "Category: Name" prefix.
-  let lastCat = "";
+  // Group headers: palette commands use KeyCommand.group; list pages use title.
+  let lastGroup = "";
   rows.forEach((r, i) => {
-    if (page.kind === "commands") {
-      const cat = r.label.includes(":") ? r.label.split(":")[0] : "Other";
-      if (cat !== lastCat) {
-        lastCat = cat;
-        listEl?.appendChild(el("div", "pal-cat", cat));
-      }
+    if (page.kind === "commands" && r.group && r.group !== lastGroup) {
+      lastGroup = r.group;
+      listEl?.appendChild(el("div", "pal-group", r.group));
+    } else if (page.kind === "list" && i === 0 && page.title) {
+      listEl?.appendChild(el("div", "pal-group", page.title));
     }
-    const row = el("div", `tab-switcher-row pal-row${i === selected ? " selected" : ""}`);
-    const label = el(
-      "span",
-      "tab-switcher-label",
-      page.kind === "commands" ? r.label.replace(/^[^:]+:\s*/, "") : r.label,
-    );
-    row.appendChild(label);
+    const row = el("div", `pal-row${i === selected ? " selected" : ""}`);
+    row.appendChild(el("span", "pal-label", r.label));
     if (r.kbd) row.appendChild(el("span", "pal-kbd", r.kbd));
-    else if (r.detail) row.appendChild(el("span", "pal-detail", r.detail));
+    else if (r.detail) row.appendChild(el("span", "pal-meta", r.detail));
     row.addEventListener("click", () => r.action());
     row.addEventListener("mousemove", () => {
       if (selected !== i) {
@@ -521,12 +582,12 @@ async function renderPage(): Promise<void> {
     });
     listEl?.appendChild(row);
   });
-  listEl.querySelector(".tab-switcher-row.selected")?.scrollIntoView({ block: "nearest" });
+  listEl.querySelector(".pal-row.selected")?.scrollIntoView({ block: "nearest" });
 }
 
 /** Selection repaint without a full re-render (arrows / mousemove). */
 function paintSelections(): void {
-  const els = listEl?.querySelectorAll(".tab-switcher-row");
+  const els = listEl?.querySelectorAll(".pal-row");
   if (!els) return;
   for (const [i, row] of els.entries()) {
     row.classList.toggle("selected", i === selected);
@@ -538,6 +599,20 @@ function onKeydown(e: KeyboardEvent): void {
   if (e.key === "Escape") {
     e.preventDefault();
     pop();
+    return;
+  }
+  // Chrome ">": Backspace on an empty command-root field flips to quick open.
+  if (
+    e.key === "Backspace" &&
+    page.kind === "commands" &&
+    inputEl &&
+    inputEl.value === "" &&
+    inputEl.selectionStart === 0
+  ) {
+    e.preventDefault();
+    const h = _handlers;
+    close();
+    h?.flipToQuickOpen("");
     return;
   }
   if (e.key === "Enter") {
@@ -555,24 +630,12 @@ function onKeydown(e: KeyboardEvent): void {
     const len = rows.length;
     selected = len === 0 ? 0 : (((selected + (e.key === "ArrowDown" ? 1 : -1)) % len) + len) % len;
     paintSelections();
-    listEl?.querySelector(".tab-switcher-row.selected")?.scrollIntoView({ block: "nearest" });
+    listEl?.querySelector(".pal-row.selected")?.scrollIntoView({ block: "nearest" });
   }
 }
 
 function onInput(): void {
   if (!inputEl) return;
-  if (top().kind === "text") {
-    void renderPage();
-    return;
-  }
-  // Deleting the ">" via selection/edit (not just Backspace) flips back.
-  if (!inputEl.value.startsWith(">")) {
-    const h = _handlers;
-    const q = inputEl.value;
-    close();
-    h?.flipToQuickOpen(q);
-    return;
-  }
   selected = 0;
   void renderPage();
 }
@@ -587,6 +650,7 @@ export function openPaletteFlow(
     | "serialProfile"
     | "serialBaud"
     | "serialFlow"
+    | "serialInputMode"
     | "forwards"
     | "forwardLocal"
     | "forwardRemote"
@@ -611,11 +675,11 @@ export function openPaletteFlow(
       pushForwardForm("dynamic");
       break;
     case "tempSsh":
-      // Same page the SSH level-2 list's first row opens.
+      // Same page the SSH level-2 list's Temporary Connect… row opens.
       push({
         kind: "text",
         title: "SSH · Temporary Connect",
-        placeholder: "user@host[:port]",
+        placeholder: "user@host[:port] — temporary, not saved",
         submit: (value) => {
           const host = parseTempHost(value);
           if (!host) {
@@ -635,6 +699,9 @@ export function openPaletteFlow(
     case "serialFlow":
       push(serialFlowPage());
       break;
+    case "serialInputMode":
+      push(serialInputModePage());
+      break;
   }
 }
 
@@ -644,16 +711,22 @@ export function openCommandPalette(query = ""): void {
   stack = [{ kind: "commands" }];
   selected = 0;
 
-  overlay = el("div", "tab-switcher-overlay");
-  const panel = el("div", "tab-switcher-panel pal-panel");
+  overlay = el("div", "pal-overlay");
+  const panel = el("div", "pal-panel");
+  const wrap = el("div", "pal-input-wrap");
+  prefixEl = el("span", "pal-prefix on", ">");
   inputEl = document.createElement("input");
-  inputEl.className = "tab-switcher-input";
-  inputEl.value = `>${query}`;
-  inputEl.setSelectionRange(1 + query.length, 1 + query.length);
+  inputEl.className = "pal-input";
+  inputEl.spellcheck = false;
+  inputEl.autocomplete = "off";
+  inputEl.value = query;
+  inputEl.setSelectionRange(query.length, query.length);
   inputEl.addEventListener("input", onInput);
   inputEl.addEventListener("keydown", onKeydown);
-  panel.appendChild(inputEl);
-  listEl = el("div", "tab-switcher-list");
+  wrap.appendChild(prefixEl);
+  wrap.appendChild(inputEl);
+  panel.appendChild(wrap);
+  listEl = el("div", "pal-list");
   panel.appendChild(listEl);
   overlay.appendChild(panel);
   overlay.addEventListener("mousedown", (e) => {
@@ -671,4 +744,5 @@ function close(): void {
   rows = [];
   listEl = null;
   inputEl = null;
+  prefixEl = null;
 }

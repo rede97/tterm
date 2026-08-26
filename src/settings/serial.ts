@@ -165,7 +165,7 @@ function serialTemplate(panel: HTMLElement, st: SerialPanelState) {
     ${section(
       "Profiles",
       html`
-        <div class="settings-item-desc" style="margin-bottom:6px">Named session modes. Duplicate a built-in profile to customize it.</div>
+        <div class="row-desc" style="margin-bottom:6px">Named session modes. Duplicate a built-in profile to customize it.</div>
         <div id="set-serial-profile-gallery" class="theme-gallery">
           <div class="theme-group-title">Built-in</div>
           <div class="theme-grid">

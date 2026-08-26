@@ -2,14 +2,15 @@
 
 对照标准：
 
-1. **显示与交互 100% 对齐**设计稿（`docs/*-preview.html` + `docs/ui/tokens.css`）。
+1. **显示与交互 100% 对齐**设计稿（`docs/*-preview.html` + kit）。
 2. **Settings：布局与按钮严格 1:1**（row wells、间距、按钮宽 148px / 主次样式 / 落位、卡片与磁贴形态）。不得「语义接近即可」。
 3. **可见性列表用左侧 checkbox**（已定案，不用 toggle）。
+4. **控件同源：** [`src/ui/kit/`](../../src/ui/kit/)（`controls.css` + `select.ts` / `modal.ts` / …）；草稿链同一 CSS，禁止再内联一套 select/btn 皮。
 
 - App：`feat/ui-redesign-migration`
-- 审计：2026-08-26（Q8、Settings 全面板复审）
+- 审计：2026-08-26（Q8、Settings 全面板复审）；控件库：同日 kit 收口
 
-**结论一句话：** **CLOSED（2026-08-26 同日收口）** — Q8a（select fixed+portal）与 **Q8b（真 overlay 浮层滚动条，`ui/overlay-scroll.ts`）** 均落地并过实机验收；Settings L1–L3 / S4–S12、关窗确认、粘贴确认已落地。
+**结论一句话：** **CLOSED（2026-08-26 同日收口）** — Q8a（select fixed+portal）与 **Q8b（真 overlay 浮层滚动条，`ui/overlay-scroll.ts`）** 均落地并过实机验收；Settings L1–L3 / S4–S12、关窗确认、粘贴确认已落地；**轻量控件库**（`.tt-select` / buttons / toggle / stepper）app+drafts 同源。
 
 ---
 
@@ -64,7 +65,7 @@
 |----|------|
 | **L1** | Settings **布局 1:1**：section / row / gallery / modal 结构、间距、对齐与稿一致。 |
 | **L2** | Settings **按钮 1:1**：实心次要按钮与 Homepage / Configure / Check for Updates / Copy / toolbar 主按钮共用 **`--tt-btn-width: 148px`**（高约 28）；主按钮 / ghost 样式与落位跟稿。Modal Save/Cancel 同宽。 |
-| **L3** | **可见性 = 左侧 checkbox**（`.check-row` + `.check-box`）。Toggle / `.qp-switch` 仅用于单一功能开/关（Built-in SSH、Frosted、Bell…）。 |
+| **L3** | **可见性 = 左侧 checkbox**（`.check-row` + `.check-box`）。Toggle / `.tt-switch` 仅用于单一功能开/关（Built-in SSH、Frosted、Bell…）。 |
 
 ### 总表
 
@@ -76,7 +77,7 @@
 | **S6** | Appearance 主题 gallery + New Theme 磁贴 1:1 | **DONE**（`.theme-new` 磁贴；gallery 保留 Built-in/Custom 分组 = OK\*，稿扁平与产品分组取舍已定） |
 | **S7** | Serial Profile gallery + New Profile 磁贴 + editor 按钮 1:1 | **DONE** |
 | **S8** | Shell：panel header、row wells、sidebar/padding | **DONE**（header 随 nav、well 行、侧栏 188、20/24/28、dirty dot） |
-| **S9** | 通用实心按钮 148（Homepage / Configure / Updates / Keys Copy…） | **DONE**（`.settings-link-btn.solid`） |
+| **S9** | 通用实心按钮 148（Homepage / Configure / Updates / Keys Copy…） | **DONE**（`.tt-btn.tt-btn-solid`） |
 | **S10** | General：Bell / Paste / **Confirm close window** / Data | **DONE**（开关 + 后端 CloseRequested 钩 + cf 模态；`window_request_close` 未确认路径） |
 | **S11** | Modal 脚按钮 148（Theme / Serial / Host editor） | **DONE** |
 | **S12** | Keyboard | **DONE** |
@@ -94,19 +95,19 @@
 | 差异 | 稿 | 实现 | 级别 |
 |------|----|------|------|
 | 面板标题区 | `.settings-header` | **有** | DONE |
-| 行容器 | `.row` well `10×12` | `.settings-item-row` well · `align center` | DONE |
+| 行容器 | `.row` well `10×12` | `.row` well · `align center` | DONE |
 | 侧栏 | `188` · pad `14px 0` · nav muted/550 | **对齐** | DONE |
 | 内容 / section | `20 24 28` / mb 28 | **对齐** | DONE |
 | Footer | sidebar bg · gap 10 · btn 28×12.5 | **对齐** | DONE |
 | Input / stepper / Settings select | 28h · 12.5/550 · stepper 52/28 · select center | **对齐** | DONE |
 | Modals | radius token · pad 16×20 · header 550 · foot 148×28 | **对齐** | DONE |
-| Keygen shell 宽 | draft `.skg` 420 | app 复用 `.she` 560 | OK\* |
+| Keygen shell 宽 | draft `.skg` 420 | `.she-dialog--sm` 420 | **DONE** |
 
 ### D1. General
 
 | 差异 | 稿 | 实现 | 级别 |
 |------|----|------|------|
-| Homepage / Check for Updates | `.link-btn.solid` 148×28 | `.settings-link-btn.solid` **对齐** | DONE |
+| Homepage / Check for Updates | `.tt-btn.tt-btn-solid` 148×28 | `.tt-btn.tt-btn-solid` **对齐** | DONE |
 | Scrollback | 窄 input / stepper | stepper（±） | OK\* |
 | Bell / Paste / Data | — | 完整 | OK\* |
 
@@ -114,8 +115,8 @@
 
 | 差异 | 稿 | 实现 | 级别 |
 |------|----|------|------|
-| Frosted / Font / Size 行 | `.row` well | `.settings-item-row` well | DONE |
-| Configure | `.link-btn.solid` 148 | `.settings-link-btn.solid` | DONE |
+| Frosted / Font / Size 行 | `.row` well | `.row` well | DONE |
+| Configure | `.tt-btn.tt-btn-solid` 148 | `.tt-btn.tt-btn-solid` | DONE |
 | Gallery | Built-in / Custom + New Theme 磁贴 | **一致**（`+ New Theme`，无单独 + 圆） | DONE |
 | Theme / Font / Host / Serial editor 脚 | 148×28 | `.te-btn` / `.fp-btn` / `.sp-btn` **对齐** | DONE |
 | Skin 卡 | minmax 190 · pad 12 · desc 11.5 | **对齐** | DONE |
@@ -157,10 +158,10 @@
 
 | 差异 | 稿 | 实现 | 级别 |
 |------|----|------|------|
-| Defaults 行 | `.row` well + select | itemRow，无 well | layout |
+| Defaults 行 | `.row` well + select | `row` well + `.tt-select` | **DONE** |
 | Gallery / 卡片 / 编辑器字段序 | Built-in+Custom、summary、Input→Enter→NL→Flow | **基本一致** | DONE\* |
-| **New Profile** | `.theme-new` 磁贴 | `+ New Profile` link 按钮 | layout |
-| Editor 脚 | min 148 | 无 | 按钮 |
+| **New Profile** | `.theme-new` 磁贴 | `.theme-new` 磁贴 | **DONE** |
+| Editor 脚 | min 148 | `.sp-btn` 148 | **DONE** |
 
 ### D6. Keyboard
 
@@ -176,30 +177,23 @@
 | 场景 | 必须用 | 禁止 |
 |------|--------|------|
 | 多条「是否出现在新标签菜单」 | 左 **checkbox** + `check-row` | 右/左 **toggle** |
-| 单一功能开/关 | 右 **toggle**（`.qp-switch`） | — |
-| 行尾实心次要 CTA | **148×~28** 灰实心（稿 `.link-btn.solid` / `.homepage-btn`） | 无宽限 accent 链接顶替 |
+| 单一功能开/关 | 右 **toggle**（`.tt-switch`） | — |
+| 行尾实心次要 CTA | **148×~28** 灰实心（稿 `.tt-btn.tt-btn-solid` / `.homepage-btn`） | 无宽限 accent 链接顶替 |
 | 新建 Theme / Profile | **`.theme-new` 磁贴** | 纯文字 `+ New …` link |
-| 下拉 | 与 QP 同族自定义 select（随 **Q8a** fixed 悬浮） | Settings 里再退回 native（modal 内亦尽量同族） |
+| 下拉 | 统一 .tt-select（kit；Q8a fixed+portal） | 第二套 select 皮 / .set-select |
 
 ---
 
 ## E. 汇总与顺序
 
-| 面 | 开放 |
+| 面 | 状态 |
 |----|------|
-| Quick panel | **Q8b**（panel overlay 滚动条；Q8a 已 DONE） |
-| Settings | 见上表（多数 DONE；以实机为准） |
-| Confirm | 粘贴 / 关窗均已落地 |
+| Quick panel | **DONE**（含 Q8a/Q8b；控件 `.tt-select` / `.tt-switch` / `.tt-btn*`） |
+| Settings | **DONE**（布局 `.section`/`.row`；控件 kit；L1–L3） |
+| Confirm | **DONE**（`.cf-overlay` + `.tt-btn*`） |
+| Palette | **DONE\***（`pal-*` 外壳；Ctrl+Tab 仍 `tab-switcher-*`） |
 
-### 建议实现序
-
-1. **S8** shell header + **row wells**（全面板受益）  
-2. **S9 / S11** 实心与 modal 按钮 **148**  
-3. **S4** Profile（+ SSH 可见性）→ **checkbox / check-row**  
-4. **S5** SSH 分区、工具条、host 行、字段序  
-5. **S6 / S7** `.theme-new` 磁贴；Appearance/Serial 余量  
-6. **Q8a** select fixed+portal（**DONE**）；**Q8b** panel overlay 滚动条（**OPEN** — webkit `width` → classic gutter）  
-7. **Confirm**：关窗确认（有 tab）+ Settings `confirmCloseWindow`；粘贴确认已在 `paste.ts`，对齐 [`confirm-preview.html`](../confirm-preview.html)
+**词汇统一（正式迁移）：** 控件与 Settings 布局以 kit + 设计稿为准；禁止 `.qp-switch` / `.cf-btn` / `.settings-link-btn` / `.settings-item-*` 主路径。
 
 ### Confirm dialogs（已落地）
 
@@ -208,6 +202,6 @@
 | 多行粘贴 | **DONE** — 标题旁 `N lines` header meta + **可编辑**等宽 textarea（`cf-body-flush` 高视区）；无 Security 脚注；确认后粘贴**编辑后**内容 |
 | 关窗（有活动 tab） | **DONE** — 后端 `CloseRequested` 拦截 → 前端 cf 模态（danger，无 meta 行）；X 按钮（`window_request_close`）/ Alt+F4 / 任务栏同路径；Cancel 不关闭 |
 
-滚动条统一：`docs/ui/scroll.css` 的 `.tt-scroll` 为草稿事实源；落地 `styles.css` 有对等全局块（Chrome 121+ 不得设 `scrollbar-width/color`，否则带回箭头条）。**注意：** 统一样式 ≠ overlay 不挤布局（见 **Q8b**）。
+滚动条：QP/Settings 真 overlay → `ui/overlay-scroll.ts`；`.tt-scroll` 用于无 148 约束的面（palette 等）。
 
-实机验收：X 点击弹出 warn 模态、Cancel 保窗；粘贴模态可编辑预览与稿一致（截图）。
+实机验收：X 点击弹出 warn 模态、Cancel 保窗；粘贴模态可编辑预览与稿一致。

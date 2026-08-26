@@ -1,0 +1,458 @@
+/**
+ * TTerm UI kit — shared controls for app + docs/*-preview.html.
+ *
+ * Classes are the contract. Behavior lives in src/ui/select.ts (and friends).
+ * Drafts must NOT redefine these rules locally — link this file.
+ *
+ * Select variants:
+ *   default  — left-aligned (Quick Panel)
+ *   settings — .settings-page .tt-select-trigger / .tt-select--settings (centered)
+ */
+
+/* ===== Select (.tt-select) ===== */
+
+.tt-select {
+  position: relative;
+  width: var(--tt-btn-width);
+  height: var(--tt-ctrl-h);
+  flex-shrink: 0;
+}
+
+/* Profile names / long labels — 2× control column (296px when --tt-btn-width is 148). */
+.tt-select.tt-select--wide {
+  width: calc(var(--tt-btn-width) * 2);
+}
+
+.tt-select-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0 26px 0 10px;
+  color: var(--tt-text);
+  background: var(--tt-inset);
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius-ctrl);
+  font-family: var(--tt-ui);
+  font-size: var(--tt-fs-label);
+  font-weight: var(--tt-ui-weight);
+  line-height: 1;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+}
+
+.tt-select-trigger::after {
+  content: "";
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translateY(-50%);
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>")
+    center / contain no-repeat;
+  pointer-events: none;
+}
+
+.tt-select-trigger:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.tt-select.open .tt-select-trigger,
+.tt-select-trigger:focus-visible {
+  border-color: var(--tt-focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tt-focus) 35%, transparent);
+}
+
+/* Settings / modal editors: centered label, ctrl size, title weight. */
+.settings-page .tt-select-trigger,
+.tt-select--settings .tt-select-trigger,
+.sp-select-slot .tt-select-trigger,
+.ski-field .tt-select-trigger,
+.skg-field .tt-select-trigger {
+  justify-content: center;
+  text-align: center;
+  padding: 0 26px;
+  font-size: var(--tt-fs-ctrl);
+  font-weight: var(--tt-title-weight);
+}
+
+.sp-select-slot .tt-select,
+.ski-field .tt-select,
+.skg-field .tt-select {
+  width: 100%;
+}
+
+.tt-select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Floating listbox: fixed + portaled to <body> (see select.ts). */
+.tt-select-menu {
+  position: fixed;
+  z-index: 1200;
+  max-height: 220px;
+  overflow: auto;
+  padding: 4px;
+  background: #161616;
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius-sm);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+  display: none;
+  box-sizing: border-box;
+}
+
+.tt-select.open .tt-select-menu,
+.tt-select-menu.open {
+  display: block;
+}
+
+.tt-optgroup {
+  padding: 6px 8px 3px;
+  font-size: var(--tt-fs-caption);
+  font-weight: var(--tt-ui-weight);
+  color: var(--tt-faint);
+  letter-spacing: 0.02em;
+}
+
+.tt-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--tt-radius-opt);
+  background: transparent;
+  color: var(--tt-text);
+  font-family: var(--tt-ui);
+  font-size: var(--tt-fs-label);
+  font-weight: var(--tt-ui-weight);
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tt-option:hover,
+.tt-option.active,
+.tt-option[aria-selected="true"]:hover {
+  background: var(--tt-hover);
+  color: var(--tt-text);
+}
+
+.tt-option[aria-selected="true"] {
+  background: var(--tt-selected);
+  color: var(--tt-text);
+}
+
+.tt-option[aria-selected="true"]::after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23f2f2f2' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6 9 17l-5-5'/></svg>")
+    center / contain no-repeat;
+}
+
+.tt-select-wrap {
+  padding-bottom: 2px;
+}
+
+.tt-select-hint {
+  padding-top: 0;
+}
+
+.tt-select.tt-disabled,
+.qp-row.qp-disabled .tt-select {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.qp-row.qp-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* ===== Toggle (.tt-switch) ===== */
+
+.tt-switch {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: 99px;
+  background: var(--tt-switch-off);
+  border: 1px solid var(--tt-switch-off-border);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  transition:
+    background 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.tt-knob {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--tt-knob-off);
+  transition:
+    left 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    background 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.tt-switch:active .tt-knob {
+  transform: scaleX(1.15);
+}
+
+.tt-switch.on:active .tt-knob {
+  transform: scaleX(1.15);
+}
+
+.tt-switch.on {
+  background: var(--tt-switch-on);
+  border-color: var(--tt-switch-on-border);
+}
+
+.tt-switch.on .tt-knob {
+  left: 13px;
+  background: var(--tt-knob-on);
+}
+
+.tt-switch:focus-visible {
+  outline: 2px solid var(--tt-focus);
+  outline-offset: 2px;
+}
+
+.tt-switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Settings: larger switch (36×20) matching docs/settings-preview */
+.settings-page .tt-switch {
+  width: 36px;
+  height: 20px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.settings-page .tt-switch .tt-knob {
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  transition:
+    left 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.settings-page .tt-switch.on .tt-knob {
+  left: 18px;
+}
+
+/* ===== Buttons (.tt-btn + variant) =====
+   Variants: primary | ghost | solid | danger | danger-fill | link */
+
+.tt-btn {
+  height: var(--tt-ctrl-h);
+  min-width: var(--tt-btn-width);
+  padding: 0 14px;
+  box-sizing: border-box;
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius-ctrl);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--tt-ui);
+  font-size: var(--tt-fs-ctrl);
+  font-weight: var(--tt-title-weight);
+  line-height: 1;
+  background: var(--tt-well);
+  color: var(--tt-text);
+  outline: none;
+}
+
+.tt-btn:hover {
+  background: var(--tt-hover);
+  filter: none;
+}
+
+.tt-btn:focus-visible {
+  outline: 2px solid var(--tt-focus);
+  outline-offset: 2px;
+}
+
+/* Confirm footer: tighter min-width */
+.cf-footer .tt-btn {
+  min-width: 88px;
+  padding: 0 16px;
+  font-weight: var(--tt-ui-weight);
+}
+
+.tt-btn-primary {
+  background: var(--tt-accent-fill);
+  border-color: var(--tt-accent-fill);
+  color: var(--tt-accent-text);
+}
+
+.tt-btn-primary:hover {
+  background: var(--tt-accent);
+  border-color: var(--tt-accent);
+  filter: none;
+}
+
+.tt-btn-primary.applied {
+  background: var(--tt-faint);
+  border-color: transparent;
+  color: var(--tt-muted);
+  cursor: default;
+}
+
+.tt-btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--tt-muted);
+}
+
+.tt-btn-ghost:hover {
+  color: var(--tt-text);
+  background: var(--tt-hover);
+  filter: none;
+}
+
+.tt-btn-solid {
+  width: var(--tt-btn-width);
+  min-width: var(--tt-btn-width);
+  height: var(--tt-ctrl-h);
+  padding: 0 12px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  border-radius: var(--tt-radius-ctrl);
+  background: var(--tt-btn-solid-bg);
+  color: var(--tt-text);
+  font-family: var(--tt-ui);
+  font-size: var(--tt-fs-ctrl);
+  font-weight: var(--tt-title-weight);
+  text-decoration: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.tt-btn-solid:hover {
+  background: var(--tt-btn-solid-bg);
+  color: var(--tt-text);
+  filter: brightness(1.1);
+}
+
+.tt-btn-danger {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--tt-bad) 45%, transparent);
+  color: var(--tt-bad);
+}
+
+.tt-btn-danger:hover {
+  background: color-mix(in srgb, var(--tt-bad) 14%, transparent);
+  color: var(--tt-bad);
+  filter: none;
+}
+
+.tt-btn-danger-fill {
+  background: var(--tt-bad);
+  border-color: var(--tt-bad);
+  color: var(--tt-text);
+}
+
+.tt-btn-danger-fill:hover {
+  filter: brightness(1.08);
+}
+
+.tt-btn-link {
+  padding: 6px 12px;
+  height: auto;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--tt-radius-ctrl);
+  color: var(--tt-accent);
+  font-size: var(--tt-fs-body);
+  font-family: var(--tt-ui);
+  font-weight: var(--tt-title-weight);
+  cursor: pointer;
+  outline: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tt-btn-link:hover {
+  background: var(--tt-hover);
+  color: var(--tt-accent);
+}
+
+.tt-btn-link.tt-danger {
+  color: var(--tt-bad);
+}
+
+.tt-btn-link.tt-danger:hover {
+  background: var(--tt-hover);
+  color: var(--tt-bad);
+}
+
+body[data-skin="cursor"] .tt-btn-link:not(.tt-danger) {
+  color: var(--tt-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ===== Stepper ===== */
+.stepper {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.stepper .settings-input-narrow {
+  width: 52px;
+  min-width: 52px;
+  max-width: 52px;
+  text-align: center;
+}
+
+.stepper-btn {
+  width: 28px;
+  background: var(--tt-inset);
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius-ctrl);
+  color: var(--tt-muted);
+  font-size: var(--tt-fs-md);
+  line-height: 1;
+  cursor: pointer;
+  outline: none;
+  padding: 0;
+}
+
+.stepper-btn:hover {
+  background: var(--tt-hover);
+  border-color: color-mix(in srgb, var(--tt-muted) 45%, transparent);
+  color: var(--tt-text);
+}

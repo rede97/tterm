@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>TTerm Settings — preview</title>
 <link rel="stylesheet" href="/docs/ui/tokens.css" />
+<link rel="stylesheet" href="/docs/ui/aliases.css" />
+<link rel="stylesheet" href="/src/ui/kit/controls.css" />
 <link rel="stylesheet" href="/docs/ui/scroll.css" />
 <link rel="stylesheet" href="/docs/ui/preview-chrome.css" />
 <style>
@@ -234,118 +236,9 @@
     max-width: 36em;
   }
 
-  /* ---- controls ---- */
-  .toggle {
-    position: relative;
-    width: 36px; height: 20px;
-    border-radius: 999px;
-    border: 1px solid var(--set-switch-off-border);
-    background: var(--set-switch-off);
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: background 160ms ease, border-color 160ms ease;
-  }
-  .toggle::after {
-    content: "";
-    position: absolute;
-    top: 2px; left: 2px;
-    width: 14px; height: 14px;
-    border-radius: 50%;
-    background: var(--set-knob-off);
-    transition: transform 160ms ease, background 160ms ease;
-  }
-  .toggle[aria-checked="true"] {
-    background: var(--set-switch-on);
-    border-color: var(--set-switch-on-border);
-  }
-  .toggle[aria-checked="true"]::after {
-    transform: translateX(16px);
-    background: var(--set-knob-on);
-  }
+  /* ---- controls (toggle → kit .tt-switch) ---- */
 
-  /* Custom select —same language as quickpanel (no OS chrome) */
-  .set-select {
-    position: relative;
-    width: var(--set-btn-width);
-    height: 28px;
-    flex-shrink: 0;
-  }
-  .set-select-trigger {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    padding: 0 26px;
-    color: var(--set-text);
-    background: var(--set-inset);
-    border: 1px solid var(--set-line-strong);
-    border-radius: var(--set-radius-ctrl);
-    font: 12.5px/1 var(--ui);
-    font-weight: var(--set-title-weight);
-    text-align: center;
-    cursor: pointer;
-    outline: none;
-  }
-  .set-select-value {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .set-select-trigger::after {
-    content: "";
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    width: 12px; height: 12px;
-    transform: translateY(-50%);
-    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>") center / contain no-repeat;
-    pointer-events: none;
-  }
-  .set-select-trigger:hover { border-color: rgba(255,255,255,0.22); }
-  .set-select.open .set-select-trigger {
-    border-color: var(--set-focus);
-  }
-  /* Floating listbox: fixed + portaled to <body> while open — never
-     contributes to dialog/panel scrollHeight (parity with app .qp-select-menu). */
-  .set-select-menu {
-    display: none;
-    position: fixed;
-    z-index: 1200;
-    max-height: 220px;
-    overflow: auto;
-    padding: 4px;
-    background: var(--set-well);
-    border: 1px solid var(--set-line-strong);
-    border-radius: var(--set-radius-ctrl);
-    box-shadow: 0 10px 28px rgba(0,0,0,0.45);
-    box-sizing: border-box;
-  }
-  .set-select.open .set-select-menu,
-  .set-select-menu.open { display: block; }
-  .set-select-opt {
-    display: block;
-    width: 100%;
-    padding: 7px 8px;
-    border: 0;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--set-text);
-    font: inherit;
-    font-size: var(--set-fs-ctrl);
-    font-weight: var(--set-title-weight);
-    font-variant-numeric: tabular-nums;
-    text-align: left;
-    cursor: pointer;
-  }
-  .set-select-opt:hover,
-  .set-select-opt[aria-selected="true"] {
-    background: var(--set-hover);
-  }
-
-  .input, .btn {
+  .input {
     height: 28px;
     border-radius: var(--set-radius-ctrl);
     border: 1px solid var(--set-line-strong);
@@ -416,59 +309,6 @@
     background: color-mix(in srgb, var(--set-accent-fill) 70%, #000 30%);
     border-color: var(--set-accent-fill);
     color: var(--set-text);
-  }
-
-  .btn {
-    padding: 0 14px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    font-weight: var(--set-title-weight);
-  }
-  .btn:hover { filter: brightness(1.08); }
-  .btn-ghost {
-    background: transparent;
-    color: var(--set-muted);
-  }
-  .btn-ghost:hover { color: var(--set-text); background: var(--set-hover); }
-  .btn-primary {
-    background: var(--set-accent-fill);
-    color: var(--set-accent-text);
-    border-color: transparent;
-  }
-  .btn-link, .link-btn {
-    height: auto;
-    border: 0;
-    background: transparent;
-    color: var(--set-accent);
-    padding: 0;
-    cursor: pointer;
-    font: inherit;
-    font-size: var(--set-fs-ctrl);
-    font-weight: var(--set-title-weight);
-  }
-  body[data-skin="cursor"] .btn-link,
-  body[data-skin="cursor"] .link-btn:not(.solid) {
-    color: var(--set-text);
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-  .link-btn.solid {
-    height: var(--tt-ctrl-h);
-    width: var(--set-btn-width);
-    min-width: var(--set-btn-width);
-    padding: 0 12px;
-    text-decoration: none;
-    background: var(--set-btn-solid-bg);
-    color: var(--set-text);
-    border-radius: var(--set-radius-ctrl);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    box-sizing: border-box;
-    font-weight: var(--set-title-weight);
   }
 
   /* ---- chrome skin cards ---- */
@@ -999,7 +839,7 @@
     margin-bottom: 4px;
   }
   .ski-field .input,
-  .ski-field .set-select {
+  .ski-field .tt-select {
     width: 100%;
     min-width: 0;
     max-width: none;
@@ -1056,7 +896,7 @@
     margin-bottom: 4px;
   }
   .skg-field .input,
-  .skg-field .set-select {
+  .skg-field .tt-select {
     width: 100%;
     min-width: 0;
     max-width: none;
@@ -1081,7 +921,7 @@
     flex-wrap: wrap;
   }
   /* Equal-width toolbar actions — same token as row buttons */
-  .host-toolbar .btn {
+  .host-toolbar .tt-btn {
     width: var(--set-btn-width);
     min-width: var(--set-btn-width);
     box-sizing: border-box;
@@ -1357,7 +1197,7 @@
     font-family: var(--mono);
     background: transparent;
   }
-  .settings-link-btn {
+  .tt-btn-link {
     align-self: start;
     height: auto;
     padding: 6px 12px;
@@ -1370,7 +1210,7 @@
     font-weight: var(--set-title-weight);
     cursor: pointer;
   }
-  .settings-link-btn:hover {
+  .tt-btn-link:hover {
     background: var(--set-hover);
     color: var(--set-text);
   }
@@ -1442,7 +1282,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .sp-row > .set-select {
+  .sp-row > .tt-select {
     flex: 1.4;
     min-width: 0;
   }
@@ -1997,7 +1837,7 @@
                 <div class="row-title">Frosted glass</div>
                 <div class="row-desc">Blur terminal behind the panel only —window stays opaque</div>
               </div>
-              <button type="button" class="toggle" id="glass-toggle" role="switch" aria-checked="true" aria-label="Frosted glass"></button>
+              <button type="button" class="tt-switch on" id="glass-toggle" role="switch" aria-checked="true" aria-label="Frosted glass"><span class="tt-knob"></span></button>
             </div>
           </div>
 
@@ -2008,7 +1848,7 @@
                 <div class="row-title">Font Family</div>
                 <div class="row-desc" id="font-family-desc">'JetBrains Mono', 'Cascadia Mono', Consolas, monospace</div>
               </div>
-              <button type="button" class="link-btn solid" id="btn-font-config">Configure</button>
+              <button type="button" class="tt-btn tt-btn-solid" id="btn-font-config">Configure</button>
             </div>
             <div class="row">
               <div class="row-info">
@@ -2150,7 +1990,7 @@
                 <div class="row-title">Built-in SSH client</div>
                 <div class="row-desc">Use embedded russh instead of system ssh (password prompts, host-key confirm, port forwards).</div>
               </div>
-              <button type="button" class="toggle" role="switch" aria-checked="true" data-dirty aria-label="Built-in SSH"></button>
+              <button type="button" class="tt-switch on" role="switch" aria-checked="true" data-dirty aria-label="Built-in SSH"><span class="tt-knob"></span></button>
             </div>
           </div>
 
@@ -2158,9 +1998,9 @@
             <div class="section-title">Hosts from ~/.ssh/config</div>
             <p class="section-note">Edits join the same Apply as app settings. No separate Save — writing config is silent (a config.tt.bak backup is kept).</p>
             <div class="host-toolbar">
-              <button type="button" class="btn btn-primary" id="add-host">+ Add Host</button>
-              <button type="button" class="btn btn-ghost" id="reload-hosts">Reload from disk</button>
-              <button type="button" class="btn btn-ghost" id="open-ssh-config">Open File</button>
+              <button type="button" class="tt-btn tt-btn-primary" id="add-host">+ Add Host</button>
+              <button type="button" class="tt-btn tt-btn-ghost" id="reload-hosts">Reload from disk</button>
+              <button type="button" class="tt-btn tt-btn-ghost" id="open-ssh-config">Open File</button>
             </div>
             <div class="host-list" id="host-list">
               <div class="check-row">
@@ -2236,7 +2076,7 @@
             <div class="section-title">Keys</div>
             <p class="section-note">Key pairs in ~/.ssh. Upload a public key from a host’s ⋯ menu — the private key never leaves this machine.</p>
             <div class="host-toolbar" style="margin-bottom:10px">
-              <button type="button" class="btn btn-primary" id="gen-ssh-key">+ Generate Key</button>
+              <button type="button" class="tt-btn tt-btn-primary" id="gen-ssh-key">+ Generate Key</button>
             </div>
             <div class="ssh-key-list" id="ssh-key-list">
               <div class="row">
@@ -2244,21 +2084,21 @@
                   <div class="row-title">id_ed25519</div>
                   <div class="row-desc">SHA256:nThbg6kXUpJWGl7E1IGOCspRomTxdCARLviKw6E5SY8</div>
                 </div>
-                <button type="button" class="link-btn solid" data-copy-pubkey>Copy</button>
+                <button type="button" class="tt-btn tt-btn-solid" data-copy-pubkey>Copy</button>
               </div>
               <div class="row">
                 <div class="row-info">
                   <div class="row-title">id_rsa</div>
                   <div class="row-desc">SHA256:uNiVztksCsDhcc0u9e8BujQXVUpKZIDTMaczZ3isY8=</div>
                 </div>
-                <button type="button" class="link-btn solid" data-copy-pubkey>Copy</button>
+                <button type="button" class="tt-btn tt-btn-solid" data-copy-pubkey>Copy</button>
               </div>
               <div class="row">
                 <div class="row-info">
                   <div class="row-title">github_deploy</div>
                   <div class="row-desc">SHA256:YhBwZVF+M3E6z0P8K9xqN2vR7tLwA5sUcDiFjHkLmNo</div>
                 </div>
-                <button type="button" class="link-btn solid" data-copy-pubkey>Copy</button>
+                <button type="button" class="tt-btn tt-btn-solid" data-copy-pubkey>Copy</button>
               </div>
             </div>
           </div>
@@ -2273,7 +2113,7 @@
                 <div class="about-title" id="set-version">TTerm 2.2.5-2</div>
                 <div class="about-desc">A fast, lightweight, efficient WebView Terminal.</div>
               </div>
-              <button type="button" class="link-btn solid" id="set-homepage" title="Open GitHub homepage">
+              <button type="button" class="tt-btn tt-btn-solid" id="set-homepage" title="Open GitHub homepage">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
                 Homepage
               </button>
@@ -2286,14 +2126,14 @@
                 <div class="row-title">Check for updates automatically</div>
                 <div class="row-desc">Check GitHub Releases for a new version when the app starts.</div>
               </div>
-              <button type="button" class="toggle" role="switch" aria-checked="true" data-dirty></button>
+              <button type="button" class="tt-switch on" role="switch" aria-checked="true" data-dirty><span class="tt-knob"></span></button>
             </div>
             <div class="row">
               <div class="row-info">
                 <div class="row-title">Manual check</div>
                 <div class="row-desc">Check for a new version right now.</div>
               </div>
-              <button type="button" class="link-btn solid" id="demo-check-update">Check for Updates</button>
+              <button type="button" class="tt-btn tt-btn-solid" id="demo-check-update">Check for Updates</button>
             </div>
           </div>
           <div class="section">
@@ -2303,11 +2143,11 @@
                 <div class="row-title">Renderer</div>
                 <div class="row-desc">WebGL is faster; Canvas has broader compatibility.</div>
               </div>
-              <div class="set-select" data-dirty data-select>
-                <button type="button" class="set-select-trigger"><span class="set-select-value">WebGL</span></button>
-                <div class="set-select-menu">
-                  <button type="button" class="set-select-opt" aria-selected="true" data-value="WebGL">WebGL</button>
-                  <button type="button" class="set-select-opt" data-value="Canvas">Canvas</button>
+              <div class="tt-select" data-dirty data-select>
+                <button type="button" class="tt-select-trigger"><span class="tt-select-value">WebGL</span></button>
+                <div class="tt-select-menu">
+                  <button type="button" class="tt-option" aria-selected="true" data-value="WebGL">WebGL</button>
+                  <button type="button" class="tt-option" data-value="Canvas">Canvas</button>
                 </div>
               </div>
             </div>
@@ -2323,28 +2163,28 @@
                 <div class="row-title">Terminal bell</div>
                 <div class="row-desc">Play a sound when the terminal requests a bell.</div>
               </div>
-              <button type="button" class="toggle" role="switch" aria-checked="false" data-dirty aria-label="Terminal bell"></button>
+              <button type="button" class="tt-switch" role="switch" aria-checked="false" data-dirty aria-label="Terminal bell"><span class="tt-knob"></span></button>
             </div>
             <div class="row">
               <div class="row-info">
                 <div class="row-title">Paste warning</div>
                 <div class="row-desc">Ask before pasting text that spans multiple lines (security).</div>
               </div>
-              <button type="button" class="toggle" role="switch" aria-checked="true" data-dirty aria-label="Paste warning"></button>
+              <button type="button" class="tt-switch on" role="switch" aria-checked="true" data-dirty aria-label="Paste warning"><span class="tt-knob"></span></button>
             </div>
             <div class="row">
               <div class="row-info">
                 <div class="row-title">Trim paste</div>
                 <div class="row-desc">Strip trailing whitespace and newlines from pasted text.</div>
               </div>
-              <button type="button" class="toggle" role="switch" aria-checked="true" data-dirty aria-label="Trim paste"></button>
+              <button type="button" class="tt-switch on" role="switch" aria-checked="true" data-dirty aria-label="Trim paste"><span class="tt-knob"></span></button>
             </div>
             <div class="row">
               <div class="row-info">
                 <div class="row-title">Confirm before closing window</div>
                 <div class="row-desc">When any tab is open, ask before closing the window. Off = quit immediately.</div>
               </div>
-              <button type="button" class="toggle" role="switch" aria-checked="true" data-dirty aria-label="Confirm before closing window"></button>
+              <button type="button" class="tt-switch on" role="switch" aria-checked="true" data-dirty aria-label="Confirm before closing window"><span class="tt-knob"></span></button>
             </div>
           </div>
         </div>
@@ -2358,13 +2198,13 @@
                 <div class="row-title">Default Profile</div>
                 <div class="row-desc">Used when opening a new local tab.</div>
               </div>
-              <div class="set-select" data-dirty data-select>
-                <button type="button" class="set-select-trigger"><span class="set-select-value">PowerShell</span></button>
-                <div class="set-select-menu">
-                  <button type="button" class="set-select-opt" aria-selected="true" data-value="PowerShell">PowerShell</button>
-                  <button type="button" class="set-select-opt" data-value="Command Prompt">Command Prompt</button>
-                  <button type="button" class="set-select-opt" data-value="Ubuntu">Ubuntu</button>
-                  <button type="button" class="set-select-opt" data-value="Git Bash">Git Bash</button>
+              <div class="tt-select tt-select--wide" data-dirty data-select>
+                <button type="button" class="tt-select-trigger"><span class="tt-select-value">PowerShell</span></button>
+                <div class="tt-select-menu">
+                  <button type="button" class="tt-option" aria-selected="true" data-value="PowerShell">PowerShell</button>
+                  <button type="button" class="tt-option" data-value="Command Prompt">Command Prompt</button>
+                  <button type="button" class="tt-option" data-value="Ubuntu">Ubuntu</button>
+                  <button type="button" class="tt-option" data-value="Git Bash">Git Bash</button>
                 </div>
               </div>
             </div>
@@ -2440,17 +2280,17 @@
                 <div class="row-title">Default baud rate</div>
                 <div class="row-desc">Baud rate for new serial sessions (8N1).</div>
               </div>
-              <div class="set-select" data-dirty data-select>
-                <button type="button" class="set-select-trigger"><span class="set-select-value">115200</span></button>
-                <div class="set-select-menu">
-                  <button type="button" class="set-select-opt" data-value="9600">9600</button>
-                  <button type="button" class="set-select-opt" data-value="19200">19200</button>
-                  <button type="button" class="set-select-opt" data-value="38400">38400</button>
-                  <button type="button" class="set-select-opt" data-value="57600">57600</button>
-                  <button type="button" class="set-select-opt" aria-selected="true" data-value="115200">115200</button>
-                  <button type="button" class="set-select-opt" data-value="230400">230400</button>
-                  <button type="button" class="set-select-opt" data-value="460800">460800</button>
-                  <button type="button" class="set-select-opt" data-value="921600">921600</button>
+              <div class="tt-select" data-dirty data-select>
+                <button type="button" class="tt-select-trigger"><span class="tt-select-value">115200</span></button>
+                <div class="tt-select-menu">
+                  <button type="button" class="tt-option" data-value="9600">9600</button>
+                  <button type="button" class="tt-option" data-value="19200">19200</button>
+                  <button type="button" class="tt-option" data-value="38400">38400</button>
+                  <button type="button" class="tt-option" data-value="57600">57600</button>
+                  <button type="button" class="tt-option" aria-selected="true" data-value="115200">115200</button>
+                  <button type="button" class="tt-option" data-value="230400">230400</button>
+                  <button type="button" class="tt-option" data-value="460800">460800</button>
+                  <button type="button" class="tt-option" data-value="921600">921600</button>
                 </div>
               </div>
             </div>
@@ -2459,9 +2299,9 @@
                 <div class="row-title">Default profile</div>
                 <div class="row-desc">Input mode, newline handling and flow control for new serial sessions.</div>
               </div>
-              <div class="set-select" data-dirty data-select id="serial-profile-select">
-                <button type="button" class="set-select-trigger"><span class="set-select-value">Normal</span></button>
-                <div class="set-select-menu" id="serial-profile-menu"></div>
+              <div class="tt-select" data-dirty data-select id="serial-profile-select">
+                <button type="button" class="tt-select-trigger"><span class="tt-select-value">Normal</span></button>
+                <div class="tt-select-menu" id="serial-profile-menu"></div>
               </div>
             </div>
           </div>
@@ -2491,8 +2331,8 @@
         <div class="settings-footer">
           <span class="dirty-hint" id="dirty-hint"><span class="dot"></span><span id="dirty-text">Unsaved changes</span></span>
           <div class="footer-spacer"></div>
-          <button type="button" class="btn btn-ghost" id="btn-revert">Revert</button>
-          <button type="button" class="btn btn-primary" id="btn-apply">Apply</button>
+          <button type="button" class="tt-btn tt-btn-ghost" id="btn-revert">Revert</button>
+          <button type="button" class="tt-btn tt-btn-primary" id="btn-apply">Apply</button>
         </div>
       </div>
     </div>
@@ -2527,8 +2367,8 @@
           </div>
         </div>
         <div class="font-picker-footer">
-          <button type="button" class="btn btn-ghost" id="fp-cancel">Cancel</button>
-          <button type="button" class="btn btn-primary" id="fp-apply">Apply</button>
+          <button type="button" class="tt-btn tt-btn-ghost" id="fp-cancel">Cancel</button>
+          <button type="button" class="tt-btn tt-btn-primary" id="fp-apply">Apply</button>
         </div>
       </div>
     </div>
@@ -2608,8 +2448,8 @@
         </div>
         <div class="she-footer">
           <span class="she-spacer"></span>
-          <button type="button" class="btn btn-ghost" id="she-cancel">Cancel</button>
-          <button type="button" class="btn btn-primary" id="she-save">Add Host</button>
+          <button type="button" class="tt-btn tt-btn-ghost" id="she-cancel">Cancel</button>
+          <button type="button" class="tt-btn tt-btn-primary" id="she-save">Add Host</button>
         </div>
       </div>
     </div>
@@ -2635,8 +2475,8 @@
         <div class="te-footer">
           <button type="button" class="btn btn-danger" id="te-delete" hidden>Delete</button>
           <span class="te-spacer"></span>
-          <button type="button" class="btn btn-ghost" id="te-cancel">Cancel</button>
-          <button type="button" class="btn btn-primary" id="te-save">Save</button>
+          <button type="button" class="tt-btn tt-btn-ghost" id="te-cancel">Cancel</button>
+          <button type="button" class="tt-btn tt-btn-primary" id="te-save">Save</button>
         </div>
       </div>
     </div>
@@ -2650,58 +2490,58 @@
         </div>
         <div class="sp-row">
           <span class="sp-label">Input mode</span>
-          <div class="set-select" data-select id="sp-input-mode" data-field="inputMode">
-            <button type="button" class="set-select-trigger"><span class="set-select-value">Normal</span></button>
-            <div class="set-select-menu">
-              <button type="button" class="set-select-opt" aria-selected="true" data-value="normal">Normal</button>
-              <button type="button" class="set-select-opt" data-value="echo">Echo</button>
-              <button type="button" class="set-select-opt" data-value="line">Line by Line</button>
+          <div class="tt-select" data-select id="sp-input-mode" data-field="inputMode">
+            <button type="button" class="tt-select-trigger"><span class="tt-select-value">Normal</span></button>
+            <div class="tt-select-menu">
+              <button type="button" class="tt-option" aria-selected="true" data-value="normal">Normal</button>
+              <button type="button" class="tt-option" data-value="echo">Echo</button>
+              <button type="button" class="tt-option" data-value="line">Line by Line</button>
             </div>
           </div>
         </div>
         <div class="sp-row">
           <span class="sp-label">Enter sends</span>
-          <div class="set-select" data-select id="sp-enter-newline" data-field="enterNewline">
-            <button type="button" class="set-select-trigger"><span class="set-select-value">CR (\r)</span></button>
-            <div class="set-select-menu">
-              <button type="button" class="set-select-opt" aria-selected="true" data-value="cr">CR (\r)</button>
-              <button type="button" class="set-select-opt" data-value="lf">LF (\n)</button>
-              <button type="button" class="set-select-opt" data-value="crlf">CRLF (\r\n)</button>
+          <div class="tt-select" data-select id="sp-enter-newline" data-field="enterNewline">
+            <button type="button" class="tt-select-trigger"><span class="tt-select-value">CR (\r)</span></button>
+            <div class="tt-select-menu">
+              <button type="button" class="tt-option" aria-selected="true" data-value="cr">CR (\r)</button>
+              <button type="button" class="tt-option" data-value="lf">LF (\n)</button>
+              <button type="button" class="tt-option" data-value="crlf">CRLF (\r\n)</button>
             </div>
           </div>
         </div>
         <div class="sp-row">
           <span class="sp-label">Output newlines</span>
-          <div class="set-select" data-select id="sp-output-newline" data-field="outputNewline">
-            <button type="button" class="set-select-trigger"><span class="set-select-value">Keep (raw)</span></button>
-            <div class="set-select-menu">
-              <button type="button" class="set-select-opt" aria-selected="true" data-value="keep">Keep (raw)</button>
-              <button type="button" class="set-select-opt" data-value="cr-in-lf">Implicit CR in every LF</button>
-              <button type="button" class="set-select-opt" data-value="lf-in-cr">Implicit LF in every CR</button>
-              <button type="button" class="set-select-opt" data-value="force-crlf">Force CRLF</button>
-              <button type="button" class="set-select-opt" data-value="force-lf">Force LF</button>
-              <button type="button" class="set-select-opt" data-value="force-cr">Force CR</button>
-              <button type="button" class="set-select-opt" data-value="strip">Strip</button>
+          <div class="tt-select" data-select id="sp-output-newline" data-field="outputNewline">
+            <button type="button" class="tt-select-trigger"><span class="tt-select-value">Keep (raw)</span></button>
+            <div class="tt-select-menu">
+              <button type="button" class="tt-option" aria-selected="true" data-value="keep">Keep (raw)</button>
+              <button type="button" class="tt-option" data-value="cr-in-lf">Implicit CR in every LF</button>
+              <button type="button" class="tt-option" data-value="lf-in-cr">Implicit LF in every CR</button>
+              <button type="button" class="tt-option" data-value="force-crlf">Force CRLF</button>
+              <button type="button" class="tt-option" data-value="force-lf">Force LF</button>
+              <button type="button" class="tt-option" data-value="force-cr">Force CR</button>
+              <button type="button" class="tt-option" data-value="strip">Strip</button>
             </div>
           </div>
         </div>
         <div class="sp-hint" id="sp-hint">Pass through unchanged</div>
         <div class="sp-row">
           <span class="sp-label">Flow control</span>
-          <div class="set-select" data-select id="sp-flow-control" data-field="flowControl">
-            <button type="button" class="set-select-trigger"><span class="set-select-value">None</span></button>
-            <div class="set-select-menu">
-              <button type="button" class="set-select-opt" aria-selected="true" data-value="none">None</button>
-              <button type="button" class="set-select-opt" data-value="software">Software XON-XOFF</button>
-              <button type="button" class="set-select-opt" data-value="hardware">Hardware RTS-CTS</button>
+          <div class="tt-select" data-select id="sp-flow-control" data-field="flowControl">
+            <button type="button" class="tt-select-trigger"><span class="tt-select-value">None</span></button>
+            <div class="tt-select-menu">
+              <button type="button" class="tt-option" aria-selected="true" data-value="none">None</button>
+              <button type="button" class="tt-option" data-value="software">Software XON-XOFF</button>
+              <button type="button" class="tt-option" data-value="hardware">Hardware RTS-CTS</button>
             </div>
           </div>
         </div>
         <div class="sp-footer">
           <button type="button" class="btn btn-danger" id="sp-delete" hidden>Delete</button>
           <span class="sp-spacer"></span>
-          <button type="button" class="btn btn-ghost" id="sp-cancel">Cancel</button>
-          <button type="button" class="btn btn-primary" id="sp-save">Save</button>
+          <button type="button" class="tt-btn tt-btn-ghost" id="sp-cancel">Cancel</button>
+          <button type="button" class="tt-btn tt-btn-primary" id="sp-save">Save</button>
         </div>
       </div>
     </div>
@@ -2714,11 +2554,11 @@
             <input class="input" id="skg-name" type="text" spellcheck="false" value="id_ed25519" />
           </label>
           <label class="skg-field"><span>Algorithm</span>
-            <div class="set-select" data-select id="skg-algo-select">
-              <button type="button" class="set-select-trigger"><span class="set-select-value">Ed25519 (recommended)</span></button>
-              <div class="set-select-menu">
-                <button type="button" class="set-select-opt" aria-selected="true" data-value="ed25519">Ed25519 (recommended)</button>
-                <button type="button" class="set-select-opt" data-value="rsa">RSA 4096</button>
+            <div class="tt-select" data-select id="skg-algo-select">
+              <button type="button" class="tt-select-trigger"><span class="tt-select-value">Ed25519 (recommended)</span></button>
+              <div class="tt-select-menu">
+                <button type="button" class="tt-option" aria-selected="true" data-value="ed25519">Ed25519 (recommended)</button>
+                <button type="button" class="tt-option" data-value="rsa">RSA 4096</button>
               </div>
             </div>
           </label>
@@ -2727,8 +2567,8 @@
           </label>
         </div>
         <div class="skg-footer">
-          <button type="button" class="btn btn-ghost" id="skg-cancel">Cancel</button>
-          <button type="button" class="btn btn-primary" id="skg-generate">Generate</button>
+          <button type="button" class="tt-btn tt-btn-ghost" id="skg-cancel">Cancel</button>
+          <button type="button" class="tt-btn tt-btn-primary" id="skg-generate">Generate</button>
         </div>
       </div>
     </div>
@@ -2738,30 +2578,30 @@
         <div class="ski-header" id="ski-title">Upload SSH Key</div>
         <p class="ski-desc" id="ski-desc">Install a local public key on the remote host. The private key never leaves this machine.</p>
         <label class="ski-field"><span>Public key</span>
-          <div class="set-select" data-select id="ski-key-select">
-            <button type="button" class="set-select-trigger"><span class="set-select-value">id_ed25519.pub</span></button>
-            <div class="set-select-menu">
-              <button type="button" class="set-select-opt" aria-selected="true" data-value="id_ed25519.pub">id_ed25519.pub</button>
-              <button type="button" class="set-select-opt" data-value="id_rsa.pub">id_rsa.pub</button>
-              <button type="button" class="set-select-opt" data-value="github_deploy.pub">github_deploy.pub</button>
+          <div class="tt-select" data-select id="ski-key-select">
+            <button type="button" class="tt-select-trigger"><span class="tt-select-value">id_ed25519.pub</span></button>
+            <div class="tt-select-menu">
+              <button type="button" class="tt-option" aria-selected="true" data-value="id_ed25519.pub">id_ed25519.pub</button>
+              <button type="button" class="tt-option" data-value="id_rsa.pub">id_rsa.pub</button>
+              <button type="button" class="tt-option" data-value="github_deploy.pub">github_deploy.pub</button>
             </div>
           </div>
         </label>
         <p class="ski-empty-hint" style="display:none;margin:0 0 10px;font-size:var(--set-fs-label);color:var(--set-muted)">No keys yet. <button type="button" class="link-btn" id="ski-gen-one">Generate one…</button></p>
         <label class="ski-field"><span>Target OS</span>
-          <div class="set-select" data-select id="ski-os-select">
-            <button type="button" class="set-select-trigger"><span class="set-select-value">Auto</span></button>
-            <div class="set-select-menu">
-              <button type="button" class="set-select-opt" aria-selected="true" data-value="auto">Auto</button>
-              <button type="button" class="set-select-opt" data-value="windows">Windows</button>
-              <button type="button" class="set-select-opt" data-value="linux">Linux</button>
-              <button type="button" class="set-select-opt" data-value="macos">macOS</button>
+          <div class="tt-select" data-select id="ski-os-select">
+            <button type="button" class="tt-select-trigger"><span class="tt-select-value">Auto</span></button>
+            <div class="tt-select-menu">
+              <button type="button" class="tt-option" aria-selected="true" data-value="auto">Auto</button>
+              <button type="button" class="tt-option" data-value="windows">Windows</button>
+              <button type="button" class="tt-option" data-value="linux">Linux</button>
+              <button type="button" class="tt-option" data-value="macos">macOS</button>
             </div>
           </div>
         </label>
         <div class="ski-footer">
-          <button type="button" class="btn btn-ghost" id="ski-cancel">Cancel</button>
-          <button type="button" class="btn btn-primary" id="ski-install">Install</button>
+          <button type="button" class="tt-btn tt-btn-ghost" id="ski-cancel">Cancel</button>
+          <button type="button" class="tt-btn tt-btn-primary" id="ski-install">Install</button>
         </div>
       </div>
     </div>
@@ -3080,21 +2920,23 @@
     const t = e.currentTarget;
     const on = t.getAttribute("aria-checked") !== "true";
     t.setAttribute("aria-checked", on ? "true" : "false");
+    t.classList.toggle("on", on);
     appDirty = true;
     syncDirty();
   });
 
   // Generic toggles / dirty
-  document.querySelectorAll(".toggle[data-dirty]").forEach((t) => {
+  document.querySelectorAll(".tt-switch[data-dirty]").forEach((t) => {
     t.addEventListener("click", () => {
       const on = t.getAttribute("aria-checked") !== "true";
       t.setAttribute("aria-checked", on ? "true" : "false");
+      t.classList.toggle("on", on);
       if (t.closest("#panel-ssh")) sshDirty = true;
       else appDirty = true;
       syncDirty();
     });
   });
-  document.querySelectorAll("[data-dirty]:not(.toggle)").forEach((el) => {
+  document.querySelectorAll("[data-dirty]:not(.tt-switch)").forEach((el) => {
     el.addEventListener("change", () => {
       if (el.closest("#panel-ssh")) sshDirty = true;
       else appDirty = true;
@@ -3477,10 +3319,10 @@
     spProfileMenu.innerHTML = names
       .map(
         (n) =>
-          `<button type="button" class="set-select-opt"${n === defaultSerialProfile ? ' aria-selected="true"' : ""} data-value="${escHtml(n)}">${escHtml(n)}</button>`,
+          `<button type="button" class="tt-option"${n === defaultSerialProfile ? ' aria-selected="true"' : ""} data-value="${escHtml(n)}">${escHtml(n)}</button>`,
       )
       .join("");
-    spProfileSelect.querySelector(".set-select-value").textContent = defaultSerialProfile;
+    spProfileSelect.querySelector(".tt-select-value").textContent = defaultSerialProfile;
   }
 
   function makeSerialCard(p) {
@@ -3532,15 +3374,15 @@
 
   function setSpSelect(id, value) {
     const root = document.getElementById(id);
-    const opt = root.querySelector(`.set-select-opt[data-value="${value}"]`);
+    const opt = root.querySelector(`.tt-option[data-value="${value}"]`);
     if (!opt) return;
-    root.querySelectorAll(".set-select-opt").forEach((o) => {
+    root.querySelectorAll(".tt-option").forEach((o) => {
       o.setAttribute("aria-selected", o === opt ? "true" : "false");
     });
-    root.querySelector(".set-select-value").textContent = opt.textContent;
+    root.querySelector(".tt-select-value").textContent = opt.textContent;
   }
   function getSpSelect(id) {
-    return document.querySelector(`#${id} .set-select-opt[aria-selected="true"]`)?.dataset.value || "";
+    return document.querySelector(`#${id} .tt-option[aria-selected="true"]`)?.dataset.value || "";
   }
 
   function openSpEditor({ base, editName, suggestedName }) {
@@ -3998,7 +3840,7 @@
   document.getElementById("skg-generate")?.addEventListener("click", () => {
     const name = document.getElementById("skg-name")?.value.trim() || "id_ed25519";
     const algo =
-      document.querySelector('#skg-algo-select .set-select-opt[aria-selected="true"]')?.dataset.value ||
+      document.querySelector('#skg-algo-select .tt-option[aria-selected="true"]')?.dataset.value ||
       "ed25519";
     closeSkg();
     const list = document.getElementById("ssh-key-list");
@@ -4016,7 +3858,7 @@
       info.append(title, desc);
       const copy = document.createElement("button");
       copy.type = "button";
-      copy.className = "link-btn solid";
+      copy.className = "tt-btn tt-btn-solid";
       copy.setAttribute("data-copy-pubkey", "");
       copy.textContent = "Copy";
       row.append(info, copy);
@@ -4100,15 +3942,15 @@
   }
 
   function closeAllSelects(except) {
-    document.querySelectorAll(".set-select.open").forEach((el) => {
+    document.querySelectorAll(".tt-select.open").forEach((el) => {
       if (el !== except) el.classList.remove("open");
     });
     if (!except || selectPortal?.root !== except) unportalSelectMenu();
   }
 
   function openSelect(root) {
-    const trigger = root.querySelector(".set-select-trigger");
-    const menu = root.querySelector(".set-select-menu");
+    const trigger = root.querySelector(".tt-select-trigger");
+    const menu = root.querySelector(".tt-select-menu");
     if (!trigger || !menu) return;
     closeAllSelects();
     root.classList.add("open");
@@ -4119,13 +3961,13 @@
   }
 
   function pickSelectOpt(root, opt) {
-    const valueEl = root.querySelector(".set-select-value");
+    const valueEl = root.querySelector(".tt-select-value");
     const menu =
       selectPortal?.root === root
         ? selectPortal.menu
-        : root.querySelector(".set-select-menu");
+        : root.querySelector(".tt-select-menu");
     valueEl.textContent = opt.textContent;
-    (menu || root).querySelectorAll(".set-select-opt").forEach((o) => {
+    (menu || root).querySelectorAll(".tt-option").forEach((o) => {
       o.setAttribute("aria-selected", o === opt ? "true" : "false");
     });
     root.classList.remove("open");
@@ -4145,7 +3987,7 @@
   }
 
   document.querySelectorAll("[data-select]").forEach((root) => {
-    const trigger = root.querySelector(".set-select-trigger");
+    const trigger = root.querySelector(".tt-select-trigger");
     trigger.addEventListener("click", (e) => {
       e.stopPropagation();
       if (root.classList.contains("open")) closeAllSelects();
@@ -4154,24 +3996,24 @@
   });
   // Opt clicks: menu may be portaled on <body>, so listen globally.
   document.addEventListener("click", (e) => {
-    const opt = e.target.closest(".set-select-opt");
+    const opt = e.target.closest(".tt-option");
     if (opt) {
       e.stopPropagation();
-      const menu = opt.closest(".set-select-menu");
+      const menu = opt.closest(".tt-select-menu");
       const root =
         (selectPortal && selectPortal.menu === menu ? selectPortal.root : null) ||
-        opt.closest(".set-select");
+        opt.closest(".tt-select");
       if (root) pickSelectOpt(root, opt);
       return;
     }
-    if (!e.target.closest(".set-select") && !e.target.closest(".set-select-menu")) {
+    if (!e.target.closest(".tt-select") && !e.target.closest(".tt-select-menu")) {
       closeAllSelects();
     }
   });
   document.addEventListener(
     "scroll",
     (e) => {
-      if (e.target instanceof Element && e.target.closest(".set-select-menu")) return;
+      if (e.target instanceof Element && e.target.closest(".tt-select-menu")) return;
       closeAllSelects();
     },
     true,

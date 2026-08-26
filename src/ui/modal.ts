@@ -6,6 +6,11 @@
 // singleton (default true): opening a modal with a className that is already
 // open closes the previous instance first (no orphaned overlays/listeners).
 // sshauth opts out: several auth prompts can be pending at once.
+//
+// close() always dismisses any portaled ttSelect menu first — selects live
+// on <body> while open, so removing the overlay alone would orphan them.
+
+import { closeAllSelects } from "./select";
 
 export interface ModalHandle {
   overlay: HTMLElement;
@@ -42,6 +47,9 @@ export function createModal(options: ModalOptions): ModalHandle {
     close() {
       if (closed) return;
       closed = true;
+      // Portaled select menus sit on <body>; tear them down before the
+      // overlay (and its triggers) disappear.
+      closeAllSelects();
       if (openModals.get(className) === handle) openModals.delete(className);
       const i = modalStack.indexOf(handle);
       if (i !== -1) modalStack.splice(i, 1);

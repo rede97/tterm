@@ -40,7 +40,7 @@ async function openAppearanceSettings() {
 
 async function clickApply() {
   const applied = await browser.execute(() => {
-    const btn = [...document.querySelectorAll(".settings-btn")].find(
+    const btn = [...document.querySelectorAll(".tt-btn-primary")].find(
       (b) => b.textContent === "Apply",
     );
     if (btn) btn.click();
@@ -83,7 +83,7 @@ describe("custom themes", () => {
             document.querySelector(".te-delete")?.click();
             setTimeout(() => {
               document
-                .querySelector(".confirm-overlay .sshauth-footer .sshauth-btn:last-child")
+                .querySelector(".cf-overlay .sshauth-footer .sshauth-btn:last-child")
                 ?.click();
             }, 200);
           }, 200);
@@ -222,12 +222,12 @@ describe("custom themes", () => {
     await $(".te-delete").click();
     // te-delete opens the app's confirmDialog (custom modal, not native
     // confirm) — approve the deletion.
-    await browser.waitUntil(async () => await $(".confirm-overlay").isExisting(), {
+    await browser.waitUntil(async () => await $(".cf-overlay").isExisting(), {
       timeout: 3000,
       timeoutMsg: "delete confirmation did not appear",
     });
     await browser.execute(() => {
-      document.querySelector(".confirm-overlay .cf-footer .cf-btn:last-child")?.click();
+      document.querySelector(".cf-overlay .cf-footer .tt-btn:last-child")?.click();
     });
     await browser.waitUntil(
       async () =>

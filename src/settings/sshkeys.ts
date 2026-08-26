@@ -39,7 +39,7 @@ export async function listKeys(): Promise<SshKeyInfo[]> {
 export function showKeygenModal(opts: { onSaved: (key: SshKeyInfo) => void }): void {
   const modal = createModal({ className: "she-overlay" });
   modal.overlay.innerHTML = `
-    <div class="she-dialog" role="dialog" aria-modal="true" aria-label="Generate SSH Key">
+    <div class="she-dialog she-dialog--sm" role="dialog" aria-modal="true" aria-label="Generate SSH Key">
       <div class="she-header">Generate SSH Key</div>
       <div class="she-grid">
         <label class="she-field"><span>Name</span>
@@ -51,8 +51,8 @@ export function showKeygenModal(opts: { onSaved: (key: SshKeyInfo) => void }): v
       </div>
       <div class="she-footer">
         <span class="she-spacer"></span>
-        <button class="sp-btn skg-cancel" type="button">Cancel</button>
-        <button class="sp-btn sp-save skg-save" type="button">Generate</button>
+        <button class="tt-btn tt-btn-ghost skg-cancel" type="button">Cancel</button>
+        <button class="tt-btn tt-btn-primary skg-save" type="button">Generate</button>
       </div>
     </div>`;
   document.body.appendChild(modal.overlay);
@@ -102,14 +102,14 @@ export function showKeygenModal(opts: { onSaved: (key: SshKeyInfo) => void }): v
 export function showInstallKeyModal(target: InstallTarget): void {
   const modal = createModal({ className: "she-overlay" });
   modal.overlay.innerHTML = `
-    <div class="she-dialog" role="dialog" aria-modal="true" aria-label="Upload SSH Key">
+    <div class="she-dialog she-dialog--sm" role="dialog" aria-modal="true" aria-label="Upload SSH Key">
       <div class="she-header">Upload SSH Key</div>
       <p class="ski-desc" style="margin:-6px 0 10px;font-size:12px;color:var(--tt-muted);">Install a local public key on ${esc(target.user)}@${esc(target.hostname)}:${target.port}. The private key never leaves this machine.</p>
       <div class="ski-body" style="padding:0 0 8px;color:#ccc;font-size:13px;">Loading keys…</div>
       <div class="she-footer">
         <span class="she-spacer"></span>
-        <button class="sp-btn ski-cancel" type="button">Cancel</button>
-        <button class="sp-btn sp-save ski-install" type="button" disabled>Install</button>
+        <button class="tt-btn tt-btn-ghost ski-cancel" type="button">Cancel</button>
+        <button class="tt-btn tt-btn-primary ski-install" type="button" disabled>Install</button>
       </div>
     </div>`;
   document.body.appendChild(modal.overlay);
@@ -121,7 +121,7 @@ export function showInstallKeyModal(target: InstallTarget): void {
   listKeys().then((keys) => {
     if (keys.length === 0) {
       body.innerHTML = `No key pairs found in ~/.ssh.
-        <button class="settings-link-btn ski-gen" type="button" style="margin-left:8px;">Generate one…</button>`;
+        <button class="tt-btn-link ski-gen" type="button" style="margin-left:8px;">Generate one…</button>`;
       body.querySelector(".ski-gen")?.addEventListener("click", () => {
         modal.close();
         showKeygenModal({ onSaved: () => showInstallKeyModal(target) });

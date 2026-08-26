@@ -32,6 +32,7 @@ export function initShortcutsWiring(): void {
     index: i + 1,
     active: id === tabManager.activeTabId,
     disconnected: t.disconnected,
+    kind: t.type,
   });
   setTabSwitcherHandlers({
     listTabs: (mode) => {
@@ -74,6 +75,7 @@ export function initShortcutsWiring(): void {
       t.flowControl = flow;
       invoke("serial_set_flow_control", { id, flow }).catch(logCatch("serial.setFlow"));
     },
+    setSerialInputMode: (id, mode) => tabManager.setSerialInputMode(id, mode),
     flipToQuickOpen: (query) => openQuickOpen(query),
   });
   initKeymap({
@@ -144,6 +146,24 @@ export function initShortcutsWiring(): void {
     "tterm.serialProfile": () => openPaletteFlow("serialProfile"),
     "tterm.serialBaud": () => openPaletteFlow("serialBaud"),
     "tterm.serialFlow": () => openPaletteFlow("serialFlow"),
+    "tterm.serialInputMode": () => openPaletteFlow("serialInputMode"),
+    "tterm.serialDisconnect": () => {
+      const t = tabManager.activeTab;
+      if (t?.type !== "serial" || t.disconnected) return;
+      invoke("serial_disconnect", { id: t.id }).catch(logCatch("serial.disconnect"));
+    },
+    "tterm.serialReconnect": () => {
+      const t = tabManager.activeTab;
+      if (t?.type !== "serial" || !t.disconnected) return;
+      invoke("serial_reconnect", { id: t.id }).catch(logCatch("serial.reconnect"));
+    },
+    "tterm.serialAutoReconnect": () => {
+      const t = tabManager.activeTab;
+      if (t?.type !== "serial") return;
+      void invoke<boolean>("session_get_auto_reconnect", { id: t.id })
+        .then((v) => invoke("session_set_auto_reconnect", { id: t.id, enabled: !v }))
+        .catch(logCatch("serial.autoReconnect"));
+    },
   });
 }
 

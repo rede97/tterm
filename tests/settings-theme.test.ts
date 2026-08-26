@@ -61,7 +61,7 @@ describe("settings — theme gallery", () => {
     [...root.querySelectorAll<HTMLElement>(".theme-card")]
       .find((c) => c.dataset.theme === "Nord")!
       .click();
-    const applyBtn = [...root.querySelectorAll<HTMLButtonElement>(".settings-btn")].find(
+    const applyBtn = [...root.querySelectorAll<HTMLButtonElement>(".tt-btn-primary")].find(
       (b) => b.textContent === "Apply",
     )!;
     applyBtn.click();

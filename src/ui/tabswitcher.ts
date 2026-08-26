@@ -1,13 +1,14 @@
-// Tab switcher overlay — two faces of one widget (VS Code style):
+// Tab switcher overlay — two faces of the palette shell (VS Code style),
+// 1:1 with docs/command-palette-preview.html `.pal-*` chrome:
 //
 //  - Quick Open (Ctrl+P): input + numbered list of every tab; type a tab
-//    number or a label substring to filter, Enter/click jumps.
+//    number or a label substring to filter, Enter/click jumps. Typing ">"
+//    flips into the command palette.
 //  - MRU switcher (Ctrl+Tab / Ctrl+Shift+Tab): no input; the list appears
 //    in most-recently-used order, each Ctrl+Tab keydown steps the highlight,
 //    and RELEASING Ctrl commits the switch. Escape cancels.
 //
-// Handlers are injected by main.ts (setTabSwitcherHandlers) — this module
-// never imports TabManager, same acyclic pattern as quickpanel.ts.
+// Handlers are injected by wiring.ts — this module never imports TabManager.
 
 import { parseCombo, resolveKeybindings } from "../core/keymap";
 import { configStore } from "../core/store";
@@ -20,6 +21,8 @@ export interface SwitcherItem {
   index: number;
   active: boolean;
   disconnected: boolean;
+  /** Session kind shown as trailing .pal-meta (local / ssh / serial). */
+  kind: string;
 }
 
 export interface TabSwitcherHandlers {
@@ -97,18 +100,19 @@ function renderList(): void {
   listEl.textContent = "";
   const visible = mode === "quick" ? filterSwitcherItems(items, inputEl?.value ?? "") : items;
   if (visible.length === 0) {
-    listEl.appendChild(el("div", "tab-switcher-empty", "No matching tabs"));
+    listEl.appendChild(el("div", "pal-empty", "No matching tabs"));
     return;
   }
   selected = Math.min(selected, visible.length - 1);
   visible.forEach((it, i) => {
-    const row = el("div", `tab-switcher-row${i === selected ? " selected" : ""}`);
+    const row = el("div", `pal-row is-tab${i === selected ? " selected" : ""}`);
     row.dataset.tabId = it.id;
-    row.appendChild(el("span", "tab-switcher-badge", String(it.index)));
-    const label = el("span", "tab-switcher-label", it.label);
+    row.appendChild(el("span", "pal-badge", String(it.index)));
+    const label = el("span", "pal-label", it.label);
     if (it.disconnected) label.classList.add("disconnected");
     row.appendChild(label);
-    if (it.active) row.appendChild(el("span", "tab-switcher-current", "current"));
+    if (it.active) row.appendChild(el("span", "pal-meta", "current"));
+    row.appendChild(el("span", "pal-meta", it.kind));
     row.addEventListener("click", () => commit(it.id));
     row.addEventListener("mousemove", () => {
       if (selected !== i) {
@@ -118,7 +122,7 @@ function renderList(): void {
     });
     listEl?.appendChild(row);
   });
-  listEl.querySelector(".tab-switcher-row.selected")?.scrollIntoView({ block: "nearest" });
+  listEl.querySelector(".pal-row.selected")?.scrollIntoView({ block: "nearest" });
 }
 
 function open(nextMode: "quick" | "mru", startSelected: number): void {
@@ -128,11 +132,16 @@ function open(nextMode: "quick" | "mru", startSelected: number): void {
   items = _handlers.listTabs(nextMode);
   selected = startSelected;
 
-  overlay = el("div", "tab-switcher-overlay");
-  const panel = el("div", "tab-switcher-panel");
+  // Same shell as the command palette (preview: one .pal-overlay).
+  overlay = el("div", "pal-overlay");
+  const panel = el("div", "pal-panel");
+  const wrap = el("div", "pal-input-wrap");
   if (mode === "quick") {
     inputEl = document.createElement("input");
-    inputEl.className = "tab-switcher-input";
+    inputEl.className = "pal-input";
+    inputEl.type = "text";
+    inputEl.spellcheck = false;
+    inputEl.autocomplete = "off";
     inputEl.placeholder = "Go to tab — number or name; > for commands";
     inputEl.addEventListener("input", () => {
       // ">" prefix flips into the command palette, carrying the query.
@@ -149,11 +158,12 @@ function open(nextMode: "quick" | "mru", startSelected: number): void {
       renderList();
     });
     inputEl.addEventListener("keydown", onQuickKeydown);
-    panel.appendChild(inputEl);
+    wrap.appendChild(inputEl);
   } else {
-    panel.appendChild(el("div", "tab-switcher-hint", "Release Ctrl to switch"));
+    wrap.appendChild(el("span", "pal-mru-hint", "Release Ctrl to switch"));
   }
-  listEl = el("div", "tab-switcher-list");
+  panel.appendChild(wrap);
+  listEl = el("div", "pal-list");
   panel.appendChild(listEl);
   overlay.appendChild(panel);
   // Click on the backdrop cancels (MRU: no switch; quick: just close).

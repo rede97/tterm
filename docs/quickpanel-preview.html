@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>TTerm Quick Panel — preview</title>
 <link rel="stylesheet" href="/docs/ui/tokens.css" />
+<link rel="stylesheet" href="/docs/ui/aliases.css" />
+<link rel="stylesheet" href="/src/ui/kit/controls.css" />
 <link rel="stylesheet" href="/docs/ui/scroll.css" />
 <link rel="stylesheet" href="/docs/ui/preview-chrome.css" />
 <style>
@@ -206,7 +208,7 @@
     width: var(--qp-width);
     max-height: calc(100% - 48px);
     /* Content may scroll when Serial + modem + forwards stack is tall.
-       Select menus are position:fixed (see .qp-select-menu) so opening a
+       Select menus are position:fixed (see .tt-select-menu) so opening a
        dropdown NEVER grows scrollHeight / never forces a classic bar. */
     overflow-x: hidden;
     overflow-y: auto;
@@ -243,13 +245,13 @@
     background: var(--qp-well);
     border-color: rgba(255, 255, 255, 0.1);
   }
-  body.qp-glass .qp-select-menu {
+  body.qp-glass .tt-select-menu {
     -webkit-backdrop-filter: saturate(160%) blur(20px);
     backdrop-filter: saturate(160%) blur(20px);
     background: rgba(22, 22, 24, 0.72);
   }
-  body.qp-glass .qp-select-trigger,
-  body.qp-glass .qp-mini-btn:not(.qp-connect-btn[data-kind="reconnect"]),
+  body.qp-glass .tt-select-trigger,
+  body.qp-glass .tt-btn.tt-btn-solid:not(.qp-connect-btn[data-kind="reconnect"]),
   body.qp-glass .qp-share-url {
     background: rgba(0, 0, 0, 0.28);
   }
@@ -442,174 +444,7 @@
     font-weight: var(--tt-ui-weight);
   }
 
-  /* -- custom select (no OS blue highlight) -- */
-  .qp-select {
-    position: relative;
-    width: var(--qp-ctrl);
-    height: var(--qp-ctrl-h);
-    flex-shrink: 0;
-  }
-  .qp-select-trigger {
-    position: relative;
-    display: flex;
-    align-items: center;
-    width: 100%;
-    height: 100%;
-    padding: 0 26px 0 10px;
-    color: var(--qp-text);
-    background: var(--qp-inset);
-    border: 1px solid var(--qp-line-strong);
-    border-radius: var(--qp-radius-ctrl);
-    font-family: var(--tt-ui);
-  font-size: var(--tt-fs-label);
-  font-weight: var(--tt-ui-weight);
-  line-height: 1;
-    font-weight: var(--tt-ui-weight);
-    text-align: left;
-    cursor: pointer;
-    outline: none;
-  }
-  .qp-select-trigger::after {
-    content: "";
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    width: 12px; height: 12px;
-    transform: translateY(-50%);
-    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>") center / contain no-repeat;
-    pointer-events: none;
-  }
-  .qp-select-trigger:hover { border-color: rgba(255,255,255,0.22); }
-  .qp-select.open .qp-select-trigger,
-  .qp-select-trigger:focus-visible {
-    border-color: var(--qp-focus);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--qp-focus) 35%, transparent);
-  }
-  .qp-select-value {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* Floating listbox: fixed to the viewport so it never contributes to
-     .quick-panel scrollHeight (opening a select must not spawn a panel
-     scrollbar or shift the control column). top/left/width set in JS. */
-  .qp-select-menu {
-    position: fixed;
-    z-index: 40;
-    max-height: 220px;
-    overflow: auto;
-    padding: 4px;
-    background: #161616;
-    border: 1px solid var(--qp-line-strong);
-    border-radius: var(--qp-radius-sm);
-    box-shadow: 0 12px 28px rgba(0,0,0,0.55);
-    display: none;
-    box-sizing: border-box;
-  }
-  .qp-select.open .qp-select-menu { display: block; }
-  /* data-drop only documents intent; geometry comes from placeSelectMenu(). */
-
-  .qp-optgroup {
-    padding: 6px 8px 3px;
-    font-size: var(--tt-fs-caption);
-    font-weight: var(--tt-ui-weight);
-    color: var(--qp-faint);
-    letter-spacing: 0.02em;
-  }
-  .qp-option {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    width: 100%;
-    padding: 6px 8px;
-    border: 0;
-    border-radius: var(--qp-radius-opt);
-    background: transparent;
-    color: var(--qp-text);
-    font-family: var(--tt-ui);
-  font-size: var(--tt-fs-label);
-  font-weight: var(--tt-ui-weight);
-  line-height: 1.3;
-    font-weight: var(--tt-ui-weight);
-    text-align: left;
-    cursor: pointer;
-  }
-  .qp-option:hover,
-  .qp-option[aria-selected="true"]:hover {
-    background: var(--qp-hover);
-    color: var(--tt-text);
-  }
-  .qp-option[aria-selected="true"] {
-    background: var(--qp-accent-fill);
-    color: var(--tt-text);
-  }
-  .qp-option[aria-selected="true"]::after {
-    content: "";
-    width: 12px; height: 12px;
-    flex-shrink: 0;
-    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23f2f2f2' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6 9 17l-5-5'/></svg>") center / contain no-repeat;
-  }
-
-  .qp-select-wrap { padding-bottom: 2px; }
-  .qp-hint {
-    font-size: var(--tt-fs-caption);
-    color: var(--qp-faint);
-    padding: 0 12px 6px;
-    line-height: 1.4;
-  }
-  .qp-select-hint { padding-top: 0; }
-  .qp-row.qp-disabled { opacity: 0.45; pointer-events: none; }
-
-  /* -- switch: animated; colors from skin tokens -- */
-  .qp-switch {
-    position: relative;
-    width: 28px;
-    height: 16px;
-    border-radius: 99px;
-    background: var(--qp-switch-off);
-    border: 1px solid var(--qp-switch-off-border);
-    cursor: pointer;
-    flex-shrink: 0;
-    padding: 0;
-    transition:
-      background 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      border-color 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-  .qp-knob {
-    position: absolute;
-    top: 1px; left: 1px;
-    width: 12px; height: 12px;
-    border-radius: 50%;
-    background: var(--qp-knob-off);
-    transition:
-      left 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      background 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-  .qp-switch:active .qp-knob {
-    transform: scaleX(1.15);
-    transform-origin: left center;
-  }
-  .qp-switch.on:active .qp-knob {
-    transform-origin: right center;
-  }
-  .qp-switch.on {
-    background: var(--qp-switch-on);
-    border-color: var(--qp-switch-on-border);
-  }
-  .qp-switch.on .qp-knob {
-    left: 13px;
-    background: var(--qp-knob-on);
-  }
-  .qp-switch:focus-visible {
-    outline: 2px solid var(--qp-focus);
-    outline-offset: 2px;
-  }
-
-  /* -- buttons: same footprint as selects -- */
-  .qp-mini-btn {
+  .tt-btn.tt-btn-solid {
     width: var(--qp-ctrl);
     height: var(--qp-ctrl-h);
     padding: 0 10px;
@@ -625,7 +460,7 @@
     cursor: pointer;
     text-align: center;
   }
-  .qp-mini-btn:hover {
+  .tt-btn.tt-btn-solid:hover {
     border-color: color-mix(in srgb, var(--qp-text) 35%, transparent);
     background: color-mix(in srgb, var(--qp-inset) 80%, #fff);
     color: var(--tt-text);
@@ -701,7 +536,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .qp-share-url-row .qp-mini-btn {
+  .qp-share-url-row .tt-btn.tt-btn-solid {
     /* Fixed width for Copy ↔ Copied so the URL field doesn't reflow. */
     width: 68px;
     min-width: 68px;
@@ -728,7 +563,7 @@
     padding: 2px 8px;
     min-height: 28px;
   }
-  .qp-signals .qp-switch,
+  .qp-signals .tt-switch,
   .qp-signals .qp-led {
     justify-self: start;
   }
@@ -901,14 +736,14 @@
         <div class="qp-section-title">AI Share</div>
         <div class="qp-row qp-toggle-row">
           <span class="qp-label">Share this session</span>
-          <button type="button" class="qp-switch" role="switch" aria-label="Share this session" aria-checked="false" data-toggle="share">
-            <span class="qp-knob"></span>
+          <button type="button" class="tt-switch" role="switch" aria-label="Share this session" aria-checked="false" data-toggle="share">
+            <span class="tt-knob"></span>
           </button>
         </div>
         <div class="qp-share-reveal" id="share-reveal">
           <div class="qp-row qp-share-url-row">
             <span class="qp-share-url" title="http://127.0.0.1:41789/share/3?token=8f2a…">http://127.0.0.1:41789/share/3?token=8f2a1c90b4</span>
-            <button type="button" class="qp-mini-btn" id="copy-btn">Copy</button>
+            <button type="button" class="tt-btn tt-btn-solid" id="copy-btn">Copy</button>
           </div>
         </div>
       </div>
@@ -917,8 +752,8 @@
         <div class="qp-section-title">Session</div>
         <div class="qp-row qp-toggle-row">
           <span class="qp-label">Auto-reconnect</span>
-          <button type="button" class="qp-switch" role="switch" aria-label="Auto-reconnect" aria-checked="false" data-toggle>
-            <span class="qp-knob"></span>
+          <button type="button" class="tt-switch" role="switch" aria-label="Auto-reconnect" aria-checked="false" data-toggle>
+            <span class="tt-knob"></span>
           </button>
         </div>
         <div class="qp-fwd">
@@ -984,38 +819,38 @@
         <div class="qp-section-title">Session</div>
         <div class="qp-row">
           <span class="qp-label">Connection</span>
-          <button type="button" class="qp-mini-btn qp-connect-btn" data-kind="disconnect" id="conn-btn">Disconnect</button>
+          <button type="button" class="tt-btn tt-btn-solid qp-connect-btn" data-kind="disconnect" id="conn-btn">Disconnect</button>
         </div>
         <div class="qp-row">
           <span class="qp-label">Profile</span>
-          <div class="qp-select" data-select aria-label="Profile">
-            <button type="button" class="qp-select-trigger"><span class="qp-select-value">ESP32</span></button>
-            <div class="qp-select-menu" role="listbox">
-              <div class="qp-optgroup">Built-in</div>
-              <button type="button" class="qp-option" role="option" data-value="Arduino">Arduino</button>
-              <button type="button" class="qp-option" role="option" data-value="ESP32" aria-selected="true">ESP32</button>
-              <button type="button" class="qp-option" role="option" data-value="Pico">Pico</button>
-              <div class="qp-optgroup">Custom</div>
-              <button type="button" class="qp-option" role="option" data-value="lab-jtag">lab-jtag</button>
+          <div class="tt-select" data-select aria-label="Profile">
+            <button type="button" class="tt-select-trigger"><span class="tt-select-value">ESP32</span></button>
+            <div class="tt-select-menu" role="listbox">
+              <div class="tt-optgroup">Built-in</div>
+              <button type="button" class="tt-option" role="option" data-value="Arduino">Arduino</button>
+              <button type="button" class="tt-option" role="option" data-value="ESP32" aria-selected="true">ESP32</button>
+              <button type="button" class="tt-option" role="option" data-value="Pico">Pico</button>
+              <div class="tt-optgroup">Custom</div>
+              <button type="button" class="tt-option" role="option" data-value="lab-jtag">lab-jtag</button>
             </div>
           </div>
         </div>
         <div class="qp-row">
           <span class="qp-label">Baud rate</span>
-          <div class="qp-select" data-select aria-label="Baud rate">
-            <button type="button" class="qp-select-trigger"><span class="qp-select-value">115200</span></button>
-            <div class="qp-select-menu" role="listbox">
-              <button type="button" class="qp-option" role="option" data-value="9600">9600</button>
-              <button type="button" class="qp-option" role="option" data-value="57600">57600</button>
-              <button type="button" class="qp-option" role="option" data-value="115200" aria-selected="true">115200</button>
-              <button type="button" class="qp-option" role="option" data-value="921600">921600</button>
+          <div class="tt-select" data-select aria-label="Baud rate">
+            <button type="button" class="tt-select-trigger"><span class="tt-select-value">115200</span></button>
+            <div class="tt-select-menu" role="listbox">
+              <button type="button" class="tt-option" role="option" data-value="9600">9600</button>
+              <button type="button" class="tt-option" role="option" data-value="57600">57600</button>
+              <button type="button" class="tt-option" role="option" data-value="115200" aria-selected="true">115200</button>
+              <button type="button" class="tt-option" role="option" data-value="921600">921600</button>
             </div>
           </div>
         </div>
         <div class="qp-row qp-toggle-row">
           <span class="qp-label">Auto-reconnect</span>
-          <button type="button" class="qp-switch on" role="switch" aria-checked="true" data-toggle>
-            <span class="qp-knob"></span>
+          <button type="button" class="tt-switch on" role="switch" aria-checked="true" data-toggle>
+            <span class="tt-knob"></span>
           </button>
         </div>
       </div>
@@ -1024,40 +859,40 @@
         <div class="qp-section-title">I/O</div>
         <div class="qp-row">
           <span class="qp-label">Input mode</span>
-          <div class="qp-select" data-select aria-label="Input mode">
-            <button type="button" class="qp-select-trigger"><span class="qp-select-value">Normal</span></button>
-            <div class="qp-select-menu" role="listbox">
-              <button type="button" class="qp-option" role="option" data-value="Normal" aria-selected="true">Normal</button>
-              <button type="button" class="qp-option" role="option" data-value="Echo">Echo</button>
-              <button type="button" class="qp-option" role="option" data-value="Line-by-line">Line-by-line</button>
+          <div class="tt-select" data-select aria-label="Input mode">
+            <button type="button" class="tt-select-trigger"><span class="tt-select-value">Normal</span></button>
+            <div class="tt-select-menu" role="listbox">
+              <button type="button" class="tt-option" role="option" data-value="Normal" aria-selected="true">Normal</button>
+              <button type="button" class="tt-option" role="option" data-value="Echo">Echo</button>
+              <button type="button" class="tt-option" role="option" data-value="Line-by-line">Line-by-line</button>
             </div>
           </div>
         </div>
         <div class="qp-row">
           <span class="qp-label">Enter sends</span>
-          <div class="qp-select" data-select aria-label="Enter sends">
-            <button type="button" class="qp-select-trigger"><span class="qp-select-value">CR (\r)</span></button>
-            <div class="qp-select-menu" role="listbox">
-              <button type="button" class="qp-option" role="option" data-value="cr" aria-selected="true">CR (\r)</button>
-              <button type="button" class="qp-option" role="option" data-value="lf">LF (\n)</button>
-              <button type="button" class="qp-option" role="option" data-value="crlf">CRLF (\r\n)</button>
+          <div class="tt-select" data-select aria-label="Enter sends">
+            <button type="button" class="tt-select-trigger"><span class="tt-select-value">CR (\r)</span></button>
+            <div class="tt-select-menu" role="listbox">
+              <button type="button" class="tt-option" role="option" data-value="cr" aria-selected="true">CR (\r)</button>
+              <button type="button" class="tt-option" role="option" data-value="lf">LF (\n)</button>
+              <button type="button" class="tt-option" role="option" data-value="crlf">CRLF (\r\n)</button>
             </div>
           </div>
         </div>
-        <div class="qp-select-wrap">
+        <div class="tt-select-wrap">
           <div class="qp-row">
             <span class="qp-label">Output newlines</span>
-            <div class="qp-select" data-select="nl" aria-label="Output newlines">
-              <button type="button" class="qp-select-trigger"><span class="qp-select-value">Keep (raw)</span></button>
-              <div class="qp-select-menu" role="listbox">
-                <button type="button" class="qp-option" role="option" data-value="keep" aria-selected="true">Keep (raw)</button>
-                <button type="button" class="qp-option" role="option" data-value="cr-in-lf">Implicit CR in every LF</button>
-                <button type="button" class="qp-option" role="option" data-value="force-crlf">Force CRLF</button>
-                <button type="button" class="qp-option" role="option" data-value="strip">Strip</button>
+            <div class="tt-select" data-select="nl" aria-label="Output newlines">
+              <button type="button" class="tt-select-trigger"><span class="tt-select-value">Keep (raw)</span></button>
+              <div class="tt-select-menu" role="listbox">
+                <button type="button" class="tt-option" role="option" data-value="keep" aria-selected="true">Keep (raw)</button>
+                <button type="button" class="tt-option" role="option" data-value="cr-in-lf">Implicit CR in every LF</button>
+                <button type="button" class="tt-option" role="option" data-value="force-crlf">Force CRLF</button>
+                <button type="button" class="tt-option" role="option" data-value="strip">Strip</button>
               </div>
             </div>
           </div>
-          <div class="qp-hint qp-select-hint" id="nl-hint">Pass through unchanged</div>
+          <div class="qp-hint tt-select-hint" id="nl-hint">Pass through unchanged</div>
         </div>
       </div>
 
@@ -1066,20 +901,20 @@
         <div class="qp-flow">
           <div class="qp-row">
             <span class="qp-label">Flow control</span>
-            <div class="qp-select" data-select="flow" aria-label="Flow control">
-              <button type="button" class="qp-select-trigger"><span class="qp-select-value">None</span></button>
-              <div class="qp-select-menu" role="listbox">
-                <button type="button" class="qp-option" role="option" data-value="none" aria-selected="true">None</button>
-                <button type="button" class="qp-option" role="option" data-value="software">Software (XON/XOFF)</button>
-                <button type="button" class="qp-option" role="option" data-value="hardware">Hardware (RTS/CTS)</button>
+            <div class="tt-select" data-select="flow" aria-label="Flow control">
+              <button type="button" class="tt-select-trigger"><span class="tt-select-value">None</span></button>
+              <div class="tt-select-menu" role="listbox">
+                <button type="button" class="tt-option" role="option" data-value="none" aria-selected="true">None</button>
+                <button type="button" class="tt-option" role="option" data-value="software">Software (XON/XOFF)</button>
+                <button type="button" class="tt-option" role="option" data-value="hardware">Hardware (RTS/CTS)</button>
               </div>
             </div>
           </div>
           <div class="qp-signals">
             <div class="qp-row qp-toggle-row" data-modem="rts">
               <span class="qp-label">RTS</span>
-              <button type="button" class="qp-switch" role="switch" aria-label="RTS" aria-checked="false" data-toggle="rts">
-                <span class="qp-knob"></span>
+              <button type="button" class="tt-switch" role="switch" aria-label="RTS" aria-checked="false" data-toggle="rts">
+                <span class="tt-knob"></span>
               </button>
             </div>
             <div class="qp-row">
@@ -1088,8 +923,8 @@
             </div>
             <div class="qp-row qp-toggle-row" data-modem="dtr">
               <span class="qp-label">DTR</span>
-              <button type="button" class="qp-switch on" role="switch" aria-label="DTR" aria-checked="true" data-toggle>
-                <span class="qp-knob"></span>
+              <button type="button" class="tt-switch on" role="switch" aria-label="DTR" aria-checked="true" data-toggle>
+                <span class="tt-knob"></span>
               </button>
             </div>
             <div class="qp-row">
@@ -1115,8 +950,8 @@
         <span class="gs-title">Frosted quick panel</span>
         <span class="gs-desc">仅面板毛玻璃，窗口不透明</span>
       </div>
-      <button type="button" class="qp-switch" role="switch" aria-label="Frosted quick panel" aria-checked="false" id="glass-toggle">
-        <span class="qp-knob"></span>
+      <button type="button" class="tt-switch" role="switch" aria-label="Frosted quick panel" aria-checked="false" id="glass-toggle">
+        <span class="tt-knob"></span>
       </button>
     </div>
     <div class="picker" id="picker">
@@ -1131,12 +966,13 @@
       <li><code>VS Code</code>：黑蓝、小圆角、蓝开关、蓝 Reconnect——骨架仍是新稿。</li>
       <li>切皮肤时对比开关颜色与圆角；结构不应跳动。</li>
       <li><strong>下拉悬浮（Q8a）</strong>：菜单 <code>position:fixed</code> + portal，不进入 panel 滚动高度；打开下拉<strong>不得</strong>因此挤出 panel 滚动条。</li>
-      <li><strong>panel 滚动条（Q8b · 未闭环）</strong>：内容过高时现行 <code>::-webkit-scrollbar &#123; width &#125;</code> 在 Chromium 上是 <strong>classic gutter</strong>（会挤 148 控件列）。<code>overflow-y: overlay</code> 已不可靠；真 overlay 需自定义浮层 thumb 或接受固定右侧 padding 预留。</li>
+      <li><strong>panel 滚动条（Q8b · DONE）</strong>：app 用 <code>ui/overlay-scroll.ts</code> 真浮层 thumb（不挤 148 列）。本预览仍为静态示意；勿用设了 width 的 webkit 条冒充 overlay。</li>
       <li><strong>Hardware flow</strong>：切到 Hardware (RTS/CTS) 时 <strong>禁用 RTS</strong>（置灰 + 驱动接管态），DTR 仍可拨；不隐藏、不加说明文案——置灰本身表达不可用。与落地 <code>quickpanel.ts</code> / <code>serial-design.md</code> 一致。</li>
     </ol>
   </aside>
 </div>
 
+<script src="/docs/ui/kit/select-preview.js"></script>
 <script>
   const nlDescs = {
     keep: "Pass through unchanged",
@@ -1145,63 +981,16 @@
     strip: "\\r | \\n → (removed)",
   };
 
-  function closeAllSelects(except) {
-    document.querySelectorAll(".qp-select.open").forEach((el) => {
-      if (el !== except) el.classList.remove("open");
-    });
-  }
-
-  /** Pin the listbox to the trigger in viewport space (never panel flow). */
-  function placeSelectMenu(trigger, menu) {
-    const rect = trigger.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const dropUp = spaceBelow < 180;
-    menu.dataset.drop = dropUp ? "up" : "down";
-    menu.style.width = `${rect.width}px`;
-    menu.style.left = `${rect.left}px`;
-    menu.style.right = "auto";
-    if (dropUp) {
-      menu.style.top = "auto";
-      menu.style.bottom = `${window.innerHeight - rect.top + 4}px`;
-    } else {
-      menu.style.bottom = "auto";
-      menu.style.top = `${rect.bottom + 4}px`;
+  document.addEventListener("tt-pick", (e) => {
+    const root = e.target;
+    if (!(root instanceof Element)) return;
+    if (root.dataset.select === "nl") {
+      const hint = document.getElementById("nl-hint");
+      if (hint) hint.textContent = nlDescs[e.detail] ?? "";
     }
-  }
-
-  document.querySelectorAll("[data-select]").forEach((root) => {
-    const trigger = root.querySelector(".qp-select-trigger");
-    const menu = root.querySelector(".qp-select-menu");
-    const valueEl = root.querySelector(".qp-select-value");
-
-    trigger.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const willOpen = !root.classList.contains("open");
-      closeAllSelects();
-      if (!willOpen) return;
-      root.classList.add("open");
-      placeSelectMenu(trigger, menu);
-    });
-
-    menu.addEventListener("click", (e) => {
-      const opt = e.target.closest(".qp-option");
-      if (!opt) return;
-      menu.querySelectorAll(".qp-option").forEach((o) => o.setAttribute("aria-selected", "false"));
-      opt.setAttribute("aria-selected", "true");
-      valueEl.textContent = opt.textContent;
-      root.classList.remove("open");
-      if (root.dataset.select === "nl") {
-        document.getElementById("nl-hint").textContent = nlDescs[opt.dataset.value] ?? "";
-      }
-      if (root.dataset.select === "flow") {
-        syncHardwareFlow(opt.dataset.value);
-      }
-    });
-  });
-
-  document.addEventListener("click", () => closeAllSelects());
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeAllSelects();
+    if (root.dataset.select === "flow") {
+      syncHardwareFlow(e.detail);
+    }
   });
 
   /** Hardware RTS/CTS: driver owns RTS — disable toggle, keep row visible. */
@@ -1354,8 +1143,8 @@
     connBtn.textContent = down ? "Reconnect" : "Disconnect";
     // Reset flow demo when leaving/entering serial so RTS isn't stuck disabled.
     if (v.sections.includes("serial-modem")) {
-      const flowSel = document.querySelector('.qp-select[data-select="flow"]');
-      const selected = flowSel?.querySelector('.qp-option[aria-selected="true"]');
+      const flowSel = document.querySelector('.tt-select[data-select="flow"]');
+      const selected = flowSel?.querySelector('.tt-option[aria-selected="true"]');
       syncHardwareFlow(selected?.dataset.value || "none");
     } else {
       syncHardwareFlow("none");
