@@ -1,0 +1,60 @@
+/**
+ * Shared overlay scrollbar — one fact source for draft surfaces.
+ *
+ * Goals:
+ *  - Floating thumb (transparent track; no reserved gutter)
+ *  - No Windows up/down arrow buttons
+ *  - Colors from --tt-scroll-* (tokens.css)
+ *
+ * Chrome 121+: setting scrollbar-width / scrollbar-color forces the native
+ * Windows scrollbar (with arrows) and overrides ::-webkit-scrollbar-*.
+ * Use webkit pseudo-elements on Chromium; reserve scrollbar-* for Firefox.
+ *
+ * Usage: add class `tt-scroll` on any overflow:auto / overflow-y:auto node.
+ */
+
+.tt-scroll {
+  /* Prefer no reserved gutter — thumb paints over the edge of content */
+  scrollbar-gutter: auto;
+}
+
+/* Firefox — no ::-webkit-* */
+@supports not selector(::-webkit-scrollbar) {
+  .tt-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--tt-scroll-thumb) transparent;
+  }
+}
+
+.tt-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: transparent;
+}
+
+.tt-scroll::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.tt-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tt-scroll::-webkit-scrollbar-thumb {
+  background: var(--tt-scroll-thumb);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.tt-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--tt-scroll-thumb-hover);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.tt-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}

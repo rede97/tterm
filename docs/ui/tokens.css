@@ -61,7 +61,7 @@ body[data-skin="cursor"] {
   --tt-ui: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
   --tt-mono: "JetBrains Mono", Consolas, ui-monospace, monospace;
 
-  /* ---- Scroll (prefer CSS scrollbar-*; avoid ::-webkit width on Windows) ---- */
+  /* ---- Scroll (colors only — chrome in docs/ui/scroll.css / .tt-scroll) ---- */
   --tt-scroll-track: transparent;
   --tt-scroll-thumb: rgba(255, 255, 255, 0.14);
   --tt-scroll-thumb-hover: rgba(255, 255, 255, 0.28);

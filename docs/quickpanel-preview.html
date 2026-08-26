@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>TTerm Quick Panel — preview</title>
 <link rel="stylesheet" href="/docs/ui/tokens.css" />
+<link rel="stylesheet" href="/docs/ui/scroll.css" />
 <link rel="stylesheet" href="/docs/ui/preview-chrome.css" />
 <style>
   /* Page layout only — skins from docs/ui/tokens.css */
@@ -196,7 +197,15 @@
     z-index: 10;
     width: var(--qp-width);
     max-height: calc(100% - 48px);
-    overflow: visible;
+    /* Content may scroll when Serial + modem + forwards stack is tall.
+       Select menus are position:fixed (see .qp-select-menu) so opening a
+       dropdown NEVER grows scrollHeight / never forces a classic bar. */
+    overflow-x: hidden;
+    overflow-y: auto;
+    /* Overlay preference (Chromium): paint over content, do not reserve a
+       gutter that shifts the 148px control column. */
+    overflow-y: overlay;
+    scrollbar-gutter: auto;
     color: var(--qp-text);
     font: 13px/1.4 var(--qp-ui);
     background: var(--qp-bg);
@@ -204,6 +213,9 @@
     border-radius: var(--qp-radius);
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
     padding: 8px;
+  }
+  @supports not (overflow: overlay) {
+    .quick-panel { overflow-y: auto; }
   }
 
   /* Apple-like vibrancy: blur + slight saturate over terminal content. */
@@ -253,15 +265,6 @@
     body.qp-glass .quick-panel {
       background: #1c1c1e;
     }
-  }
-
-  .quick-panel::-webkit-scrollbar { width: 8px; }
-  .quick-panel::-webkit-scrollbar-track { background: transparent; }
-  .quick-panel::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.12);
-    border-radius: 8px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
   }
 
   /* -- header: title | connection pill (fixed width) -- */
@@ -474,12 +477,12 @@
     white-space: nowrap;
   }
 
+  /* Floating listbox: fixed to the viewport so it never contributes to
+     .quick-panel scrollHeight (opening a select must not spawn a panel
+     scrollbar or shift the control column). top/left/width set in JS. */
   .qp-select-menu {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    right: 0;
-    z-index: 20;
+    position: fixed;
+    z-index: 40;
     max-height: 220px;
     overflow: auto;
     padding: 4px;
@@ -488,12 +491,10 @@
     border-radius: var(--qp-radius-sm);
     box-shadow: 0 12px 28px rgba(0,0,0,0.55);
     display: none;
+    box-sizing: border-box;
   }
   .qp-select.open .qp-select-menu { display: block; }
-  .qp-select-menu[data-drop="up"] {
-    top: auto;
-    bottom: calc(100% + 4px);
-  }
+  /* data-drop only documents intent; geometry comes from placeSelectMenu(). */
 
   .qp-optgroup {
     padding: 6px 8px 3px;
@@ -831,6 +832,7 @@
   <a href="/docs/tabbar-preview.html">Tab bar</a>
   <a href="/docs/quickpanel-preview.html" aria-current="page">Quick panel</a>
   <a href="/docs/command-palette-preview.html">Palette</a>
+  <a href="/docs/confirm-preview.html">Confirm</a>
 </nav>
 <div class="stage">
   <div class="app">
@@ -857,7 +859,7 @@
   ▸ reading AGENT.md
   ▸ implementing serialctl</div>
 
-    <div class="quick-panel open" id="panel">
+    <div class="quick-panel open tt-scroll" id="panel">
 
       <div class="qp-header">
         <div class="qp-ident">
@@ -1103,6 +1105,7 @@
       <li><code>Cursor</code>：黑白、大圆角、白开关、白 Reconnect。</li>
       <li><code>VS Code</code>：黑蓝、小圆角、蓝开关、蓝 Reconnect——骨架仍是新稿。</li>
       <li>切皮肤时对比开关颜色与圆角；结构不应跳动。</li>
+      <li><strong>下拉悬浮</strong>：菜单 <code>position:fixed</code>，不进入 panel 滚动高度；打开下拉<strong>不得</strong>挤出 panel 滚动条、不得横向挤占控件列。内容本身过高时，panel 滚动条须为 overlay（不预留 gutter）。</li>
       <li><strong>Hardware flow</strong>：切到 Hardware (RTS/CTS) 时 <strong>禁用 RTS</strong>（置灰 + 驱动接管态），DTR 仍可拨；不隐藏、不加说明文案——置灰本身表达不可用。与落地 <code>quickpanel.ts</code> / <code>serial-design.md</code> 一致。</li>
     </ol>
   </aside>
@@ -1122,6 +1125,24 @@
     });
   }
 
+  /** Pin the listbox to the trigger in viewport space (never panel flow). */
+  function placeSelectMenu(trigger, menu) {
+    const rect = trigger.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const dropUp = spaceBelow < 180;
+    menu.dataset.drop = dropUp ? "up" : "down";
+    menu.style.width = `${rect.width}px`;
+    menu.style.left = `${rect.left}px`;
+    menu.style.right = "auto";
+    if (dropUp) {
+      menu.style.top = "auto";
+      menu.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+    } else {
+      menu.style.bottom = "auto";
+      menu.style.top = `${rect.bottom + 4}px`;
+    }
+  }
+
   document.querySelectorAll("[data-select]").forEach((root) => {
     const trigger = root.querySelector(".qp-select-trigger");
     const menu = root.querySelector(".qp-select-menu");
@@ -1133,10 +1154,7 @@
       closeAllSelects();
       if (!willOpen) return;
       root.classList.add("open");
-      // Flip upward if not enough room below.
-      const rect = trigger.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      menu.dataset.drop = spaceBelow < 180 ? "up" : "down";
+      placeSelectMenu(trigger, menu);
     });
 
     menu.addEventListener("click", (e) => {

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>TTerm Command Palette — preview</title>
 <link rel="stylesheet" href="/docs/ui/tokens.css" />
+<link rel="stylesheet" href="/docs/ui/scroll.css" />
 <link rel="stylesheet" href="/docs/ui/preview-chrome.css" />
 <style>
   /* Page layout — skins from docs/ui/tokens.css */
@@ -129,67 +130,11 @@
     color: var(--pal-muted);
     border-bottom: 1px solid var(--pal-line);
   }
-  /* Custom scrollbar — clip native Windows bar (arrows) outside the wrap */
-  .pal-scroll {
-    position: relative;
-    max-height: min(52vh, 420px);
-    overflow: hidden; /* clips native scrollbar pushed outside */
-  }
+  /* List scrolls with shared .tt-scroll (docs/ui/scroll.css) */
   .pal-list {
     max-height: min(52vh, 420px);
-    overflow-y: scroll;
+    overflow-y: auto;
     padding: 4px 0;
-    /* Push native scrollbar past the clip edge (Windows keeps arrows otherwise) */
-    width: calc(100% + 24px);
-    padding-right: 24px;
-    box-sizing: border-box;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  .pal-list::-webkit-scrollbar {
-    width: 24px;
-    background: transparent;
-  }
-  .pal-list::-webkit-scrollbar-thumb {
-    background: transparent;
-  }
-  .pal-list::-webkit-scrollbar-button {
-    width: 0;
-    height: 0;
-    display: none;
-  }
-  .pal-sb {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    bottom: 4px;
-    width: 5px;
-    border-radius: 3px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 120ms ease;
-    z-index: 2;
-  }
-  .pal-scroll:hover .pal-sb,
-  .pal-scroll.is-scrolling .pal-sb {
-    opacity: 1;
-  }
-  .pal-sb.is-needed { opacity: 0.85; }
-  .pal-scroll:hover .pal-sb.is-needed,
-  .pal-scroll.is-scrolling .pal-sb.is-needed {
-    opacity: 1;
-  }
-  .pal-sb-thumb {
-    position: absolute;
-    left: 0;
-    width: 100%;
-    min-height: 24px;
-    border-radius: 3px;
-    background: var(--pal-scroll-thumb);
-  }
-  .pal-scroll:hover .pal-sb-thumb,
-  .pal-scroll.is-scrolling .pal-sb-thumb {
-    background: var(--pal-scroll-thumb-hover);
   }
   .pal-group {
     padding: 8px 12px 4px;
@@ -288,13 +233,6 @@
     overflow-y: auto;
     background: #0f0f0f;
     color: #b0b0b0;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  .notes::-webkit-scrollbar {
-    width: 0 !important;
-    height: 0 !important;
-    display: none !important;
   }
   .notes h1 {
     font-size: 15px;
@@ -415,6 +353,7 @@
   <a href="/docs/tabbar-preview.html">Tab bar</a>
   <a href="/docs/quickpanel-preview.html">Quick panel</a>
   <a href="/docs/command-palette-preview.html" aria-current="page">Palette</a>
+  <a href="/docs/confirm-preview.html">Confirm</a>
 </nav>
 
 <div class="stage">
@@ -434,10 +373,7 @@ Type &gt; inside Ctrl+P to flip into commands (VS Code).</span></div>
           <input class="pal-input" id="pal-input" type="text" spellcheck="false" autocomplete="off" />
         </div>
         <div class="pal-hint" id="pal-hint"></div>
-        <div class="pal-scroll" id="pal-scroll">
-          <div class="pal-list" id="pal-list"></div>
-          <div class="pal-sb" id="pal-sb" aria-hidden="true"><div class="pal-sb-thumb" id="pal-sb-thumb"></div></div>
-        </div>
+        <div class="pal-list tt-scroll" id="pal-list"></div>
         <div class="pal-footer">
           <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
           <span><kbd>Enter</kbd> run</span>
@@ -449,7 +385,7 @@ Type &gt; inside Ctrl+P to flip into commands (VS Code).</span></div>
     <div id="toast-stack" aria-live="polite"></div>
   </div>
 
-  <aside class="notes">
+  <aside class="notes tt-scroll">
     <h1>Command palette — design draft</h1>
     <p>VS Code 模型：Ctrl+P 找 Tab；Ctrl+Shift+P 进 <code>&gt;</code> 命令。Quick Panel / SSH 转发 / Serial 参数都进命令面，不另开窗。</p>
 
@@ -583,40 +519,9 @@ Type &gt; inside Ctrl+P to flip into commands (VS Code).</span></div>
   const prefix = document.getElementById("pal-prefix");
   const hint = document.getElementById("pal-hint");
   const listEl = document.getElementById("pal-list");
-  const palScroll = document.getElementById("pal-scroll");
-  const palSb = document.getElementById("pal-sb");
-  const palSbThumb = document.getElementById("pal-sb-thumb");
   const tabBar = document.getElementById("tab-bar");
   const term = document.getElementById("term");
   const toastStack = document.getElementById("toast-stack");
-  let scrollIdleTimer = 0;
-
-  function updatePalScrollbar() {
-    if (!listEl || !palSb || !palSbThumb) return;
-    const view = listEl.clientHeight;
-    const full = listEl.scrollHeight;
-    const needed = full > view + 1;
-    palSb.classList.toggle("is-needed", needed);
-    if (!needed) {
-      palSbThumb.style.height = "0px";
-      return;
-    }
-    const track = palSb.clientHeight || Math.max(view - 8, 24);
-    const thumbH = Math.max(24, Math.round((view / full) * track));
-    const maxTop = track - thumbH;
-    const maxScroll = full - view;
-    const top = maxScroll <= 0 ? 0 : Math.round((listEl.scrollTop / maxScroll) * maxTop);
-    palSbThumb.style.height = `${thumbH}px`;
-    palSbThumb.style.transform = `translateY(${top}px)`;
-  }
-
-  listEl.addEventListener("scroll", () => {
-    updatePalScrollbar();
-    palScroll.classList.add("is-scrolling");
-    clearTimeout(scrollIdleTimer);
-    scrollIdleTimer = setTimeout(() => palScroll.classList.remove("is-scrolling"), 600);
-  });
-  window.addEventListener("resize", updatePalScrollbar);
 
   /** @type {"tabs" | "commands" | "picker" | "adhocSsh" | "adhocSshPass" | "newTabKind" | "newTabPick" | null} */
   let mode = null;
@@ -911,7 +816,6 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
                     ? "Type password, then Enter"
                     : "No matching commands";
       listEl.appendChild(empty);
-      requestAnimationFrame(updatePalScrollbar);
       return;
     }
 
@@ -987,7 +891,6 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
     });
 
     listEl.querySelector(".pal-row.selected")?.scrollIntoView({ block: "nearest" });
-    requestAnimationFrame(updatePalScrollbar);
   }
 
   function openPalette(nextMode) {

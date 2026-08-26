@@ -171,6 +171,7 @@
     <a href="/docs/tabbar-preview.html">Tab bar</a>
     <a href="/docs/quickpanel-preview.html">Quick panel</a>
     <a href="/docs/command-palette-preview.html">Palette</a>
+    <a href="/docs/confirm-preview.html">Confirm</a>
   </nav>
 
   <main class="main">
@@ -225,14 +226,33 @@
         </ul>
         <span class="go">Open →</span>
       </a>
+      <a class="card" href="/docs/confirm-preview.html">
+        <div class="kicker">UX-01 · Security</div>
+        <h2>Confirm dialogs</h2>
+        <p>多行粘贴（安全）与关窗提示（有 tab 时）；Settings 可关关窗提示。</p>
+        <ul>
+          <li><strong>Paste</strong>：标题旁 <code>N lines</code> + 可编辑等宽预览；受 Paste warning 控制</li>
+          <li><strong>Close window</strong>：有活动 tab 才问；<code>confirmCloseWindow</code> 可关</li>
+          <li><strong>壳</strong>：共用 confirm 族；Cursor / VS Code 皮肤</li>
+        </ul>
+        <span class="go">Open →</span>
+      </a>
     </div>
 
     <section class="ux-log" aria-labelledby="ux-log-title">
       <h2 id="ux-log-title">Menus &amp; UX — 本轮标注</h2>
       <dl>
+        <dt><a href="/docs/ui/scroll.css">Scroll · 统一浮空条</a></dt>
+        <dd>
+          共用 <code>docs/ui/scroll.css</code>（<code>.tt-scroll</code>）：Chromium 只用 <code>::-webkit-*</code>（避免 <code>scrollbar-width</code> 带回箭头）；Firefox 用标准属性。Settings / Font / Palette / Paste / QP 共用。
+        </dd>
         <dt><a href="/docs/quickpanel-preview.html">Quick panel · Hardware flow</a></dt>
         <dd>
           Flow = Hardware (RTS/CTS) 时 <strong>禁用 RTS</strong>（置灰、驱动接管），DTR 仍可拨；不隐藏、无额外说明文案。
+        </dd>
+        <dt><a href="/docs/confirm-preview.html">Confirm · 粘贴 / 关窗</a></dt>
+        <dd>
+          多行粘贴：标题旁 <code>N lines</code> + 预览（无 Security 脚注）；关窗有 tab 时确认，Settings → General <code>confirmCloseWindow</code>（默认 on）可关。
         </dd>
         <dt><a href="/docs/settings-preview.html">Settings · Keyboard</a></dt>
         <dd>

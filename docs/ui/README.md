@@ -5,6 +5,7 @@ Preview HTML under `docs/*-preview.html` shares **one token sheet**:
 | File | Role |
 |------|------|
 | [`tokens.css`](./tokens.css) | Canonical `--tt-*` skins (`cursor` / `vscode`) + feature aliases (`--set-*`, `--qp-*`, `--pal-*`, tab chrome) |
+| [`scroll.css`](./scroll.css) | Shared overlay scrollbar (`.tt-scroll`) — floating thumb, no arrows, no gutter |
 | [`preview-chrome.css`](./preview-chrome.css) | Shared draft top nav |
 
 ## Rules
@@ -17,10 +18,12 @@ Preview HTML under `docs/*-preview.html` shares **one token sheet**:
 
 ```html
 <link rel="stylesheet" href="/docs/ui/tokens.css" />
+<link rel="stylesheet" href="/docs/ui/scroll.css" />
 <link rel="stylesheet" href="/docs/ui/preview-chrome.css" />
 <style>/* page-local layout only */</style>
 ```
 
+6. Scrollable surfaces use class **`tt-scroll`** (do not re-copy `::-webkit-scrollbar` rules in each preview). On Chromium, do **not** set `scrollbar-width` / `scrollbar-color` together with webkit pseudos — that restores Windows arrows (Chrome 121+).
 ## Skins
 
 - `body[data-skin="cursor"]` — near-black, white CTA, soft radius  
@@ -40,4 +43,10 @@ from `quickPanelGlass` → `body.qp-glass`. One intentional divergence:
 
 ## Parity tracking
 
-Draft ↔ app gap list (100% display + interaction): [`parity-gap.md`](./parity-gap.md).
+Draft ↔ app gap list: [`parity-gap.md`](./parity-gap.md). Confirm dialogs
+(paste / close-window): [`../confirm-preview.html`](../confirm-preview.html).
+
+**Settings rule (LOCKED):** layout and buttons are **strictly 1:1** with
+`docs/settings-preview.html`. Visibility lists use **left checkboxes**;
+toggles only for single feature on/off. Solid trailing CTAs and modal
+footers share **148px** width (`--tt-btn-width`).
