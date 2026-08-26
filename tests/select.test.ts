@@ -42,6 +42,11 @@ describe("custom select — floating menu (Q8)", () => {
     openSelect(root);
     const menu = menuOf(root);
     expect(root.classList.contains("open")).toBe(true);
+    // Regression (visibility): portaled to <body> the menu is outside the
+    // .qp-select.open descendant selector — it must carry its own .open or
+    // it stays display:none forever.
+    expect(menu.parentElement).toBe(document.body);
+    expect(menu.classList.contains("open")).toBe(true);
     // jsdom rects are all 0: left/width pin to the trigger, top = bottom+4.
     expect(menu.style.width).toBe("0px");
     expect(menu.style.left).toBe("0px");

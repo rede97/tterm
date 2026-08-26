@@ -687,7 +687,10 @@ body.qp-glass .qp-sharing {
   box-sizing: border-box;
 }
 
-.qp-select.open .qp-select-menu {
+/* While portaled to <body> the menu is outside .qp-select — it carries
+   its own .open there. */
+.qp-select.open .qp-select-menu,
+.qp-select-menu.open {
   display: block;
 }
 

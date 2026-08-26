@@ -190,6 +190,30 @@ describe("Quick-status button and panel", () => {
     expect(earlySignals.toggles).toBe(2);
     expect(earlySignals.leds).toBe(2);
 
+    // Regression (visibility): the opened menu must be VISIBLE — portaled
+    // to <body> it sits outside the .qp-select.open descendant selector, so
+    // it carries its own .open. Computed display + non-zero layout rect.
+    await browser.execute(() => {
+      document.querySelector('.qp-select[aria-label="Baud rate"] .qp-select-trigger').click();
+    });
+    await browser.pause(200);
+    const menuVis = await browser.execute(() => {
+      const menu = document.querySelector("body > .qp-select-menu");
+      if (!menu) return { found: false };
+      const r = menu.getBoundingClientRect().toJSON();
+      return {
+        found: true,
+        display: getComputedStyle(menu).display,
+        w: r.width,
+        h: r.height,
+      };
+    });
+    expect(menuVis.found).toBe(true);
+    expect(menuVis.display).toBe("block");
+    expect(menuVis.w).toBeGreaterThan(100);
+    expect(menuVis.h).toBeGreaterThan(40);
+    await browser.keys("Escape"); // close the menu (select only)
+
     // Switch profile to AT: the section re-renders with its parameters
     // (line-by-line input, CRLF enter) reflected in the live selects.
     await browser.execute(qpPick, "Profile", "AT");

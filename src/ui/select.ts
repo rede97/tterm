@@ -68,6 +68,8 @@ let openSelect: { root: HTMLElement; menu: HTMLElement } | null = null;
 function unportalMenu(): void {
   if (!portalReturn) return;
   const { menu, parent, next } = portalReturn;
+  // Back inside its root, the descendant selector takes over again.
+  menu.classList.remove("open");
   parent.insertBefore(menu, next);
   portalReturn = null;
   openSelect = null;
@@ -78,6 +80,9 @@ function portalMenu(root: HTMLElement, menu: HTMLElement): void {
   const parent = menu.parentNode;
   if (!parent) return;
   portalReturn = { menu, parent, next: menu.nextSibling };
+  // On <body> the .qp-select.open descendant selector no longer matches —
+  // the menu carries its own .open while portaled or it stays display:none.
+  menu.classList.add("open");
   document.body.appendChild(menu);
   openSelect = { root, menu };
 }
