@@ -1,11 +1,44 @@
 // Runtime constants and utility functions — separated from types.ts
 // to keep type definitions pure.
 
-import type { SerialEnterNewline, SerialOutputNewline, SshHost } from "./types";
+import type {
+  SerialEnterNewline,
+  SerialFrame,
+  SerialOutputNewline,
+  SshHost,
+} from "./types";
 
 // ---- Constants ----
 
 export const SERIAL_BAUD_RATES = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
+
+/** Classic 8-bit frames for new serial sessions (data / parity / stop). */
+export const SERIAL_FRAMES: readonly (readonly [SerialFrame, string])[] = [
+  ["8N1", "8N1"],
+  ["8E1", "8E1"],
+  ["8O1", "8O1"],
+];
+
+export const SERIAL_FRAME_DESCS: Record<SerialFrame, string> = {
+  "8N1": "8 data bits, no parity, 1 stop bit",
+  "8E1": "8 data bits, even parity, 1 stop bit",
+  "8O1": "8 data bits, odd parity, 1 stop bit",
+};
+
+export function parseSerialFrame(frame: string): {
+  dataBits: number;
+  parity: "none" | "even" | "odd";
+  stopBits: number;
+} {
+  switch (frame) {
+    case "8E1":
+      return { dataBits: 8, parity: "even", stopBits: 1 };
+    case "8O1":
+      return { dataBits: 8, parity: "odd", stopBits: 1 };
+    default:
+      return { dataBits: 8, parity: "none", stopBits: 1 };
+  }
+}
 
 export const SERIAL_ENTER_NEWLINES: [SerialEnterNewline, string][] = [
   ["cr", "CR (\\r)"],

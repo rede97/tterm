@@ -46,7 +46,7 @@ export function showKeygenModal(opts: { onSaved: (key: SshKeyInfo) => void }): v
           <input class="settings-input skg-name" type="text" spellcheck="false" value="id_ed25519" /></label>
         <label class="she-field"><span>Algorithm</span>
           <span class="skg-algo-slot"></span></label>
-        <label class="she-field"><span>Passphrase <span style="color:#888">(optional)</span></span>
+        <label class="she-field"><span>Passphrase</span>
           <input class="settings-input skg-pass" type="password" placeholder="empty = no passphrase" /></label>
       </div>
       <div class="she-footer">

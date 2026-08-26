@@ -7,6 +7,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { clearSshHistory } from "./config/ssh-history";
 import { loadSerialPorts } from "./config/wt-profiles";
 import { logCatch } from "./core/errorlog";
 import { initKeymap } from "./core/keymap";
@@ -21,6 +22,7 @@ import { confirmDialog } from "./ui/confirm";
 import { listForwards, removeForward } from "./ui/forwarding";
 import { openCommandPalette, openPaletteFlow, setPaletteHandlers } from "./ui/palette";
 import { openQuickOpen, setTabSwitcherHandlers, stepMruSwitcher } from "./ui/tabswitcher";
+import { showToast } from "./ui/toast";
 import { toggleFullscreenMode, toggleZenMode } from "./ui/window";
 
 // Keyboard shortcuts: global dispatcher (core/keymap) + tab switcher overlay.
@@ -69,6 +71,7 @@ export function initShortcutsWiring(): void {
     },
     setSerialBaud: (id, baud) => tabManager.setSerialBaud(id, baud),
     setSerialProfile: (id, name) => tabManager.setSerialProfile(id, name),
+    setSerialFrame: (id, frame) => tabManager.setSerialFrame(id, frame),
     setSerialFlow: (id, flow) => {
       const t = tabManager.get(id);
       if (!t) return;
@@ -144,6 +147,11 @@ export function initShortcutsWiring(): void {
       });
     },
     "tterm.tempSsh": () => openPaletteFlow("tempSsh"),
+    "tterm.clearSshTempHistory": () => {
+      void clearSshHistory()
+        .then(() => showToast("SSH temporary history cleared", "info"))
+        .catch(logCatch("ssh.clearTempHistory"));
+    },
     "tterm.portForwards": () => openPaletteFlow("forwards"),
     "tterm.serialProfile": () => openPaletteFlow("serialProfile"),
     "tterm.serialBaud": () => openPaletteFlow("serialBaud"),
@@ -176,6 +184,7 @@ export function initQuickPanelWiring(): void {
       getTab: (id) => tabManager.get(id),
       shareTab: (id) => tabManager.shareTab(id),
       setSerialBaud: (id, baud) => tabManager.setSerialBaud(id, baud),
+      setSerialFrame: (id, frame) => tabManager.setSerialFrame(id, frame),
       setSerialProfile: (id, name) => tabManager.setSerialProfile(id, name),
       setSerialInputMode: (id, mode) => tabManager.setSerialInputMode(id, mode),
       setSerialOutputNewline: (id, mode) => tabManager.setSerialOutputNewline(id, mode),

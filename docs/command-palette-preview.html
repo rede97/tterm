@@ -247,9 +247,9 @@ Type &gt; inside Ctrl+P to flip into commands (VS Code).</span></div>
     <ol>
       <li><strong>Ctrl+P</strong>: filter by number or title; guidance lives in the input placeholder only (no separate hint bar).</li>
       <li><strong>Ctrl+Shift+P</strong>: fixed <code>&gt;</code> prefix; commands grouped by section. New Local / SSH / Serial Tab each open a target list (profile / host / COM).</li>
-      <li><strong>Interruptible flows</strong>: Baud / Profile / Flow and Temporary SSH (host → open tab; password in terminal) stay in one panel; Esc pops one level.</li>
-      <li><strong>New Local / SSH / Serial Tab</strong>: secondary menus match Profiles ▾; Temporary Connect… is only under New SSH Tab (not a root command).</li>
-      <li><strong>Coverage</strong>: New Window / New Local·SSH·Serial Tab, Quick Panel, Share, Temporary SSH under New SSH Tab (<code>ssh-history.json</code>, not <code>~/.ssh/config</code>), SSH Port Forwards, Serial Profile · baud · flow.</li>
+      <li><strong>Interruptible flows</strong>: Baud / Profile / Flow and New SSH Temporary Tab (host → open tab; password in terminal) stay in one panel; Esc pops one level.</li>
+      <li><strong>New Local / SSH / Serial Tab</strong>: secondary menus match Profiles ▾ (shell / host / COM only).</li>
+      <li><strong>Coverage</strong>: New Window / New Local·SSH·Serial·SSH Temporary Tab, Quick Panel, Share, Temporary SSH as a root Tab command (<code>ssh-history.json</code>, not <code>~/.ssh/config</code>), SSH Port Forwards, Serial Profile · baud · flow.</li>
       <li><strong>App landing</strong>: shared <code>tabswitcher.ts</code> chrome; command registry SSOT is <code>src/core/commands.ts</code>; unbound commands are palette-only.</li>
     </ol>
 
@@ -315,7 +315,6 @@ const NEW_TAB_TARGETS = {
     { label: "pi", detail: "pi@example.raspi.lan", kind: "ssh" },
     { label: "github.com", detail: "git@github.com", kind: "ssh" },
     { label: "lab-jtag", detail: "root@lab:2222", kind: "ssh" },
-    { label: "Temporary Connect…", detail: "user@host · local history", kind: "ssh", action: "adhocSsh" },
   ],
   serial: [
     { label: "COM3 · USB Serial Device", detail: "Microsoft 303A:1001", kind: "serial" },

@@ -426,21 +426,29 @@
 }
 
 /* ===== Stepper ===== */
+/* Full control-column width so − / value / + lines up with .tt-btn / selects. */
 .stepper {
   display: flex;
   align-items: stretch;
   gap: 4px;
+  width: var(--tt-btn-width);
+  height: var(--tt-ctrl-h);
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
-.stepper .settings-input-narrow {
-  width: 52px;
-  min-width: 52px;
-  max-width: 52px;
+.stepper .settings-input-narrow,
+.stepper .input-narrow {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  max-width: none;
   text-align: center;
 }
 
 .stepper-btn {
   width: 28px;
+  flex-shrink: 0;
   background: var(--tt-inset);
   border: 1px solid var(--tt-line-strong);
   border-radius: var(--tt-radius-ctrl);

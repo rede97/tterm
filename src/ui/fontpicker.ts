@@ -15,9 +15,9 @@ import {
 
 const NERDFONT_URL = "https://www.nerdfonts.com/";
 
-// Design (settings-preview font picker): + adds, ✓ marks in-use.
-const ICO_PLUS = `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M8 3.5v9M3.5 8h9"/></svg>`;
-const ICO_CHECK = `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M3.5 8.2 6.6 11.2 12.5 4.8"/></svg>`;
+// Design (settings-preview font picker): small + / ✓ (12px), quiet chrome.
+const ICO_PLUS = `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M8 3.5v9M3.5 8h9"/></svg>`;
+const ICO_CHECK = `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3.5 8.2 6.6 11.2 12.5 4.8"/></svg>`;
 
 const PREVIEW_CONTENT = [
   "\x1b[32muser@host\x1b[0m:\x1b[34m~/projects\x1b[0m$ ls -la",
@@ -60,9 +60,6 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
               <span class="fp-system-count"></span>
             </div>
             <div class="fp-list" id="fp-system"></div>
-            <a class="fp-nf-link" href="${NERDFONT_URL}" target="_blank">
-              Install more Nerd Fonts →
-            </a>
           </div>
         </div>
         <div class="fp-selected-section">
@@ -70,13 +67,15 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
           <div class="fp-selected-list" id="fp-selected"></div>
         </div>
         <div class="fp-preview-section">
-          <div class="fp-preview-title">Preview: <span id="fp-preview-font"></span></div>
           <div class="fp-preview-terminal" id="fp-preview"></div>
         </div>
       </div>
       <div class="font-picker-footer">
-        <button type="button" class="tt-btn tt-btn-ghost fp-btn-cancel">Cancel</button>
-        <button type="button" class="tt-btn tt-btn-primary fp-btn-apply">Apply</button>
+        <a class="fp-nf-link" href="${NERDFONT_URL}" target="_blank" rel="noopener">Install more Nerd Fonts →</a>
+        <div class="font-picker-footer-actions">
+          <button type="button" class="tt-btn tt-btn-ghost fp-btn-cancel">Cancel</button>
+          <button type="button" class="tt-btn tt-btn-primary fp-btn-apply">Apply</button>
+        </div>
       </div>
     </div>
   `;
@@ -94,7 +93,6 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
   const systemList = mustQuery(overlay, "#fp-system");
   const selectedList = mustQuery<HTMLElement>(overlay, "#fp-selected");
   const searchInput = mustQuery<HTMLInputElement>(overlay, ".fp-search");
-  const previewFontLabel = mustQuery(overlay, "#fp-preview-font");
   const systemCount = mustQuery(overlay, ".fp-system-count");
   const previewContainer = mustQuery<HTMLElement>(overlay, "#fp-preview");
 
@@ -225,13 +223,9 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
   function updatePreview() {
     if (!previewTerminal || !previewFitAddon) return;
     if (previewFont) {
-      const css = `'${previewFont}', monospace`;
-      previewTerminal.options.fontFamily = css;
-      previewFontLabel.textContent = previewFont;
+      previewTerminal.options.fontFamily = `'${previewFont}', monospace`;
     } else {
-      const css = buildFontFamily(selected);
-      previewTerminal.options.fontFamily = css;
-      previewFontLabel.textContent = css;
+      previewTerminal.options.fontFamily = buildFontFamily(selected);
     }
 
     previewTerminal.reset();
@@ -282,7 +276,6 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
     term.writeln(PREVIEW_CONTENT);
     previewTerminal = term;
     previewFitAddon = fitAddon;
-    previewFontLabel.textContent = buildFontFamily(selected);
   }
 
   // --- buttons --- (Escape/backdrop also close, via createModal)

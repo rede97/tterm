@@ -256,15 +256,17 @@
     color: var(--tt-bad);
     text-decoration: line-through;
   }
-  .tab.shared::after {
+  .tab.shared::after,
+  .tab.dirty::after {
     content: "";
     width: 6px; height: 6px;
     border-radius: 50%;
-    background: var(--share);
     flex-shrink: 0;
     margin: 0 2px 0 6px;
     order: 3; /* before close (× stays rightmost) */
   }
+  .tab.shared::after { background: var(--share); }
+  .tab.dirty::after { background: var(--tt-warn); }
 
   .tab-close {
     width: 26px; height: 100%;

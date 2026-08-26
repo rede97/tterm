@@ -42,6 +42,8 @@ export interface ConfigState {
   // Default serial profile name (built-in or custom). The rest of the
   // serial defaults live in profiles (serial-profiles.json), not here.
   serialProfile: string;
+  // Data/parity/stop frame for new serial sessions (8N1 / 8E1 / 8O1).
+  serialFrame: string;
   defaultLocalProfile: string | null;
   autoCheckUpdates: boolean;
   // Built-in SSH client (russh) instead of spawning the system ssh binary.
@@ -102,6 +104,10 @@ const SCHEMA = {
   confirmCloseTab: { default: true, validate: isBoolean },
   serialBaud: { default: 115200, validate: isNumber(300, 921600) },
   serialProfile: { default: "Normal", validate: isString },
+  serialFrame: {
+    default: "8N1",
+    validate: (v: unknown): v is string => v === "8N1" || v === "8E1" || v === "8O1",
+  },
   defaultLocalProfile: { default: null as string | null, validate: isOrNull(isString) },
   autoCheckUpdates: { default: true, validate: isBoolean },
   sshEmbedded: { default: true, validate: isBoolean },

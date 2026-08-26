@@ -65,7 +65,37 @@ let portalReturn: { menu: HTMLElement; parent: Node; next: Node | null } | null 
 // closest()/querySelector.
 let openSelect: { root: HTMLElement; menu: HTMLElement } | null = null;
 
+// Portaled menus outlive a hidden trigger (Settings panel switch, page
+// close, etc.). Watch at the control layer so callers never call
+// closeAllSelects for lifecycle — only for explicit dismiss.
+let triggerWatch: ResizeObserver | null = null;
+
+function stopWatchingTrigger(): void {
+  triggerWatch?.disconnect();
+  triggerWatch = null;
+}
+
+function watchTrigger(trigger: HTMLElement): void {
+  stopWatchingTrigger();
+  // Skip the first callback: happy-dom/jsdom give 0×0 boxes, and a real
+  // open must not self-close before layout. Collapse-to-zero after that
+  // means an ancestor went display:none / was removed.
+  let primed = false;
+  triggerWatch = new ResizeObserver((entries) => {
+    for (const e of entries) {
+      const gone = e.contentRect.width === 0 && e.contentRect.height === 0;
+      if (!primed) {
+        primed = true;
+        if (gone) return;
+      }
+      if (gone) closeAllSelects();
+    }
+  });
+  triggerWatch.observe(trigger);
+}
+
 function unportalMenu(): void {
+  stopWatchingTrigger();
   if (!portalReturn) return;
   const { menu, parent, next } = portalReturn;
   // Back inside its root, the descendant selector takes over again.
@@ -85,7 +115,23 @@ function portalMenu(root: HTMLElement, menu: HTMLElement): void {
   menu.classList.add("open");
   document.body.appendChild(menu);
   openSelect = { root, menu };
+  const trigger = root.querySelector<HTMLElement>(".tt-select-trigger");
+  if (trigger) watchTrigger(trigger);
 }
+
+// Click/press outside the open control dismisses it (nav, Apply, etc.).
+// Capture phase so we win before stopPropagation on triggers.
+document.addEventListener(
+  "pointerdown",
+  (e) => {
+    if (!openSelect) return;
+    const t = e.target;
+    if (!(t instanceof Node)) return;
+    if (openSelect.menu.contains(t) || openSelect.root.contains(t)) return;
+    closeAllSelects();
+  },
+  true,
+);
 
 /** Options of the root's menu, wherever the menu currently lives. */
 function menuOptions(root: HTMLElement): HTMLElement[] {

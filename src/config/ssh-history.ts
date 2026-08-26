@@ -146,3 +146,12 @@ export async function rememberSshHistory(host: SshHost): Promise<SshHistoryEntry
   setSshHistory(next);
   return next;
 }
+
+/** Wipe Temporary Connect MRU (file + in-memory cache). */
+export async function clearSshHistory(): Promise<void> {
+  await invoke("write_config_file", {
+    name: FILE,
+    content: serializeSshHistory([]),
+  });
+  setSshHistory([]);
+}

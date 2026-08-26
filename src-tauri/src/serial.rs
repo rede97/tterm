@@ -317,6 +317,23 @@ pub(crate) fn serial_io_loop(
                     let _ = port.set_baud_rate(baud);
                     restore_driven_lines(&mut *port, rts, dtr, hardware_flow);
                 }
+                SerialCtl::SetFrame {
+                    data_bits,
+                    parity,
+                    stop_bits,
+                } => {
+                    if let (Ok(db), Ok(p), Ok(sb)) = (
+                        map_data_bits(data_bits),
+                        map_parity(&parity),
+                        map_stop_bits(stop_bits),
+                    ) {
+                        release_rts_before_dcb_write(&mut *port, rts, hardware_flow);
+                        let _ = port.set_data_bits(db);
+                        let _ = port.set_parity(p);
+                        let _ = port.set_stop_bits(sb);
+                        restore_driven_lines(&mut *port, rts, dtr, hardware_flow);
+                    }
+                }
                 SerialCtl::SetOutputNewline(mode) => {
                     newline_filter.set_mode(mode);
                 }
@@ -697,6 +714,43 @@ pub fn serial_set_baud(
     session
         .ctl
         .send(SerialCtl::SetBaud(baud_rate))
+        .map_err(|e| format!("Serial session closed: {}", e))
+}
+
+/// Live data/parity/stop switch (quick panel Frame select).
+#[tauri::command]
+pub fn serial_set_frame(
+    state: tauri::State<AppState>,
+    id: &str,
+    data_bits: u8,
+    parity: &str,
+    stop_bits: u8,
+) -> Result<(), String> {
+    map_data_bits(data_bits)?;
+    map_parity(parity)?;
+    map_stop_bits(stop_bits)?;
+    let mut sessions = state.serial_sessions.lock().map_err(|e| e.to_string())?;
+    let session = sessions
+        .get_mut(id)
+        .ok_or_else(|| format!("No serial session: {}", id))?;
+    if let Some(SpawnSpec::Serial {
+        data_bits: spec_db,
+        parity: spec_parity,
+        stop_bits: spec_sb,
+        ..
+    }) = &mut session.spec
+    {
+        *spec_db = data_bits;
+        *spec_parity = parity.to_string();
+        *spec_sb = stop_bits;
+    }
+    session
+        .ctl
+        .send(SerialCtl::SetFrame {
+            data_bits,
+            parity: parity.to_string(),
+            stop_bits,
+        })
         .map_err(|e| format!("Serial session closed: {}", e))
 }
 

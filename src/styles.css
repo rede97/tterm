@@ -941,15 +941,23 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   font-size: var(--tt-fs-label);
 }
 
-/* AI session sharing indicator: small teal dot on the shared tab. */
-.tab.shared::after {
+/* AI session sharing: teal dot. Settings unsaved: yellow dot. Same chrome.
+   order keeps the × rightmost (matches docs/tabbar-preview.html). */
+.tab.shared::after,
+.tab.dirty::after {
   content: "";
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #4ec9b0;
   flex-shrink: 0;
   margin: 0 6px;
+  order: 3;
+}
+.tab.shared::after {
+  background: #4ec9b0;
+}
+.tab.dirty::after {
+  background: var(--tt-warn);
 }
 
 /* Active = one step LIGHTER than the bar plus a faint top highlight
@@ -1217,6 +1225,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   cursor: pointer;
   opacity: 0;
   flex-shrink: 0;
+  order: 4;
 }
 
 .tab:hover .tab-close,
@@ -1229,49 +1238,31 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   color: var(--tt-text);
 }
 
-/* Close-tab confirmation: in-place on the tab (Confirm: + Close). */
-.tab.confirming > .tab-badge,
-.tab.confirming > .tab-label,
+/* Close-tab confirmation: floating Close over the × — title stays, width
+   unchanged (overlay layer only). */
 .tab.confirming > .tab-close {
-  display: none;
-}
-
-.tab.confirming.shared::after {
-  display: none;
-}
-
-.tab-close-confirm-inline {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  padding-right: 6px;
-  font-family: var(--tt-ui);
-  font-size: var(--tt-fs-label);
-  font-weight: var(--tt-ui-weight);
-  color: var(--tt-chrome-text);
-}
-
-.tab-close-confirm-text {
-  flex-shrink: 0;
-  color: var(--tt-chrome-muted);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .tab-close-confirm-btn {
-  flex-shrink: 0;
-  margin-left: auto;
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
   height: 22px;
   padding: 0 10px;
   border: none;
   border-radius: var(--tt-radius-ctrl);
   background: var(--tt-bad);
   color: #fff;
-  font: inherit;
+  font-family: var(--tt-ui);
   font-size: var(--tt-fs-label);
   font-weight: var(--tt-title-weight);
+  line-height: 1;
   cursor: pointer;
+  box-shadow: var(--tt-shadow);
 }
 
 .tab-close-confirm-btn:hover {
@@ -3213,29 +3204,46 @@ body[data-skin="cursor"] .check-box:checked::after {
 }
 
 .fp-font-add {
-  width: 20px;
-  height: 20px;
-  display: flex;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--tt-line-strong);
-  border: none;
-  border-radius: 3px;
-  color: var(--tt-text);
-  cursor: pointer;
-  font-size: var(--tt-fs-md);
-  line-height: 1;
   flex-shrink: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--tt-radius-ctrl);
+  background: transparent;
+  color: var(--tt-faint);
+  cursor: pointer;
+  line-height: 0;
+}
+
+.fp-font-add svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
+.fp-font-item:hover .fp-font-add {
+  color: var(--tt-muted);
 }
 
 .fp-font-add:hover {
+  border-color: var(--tt-line-strong);
   background: var(--tt-hover);
   color: var(--tt-text);
 }
 
 .fp-font-add.in-use {
-  background: var(--tt-accent-fill);
-  color: var(--tt-accent-text);
+  border-color: color-mix(in srgb, var(--tt-accent) 28%, transparent);
+  background: color-mix(in srgb, var(--tt-accent) 10%, transparent);
+  color: var(--tt-text);
+}
+
+.fp-font-add.in-use:hover {
+  border-color: color-mix(in srgb, var(--tt-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--tt-accent) 16%, transparent);
 }
 
 .fp-badge {
@@ -3257,14 +3265,14 @@ body[data-skin="cursor"] .check-box:checked::after {
 
 .fp-nf-link {
   display: inline-block;
-  margin-top: 6px;
   font-size: var(--tt-fs-label);
-  color: var(--tt-accent);
+  color: var(--tt-muted);
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .fp-nf-link:hover {
-  text-decoration: underline;
+  color: var(--tt-text);
 }
 
 /* -- Selected (used) list -- */
@@ -3371,15 +3379,6 @@ body[data-skin="cursor"] .check-box:checked::after {
   margin-top: 2px;
 }
 
-.fp-preview-title {
-  font-size: var(--tt-fs-caption);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--tt-muted);
-  margin-bottom: 6px;
-  user-select: none;
-}
-
 .fp-preview-terminal {
   height: 180px;
   background: var(--tt-inset);
@@ -3394,8 +3393,16 @@ body[data-skin="cursor"] .check-box:checked::after {
   padding: 12px 20px;
   border-top: 1px solid var(--tt-line);
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.font-picker-footer-actions {
+  display: flex;
+  align-items: center;
   gap: 8px;
+  margin-left: auto;
 }
 
 /* ===== SSH Auth Dialogs ===== */
@@ -3802,6 +3809,7 @@ body[data-skin="cursor"] .check-box:checked::after {
   height: 72px;
   min-height: 72px;
   max-height: 72px;
+  cursor: pointer;
 }
 
 .sp-card .theme-card-name {
@@ -3859,32 +3867,41 @@ body[data-skin="cursor"] .check-box:checked::after {
   margin-bottom: 12px;
 }
 
-.sp-name-row {
-  display: flex;
+.sp-name-row,
+.sp-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--tt-btn-width);
   align-items: center;
-  gap: 8px;
+  column-gap: 8px;
+  padding: 4px 0;
+}
+
+.sp-name-row {
   margin-bottom: 10px;
 }
 
 .sp-name {
-  flex: 1;
+  width: 100%;
+  min-width: 0;
+  height: var(--tt-ctrl-h);
+  box-sizing: border-box;
   background: var(--tt-inset);
-  border: 1px solid var(--tt-line);
+  border: 1px solid var(--tt-line-strong);
   border-radius: var(--tt-radius-ctrl);
   color: var(--tt-text);
-  padding: 5px 8px;
-  font-size: var(--tt-fs-body);
+  padding: 0 10px;
+  font-family: var(--tt-ui);
+  font-size: var(--tt-fs-ctrl);
+  font-weight: var(--tt-title-weight);
+  outline: none;
 }
 
-.sp-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
+.sp-name:focus {
+  border-color: var(--tt-focus);
 }
 
 .sp-label {
-  flex: 1;
+  min-width: 0;
   color: var(--tt-muted);
   font-size: var(--tt-fs-label);
   font-weight: var(--tt-title-weight);
@@ -3893,9 +3910,9 @@ body[data-skin="cursor"] .check-box:checked::after {
   white-space: nowrap;
 }
 
-/* Shared ttSelect (tt-select) in the serial profile editor. */
+/* Shared ttSelect — same 148px column as .sp-name. */
 .sp-select-slot {
-  flex: 1.4;
+  width: 100%;
   min-width: 0;
 }
 .sp-select-slot .tt-select {

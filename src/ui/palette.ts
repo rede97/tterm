@@ -228,7 +228,7 @@ function connectTempSsh(host: SshHost): void {
 function tempSshHostPage(): PalettePage {
   return {
     kind: "text",
-    title: "SSH · Temporary Connect",
+    title: "SSH · Temporary",
     placeholder: "user@host[:port] — kept in connection history",
     rows: (value) => {
       const q = value.trim().toLowerCase();
@@ -290,20 +290,11 @@ function newTabSshPage(): PalettePage {
     rows: () => {
       const h = _handlers;
       if (!h) return [];
-      const temp: PaletteRow = {
-        label: "Temporary Connect…",
-        detail: "user@host · local history",
-        action: () => push(tempSshHostPage()),
-      };
-      // Draft order: saved hosts first, Temporary Connect… last.
-      return [
-        ...h.listSshHosts().map((host) => ({
-          label: host.name,
-          detail: `${hostProp(host, "user")}@${hostProp(host, "hostname") || host.name}`,
-          action: () => run(() => h.openSshTab(host)),
-        })),
-        temp,
-      ];
+      return h.listSshHosts().map((host) => ({
+        label: host.name,
+        detail: `${hostProp(host, "user")}@${hostProp(host, "hostname") || host.name}`,
+        action: () => run(() => h.openSshTab(host)),
+      }));
     },
   };
 }
@@ -778,7 +769,7 @@ export function openPaletteFlow(
       pushForwardForm("dynamic");
       break;
     case "tempSsh":
-      // Same page the SSH level-2 list's Temporary Connect… row opens.
+      // Same page the Tab command New SSH Temporary Tab opens.
       push(tempSshHostPage());
       break;
     case "serialProfile":

@@ -68,6 +68,7 @@ macro_rules! tterm_commands {
             serial::serial_list_ports,
             serial::serial_spawn,
             serial::serial_set_baud,
+            serial::serial_set_frame,
             serial::serial_set_output_newline,
             serial::serial_set_dtr,
             serial::serial_set_flow_control,

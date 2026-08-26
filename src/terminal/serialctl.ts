@@ -11,6 +11,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { findSerialProfile } from "../config/serial-profiles";
+import { parseSerialFrame } from "../core/common";
 import type { SerialEnterNewline, SerialInputMode, SerialOutputNewline } from "../core/types";
 import type { TerminalTab } from "./tab";
 
@@ -69,4 +70,13 @@ export async function setSerialBaud(tab: TerminalTab | undefined, baud: number):
   t.serialBaud = baud;
   // Baud display update, not a user rename — keep OSC title tracking live.
   t.rename(`${t.serialPortName} · ${baud}`, false);
+}
+
+// Live data/parity/stop switch (this session only).
+export async function setSerialFrame(tab: TerminalTab | undefined, frame: string): Promise<void> {
+  const t = serialTab(tab);
+  if (!t) return;
+  const { dataBits, parity, stopBits } = parseSerialFrame(frame);
+  await invoke("serial_set_frame", { id: t.id, dataBits, parity, stopBits });
+  t.serialFrame = frame;
 }

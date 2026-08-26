@@ -4,7 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createElement, FolderOpen } from "lucide";
 import Sortable from "sortablejs";
 import { findSerialProfile } from "../config/serial-profiles";
-import { hostProp } from "../core/common";
+import { hostProp, parseSerialFrame } from "../core/common";
 import { DOM_ID } from "../core/dom-ids";
 import { logCatch, swallow } from "../core/errorlog";
 import { configStore } from "../core/store";
@@ -27,6 +27,7 @@ import { closeFindForTab } from "./search";
 import {
   setSerialBaud,
   setSerialEnterNewline,
+  setSerialFrame,
   setSerialInputMode,
   setSerialOutputNewline,
   setSerialProfile,
@@ -446,14 +447,16 @@ export class TabManager {
     // global default. No per-device parameter memory (removed by design).
     const profile = findSerialProfile(configStore.get("serialProfile"));
     const baud = configStore.get("serialBaud");
+    const frame = configStore.get("serialFrame");
+    const { dataBits, parity, stopBits } = parseSerialFrame(frame);
     let result: WsConnectResult;
     try {
       result = await invoke("serial_spawn", {
         portName: port.name,
         baudRate: baud,
-        dataBits: 8,
-        parity: "none",
-        stopBits: 1,
+        dataBits,
+        parity,
+        stopBits,
         flowControl: profile.flowControl,
         outputNewline: profile.outputNewline,
       });
@@ -466,6 +469,7 @@ export class TabManager {
     tab.serialPortName = port.name;
     tab.serialPort = port;
     tab.serialBaud = baud;
+    tab.serialFrame = frame;
     tab.serialProfile = profile.name;
     tab.outputNewline = profile.outputNewline;
     tab.flowControl = profile.flowControl;
@@ -497,6 +501,10 @@ export class TabManager {
 
   async setSerialBaud(tabId: string, baud: number): Promise<void> {
     await setSerialBaud(this.tabs.get(tabId), baud);
+  }
+
+  async setSerialFrame(tabId: string, frame: string): Promise<void> {
+    await setSerialFrame(this.tabs.get(tabId), frame);
   }
 
   async createDemoTab(): Promise<TerminalTab | null> {

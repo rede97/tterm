@@ -5,6 +5,7 @@
 import {
   SERIAL_BAUD_RATES,
   SERIAL_ENTER_NEWLINES,
+  SERIAL_FRAMES,
   SERIAL_OUTPUT_NEWLINE_DESCS,
   SERIAL_OUTPUT_NEWLINES,
 } from "../../../core/common";
@@ -37,6 +38,8 @@ export interface QpPanelModel {
   serialProfile?: string;
   profileGroups?: TtSelectGroup[];
   baud?: string;
+  /** Link frame 8N1 / 8E1 / 8O1. */
+  frame?: string;
   inputMode?: string;
   enterNewline?: string;
   outputNewline?: string;
@@ -52,6 +55,7 @@ export interface QpPanelActions {
   onConnectToggle?: () => void;
   onProfile?: (value: string) => void;
   onBaud?: (value: string) => void;
+  onFrame?: (value: string) => void;
   onInputMode?: (value: string) => void;
   onEnterNewline?: (value: string) => void;
   onOutputNewline?: (value: string) => void;
@@ -61,6 +65,8 @@ export interface QpPanelActions {
 }
 
 export const QP_SERIAL_BAUD_OPTIONS = SERIAL_BAUD_RATES.map((b) => [String(b), String(b)] as const);
+
+export const QP_SERIAL_FRAME_OPTIONS = SERIAL_FRAMES;
 
 export const QP_SERIAL_INPUT_MODES = [
   ["normal", "Normal"],
@@ -180,6 +186,7 @@ function serialSessionSection(m: QpPanelModel, a: QpPanelActions): TemplateResul
     "Session",
     "serial",
     html`
+      ${qpToggle("Auto-reconnect", m.autoReconnect ?? false, (on) => a.onAutoReconnect?.(on))}
       <div class="qp-row">
         <span class="qp-label">Connection</span>
         <button
@@ -198,7 +205,12 @@ function serialSessionSection(m: QpPanelModel, a: QpPanelActions): TemplateResul
         ${ttSelect("Profile", [], current, (value) => a.onProfile?.(value), { groups })}
       </div>
       ${qpSelectRow("Baud rate", QP_SERIAL_BAUD_OPTIONS, m.baud ?? "115200", (v) => a.onBaud?.(v))}
-      ${qpToggle("Auto-reconnect", m.autoReconnect ?? false, (on) => a.onAutoReconnect?.(on))}
+      ${qpSelectRow(
+        "Data / parity / stop",
+        QP_SERIAL_FRAME_OPTIONS,
+        m.frame ?? "8N1",
+        (v) => a.onFrame?.(v),
+      )}
     `,
   );
 }

@@ -811,6 +811,7 @@ const state = {
     { label: "Built-in", items: [["Normal", "Normal"], ["Log", "Log"], ["AT", "AT"]] },
   ],
   baud: "115200",
+  frame: "8N1",
   inputMode: "normal",
   enterNewline: "cr",
   outputNewline: "keep",
@@ -869,7 +870,12 @@ function paint() {
       onProfile: (v) => { state.serialProfile = v; paint(); },
       onBaud: (v) => {
         state.baud = v;
-        state.meta = `Serial · ${v} 8N1`;
+        state.meta = `Serial · ${v} ${state.frame || "8N1"}`;
+        paint();
+      },
+      onFrame: (v) => {
+        state.frame = v;
+        state.meta = `Serial · ${state.baud || "115200"} ${v}`;
         paint();
       },
       onInputMode: (v) => { state.inputMode = v; paint(); },

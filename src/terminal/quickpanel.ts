@@ -49,6 +49,7 @@ export interface QuickPanelHandlers {
   getTab: (tabId: string) => TerminalTab | undefined;
   shareTab: (tabId: string) => Promise<void>;
   setSerialBaud: (tabId: string, baud: number) => Promise<void>;
+  setSerialFrame: (tabId: string, frame: string) => Promise<void>;
   setSerialProfile: (tabId: string, name: string) => Promise<void>;
   setSerialInputMode: (tabId: string, mode: SerialInputMode) => void;
   setSerialOutputNewline: (tabId: string, mode: SerialOutputNewline) => Promise<void>;
@@ -91,6 +92,7 @@ interface QuickPanelState {
   // In-flight serial select values, shadowing the tab until handlers land.
   serialProfile: string | null;
   baud: string | null;
+  frame: string | null;
   inputMode: string | null;
   enterNewline: string | null;
   outputNewline: string | null;
@@ -114,6 +116,7 @@ function stateFor(tab: TerminalTab): QuickPanelState {
       forwardsQueried: false,
       serialProfile: null,
       baud: null,
+      frame: null,
       inputMode: null,
       enterNewline: null,
       outputNewline: null,
@@ -132,7 +135,9 @@ function metaFor(tab: TerminalTab): string {
     const target = h ? `${hostProp(h, "user") || "root"}@${hostProp(h, "hostname") || h.name}` : "";
     return target ? `SSH · ${target}` : "SSH";
   }
-  if (tab.type === "serial") return `Serial · ${tab.serialBaud ?? 115200} 8N1`;
+  if (tab.type === "serial") {
+    return `Serial · ${tab.serialBaud ?? 115200} ${tab.serialFrame ?? "8N1"}`;
+  }
   return "Local shell";
 }
 
@@ -173,6 +178,7 @@ function toModel(tab: TerminalTab, st: QuickPanelState): QpPanelModel {
     serialProfile: st.serialProfile ?? tab.serialProfile ?? DEFAULT_SERIAL_PROFILE,
     profileGroups: kind === "serial" ? profileGroups() : undefined,
     baud: st.baud ?? String(tab.serialBaud ?? 115200),
+    frame: st.frame ?? tab.serialFrame ?? "8N1",
     inputMode: st.inputMode ?? tab.inputMode ?? "normal",
     enterNewline: st.enterNewline ?? tab.enterNewline ?? "cr",
     outputNewline: st.outputNewline ?? tab.outputNewline ?? "keep",
@@ -248,6 +254,13 @@ function actionsFor(tab: TerminalTab, st: QuickPanelState): QpPanelActions {
           if (panelTabId === tab.id) renderPanel(tab);
         })
         .catch(logCatch("serial.setBaud"));
+    },
+    onFrame: (v) => {
+      st.frame = v;
+      _handlers
+        ?.setSerialFrame(tab.id, v)
+        .catch(logCatch("serial.setFrame"));
+      renderPanel(tab);
     },
     onInputMode: (v) => {
       st.inputMode = v;

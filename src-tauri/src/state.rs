@@ -95,6 +95,12 @@ pub struct SerialLineState {
 #[derive(Debug, Clone)]
 pub enum SerialCtl {
     SetBaud(u32),
+    /// Live data/parity/stop reconfigure (8N1 / 8E1 / 8O1).
+    SetFrame {
+        data_bits: u8,
+        parity: String,
+        stop_bits: u8,
+    },
     SetOutputNewline(NewlineMode),
     // Drive the RTS modem line (never asserted at open). Ignored while
     // hardware RTS/CTS is on — the driver owns RTS then.

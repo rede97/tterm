@@ -53,6 +53,9 @@ export interface SerialParams {
 
 export type SerialFlowControl = "none" | "software" | "hardware";
 
+/** Link frame for new serial sessions: 8 data bits · parity · 1 stop. */
+export type SerialFrame = "8N1" | "8E1" | "8O1";
+
 // A named serial session mode (built-in or user-defined). Baud and live
 // flow control are link parameters, not session modes: a running session's
 // profile switch must not touch them. flowControl is stored for custom

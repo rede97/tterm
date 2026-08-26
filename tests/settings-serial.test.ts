@@ -39,7 +39,7 @@ beforeEach(() => {
   document.body.innerHTML = "";
   file.content = "[]";
   setCustomSerialProfiles([]);
-  configStore.set({ serialBaud: 115200, serialProfile: "Normal" });
+  configStore.set({ serialBaud: 115200, serialProfile: "Normal", serialFrame: "8N1" });
 });
 
 describe("settings — Serial panel defaults", () => {
@@ -61,31 +61,43 @@ describe("settings — Serial panel defaults", () => {
     expect(collectSerialSettings(panel).serialBaud).toBe(57600);
   });
 
-  it("default profile select lists built-in profiles and is collected on Apply", () => {
+  it("frame select offers 8N1 / 8E1 / 8O1 and is collected on Apply", () => {
     const panel = openPanel();
-    const sel = panel.querySelector<HTMLElement>("#set-serial-profile")!;
+    const sel = panel.querySelector<HTMLElement>("#set-serial-frame")!;
     const options = [...sel.querySelectorAll<HTMLElement>(".tt-option")].map(
       (o) => o.dataset.value,
     );
-    expect(options).toEqual(expect.arrayContaining(["Normal", "Log", "AT"]));
-    // Built-in profiles live in their own optgroup
-    expect(sel.querySelector(".tt-optgroup")!.textContent).toBe("Built-in");
-    expect(options.slice(0, 3)).toEqual(["Normal", "Log", "AT"]);
-    expect(sel.dataset.current).toBe("Normal");
-    expect(sel.querySelector('.tt-option[aria-selected="true"]')!.dataset.value).toBe("Normal");
+    expect(options).toEqual(["8N1", "8E1", "8O1"]);
+    expect(sel.dataset.current).toBe("8N1");
 
-    pick(sel, "AT");
-    expect(collectSerialSettings(panel).serialProfile).toBe("AT");
+    pick(sel, "8E1");
+    expect(collectSerialSettings(panel).serialFrame).toBe("8E1");
+    expect(sel.dataset.current).toBe("8E1");
   });
 
-  it("refreshSerialPanel restores selects from config", () => {
+  it("clicking a profile card sets the pending default (no profile select)", () => {
+    const panel = openPanel();
+    expect(panel.querySelector("#set-serial-profile")).toBeNull();
+    expect(card(panel, "Normal").getAttribute("aria-pressed")).toBe("true");
+
+    card(panel, "Log").click();
+    expect(card(panel, "Log").classList.contains("selected")).toBe(true);
+    expect(card(panel, "Log").getAttribute("aria-pressed")).toBe("true");
+    expect(card(panel, "Normal").classList.contains("selected")).toBe(false);
+    expect(collectSerialSettings(panel).serialProfile).toBe("Log");
+  });
+
+  it("refreshSerialPanel restores baud / frame / profile from config", () => {
     const panel = openPanel();
     pick(panel.querySelector<HTMLElement>("#set-serial-baud")!, "9600");
-    pick(panel.querySelector<HTMLElement>("#set-serial-profile")!, "Log");
+    pick(panel.querySelector<HTMLElement>("#set-serial-frame")!, "8O1");
+    card(panel, "Log").click();
     // Refresh fully rebuilds the panel (stale element references die).
     refreshSerialPanel(panel);
     expect(panel.querySelector<HTMLElement>("#set-serial-baud")!.dataset.current).toBe("115200");
-    expect(panel.querySelector<HTMLElement>("#set-serial-profile")!.dataset.current).toBe("Normal");
+    expect(panel.querySelector<HTMLElement>("#set-serial-frame")!.dataset.current).toBe("8N1");
+    expect(card(panel, "Normal").classList.contains("selected")).toBe(true);
+    expect(collectSerialSettings(panel).serialProfile).toBe("Normal");
   });
 });
 
@@ -190,11 +202,10 @@ describe("settings — Serial profile gallery", () => {
       (b) => b.getAttribute("aria-label") || b.textContent,
     );
     expect(actions).toEqual(["Duplicate", "Edit"]);
-    // The new profile is also selectable as the default.
-    const sel = panel.querySelector<HTMLElement>("#set-serial-profile")!;
-    expect(
-      [...sel.querySelectorAll<HTMLElement>(".tt-option")].map((o) => o.dataset.value),
-    ).toContain("AT Copy");
+    // The new profile is also selectable as the default via its gallery card.
+    expect(card(panel, "AT Copy").classList.contains("selected")).toBe(false);
+    card(panel, "AT Copy").click();
+    expect(collectSerialSettings(panel).serialProfile).toBe("AT Copy");
   });
 
   it("rejects a name that collides with an existing profile", async () => {
@@ -220,9 +231,8 @@ describe("settings — Serial profile gallery", () => {
     });
     configStore.set({ serialProfile: "AT Copy" });
     refreshSerialPanel(panel);
-    expect(panel.querySelector<HTMLElement>("#set-serial-profile")!.dataset.current).toBe(
-      "AT Copy",
-    );
+    expect(card(panel, "AT Copy").classList.contains("selected")).toBe(true);
+    expect(collectSerialSettings(panel).serialProfile).toBe("AT Copy");
 
     vi.stubGlobal(
       "confirm",
@@ -248,9 +258,8 @@ describe("settings — Serial profile gallery", () => {
         expect(configStore.get("serialProfile")).toBe("Normal");
       });
       expect(panel.querySelector('.sp-card[data-profile="AT Copy"]')).toBeNull();
-      expect(panel.querySelector<HTMLElement>("#set-serial-profile")!.dataset.current).toBe(
-        "Normal",
-      );
+      expect(card(panel, "Normal").classList.contains("selected")).toBe(true);
+      expect(collectSerialSettings(panel).serialProfile).toBe("Normal");
       expect(JSON.parse(file.content)).toEqual([]);
     } finally {
       vi.unstubAllGlobals();

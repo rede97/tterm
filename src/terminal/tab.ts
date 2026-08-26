@@ -54,6 +54,8 @@ export class TerminalTab {
   serialProfile?: string;
   flowControl?: string;
   serialBaud?: number;
+  /** Link frame at open (8N1 / 8E1 / 8O1) — for QP meta, not live-editable yet. */
+  serialFrame?: string;
   outputNewline?: string;
   inputMode: SerialInputMode = "normal";
   enterNewline: SerialEnterNewline = "cr";

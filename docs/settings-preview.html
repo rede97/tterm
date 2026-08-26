@@ -284,13 +284,21 @@
     display: flex;
     align-items: stretch;
     gap: 4px;
+    width: var(--set-btn-width);
+    height: var(--set-ctrl-h);
+    box-sizing: border-box;
+    flex-shrink: 0;
   }
   .stepper .input-narrow {
-    width: 52px;
-    min-width: 52px;
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    text-align: center;
   }
   .stepper-btn {
     width: 28px;
+    flex-shrink: 0;
     border: 1px solid var(--set-line-strong);
     border-radius: var(--set-radius-ctrl);
     background: var(--set-inset);
@@ -912,10 +920,6 @@
     max-width: none;
     box-sizing: border-box;
   }
-  .skg-opt {
-    color: var(--set-faint);
-    font-weight: var(--set-ui-weight);
-  }
   .skg-footer {
     display: flex;
     gap: 8px;
@@ -1181,7 +1185,7 @@
   }
   .theme-gallery > .theme-group-title:first-child { margin-top: 0; }
   .sp-card {
-    cursor: default;
+    cursor: pointer;
     background: var(--set-well);
     height: 72px;
     min-height: 72px;
@@ -1255,16 +1259,22 @@
     color: var(--set-text);
     margin-bottom: 12px;
   }
-  .sp-name-row {
-    display: flex;
+  .sp-name-row,
+  .sp-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--set-btn-width);
     align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
+    column-gap: 8px;
+    padding: 4px 0;
   }
-  .sp-name-row > .sp-label { flex: 0 0 auto; width: 48px; }
+  .sp-name-row {
+    margin-bottom: 10px;
+  }
   .sp-name {
-    flex: 1;
+    width: 100%;
+    min-width: 0;
     height: 28px;
+    box-sizing: border-box;
     padding: 0 10px;
     background: var(--set-inset);
     border: 1px solid var(--set-line-strong);
@@ -1276,14 +1286,7 @@
     outline: none;
   }
   .sp-name:focus { border-color: var(--set-focus); }
-  .sp-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 0;
-  }
   .sp-label {
-    flex: 1;
     min-width: 0;
     color: var(--set-muted);
     font-size: var(--set-fs-label);
@@ -1292,8 +1295,9 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .sp-row > .tt-select {
-    flex: 1.4;
+  .sp-row > .tt-select,
+  .sp-select-slot {
+    width: 100%;
     min-width: 0;
   }
   .sp-hint {
@@ -1568,13 +1572,13 @@
   }
   .fp-nf-link {
     display: inline-block;
-    margin-top: 6px;
     font-size: var(--set-fs-desc);
     color: var(--set-muted);
     text-decoration: none;
+    white-space: nowrap;
   }
   .fp-nf-link:hover { color: var(--set-text); }
-  .fp-selected-title, .fp-preview-title {
+  .fp-selected-title {
     font-size: var(--set-fs-caption);
     font-weight: var(--set-title-weight);
     text-transform: uppercase;
@@ -1620,10 +1624,17 @@
   }
   .font-picker-footer {
     display: flex;
-    justify-content: flex-end;
-    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
     padding: 12px 20px;
     border-top: 1px solid var(--set-line);
+  }
+  .font-picker-footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
   }
 
   /* ---- footer ---- */
@@ -2288,7 +2299,7 @@
             <div class="row">
               <div class="row-info">
                 <div class="row-title">Default baud rate</div>
-                <div class="row-desc">Baud rate for new serial sessions (8N1).</div>
+                <div class="row-desc">Baud rate for new serial sessions.</div>
               </div>
               <div class="tt-select" data-dirty data-select>
                 <button type="button" class="tt-select-trigger"><span class="tt-select-value">115200</span></button>
@@ -2306,18 +2317,22 @@
             </div>
             <div class="row">
               <div class="row-info">
-                <div class="row-title">Default profile</div>
-                <div class="row-desc">Input mode, newline handling and flow control for new serial sessions.</div>
+                <div class="row-title">Data / parity / stop</div>
+                <div class="row-desc">Frame for new serial sessions.</div>
               </div>
-              <div class="tt-select" data-dirty data-select id="serial-profile-select">
-                <button type="button" class="tt-select-trigger"><span class="tt-select-value">Normal</span></button>
-                <div class="tt-select-menu" id="serial-profile-menu"></div>
+              <div class="tt-select" data-dirty data-select id="serial-frame-select">
+                <button type="button" class="tt-select-trigger"><span class="tt-select-value">8N1</span></button>
+                <div class="tt-select-menu">
+                  <button type="button" class="tt-option" aria-selected="true" data-value="8N1">8N1</button>
+                  <button type="button" class="tt-option" data-value="8E1">8E1</button>
+                  <button type="button" class="tt-option" data-value="8O1">8O1</button>
+                </div>
               </div>
             </div>
           </div>
           <div class="section">
             <div class="section-title">Profiles</div>
-            <p class="section-note">Named session modes. Duplicate a built-in profile to customize it.</p>
+            <p class="section-note">Named session modes. Click a card to set the default; Duplicate a built-in to customize.</p>
             <div class="theme-gallery" id="serial-profile-gallery"></div>
           </div>
         </div>
@@ -2364,7 +2379,6 @@
             <div class="fp-list-col">
               <div class="fp-list-title">System <span class="fp-system-count" id="fp-system-count"></span></div>
               <div class="fp-list tt-scroll" id="fp-system"></div>
-              <a class="fp-nf-link" href="https://www.nerdfonts.com/" target="_blank" rel="noopener">Install more Nerd Fonts →</a>
             </div>
           </div>
           <div class="fp-selected-section">
@@ -2372,13 +2386,15 @@
             <div class="fp-selected-list" id="fp-selected"></div>
           </div>
           <div class="fp-preview-section">
-            <div class="fp-preview-title">Preview: <span id="fp-preview-font">JetBrains Mono</span></div>
             <div class="fp-preview-terminal" id="fp-preview"></div>
           </div>
         </div>
         <div class="font-picker-footer">
-          <button type="button" class="tt-btn tt-btn-ghost" id="fp-cancel">Cancel</button>
-          <button type="button" class="tt-btn tt-btn-primary" id="fp-apply">Apply</button>
+          <a class="fp-nf-link" href="https://www.nerdfonts.com/" target="_blank" rel="noopener">Install more Nerd Fonts →</a>
+          <div class="font-picker-footer-actions">
+            <button type="button" class="tt-btn tt-btn-ghost" id="fp-cancel">Cancel</button>
+            <button type="button" class="tt-btn tt-btn-primary" id="fp-apply">Apply</button>
+          </div>
         </div>
       </div>
     </div>
@@ -2572,7 +2588,7 @@
               </div>
             </div>
           </label>
-          <label class="skg-field"><span>Passphrase <span class="skg-opt">(optional)</span></span>
+          <label class="skg-field"><span>Passphrase</span>
             <input class="input" id="skg-pass" type="password" placeholder="empty = no passphrase" autocomplete="new-password" />
           </label>
         </div>
@@ -3292,8 +3308,6 @@
   const spHint = document.getElementById("sp-hint");
   const spDelete = document.getElementById("sp-delete");
   const spGallery = document.getElementById("serial-profile-gallery");
-  const spProfileSelect = document.getElementById("serial-profile-select");
-  const spProfileMenu = document.getElementById("serial-profile-menu");
 
   function allSerialProfiles() {
     return [...BUILTIN_SERIAL_PROFILES, ...customSerialProfiles];
@@ -3323,22 +3337,14 @@
       .replace(/"/g, "&quot;");
   }
 
-  function syncSerialProfileSelect() {
-    const names = allSerialProfiles().map((p) => p.name);
-    if (!names.includes(defaultSerialProfile)) defaultSerialProfile = "Normal";
-    spProfileMenu.innerHTML = names
-      .map(
-        (n) =>
-          `<button type="button" class="tt-option"${n === defaultSerialProfile ? ' aria-selected="true"' : ""} data-value="${escHtml(n)}">${escHtml(n)}</button>`,
-      )
-      .join("");
-    spProfileSelect.querySelector(".tt-select-value").textContent = defaultSerialProfile;
-  }
-
   function makeSerialCard(p) {
     const card = document.createElement("div");
-    card.className = "theme-card sp-card";
+    const selected = p.name === defaultSerialProfile;
+    card.className = "theme-card sp-card" + (selected ? " selected" : "");
     card.dataset.profile = p.name;
+    card.setAttribute("role", "button");
+    card.tabIndex = 0;
+    card.setAttribute("aria-pressed", selected ? "true" : "false");
     card.innerHTML = `
       <div class="theme-card-name">${escHtml(p.name)}</div>
       <div class="sp-card-summary">${escHtml(serialProfileSummary(p))}</div>
@@ -3346,6 +3352,13 @@
         <button type="button" class="theme-card-action theme-card-action-icon" data-sp-dup aria-label="Duplicate" title="Duplicate"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
         ${p.source === "custom" ? `<button type="button" class="theme-card-action" data-sp-edit>Edit</button>` : ""}
       </div>`;
+    card.addEventListener("click", (e) => {
+      if (e.target.closest(".theme-card-action")) return;
+      if (defaultSerialProfile === p.name) return;
+      defaultSerialProfile = p.name;
+      renderSerialGallery();
+      showToast(`Default profile → ${p.name} (pending Apply)`, "info");
+    });
     return card;
   }
 
@@ -3379,7 +3392,6 @@
       <span class="theme-new-hint">Start from Normal</span>`;
     customGrid.appendChild(newBtn);
     spGallery.appendChild(customGrid);
-    syncSerialProfileSelect();
   }
 
   function setSpSelect(id, value) {
@@ -3982,9 +3994,6 @@
     });
     root.classList.remove("open");
     unportalSelectMenu();
-    if (root.id === "serial-profile-select") {
-      defaultSerialProfile = opt.dataset.value;
-    }
     if (root.id === "sp-output-newline") {
       const hint = document.getElementById("sp-hint");
       if (hint) hint.textContent = SERIAL_OUTPUT_NEWLINE_DESCS[opt.dataset.value] || "";
@@ -4051,7 +4060,6 @@
   const fpSystem = document.getElementById("fp-system");
   const fpSelected = document.getElementById("fp-selected");
   const fpPreview = document.getElementById("fp-preview");
-  const fpPreviewFont = document.getElementById("fp-preview-font");
   const fontDesc = document.getElementById("font-family-desc");
 
   let selectedStack = ["JetBrains Mono", "Cascadia Mono", "Consolas", "monospace"];
@@ -4132,7 +4140,6 @@
   }
 
   function renderPreview() {
-    fpPreviewFont.textContent = previewFont;
     fpPreview.style.fontFamily = `'${previewFont}', monospace`;
     fpPreview.textContent = PREVIEW_LINES;
   }

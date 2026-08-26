@@ -15,6 +15,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 import {
+  clearSshHistory,
   entryLabel,
   entryToHost,
   historyKey,
@@ -104,6 +105,14 @@ describe("ssh-history MRU", () => {
 
     await rememberSshHistory({ name: "lab", hostname: "lab", user: "root", port: "2222" });
     expect(listSshHistory().map((e) => entryLabel(e))).toEqual(["root@lab:2222", "pi@pi.lan"]);
+  });
+
+  it("clearSshHistory empties file and cache", async () => {
+    await rememberSshHistory({ name: "pi", hostname: "pi.lan", user: "pi" });
+    expect(listSshHistory()).toHaveLength(1);
+    await clearSshHistory();
+    expect(listSshHistory()).toEqual([]);
+    expect(JSON.parse(file.content)).toEqual([]);
   });
 
   it("load treats Rust empty-object fallback as no history", async () => {

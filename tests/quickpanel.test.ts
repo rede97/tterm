@@ -34,6 +34,7 @@ const handlers = {
   getTab: vi.fn((id: string) => (activeTab?.id === id ? activeTab : undefined)),
   shareTab: vi.fn(() => Promise.resolve()),
   setSerialBaud: vi.fn(() => Promise.resolve()),
+  setSerialFrame: vi.fn(() => Promise.resolve()),
   setSerialProfile: vi.fn(() => Promise.resolve()),
   setSerialInputMode: vi.fn(),
   setSerialOutputNewline: vi.fn(() => Promise.resolve()),
@@ -205,12 +206,13 @@ describe("quick panel — serial tab", () => {
   it("splits into Session / I/O / Modem lines sections per the design", () => {
     const p = openPanel();
     const sec = session(p);
-    // Connection (manual release/reconnect) is the first row; Profile next.
+    // Auto-reconnect first; then Connection / Profile / Baud / Frame.
     const firstRow = sec.querySelector<HTMLElement>(".qp-row")!;
-    expect(firstRow.querySelector(".qp-label")!.textContent).toBe("Connection");
+    expect(firstRow.querySelector(".qp-label")!.textContent).toBe("Auto-reconnect");
+    expect(rowOf(sec, "Connection")).toBeDefined();
     expect(rowOf(sec, "Profile")).toBeDefined();
     expect(rowOf(sec, "Baud rate")).toBeDefined();
-    expect(rowOf(sec, "Auto-reconnect")).toBeDefined();
+    expect(rowOf(sec, "Data / parity / stop")).toBeDefined();
     expect(rowOf(io(p), "Input mode")).toBeDefined();
     expect(rowOf(io(p), "Enter sends")).toBeDefined();
     expect(rowOf(io(p), "Output newlines")).toBeDefined();
@@ -245,6 +247,15 @@ describe("quick panel — serial tab", () => {
     expect(selectText(baudRow)).toBe("115200");
     pick(baudRow, "9600");
     expect(handlers.setSerialBaud).toHaveBeenCalledWith("tab-7", 9600);
+  });
+
+  it("frame select offers 8N1/8E1/8O1 and calls setSerialFrame", () => {
+    const p = openPanel();
+    const frameRow = rowOf(session(p), "Data / parity / stop")!;
+    expect(selectText(frameRow)).toBe("8N1");
+    expect(session(p).querySelector(".tt-select-hint")).toBeNull();
+    pick(frameRow, "8E1");
+    expect(handlers.setSerialFrame).toHaveBeenCalledWith("tab-7", "8E1");
   });
 
   it("parameter selects call the live session-only handlers", () => {

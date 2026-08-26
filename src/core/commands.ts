@@ -43,7 +43,7 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
   {
     id: "tterm.newSshTab",
     title: "New SSH Tab",
-    desc: "Open an SSH host from ~/.ssh/config, or Temporary Connect…",
+    desc: "Open an SSH host from ~/.ssh/config.",
     default: "",
     group: "Tab",
   },
@@ -51,6 +51,13 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
     id: "tterm.newSerialTab",
     title: "New Serial Tab",
     desc: "Open a serial COM port.",
+    default: "",
+    group: "Tab",
+  },
+  {
+    id: "tterm.tempSsh",
+    title: "New SSH Temporary Tab",
+    desc: "Connect without ~/.ssh/config. Host goes to connection history.",
     default: "",
     group: "Tab",
   },
@@ -121,13 +128,6 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
   },
   // ---- SSH ----
   {
-    id: "tterm.tempSsh",
-    title: "SSH: Temporary Connect…",
-    desc: "Connect without ~/.ssh/config — also under New SSH Tab. Host goes to connection history.",
-    default: "",
-    // No group: not a root palette row; open via New SSH Tab → Temporary Connect…
-  },
-  {
     id: "tterm.forwardAddLocal",
     title: "SSH: Add Local Port Forward…",
     desc: "Add a local (-L) port forward: listen here, dial from the remote.",
@@ -159,6 +159,13 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
     id: "tterm.sshAutoReconnect",
     title: "SSH: Toggle Auto-reconnect",
     desc: "Toggle timed auto-reconnect for the active SSH session.",
+    default: "",
+    group: "SSH",
+  },
+  {
+    id: "tterm.clearSshTempHistory",
+    title: "Clear SSH Temporary History",
+    desc: "Clear New SSH Temporary Tab connection history (ssh-history.json). Passwords are never stored.",
     default: "",
     group: "SSH",
   },

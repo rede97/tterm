@@ -116,12 +116,17 @@ export function createSettingsContent(): HTMLElement {
   footer.appendChild(dirtyHint);
 
   const syncDirty = (): void => {
-    dirtyHint.classList.toggle("on", appDirty || sshDirty);
+    const dirty = appDirty || sshDirty;
+    dirtyHint.classList.toggle("on", dirty);
     dirtyHint.textContent = sshDirty
       ? appDirty
         ? "Unsaved changes · SSH config will be written"
         : "SSH config will be written on Apply"
       : "Unsaved changes";
+    // Yellow strip dot on the Settings pseudo-tab (teal = Share on session tabs).
+    document
+      .querySelector<HTMLElement>('.tab[data-tab-id="#settings"]')
+      ?.classList.toggle("dirty", dirty);
   };
   syncDirty();
 

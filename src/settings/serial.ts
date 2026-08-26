@@ -1,5 +1,5 @@
 // Settings — Serial panel
-// Default baud rate, default serial profile, profile gallery.
+// Default baud / frame (8N1·8E1·8O1), default serial profile via gallery cards.
 // Per-device parameter memory is gone: named profiles (serial-profiles.json)
 // replace it.
 //
@@ -18,8 +18,9 @@ import {
   findSerialProfile,
   type SerialProfileDef,
 } from "../config/serial-profiles";
-import { SERIAL_BAUD_RATES } from "../core/common";
+import { SERIAL_BAUD_RATES, SERIAL_FRAMES } from "../core/common";
 import { type ConfigState, configStore } from "../core/store";
+import type { SerialFrame } from "../core/types";
 import { html, itemRow, nothing, render, repeat, section } from "../ui/lit";
 import { syncSelectTexts, ttSelect } from "../ui/select";
 import { serialProfileSummary, showSerialProfileEditor } from "./serialprofileeditor";
@@ -31,18 +32,32 @@ import { serialProfileSummary, showSerialProfileEditor } from "./serialprofileed
 
 interface SerialPanelState {
   baud: number;
+  frame: SerialFrame;
   profile: string;
 }
 
 const panelStates = new WeakMap<HTMLElement, SerialPanelState>();
 
+function asFrame(v: string): SerialFrame {
+  return v === "8E1" || v === "8O1" ? v : "8N1";
+}
+
 function stateOf(panel: HTMLElement): SerialPanelState {
   let st = panelStates.get(panel);
   if (!st) {
-    st = { baud: configStore.get("serialBaud"), profile: configStore.get("serialProfile") };
+    st = {
+      baud: configStore.get("serialBaud"),
+      frame: asFrame(configStore.get("serialFrame")),
+      profile: configStore.get("serialProfile"),
+    };
     panelStates.set(panel, st);
   }
   return st;
+}
+
+function findSerialPanel(root: HTMLElement): HTMLElement | null {
+  if (root.dataset.panel === "serial") return root;
+  return root.querySelector<HTMLElement>('.settings-panel-content[data-panel="serial"]');
 }
 
 export function createSerialPanel(): HTMLElement {
@@ -56,13 +71,11 @@ export function createSerialPanel(): HTMLElement {
 
 export function refreshSerialPanel(root: HTMLElement): void {
   // Accepts the settings page root (shell Revert) or the panel itself.
-  const panel =
-    root.dataset.panel === "serial"
-      ? root
-      : root.querySelector<HTMLElement>('.settings-panel-content[data-panel="serial"]');
+  const panel = findSerialPanel(root);
   if (!panel) return;
   const st = stateOf(panel);
   st.baud = configStore.get("serialBaud"); // Revert drops the pending choices
+  st.frame = asFrame(configStore.get("serialFrame"));
   st.profile = configStore.get("serialProfile");
   renderSerialPanel(panel);
 }
@@ -84,10 +97,24 @@ function renderSerialPanel(panel: HTMLElement): void {
   syncSelectTexts(panel);
 }
 
-function profileCard(panel: HTMLElement, p: SerialProfileDef) {
+function profileCard(panel: HTMLElement, p: SerialProfileDef, current: string) {
   // Card actions: duplicate any profile into a custom copy; custom
-  // profiles can also be edited.
-  return html`<div class="theme-card sp-card" data-profile=${p.name}>
+  // profiles can also be edited. Card body click sets the default
+  // (same as Color Scheme gallery).
+  return html`<div
+    class="theme-card sp-card ${p.name === current ? "selected" : ""}"
+    role="button"
+    tabindex="0"
+    aria-pressed=${p.name === current ? "true" : "false"}
+    data-profile=${p.name}
+    @click=${() => selectProfile(panel, p.name)}
+    @keydown=${(e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        selectProfile(panel, p.name);
+      }
+    }}
+  >
     <div class="theme-card-name">${p.name}</div>
     <div class="sp-card-summary">${serialProfileSummary(p)}</div>
     <div class="theme-card-actions">
@@ -126,7 +153,7 @@ function serialTemplate(panel: HTMLElement, st: SerialPanelState) {
       html`
         ${itemRow(
           "Default baud rate",
-          "Baud rate for new serial sessions (8N1).",
+          "Baud rate for new serial sessions.",
           ttSelect(
             "Default baud rate",
             SERIAL_BAUD_RATES.map((b) => [String(b), String(b)] as const),
@@ -138,29 +165,18 @@ function serialTemplate(panel: HTMLElement, st: SerialPanelState) {
           ),
         )}
         ${itemRow(
-          "Default profile",
-          "Input mode, newline handling and flow control for new serial sessions.",
+          "Data / parity / stop",
+          "Frame for new serial sessions.",
           ttSelect(
-            "Default profile",
-            [],
-            st.profile,
+            "Data / parity / stop",
+            SERIAL_FRAMES,
+            st.frame,
             (v) => {
-              st.profile = v;
+              st.frame = asFrame(v);
+              renderSerialPanel(panel);
+              panel.dispatchEvent(new CustomEvent("tterm-settings-changed", { bubbles: true }));
             },
-            {
-              id: "set-serial-profile",
-              groups: (
-                [
-                  ["Built-in", ofSource("builtin")],
-                  ["Custom", ofSource("custom")],
-                ] as const
-              )
-                .map(([label, list]) => ({
-                  label,
-                  items: list.map((p) => [p.name, p.name] as const),
-                }))
-                .filter((g) => g.items.length > 0),
-            },
+            { id: "set-serial-frame" },
           ),
         )}
       `,
@@ -168,14 +184,14 @@ function serialTemplate(panel: HTMLElement, st: SerialPanelState) {
     ${section(
       "Profiles",
       html`
-        <div class="row-desc" style="margin-bottom:6px">Named session modes. Duplicate a built-in profile to customize it.</div>
+        <div class="row-desc" style="margin-bottom:6px">Named session modes. Click a card to set the default; Duplicate a built-in to customize.</div>
         <div id="set-serial-profile-gallery" class="theme-gallery">
           <div class="theme-group-title">Built-in</div>
           <div class="theme-grid">
             ${repeat(
               ofSource("builtin"),
               (p) => p.name,
-              (p) => profileCard(panel, p),
+              (p) => profileCard(panel, p, st.profile),
             )}
           </div>
           <div class="theme-group-title">Custom</div>
@@ -183,7 +199,7 @@ function serialTemplate(panel: HTMLElement, st: SerialPanelState) {
             ${repeat(
               ofSource("custom"),
               (p) => p.name,
-              (p) => profileCard(panel, p),
+              (p) => profileCard(panel, p, st.profile),
             )}
             <button
               id="set-serial-profile-new"
@@ -203,6 +219,15 @@ function serialTemplate(panel: HTMLElement, st: SerialPanelState) {
 
 // ---- Actions -----------------------------------------------------------
 
+/** Gallery card — pending default profile until Apply. */
+function selectProfile(panel: HTMLElement, name: string): void {
+  const st = stateOf(panel);
+  if (st.profile === name) return;
+  st.profile = name;
+  renderSerialPanel(panel);
+  panel.dispatchEvent(new CustomEvent("tterm-settings-changed", { bubbles: true }));
+}
+
 /** Open the profile editor and reconcile the gallery/default afterwards. */
 function openProfileEditor(
   panel: HTMLElement,
@@ -214,16 +239,24 @@ function openProfileEditor(
     editName,
     suggestedName: editName ?? dedupeSerialProfileName(`${base.name} Copy`),
     onSaved: (savedName) => {
-      // Renaming the profile that is the global default: follow the new name.
-      if (editName && configStore.get("serialProfile") === editName) {
-        configStore.set({ serialProfile: savedName });
+      const st = stateOf(panel);
+      // Renaming the profile that is the pending / applied default: follow.
+      if (editName && (st.profile === editName || configStore.get("serialProfile") === editName)) {
+        st.profile = savedName;
+        if (configStore.get("serialProfile") === editName) {
+          configStore.set({ serialProfile: savedName });
+        }
       }
       renderSerialPanel(panel);
     },
     onDeleted: (deletedName) => {
+      const st = stateOf(panel);
       // Deleted the default profile: fall back to Normal.
-      if (configStore.get("serialProfile") === deletedName) {
-        configStore.set({ serialProfile: DEFAULT_SERIAL_PROFILE });
+      if (st.profile === deletedName || configStore.get("serialProfile") === deletedName) {
+        st.profile = DEFAULT_SERIAL_PROFILE;
+        if (configStore.get("serialProfile") === deletedName) {
+          configStore.set({ serialProfile: DEFAULT_SERIAL_PROFILE });
+        }
       }
       renderSerialPanel(panel);
     },
@@ -231,10 +264,14 @@ function openProfileEditor(
 }
 
 export function collectSerialSettings(root: HTMLElement): Partial<ConfigState> {
+  const panel = findSerialPanel(root);
   const partial: Partial<ConfigState> = {};
-  const baudEl = root.querySelector<HTMLElement>("#set-serial-baud");
-  const profileEl = root.querySelector<HTMLElement>("#set-serial-profile");
-  if (baudEl) partial.serialBaud = parseInt(baudEl.dataset.current ?? "", 10) || 115200;
-  if (profileEl) partial.serialProfile = profileEl.dataset.current || DEFAULT_SERIAL_PROFILE;
+  if (!panel) return partial;
+  const st = stateOf(panel);
+  const baudEl = panel.querySelector<HTMLElement>("#set-serial-baud");
+  const frameEl = panel.querySelector<HTMLElement>("#set-serial-frame");
+  if (baudEl) partial.serialBaud = parseInt(baudEl.dataset.current ?? "", 10) || st.baud;
+  if (frameEl) partial.serialFrame = asFrame(frameEl.dataset.current ?? st.frame);
+  partial.serialProfile = st.profile || DEFAULT_SERIAL_PROFILE;
   return partial;
 }

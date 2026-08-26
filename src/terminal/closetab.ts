@@ -1,7 +1,8 @@
-// Tab close confirmation — replaces the tab's chrome in-place with
-// "Confirm:" + a Close button (docs/tabbar-preview.html). Confirm-only
-// (no Cancel); dismissed by clicking anywhere else or Escape. Shift+×
-// and Settings → confirmCloseTab=off skip this (handled at the call site).
+// Tab close confirmation — floating "Close" button over the × (does not
+// replace tab chrome or change tab width). Confirm-only (no Cancel);
+// dismissed by clicking anywhere else or Escape. Shift+× and Settings →
+// confirmCloseTab=off skip this for session tabs (handled at the call site).
+// Settings with unsaved changes also uses this when clicking its ×.
 //
 // Deliberately NOT ui/confirm.ts: that is a centered modal with Cancel and
 // backdrop. Only the × button routes here — Ctrl+W, context-menu Close,
@@ -24,33 +25,23 @@ export function showTabCloseConfirm(
   tabEl.classList.add("confirming");
   tabEl.title = `Close ${label}? · Esc / click away cancels`;
 
-  const inline = document.createElement("div");
-  inline.className = "tab-close-confirm-inline";
-  inline.setAttribute("role", "alertdialog");
-  inline.setAttribute("aria-label", `Close ${label}?`);
-
-  const text = document.createElement("span");
-  text.className = "tab-close-confirm-text";
-  text.textContent = "Confirm:";
-  inline.appendChild(text);
-
-  const confirmBtn = document.createElement("button");
-  confirmBtn.type = "button";
-  confirmBtn.className = "tab-close-confirm-btn";
-  confirmBtn.textContent = "Close";
-  inline.appendChild(confirmBtn);
+  const float = document.createElement("button");
+  float.type = "button";
+  float.className = "tab-close-confirm-btn";
+  float.textContent = "Close";
+  float.setAttribute("role", "alertdialog");
+  float.setAttribute("aria-label", `Close ${label}?`);
 
   // Don't let the tab's switchTo / contextmenu handlers see these clicks.
-  inline.addEventListener("click", (e) => e.stopPropagation());
-  inline.addEventListener("contextmenu", (e) => e.stopPropagation());
+  float.addEventListener("contextmenu", (e) => e.stopPropagation());
 
-  tabEl.appendChild(inline);
+  tabEl.appendChild(float);
 
   const dismiss = (): void => {
     document.removeEventListener("pointerdown", onPointerDown, true);
     document.removeEventListener("keydown", onKeyDown, true);
     mo.disconnect();
-    inline.remove();
+    float.remove();
     tabEl.classList.remove("confirming");
     // Restore the hover tooltip to the tab label (badge/label still in DOM).
     const labelEl = tabEl.querySelector(".tab-label");
@@ -79,12 +70,12 @@ export function showTabCloseConfirm(
   });
   if (tabEl.parentElement) mo.observe(tabEl.parentElement, { childList: true });
 
-  confirmBtn.addEventListener("click", (e) => {
+  float.addEventListener("click", (e) => {
     e.stopPropagation();
     dismiss();
     onConfirm();
   });
-  confirmBtn.focus();
+  float.focus();
 
   active = { dismiss };
 }

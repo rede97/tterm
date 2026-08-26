@@ -54,9 +54,13 @@
   border: none;
   border-bottom: 1px solid var(--tt-line-strong);
   color: var(--tt-text);
-  font: inherit;
-  font-size: var(--tt-fs-body);
+  /* Same stack as .pal-row / .pal-label. One step up on the type scale:
+     Chromium paints <input> glyphs optically smaller than div text at the
+     same px, so --tt-fs-body here still reads thin next to row titles. */
+  font-family: var(--tt-ui);
+  font-size: var(--tt-fs-md);
   font-weight: var(--tt-ui-weight);
+  line-height: 1.3;
   outline: none;
   box-sizing: border-box;
 }
@@ -101,8 +105,10 @@
   padding: 7px 12px;
   cursor: pointer;
   color: var(--tt-text);
+  font-family: var(--tt-ui);
   font-size: var(--tt-fs-body);
   font-weight: var(--tt-ui-weight);
+  line-height: 1.3;
 }
 
 .pal-row:hover {

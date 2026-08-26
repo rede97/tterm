@@ -96,4 +96,23 @@ describe("custom select — floating menu (Q8)", () => {
     expect(document.querySelector("body > .tt-select-menu.open")).toBeNull();
     expect(root.querySelector(".tt-select-menu")).not.toBeNull();
   });
+
+  it("pointerdown outside the control closes the menu", () => {
+    const { root } = mountSelect();
+    openSelect(root);
+    const outside = document.createElement("button");
+    document.body.appendChild(outside);
+    outside.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    expect(root.classList.contains("open")).toBe(false);
+    expect(document.querySelector("body > .tt-select-menu.open")).toBeNull();
+  });
+
+  it("pointerdown on the open menu does not close it", () => {
+    const { root } = mountSelect();
+    openSelect(root);
+    const menu = menuOf(root);
+    menu.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    expect(root.classList.contains("open")).toBe(true);
+    expect(menu.classList.contains("open")).toBe(true);
+  });
 });
