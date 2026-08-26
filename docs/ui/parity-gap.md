@@ -179,10 +179,12 @@
 
 | 场景 | 状态 |
 |------|------|
-| 多行粘贴 | **DONE** — cf 壳 + 行数 + 前 8 行 preview + 风险 meta |
-| 关窗（有活动 tab） | **DONE** — 后端 `CloseRequested` 拦截 → 前端 cf 模态（danger）；X 按钮 / Alt+F4 / 任务栏同路径；Cancel 不关闭 |
+| 多行粘贴 | **DONE** — 标题旁 `N lines` header meta + **可编辑**等宽 textarea（`cf-body-flush` 高视区）；无 Security 脚注；确认后粘贴**编辑后**内容 |
+| 关窗（有活动 tab） | **DONE** — 后端 `CloseRequested` 拦截 → 前端 cf 模态（danger，无 meta 行）；X 按钮（`window_request_close`）/ Alt+F4 / 任务栏同路径；Cancel 不关闭 |
 
-实机验收：X 点击弹出 warn 模态、文案含 tab 数、Cancel 保窗；截图对齐 `confirm-preview.html`。
+滚动条统一：`docs/ui/scroll.css` 的 `.tt-scroll` 已是唯一事实源（Chrome 121+ 不得设 `scrollbar-width/color`，否则回退原生带箭头条；Firefox 走 `@supports not` 兜底）；`styles.css` 内重复的 `.tt-scroll` 副本与 `.quick-panel`/`.tab-switcher-list` 的散置规则已清除。
+
+实机验收：X 点击弹出 warn 模态、Cancel 保窗；粘贴模态可编辑预览与稿一致（截图）。
 ### ����
 
 - ���� `docs/settings-preview.html` ����岢�Ž�ͼ���иߡ�well����ť����������checkbox ��Ե���롣

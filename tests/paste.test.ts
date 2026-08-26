@@ -45,6 +45,23 @@ describe("pasteIntoTerminal (pasteTrim / pasteWarning)", () => {
     await flushMicrotasks();
     expect(t.pasted).toEqual(["echo a\necho b"]);
   });
+  it("the preview is an editable textarea; edits are what gets pasted", async () => {
+    const t = target();
+    pasteIntoTerminal(t, "echo a\necho b\n");
+    const area = document.querySelector<HTMLTextAreaElement>(
+      ".confirm-overlay textarea.cf-preview",
+    )!;
+    expect(area.value).toBe("echo a\necho b"); // pasteTrim strips the trailing newline
+    // Header carries the line count; no security footnote (design).
+    expect(document.querySelector(".cf-header-meta")!.textContent).toContain("2");
+    expect(document.querySelector(".cf-meta")).toBeNull();
+    area.value = "echo edited\nrm -rf /tmp/x";
+    document
+      .querySelector<HTMLButtonElement>(".confirm-overlay .cf-footer .cf-btn:last-child")!
+      .click();
+    await flushMicrotasks();
+    expect(t.pasted).toEqual(["echo edited\nrm -rf /tmp/x"]);
+  });
 
   it("multi-line paste warns; cancelling pastes nothing", async () => {
     const t = target();

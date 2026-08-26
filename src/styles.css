@@ -3128,47 +3128,6 @@ body[data-skin="cursor"] .check-box:checked::after {
   color: var(--tt-text);
 }
 
-/* Shared overlay scrollbar (docs/ui/scroll.css): floating thin thumb, no
-   reserved gutter, no arrow buttons. */
-.tt-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: var(--tt-scroll-thumb) transparent;
-  scrollbar-gutter: auto;
-}
-
-.tt-scroll::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-  background: transparent;
-}
-
-.tt-scroll::-webkit-scrollbar-button {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
-.tt-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.tt-scroll::-webkit-scrollbar-thumb {
-  background: var(--tt-scroll-thumb);
-  border-radius: 8px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-.tt-scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--tt-scroll-thumb-hover);
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-.tt-scroll::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
 /* Confirm dialog chrome (docs/confirm-preview.html .cf-*): 420px well
    dialog; warn border + danger primary for destructive actions. */
 .cf-dialog {
@@ -3188,11 +3147,22 @@ body[data-skin="cursor"] .check-box:checked::after {
 }
 
 .cf-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
   padding: 14px 20px;
   font-size: 13px;
   font-weight: var(--tt-title-weight);
   border-bottom: 1px solid var(--tt-line);
   user-select: none;
+}
+
+.cf-header-meta {
+  font-size: 12px;
+  font-weight: var(--tt-ui-weight);
+  color: var(--tt-muted);
+  white-space: nowrap;
 }
 
 .cf-dialog.warn .cf-header {
@@ -3205,6 +3175,12 @@ body[data-skin="cursor"] .check-box:checked::after {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/* Paste: the editable preview fills the body edge-to-edge (no gutter). */
+.cf-body.cf-body-flush {
+  padding: 0;
+  gap: 0;
 }
 
 .cf-text {
@@ -3228,9 +3204,31 @@ body[data-skin="cursor"] .check-box:checked::after {
   background: var(--tt-inset);
   border: 1px solid var(--tt-line);
   border-radius: var(--tt-radius-ctrl);
-  font: 12px / 1.45 var(--tt-mono);
-  color: var(--tt-muted);
+  font: 12.5px / 1.45 var(--tt-mono);
+  color: var(--tt-text);
   white-space: pre;
+}
+
+textarea.cf-preview {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  outline: none;
+  field-sizing: fixed;
+  tab-size: 4;
+}
+
+textarea.cf-preview:focus {
+  box-shadow: inset 0 0 0 1px var(--tt-focus);
+}
+
+.cf-body-flush .cf-preview {
+  border: 0;
+  border-radius: 0;
+  max-height: none;
+  height: min(42vh, 320px);
+  min-height: 220px;
 }
 
 .cf-footer {

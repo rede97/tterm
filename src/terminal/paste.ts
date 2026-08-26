@@ -7,7 +7,7 @@
 
 import { trimPasteContent } from "../core/common";
 import { configStore } from "../core/store";
-import { confirmDialog } from "../ui/confirm";
+import { confirmPaste } from "../ui/confirm";
 
 interface PasteTarget {
   paste(text: string): void;
@@ -25,16 +25,11 @@ export function pasteIntoTerminal(target: PasteTarget, raw: string): void {
     return;
   }
 
+  // Editable preview (design): the user reviews — and can edit — the exact
+  // text before it runs. The confirmed text pastes verbatim (a trailing
+  // newline executes the last line, as before).
   const lines = body.split("\n").length;
-  confirmDialog({
-    title: "Paste multiple lines?",
-    message: `The clipboard contains ${lines} lines. Pasting runs them in the terminal one by one.`,
-    // First lines verbatim (design .cf-preview); the meta names the risk
-    // and the way out (UX-06).
-    preview: body.split("\n").slice(0, 8).join("\n"),
-    meta: "Security · multi-line paste can execute unintended commands. Disable in Settings → General → Paste warning.",
-    okLabel: "Paste",
-  }).then((ok) => {
-    if (ok) target.paste(text);
+  confirmPaste({ lines, text }).then((edited) => {
+    if (edited !== null) target.paste(edited);
   });
 }

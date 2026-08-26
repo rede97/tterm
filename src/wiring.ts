@@ -214,7 +214,6 @@ export function initWindowCloseConfirm(): void {
     void confirmDialog({
       title: "Close window?",
       message: `This window has ${tabCount} open tab${tabCount === 1 ? "" : "s"}. Closing it ends those sessions.`,
-      meta: "You can turn this prompt off in Settings → General → Confirm before closing window.",
       okLabel: "Close window",
       danger: true,
     }).then((ok) => {
