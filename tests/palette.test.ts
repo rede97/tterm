@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(() => Promise.resolve(null)) }));
 
+import { invoke } from "@tauri-apps/api/core";
 import { initKeymap } from "../src/core/keymap";
 import { configStore } from "../src/core/store";
 import type { SshHost } from "../src/core/types";
@@ -21,7 +22,12 @@ initKeymap(new Proxy({}, { get: (_, id) => () => fired.push(String(id)) }) as ne
 const sshTabs: { host: SshHost; password?: string }[] = [];
 const serialCalls: string[] = [];
 let flippedTo: string | null = null;
-let activeTab: { id: string; type: string } | null = { id: "tab-1", type: "local" };
+let activeTab: { id: string; type: string; sshEmbedded?: boolean } | null = {
+  id: "tab-1",
+  type: "local",
+};
+
+const invokeMock = vi.mocked(invoke);
 
 const handlers: PaletteHandlers = {
   listLocalProfiles: () => [
@@ -40,7 +46,6 @@ const handlers: PaletteHandlers = {
   setSerialBaud: (id, baud) => serialCalls.push(`baud:${id}:${baud}`),
   setSerialProfile: (id, name) => serialCalls.push(`profile:${id}:${name}`),
   setSerialFlow: (id, flow) => serialCalls.push(`flow:${id}:${flow}`),
-  showPortForwards: vi.fn(),
   flipToQuickOpen: (q) => {
     flippedTo = q;
   },
@@ -173,5 +178,118 @@ describe("command palette — two-level flows", () => {
     await vi.waitFor(() => expect(rowTexts()).toEqual(["115200"]));
     key("Enter");
     expect(serialCalls).toEqual(["baud:tab-9:115200"]);
+  });
+});
+
+describe("command palette — port forwards", () => {
+  const SAMPLE = [
+    {
+      forwardId: 7,
+      kind: "local",
+      listenHost: "127.0.0.1",
+      listenPort: 8080,
+      targetHost: "db.internal",
+      targetPort: 5432,
+    },
+    {
+      forwardId: 9,
+      kind: "dynamic",
+      listenHost: "127.0.0.1",
+      listenPort: 1080,
+      targetHost: "",
+      targetPort: 0,
+    },
+  ];
+
+  beforeEach(() => {
+    activeTab = { id: "tab-3", type: "ssh", sshEmbedded: true };
+    invokeMock.mockClear();
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "ssh_forward_list") return Promise.resolve(SAMPLE);
+      if (cmd === "ssh_forward_add") return Promise.resolve(12);
+      return Promise.resolve(null);
+    });
+  });
+
+  it("lists forwards in-overlay with add/remove actions", async () => {
+    openPaletteFlow("forwards");
+    await vi.waitFor(() => expect(rowTexts().some((t) => t.includes("8080"))).toBe(true));
+    expect(rowTexts()).toContain("Add Local Forward…");
+    expect(rowTexts()).toContain("Add Remote Forward…");
+    expect(rowTexts()).toContain("Add Dynamic Forward…");
+    expect(rowTexts()).toContain("Remove all forwards (2)");
+    // Dynamic renders as SOCKS, not host:port.
+    expect(rowFullTexts().some((t) => t.includes("any destination (SOCKS5)"))).toBe(true);
+
+    // Clicking a forward row removes it by backend id.
+    const row = [...document.querySelectorAll<HTMLElement>(".pal-row")].find((r) =>
+      r.textContent?.includes("db.internal"),
+    )!;
+    row.click();
+    await vi.waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("ssh_forward_remove", {
+        id: "tab-3",
+        forwardId: 7,
+      }),
+    );
+  });
+
+  it("add local forward is a three-step in-overlay flow", async () => {
+    openPaletteFlow("forwardLocal");
+    await vi.waitFor(() => expect(input().placeholder).toBe("8080"));
+    type("8080");
+    key("Enter");
+    await vi.waitFor(() => expect(input().placeholder).toBe("127.0.0.1"));
+    type("db.internal");
+    key("Enter");
+    await vi.waitFor(() => expect(input().placeholder).toBe("3000"));
+    type("5432");
+    key("Enter");
+
+    await vi.waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("ssh_forward_add", {
+        id: "tab-3",
+        kind: "local",
+        listenHost: "127.0.0.1",
+        listenPort: 8080,
+        targetHost: "db.internal",
+        targetPort: 5432,
+      }),
+    );
+    expect(paletteOpen()).toBe(false);
+  });
+
+  it("dynamic forward collects only the listen port", async () => {
+    openPaletteFlow("forwardDynamic");
+    await vi.waitFor(() => expect(input().placeholder).toBe("1080"));
+    type("1080");
+    key("Enter");
+    await vi.waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("ssh_forward_add", {
+        id: "tab-3",
+        kind: "dynamic",
+        listenHost: "127.0.0.1",
+        listenPort: 1080,
+        targetHost: "",
+        targetPort: 0,
+      }),
+    );
+  });
+
+  it("refuses a non-embedded tab with an explanation", async () => {
+    activeTab = { id: "tab-1", type: "local" };
+    openPaletteFlow("forwards");
+    expect(paletteOpen()).toBe(false);
+    expect(document.querySelector("#toast-container")?.textContent).toContain("embedded-SSH");
+  });
+
+  it("rejects an invalid port without leaving the page", async () => {
+    openPaletteFlow("forwardLocal");
+    await vi.waitFor(() => expect(input().placeholder).toBe("8080"));
+    type("99999");
+    key("Enter");
+    expect(invokeMock).not.toHaveBeenCalledWith("ssh_forward_add", expect.anything());
+    expect(paletteOpen()).toBe(true);
+    expect(document.querySelector("#toast-container")?.textContent).toContain("Invalid port");
   });
 });

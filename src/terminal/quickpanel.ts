@@ -48,7 +48,8 @@ import { el } from "../ui/dom";
 import type { ForwardEditorValue, ForwardKind } from "../ui/forwardeditor";
 import { addForward, listForwards, removeForward } from "../ui/forwarding";
 import { createForwardTable } from "../ui/forwardtable";
-import { html, ifDefined, nothing, render, type TemplateResult } from "../ui/lit";
+import { html, nothing, render, type TemplateResult } from "../ui/lit";
+import { closeAllSelects, syncSelectTexts, type TtSelectGroup, ttSelect } from "../ui/select";
 import { showToast } from "../ui/toast";
 import type { TerminalTab } from "./tab";
 
@@ -172,164 +173,7 @@ function qpToggle(
     ><span class="qp-knob"></span></button></div>`;
 }
 
-// -- custom select (design: no OS menu; same control family as Settings) --
-// Structure: [data-select] root > trigger(.qp-select-value) + menu
-// (role=listbox, .qp-option[role=option][data-value][aria-selected],
-// .qp-optgroup headers). Open/close state is DOM-only (the .open class) so
-// lit re-renders never collapse an open menu; the picked value is written
-// back to the trigger/aria-selected immediately, then onPick runs — any
-// later re-render re-asserts the same state from the model.
-
-interface QpSelectGroup {
-  label: string;
-  items: readonly (readonly [string, string])[];
-}
-
-function closeAllSelects(except?: Element): void {
-  for (const root of document.querySelectorAll(".qp-select.open")) {
-    if (root !== except) root.classList.remove("open");
-  }
-}
-
-function pickOption(root: HTMLElement, opt: HTMLElement): void {
-  for (const o of root.querySelectorAll(".qp-option")) {
-    o.setAttribute("aria-selected", o === opt ? "true" : "false");
-  }
-  const valueEl = root.querySelector(".qp-select-value");
-  if (valueEl) valueEl.textContent = opt.textContent;
-  root.classList.remove("open");
-}
-
-function onSelectTriggerClick(root: HTMLElement): void {
-  const willOpen = !root.classList.contains("open");
-  closeAllSelects();
-  if (!willOpen) return;
-  root.classList.add("open");
-  // Flip upward when there is not enough room below (design: <180px).
-  const menu = root.querySelector<HTMLElement>(".qp-select-menu");
-  const trigger = root.querySelector<HTMLElement>(".qp-select-trigger");
-  if (menu && trigger) {
-    const spaceBelow = window.innerHeight - trigger.getBoundingClientRect().bottom;
-    menu.dataset.drop = spaceBelow < 180 ? "up" : "down";
-  }
-}
-
-function onSelectKeydown(root: HTMLElement, e: KeyboardEvent): void {
-  const options = [...root.querySelectorAll<HTMLElement>(".qp-option")];
-  if (options.length === 0) return;
-  const open = root.classList.contains("open");
-  const activeIdx = options.findIndex((o) => o.classList.contains("active"));
-  if (e.key === "Escape" && open) {
-    e.preventDefault();
-    e.stopPropagation(); // don't close the whole panel
-    root.classList.remove("open");
-    root.querySelector<HTMLElement>(".qp-select-trigger")?.focus();
-    return;
-  }
-  if (e.key === "Enter" || e.key === " ") {
-    e.preventDefault();
-    if (!open) {
-      onSelectTriggerClick(root);
-      return;
-    }
-    const opt = activeIdx >= 0 ? options[activeIdx] : null;
-    if (opt) {
-      pickOption(root, opt);
-      opt.dispatchEvent(new CustomEvent("qp-pick", { bubbles: true }));
-    }
-    return;
-  }
-  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-    e.preventDefault();
-    if (!open) {
-      onSelectTriggerClick(root);
-      return;
-    }
-    const delta = e.key === "ArrowDown" ? 1 : -1;
-    const next = activeIdx < 0 ? 0 : (activeIdx + delta + options.length) % options.length;
-    for (const [i, o] of options.entries()) o.classList.toggle("active", i === next);
-    options[next]?.scrollIntoView({ block: "nearest" });
-  }
-}
-
-function qpSelect(
-  label: string,
-  options: readonly (readonly [string, string])[],
-  current: string,
-  onPick: (value: string) => void,
-  opts?: {
-    descs?: Record<string, string>;
-    disabled?: boolean;
-    groups?: QpSelectGroup[];
-    id?: string;
-  },
-): TemplateResult {
-  const disabled = opts?.disabled ?? false;
-  const option = ([value, text]: readonly [string, string]): TemplateResult => html`
-    <button
-      type="button"
-      class="qp-option"
-      role="option"
-      data-value=${value}
-      title=${ifDefined(opts?.descs?.[value])}
-      aria-selected=${value === current ? "true" : "false"}
-      @click=${(e: Event) => {
-        e.stopPropagation();
-        const root = (e.currentTarget as HTMLElement).closest<HTMLElement>(".qp-select");
-        if (root) pickOption(root, e.currentTarget as HTMLElement);
-        onPick(value);
-      }}
-    >${text}</button>
-  `;
-  const menuBody = opts?.groups
-    ? opts.groups.map(
-        (g) => html`
-          <div class="qp-optgroup">${g.label}</div>
-          ${g.items.map(option)}
-        `,
-      )
-    : options.map(option);
-  const currentText =
-    options.find(([v]) => v === current)?.[1] ??
-    opts?.groups?.flatMap((g) => g.items).find(([v]) => v === current)?.[1] ??
-    current;
-  return html`
-    <div
-      class="qp-select ${disabled ? "qp-disabled" : ""}"
-      data-select=${ifDefined(opts?.id)}
-      aria-label=${label}
-      @keydown=${(e: KeyboardEvent) => {
-        if (!disabled) onSelectKeydown(e.currentTarget as HTMLElement, e);
-      }}
-    >
-      <button
-        type="button"
-        class="qp-select-trigger"
-        aria-haspopup="listbox"
-        ?disabled=${disabled}
-        @click=${(e: Event) => {
-          e.stopPropagation();
-          const root = (e.currentTarget as HTMLElement).parentElement;
-          if (!disabled && root) onSelectTriggerClick(root);
-        }}
-      ><span class="qp-select-value" data-current-text=${currentText}></span></button>
-      <div class="qp-select-menu" role="listbox">
-        ${menuBody}
-      </div>
-    </div>
-  `;
-}
-
-/** Select trigger texts can't ride the template: option picks write the
- *  span imperatively (a lit-bound text part would be ejected by that
- *  write), so the span starts empty and is synced after every render —
- *  same convention as the old syncSelectValues. */
-function syncSelectTexts(root: ParentNode): void {
-  for (const span of root.querySelectorAll<HTMLElement>(".qp-select-value[data-current-text]")) {
-    const text = span.dataset.currentText ?? "";
-    if (span.textContent !== text) span.textContent = text;
-  }
-}
+// The custom select lives in ui/select.ts (shared with Settings).
 
 // Label + custom select row. With `descs`: per-option tooltips + a live
 // help line under the row that follows the selection.
@@ -342,7 +186,7 @@ function qpSelectRow(
 ): TemplateResult {
   const row = html`<div class="qp-row ${opts?.rowClass ?? ""}">
     <span class="qp-label">${label}</span>
-    ${qpSelect(label, options, current, onPick, opts)}
+    ${ttSelect(label, options, current, onPick, opts)}
   </div>`;
   if (!opts?.descs) return row;
   return html`<div class="qp-select-wrap">
@@ -380,10 +224,17 @@ function shareTemplate(tab: TerminalTab): TemplateResult {
           <button
             type="button"
             class="qp-mini-btn"
-            @click=${() => {
+            @click=${(e: Event) => {
               if (!url) return;
+              // In-place feedback (design): Copied for ~900ms, then back.
+              const btn = e.currentTarget as HTMLButtonElement;
               clipboardWriteText(url)
-                .then(() => showToast("Share link copied", "info"))
+                .then(() => {
+                  btn.textContent = "Copied";
+                  setTimeout(() => {
+                    btn.textContent = "Copy";
+                  }, 900);
+                })
                 .catch(logCatch("clipboard.write"));
             }}
             >Copy</button
@@ -525,7 +376,7 @@ function connectionTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResu
 function serialSessionTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResult {
   const profiles = allSerialProfiles();
   const current = st.serialProfile ?? tab.serialProfile ?? DEFAULT_SERIAL_PROFILE;
-  const groups: QpSelectGroup[] = (
+  const groups: TtSelectGroup[] = (
     [
       ["Built-in", "builtin"],
       ["Custom", "custom"],
@@ -544,7 +395,7 @@ function serialSessionTemplate(tab: TerminalTab, st: QuickPanelState): TemplateR
       ${connectionTemplate(tab, st)}
       <div class="qp-row">
         <span class="qp-label">Profile</span>
-        ${qpSelect(
+        ${ttSelect(
           "Profile",
           [],
           current,
@@ -874,11 +725,10 @@ export function initQuickPanel(): void {
     }
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && panelTabId !== null) {
-      closeQuickPanel();
-      // Focus returns to the trigger button, never to <body>.
-      qsButton()?.focus();
-    }
+    // Design (quickpanel-preview): Escape closes an open select dropdown
+    // only — the panel itself stays open (a select's own handler already
+    // stopPropagations; this catches focus elsewhere in the panel).
+    if (e.key === "Escape") closeAllSelects();
   });
 
   // Session death/respawn: refresh the button dot, and re-render the panel

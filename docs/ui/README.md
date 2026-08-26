@@ -37,3 +37,7 @@ from `quickPanelGlass` → `body.qp-glass`. One intentional divergence:
 `--term-bg` is NOT aliased to `--tt-term-bg` in production — the app's
 `--term-bg` is JS-written per terminal scheme (terminal seam), while
 `--tt-term-bg` stays fixed for chrome.
+
+## Parity tracking
+
+Draft ↔ app gap list (100% display + interaction): [`parity-gap.md`](./parity-gap.md).

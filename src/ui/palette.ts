@@ -21,6 +21,13 @@ import { formatCombo, KEY_COMMANDS, resolveKeybindings, runCommand } from "../co
 import { configStore } from "../core/store";
 import type { SerialFlowControl, SerialPort, SshHost } from "../core/types";
 import { el } from "./dom";
+import {
+  addForward,
+  type ForwardInfo,
+  listForwards,
+  type NewForward,
+  removeForward,
+} from "./forwarding";
 import { showToast } from "./toast";
 
 export interface PaletteHandlers {
@@ -32,11 +39,10 @@ export interface PaletteHandlers {
   openSshTab: (host: SshHost, password?: string) => void;
   openSerialTab: (port: SerialPort) => void;
   // Active-tab context for session commands (serial setters, forwards).
-  getActiveTab: () => { id: string; type: string } | null;
+  getActiveTab: () => { id: string; type: string; sshEmbedded?: boolean } | null;
   setSerialBaud: (id: string, baud: number) => void;
   setSerialProfile: (id: string, name: string) => void;
   setSerialFlow: (id: string, flow: SerialFlowControl) => void;
-  showPortForwards: (tabId: string) => void;
   // Deleting the ">" prefix returns to quick open with the rest as query.
   flipToQuickOpen: (query: string) => void;
 }
@@ -226,6 +232,148 @@ function newTabSerialPage(): PalettePage {
         detail: p.product || p.driver || undefined,
         action: () => run(() => h.openSerialTab(p)),
       }));
+    },
+  };
+}
+
+/** Embedded-SSH-only commands get the same honest refusal. Returns the
+ *  tab id when usable, null after toasting otherwise. */
+function activeEmbeddedSshTab(): string | null {
+  const tab = _handlers?.getActiveTab();
+  if (tab?.type !== "ssh" || tab.sshEmbedded !== true) {
+    showToast("Active tab is not an embedded-SSH session", "error");
+    return null;
+  }
+  return tab.id;
+}
+
+// -- Port forwards (in-overlay, design: 不另开窗) --
+
+function parsePortField(value: string): number | null {
+  const n = parseInt(value.trim(), 10);
+  return Number.isInteger(n) && n >= 1 && n <= 65535 ? n : null;
+}
+
+function forwardTextPage(
+  title: string,
+  placeholder: string,
+  validate: (value: string) => string | null,
+  next: (value: string) => void,
+): PalettePage {
+  return {
+    kind: "text",
+    title,
+    placeholder,
+    submit: (value) => {
+      const err = validate(value);
+      if (err) {
+        showToast(err, "error");
+        return;
+      }
+      next(value.trim());
+    },
+  };
+}
+
+/** Two/three-step add flow: local and remote collect listen-port →
+ *  target-host → target-port; dynamic just the listen port. */
+function pushForwardForm(kind: "local" | "remote" | "dynamic"): void {
+  const tabId = activeEmbeddedSshTab();
+  if (!tabId) {
+    close();
+    return;
+  }
+  const finish = (f: NewForward): void => {
+    close();
+    void addForward(tabId, f);
+  };
+  const portValidator = (v: string) => (parsePortField(v) === null ? `Invalid port: ${v}` : null);
+  const hostValidator = (v: string) => (v.trim() ? null : "Target host required");
+  push(
+    forwardTextPage(
+      `Forward · listen port${kind === "remote" ? " (remote)" : ""}`,
+      kind === "dynamic" ? "1080" : "8080",
+      portValidator,
+      (listenText) => {
+        // Validated by portValidator upstream — always a number here.
+        const listenPort = parsePortField(listenText) ?? 0;
+        if (kind === "dynamic") {
+          finish({
+            kind,
+            listenHost: "127.0.0.1",
+            listenPort,
+            targetHost: "",
+            targetPort: 0,
+          });
+          return;
+        }
+        push(
+          forwardTextPage("Forward · target host", "127.0.0.1", hostValidator, (targetHost) => {
+            push(
+              forwardTextPage("Forward · target port", "3000", portValidator, (targetText) => {
+                finish({
+                  kind,
+                  listenHost: "127.0.0.1",
+                  listenPort,
+                  targetHost,
+                  targetPort: parsePortField(targetText) ?? 0,
+                });
+              }),
+            );
+          }),
+        );
+      },
+    ),
+  );
+}
+
+const FORWARD_KIND_LABELS: Record<string, string> = {
+  local: "Local (-L)",
+  remote: "Remote (-R)",
+  dynamic: "Dynamic (-D)",
+};
+
+function forwardRoute(f: ForwardInfo): string {
+  const listen = `${f.listenHost}:${f.listenPort}`;
+  return f.kind === "dynamic"
+    ? `${listen} → any destination (SOCKS5)`
+    : `${listen} → ${f.targetHost}:${f.targetPort}`;
+}
+
+function forwardsPage(): PalettePage {
+  return {
+    kind: "list",
+    title: "SSH · Port Forwards",
+    rows: async (): Promise<PaletteRow[]> => {
+      const tabId = activeEmbeddedSshTab();
+      if (!tabId) return [];
+      const forwards = (await listForwards(tabId)) ?? [];
+      const actions: PaletteRow[] = [
+        { label: "Add Local Forward…", action: () => pushForwardForm("local") },
+        { label: "Add Remote Forward…", action: () => pushForwardForm("remote") },
+        { label: "Add Dynamic Forward…", action: () => pushForwardForm("dynamic") },
+      ];
+      if (forwards.length > 0) {
+        actions.push({
+          label: `Remove all forwards (${forwards.length})`,
+          action: () => {
+            void (async () => {
+              for (const f of forwards) await removeForward(tabId, f.forwardId);
+              await renderPage();
+            })();
+          },
+        });
+      }
+      return [
+        ...actions,
+        ...forwards.map((f) => ({
+          label: forwardRoute(f),
+          detail: FORWARD_KIND_LABELS[f.kind] ?? f.kind,
+          action: () => {
+            void removeForward(tabId, f.forwardId).then(() => renderPage());
+          },
+        })),
+      ];
     },
   };
 }
@@ -433,12 +581,34 @@ function onInput(): void {
  *  the palette-first commands in wiring (New Tab…, Temporary Connect…,
  *  Serial setters). */
 export function openPaletteFlow(
-  flow: "newTab" | "tempSsh" | "serialProfile" | "serialBaud" | "serialFlow",
+  flow:
+    | "newTab"
+    | "tempSsh"
+    | "serialProfile"
+    | "serialBaud"
+    | "serialFlow"
+    | "forwards"
+    | "forwardLocal"
+    | "forwardRemote"
+    | "forwardDynamic",
 ): void {
   openCommandPalette();
   switch (flow) {
     case "newTab":
       push(newTabKindPage());
+      break;
+    case "forwards":
+      if (activeEmbeddedSshTab()) push(forwardsPage());
+      else close();
+      break;
+    case "forwardLocal":
+      pushForwardForm("local");
+      break;
+    case "forwardRemote":
+      pushForwardForm("remote");
+      break;
+    case "forwardDynamic":
+      pushForwardForm("dynamic");
       break;
     case "tempSsh":
       // Same page the SSH level-2 list's first row opens.

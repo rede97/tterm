@@ -35,9 +35,6 @@ interface AppearancePanelState {
   // Pending gallery selection (applied by the shell's Apply; dropped on
   // Revert). null = follow the store. Replaces root.dataset.themeName.
   pendingThemeName: string | null;
-  // Pending chrome skin / glass picks (same Apply/Revert lifecycle).
-  pendingSkin: string | null;
-  pendingGlass: boolean | null;
 }
 
 const panelStates = new WeakMap<HTMLElement, AppearancePanelState>();
@@ -45,7 +42,7 @@ const panelStates = new WeakMap<HTMLElement, AppearancePanelState>();
 function stateOf(panel: HTMLElement): AppearancePanelState {
   let st = panelStates.get(panel);
   if (!st) {
-    st = { pendingThemeName: null, pendingSkin: null, pendingGlass: null };
+    st = { pendingThemeName: null };
     panelStates.set(panel, st);
   }
   return st;
@@ -84,8 +81,6 @@ export function refreshAppearancePanel(root: HTMLElement): void {
   const panel = appearancePanel(root);
   if (!panel) return;
   stateOf(panel).pendingThemeName = null; // Revert drops the pending selection
-  stateOf(panel).pendingSkin = null;
-  stateOf(panel).pendingGlass = null;
   renderPanel(panel);
   // The size input is user-editable DOM: when the store value equals the last
   // rendered value lit leaves it alone, so reset it explicitly (Revert).
@@ -101,10 +96,8 @@ export function collectAppearanceSettings(root: HTMLElement): Partial<ConfigStat
   partial.themeName = panel
     ? pendingThemeName(panel)
     : root.dataset.themeName || configStore.get("themeName");
-  if (panel) {
-    partial.chromeSkin = stateOf(panel).pendingSkin ?? configStore.get("chromeSkin");
-    partial.quickPanelGlass = stateOf(panel).pendingGlass ?? configStore.get("quickPanelGlass");
-  }
+  // chromeSkin / quickPanelGlass are NOT collected: both apply instantly
+  // (UX-05), no Apply gate.
   return partial;
 }
 
@@ -124,7 +117,7 @@ function renderPanel(panel: HTMLElement): void {
 
 function appearanceTemplate(panel: HTMLElement): TemplateResult {
   const current = pendingThemeName(panel);
-  const skin = stateOf(panel).pendingSkin ?? configStore.get("chromeSkin");
+  const skin = configStore.get("chromeSkin");
   const skinCard = (id: string, title: string, desc: string): TemplateResult => html`
     <div
       class="skin-card ${skin === id ? "selected" : ""}"
@@ -140,6 +133,7 @@ function appearanceTemplate(panel: HTMLElement): TemplateResult {
         }
       }}
     >
+      <div class="skin-swatch"></div>
       <div class="skin-card-title">${title}</div>
       <div class="skin-card-desc">${desc}</div>
     </div>
@@ -163,8 +157,9 @@ function appearanceTemplate(panel: HTMLElement): TemplateResult {
       itemRow(
         "Frosted glass",
         "Blur the terminal behind the panel only — the window stays opaque.",
-        toggle(stateOf(panel).pendingGlass ?? configStore.get("quickPanelGlass"), (on) => {
-          stateOf(panel).pendingGlass = on;
+        toggle(configStore.get("quickPanelGlass"), (on) => {
+          // Frosted glass is instant too — the panel can be compared live.
+          configStore.set({ quickPanelGlass: on });
         }),
       ),
     )}
@@ -318,9 +313,10 @@ function selectTheme(panel: HTMLElement, name: string): void {
 }
 
 function selectSkin(panel: HTMLElement, id: string): void {
-  stateOf(panel).pendingSkin = id;
+  // Chrome skin applies instantly (UX-05: live preview, no Apply gate) —
+  // the pending slot stays null so the cards just mirror the store.
+  configStore.set({ chromeSkin: id });
   renderPanel(panel);
-  panel.dispatchEvent(new CustomEvent("tterm-settings-changed", { bubbles: true }));
 }
 
 function openFontPicker(panel: HTMLElement): void {

@@ -429,22 +429,33 @@ describe("quick panel — ssh tab", () => {
 });
 
 describe("quick panel — dismissal", () => {
-  it("closes on outside click and Escape", async () => {
+  it("closes on outside click", async () => {
     activeTab = fakeTab({ id: "tab-1" });
     const p = openPanel();
     expect(p.classList.contains("open")).toBe(true);
     document.body.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(p.classList.contains("open")).toBe(false);
-
-    openPanel();
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-    expect(p.classList.contains("open")).toBe(false);
   });
 
-  it("Escape returns keyboard focus to the quick-status button", () => {
-    activeTab = fakeTab({ id: "tab-1" });
-    openPanel();
+  it("Escape closes only an open select — the panel stays open (design)", async () => {
+    activeTab = fakeTab({
+      id: "tab-7",
+      type: "serial",
+      serialBaud: 115200,
+      outputNewline: "keep",
+      serialProfile: "Normal",
+    });
+    const p = openPanel();
+    const root = p.querySelector<HTMLElement>('.qp-select[aria-label="Baud rate"]')!;
+    root.querySelector<HTMLElement>(".qp-select-trigger")!.click();
+    expect(root.classList.contains("open")).toBe(true);
+
+    root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(root.classList.contains("open")).toBe(false);
+    expect(p.classList.contains("open")).toBe(true);
+
+    // Even with no select open, Escape never closes the panel itself.
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-    expect(document.activeElement).toBe(button());
+    expect(p.classList.contains("open")).toBe(true);
   });
 });

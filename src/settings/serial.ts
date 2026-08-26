@@ -19,7 +19,8 @@ import {
 } from "../config/serial-profiles";
 import { SERIAL_BAUD_RATES } from "../core/common";
 import { type ConfigState, configStore } from "../core/store";
-import { html, itemRow, nothing, render, repeat, section, syncSelectValues } from "../ui/lit";
+import { html, itemRow, nothing, render, repeat, section } from "../ui/lit";
+import { syncSelectTexts, ttSelect } from "../ui/select";
 import { serialProfileSummary, showSerialProfileEditor } from "./serialprofileeditor";
 
 // ---- Per-panel state -------------------------------------------------
@@ -73,14 +74,13 @@ function renderSerialPanel(panel: HTMLElement): void {
   if (!allSerialProfiles().some((p) => p.name === st.profile)) {
     st.profile = DEFAULT_SERIAL_PROFILE;
   }
+  // Full clear + rebuild: a custom-select pick writes data-current
+  // imperatively, and lit skips re-committing an attribute whose value is
+  // unchanged since the last render — Revert/refresh must always land the
+  // store values (same convention as the profile panel).
+  render(nothing, panel);
   render(serialTemplate(panel, st), panel);
-  syncSelectValues(panel);
-}
-
-function profileOptions(label: string, list: SerialProfileDef[]) {
-  return html`<optgroup label=${label}>
-    ${list.map((p) => html`<option value=${p.name}>${p.name}</option>`)}
-  </optgroup>`;
+  syncSelectTexts(panel);
 }
 
 function profileCard(panel: HTMLElement, p: SerialProfileDef) {
@@ -124,31 +124,41 @@ function serialTemplate(panel: HTMLElement, st: SerialPanelState) {
         ${itemRow(
           "Default baud rate",
           "Baud rate for new serial sessions (8N1).",
-          html`<select
-            id="set-serial-baud"
-            class="settings-select"
-            data-current=${st.baud}
-            @change=${(e: Event) => {
-              st.baud = parseInt((e.target as HTMLSelectElement).value, 10) || 115200;
-            }}
-          >
-            ${SERIAL_BAUD_RATES.map((b) => html`<option value=${b}>${b}</option>`)}
-          </select>`,
+          ttSelect(
+            "Default baud rate",
+            SERIAL_BAUD_RATES.map((b) => [String(b), String(b)] as const),
+            String(st.baud),
+            (v) => {
+              st.baud = parseInt(v, 10) || 115200;
+            },
+            { id: "set-serial-baud" },
+          ),
         )}
         ${itemRow(
           "Default profile",
           "Input mode, newline handling and flow control for new serial sessions.",
-          html`<select
-            id="set-serial-profile"
-            class="settings-select"
-            data-current=${st.profile}
-            @change=${(e: Event) => {
-              st.profile = (e.target as HTMLSelectElement).value;
-            }}
-          >
-            ${profileOptions("Built-in", ofSource("builtin"))}
-            ${profileOptions("Custom", ofSource("custom"))}
-          </select>`,
+          ttSelect(
+            "Default profile",
+            [],
+            st.profile,
+            (v) => {
+              st.profile = v;
+            },
+            {
+              id: "set-serial-profile",
+              groups: (
+                [
+                  ["Built-in", ofSource("builtin")],
+                  ["Custom", ofSource("custom")],
+                ] as const
+              )
+                .map(([label, list]) => ({
+                  label,
+                  items: list.map((p) => [p.name, p.name] as const),
+                }))
+                .filter((g) => g.items.length > 0),
+            },
+          ),
         )}
       `,
     )}
@@ -216,9 +226,9 @@ function openProfileEditor(
 
 export function collectSerialSettings(root: HTMLElement): Partial<ConfigState> {
   const partial: Partial<ConfigState> = {};
-  const baudEl = root.querySelector<HTMLSelectElement>("#set-serial-baud");
-  const profileEl = root.querySelector<HTMLSelectElement>("#set-serial-profile");
-  if (baudEl) partial.serialBaud = parseInt(baudEl.value, 10) || 115200;
-  if (profileEl) partial.serialProfile = profileEl.value || DEFAULT_SERIAL_PROFILE;
+  const baudEl = root.querySelector<HTMLElement>("#set-serial-baud");
+  const profileEl = root.querySelector<HTMLElement>("#set-serial-profile");
+  if (baudEl) partial.serialBaud = parseInt(baudEl.dataset.current ?? "", 10) || 115200;
+  if (profileEl) partial.serialProfile = profileEl.dataset.current || DEFAULT_SERIAL_PROFILE;
   return partial;
 }

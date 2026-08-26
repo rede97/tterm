@@ -6,7 +6,8 @@
 // re-render resets them.
 
 import { type ConfigState, configStore } from "../core/store";
-import { html, nothing, render, repeat, section, syncSelectValues } from "../ui/lit";
+import { html, nothing, render, repeat, section } from "../ui/lit";
+import { syncSelectTexts, ttSelect } from "../ui/select";
 
 export function createProfilePanel(): HTMLElement {
   const panel = document.createElement("div");
@@ -48,13 +49,16 @@ function renderProfilePanel(panel: HTMLElement): void {
             <div class="settings-item-title">Default Profile</div>
           </div>
           <div class="settings-item-control">
-            <select
-              id="set-default-profile"
-              class="settings-select"
-              data-current=${defaultProfile}
-            >
-              ${localProfiles.map((p) => html`<option value=${p.name}>${p.name}</option>`)}
-            </select>
+            ${ttSelect(
+              "Default Profile",
+              localProfiles.map((p) => [p.name, p.name] as const),
+              defaultProfile,
+              () => {
+                // Pending lives in the DOM (data-current) until Apply —
+                // same contract the native select had.
+              },
+              { id: "set-default-profile" },
+            )}
           </div>
         </div>`,
       )}
@@ -100,15 +104,15 @@ function renderProfilePanel(panel: HTMLElement): void {
     `,
     panel,
   );
-  syncSelectValues(panel);
+  syncSelectTexts(panel);
 }
 
 export function collectProfileSettings(root: HTMLElement): Partial<ConfigState> {
   const partial: Partial<ConfigState> = {};
-  const profileEl = root.querySelector("#set-default-profile") as HTMLSelectElement;
+  const profileEl = root.querySelector<HTMLElement>("#set-default-profile");
   const checks = root.querySelectorAll<HTMLElement>(".wt-profile-check");
-  if (profileEl && profileEl.options.length > 0) {
-    partial.defaultLocalProfile = profileEl.value;
+  if (profileEl?.dataset.current) {
+    partial.defaultLocalProfile = profileEl.dataset.current;
   }
   const hidden: string[] = [];
   checks.forEach((c) => {

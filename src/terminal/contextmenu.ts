@@ -19,7 +19,6 @@ import {
   Link,
   Palette,
   Pencil,
-  Plus,
   Search,
   Share2,
   Unlink,
@@ -254,7 +253,6 @@ termMenuGroup.appendChild(mkItem("Clear", "clear", Eraser));
 termMenuGroup.appendChild(mkItem("Find", "find", Search));
 termMenuGroup.appendChild(mkItem("Export Text", "export", FileDown));
 termMenuGroup.appendChild(mkSeparator());
-termMenuGroup.appendChild(mkItem("New Tab", "new-tab", Plus));
 termMenuGroup.appendChild(mkItem("Open in New Window", "new-window", ExternalLink));
 // Same shape as the tab menu: duplicate the current session, last row.
 termMenuGroup.appendChild(mkItem("Duplicate Tab", "duplicate", Copy));
@@ -411,9 +409,10 @@ export function showTabContextMenu(tabId: string, x: number, y: number) {
   copyShareItem.style.display = shared ? "" : "none";
   stopShareItem.style.display = shared ? "" : "none";
   // Color row: live preview of the tab's current color + the swatch marker.
+  // Uncolored tabs show the hollow hatch chip (design), never an empty slot.
   const tabColor = _handlers?.getTabColor(tabId);
-  colorPreview.style.display = tabColor ? "" : "none";
-  if (tabColor) colorPreview.style.background = tabColor;
+  colorPreview.classList.toggle("empty", !tabColor);
+  colorPreview.style.background = tabColor ?? "";
   for (const swatch of colorGrid.querySelectorAll<HTMLElement>(".color-swatch")) {
     swatch.classList.toggle("current", swatch.dataset.color === tabColor);
   }

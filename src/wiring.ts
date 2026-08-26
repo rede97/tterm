@@ -16,7 +16,7 @@ import { setSearchHandlers } from "./terminal/search";
 import { setSshAuthTabLookup } from "./terminal/sshauth";
 import type { TerminalTab } from "./terminal/tab";
 import { tabManager } from "./terminal/tabmanager";
-import { showPortForwardingDialog } from "./ui/forwarding";
+import { listForwards, removeForward } from "./ui/forwarding";
 import { openCommandPalette, openPaletteFlow, setPaletteHandlers } from "./ui/palette";
 import { openQuickOpen, setTabSwitcherHandlers, stepMruSwitcher } from "./ui/tabswitcher";
 import { toggleFullscreenMode, toggleZenMode } from "./ui/window";
@@ -62,7 +62,7 @@ export function initShortcutsWiring(): void {
     openSerialTab: (port) => void tabManager.createSerialTab(port),
     getActiveTab: () => {
       const t = tabManager.settingsOpen ? null : tabManager.activeTab;
-      return t ? { id: t.id, type: t.type } : null;
+      return t ? { id: t.id, type: t.type, sshEmbedded: t.sshEmbedded } : null;
     },
     setSerialBaud: (id, baud) => tabManager.setSerialBaud(id, baud),
     setSerialProfile: (id, name) => tabManager.setSerialProfile(id, name),
@@ -72,7 +72,6 @@ export function initShortcutsWiring(): void {
       t.flowControl = flow;
       invoke("serial_set_flow_control", { id, flow }).catch(logCatch("serial.setFlow"));
     },
-    showPortForwards: (tabId) => showPortForwardingDialog(tabId),
     flipToQuickOpen: (query) => openQuickOpen(query),
   });
   initKeymap({
@@ -108,13 +107,38 @@ export function initShortcutsWiring(): void {
     "tterm.toggleQuickPanel": () => {
       document.getElementById("quick-status")?.click();
     },
-    "tterm.toggleShare": () => {
-      if (tabManager.activeTabId) tabManager.shareTab(tabManager.activeTabId);
+    "tterm.shareStart": () => {
+      const t = tabManager.activeTab;
+      if (t && !t.shared) tabManager.shareTab(t.id);
+    },
+    "tterm.shareStop": () => {
+      const t = tabManager.activeTab;
+      if (t?.shared) tabManager.shareTab(t.id);
+    },
+    "tterm.duplicateTab": () => {
+      if (tabManager.activeTabId) tabManager.duplicateTab(tabManager.activeTabId);
+    },
+    "tterm.closeWindow": () => invoke("window_close").catch(logCatch("window.close")),
+    "tterm.sshAutoReconnect": () => {
+      const t = tabManager.activeTab;
+      if (t?.type !== "ssh") return;
+      void invoke<boolean>("session_get_auto_reconnect", { id: t.id })
+        .then((v) => invoke("session_set_auto_reconnect", { id: t.id, enabled: !v }))
+        .catch(logCatch("ssh.autoReconnect"));
+    },
+    "tterm.forwardAddLocal": () => openPaletteFlow("forwardLocal"),
+    "tterm.forwardAddRemote": () => openPaletteFlow("forwardRemote"),
+    "tterm.forwardAddDynamic": () => openPaletteFlow("forwardDynamic"),
+    "tterm.forwardRemoveAll": () => {
+      const t = tabManager.activeTab;
+      if (t?.type !== "ssh" || !t.sshEmbedded) return;
+      void listForwards(t.id).then(async (forwards) => {
+        if (!forwards) return;
+        for (const f of forwards) await removeForward(t.id, f.forwardId);
+      });
     },
     "tterm.tempSsh": () => openPaletteFlow("tempSsh"),
-    "tterm.portForwards": () => {
-      if (tabManager.activeTabId) showPortForwardingDialog(tabManager.activeTabId);
-    },
+    "tterm.portForwards": () => openPaletteFlow("forwards"),
     "tterm.serialProfile": () => openPaletteFlow("serialProfile"),
     "tterm.serialBaud": () => openPaletteFlow("serialBaud"),
     "tterm.serialFlow": () => openPaletteFlow("serialFlow"),

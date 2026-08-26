@@ -31,8 +31,8 @@ beforeEach(() => {
   });
 });
 
-function profileSelect(root: HTMLElement): HTMLSelectElement {
-  const el = root.querySelector<HTMLSelectElement>("#set-default-profile");
+function profileSelect(root: HTMLElement): HTMLElement {
+  const el = root.querySelector<HTMLElement>("#set-default-profile");
   expect(el, "default-profile select").toBeTruthy();
   return el!;
 }
@@ -40,7 +40,7 @@ function profileSelect(root: HTMLElement): HTMLSelectElement {
 describe("settings — profile panel", () => {
   it("default-profile select initializes to the configured profile, not the first", () => {
     const root = createSettingsContent();
-    expect(profileSelect(root).value).toBe("Ubuntu");
+    expect(profileSelect(root).dataset.current).toBe("Ubuntu");
   });
 
   it("Apply preserves the configured default profile", async () => {
@@ -60,7 +60,7 @@ describe("settings — profile panel", () => {
 
   it("refreshProfilePanel rebuilds the lists from the store (WT set changed)", () => {
     const root = createSettingsContent();
-    expect(profileSelect(root).options).toHaveLength(2);
+    expect(profileSelect(root).querySelectorAll(".qp-option")).toHaveLength(2);
 
     configStore.set({
       localProfiles: [...PROFILES.map((p) => ({ ...p })), { name: "CMD", command: "cmd.exe" }],
@@ -70,8 +70,8 @@ describe("settings — profile panel", () => {
     refreshProfilePanel(root);
 
     const sel = profileSelect(root);
-    expect(sel.options).toHaveLength(3);
-    expect(sel.value).toBe("CMD");
+    expect(sel.querySelectorAll(".qp-option")).toHaveLength(3);
+    expect(sel.dataset.current).toBe("CMD");
     const checks = root.querySelectorAll<HTMLElement>(".wt-profile-check");
     expect(checks).toHaveLength(3);
     const ps = [...checks].find((c) => c.getAttribute("value") === "PowerShell")!;

@@ -12,16 +12,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { logCatch, logError, swallow } from "../core/errorlog";
 import { type ConfigState, configStore } from "../core/store";
-import {
-  html,
-  itemRow,
-  linkBtn,
-  nothing,
-  render,
-  section,
-  syncSelectValues,
-  toggle,
-} from "../ui/lit";
+import { html, itemRow, linkBtn, nothing, render, section, toggle } from "../ui/lit";
+import { syncSelectTexts, ttSelect } from "../ui/select";
 import { attachStepper } from "../ui/stepper";
 
 // ---- Per-panel state -------------------------------------------------
@@ -97,7 +89,7 @@ export function refreshGeneralPanel(root: HTMLElement): void {
 
 function renderGeneralPanel(panel: HTMLElement): void {
   render(generalTemplate(panel, stateOf(panel)), panel);
-  syncSelectValues(panel);
+  syncSelectTexts(panel);
 }
 
 // Full clear + rebuild. A plain diffing re-render can't reset pending DOM
@@ -166,15 +158,18 @@ function generalTemplate(panel: HTMLElement, st: GeneralPanelState) {
         ${itemRow(
           "Renderer",
           "Rendering backend for terminal output. WebGL is faster, Canvas has broader compatibility.",
-          html`<select
-            id="set-renderer"
-            class="settings-select"
-            data-current=${st.renderer}
-            @change=${(e: Event) => (st.renderer = (e.target as HTMLSelectElement).value)}
-          >
-            <option value="webgl">WebGL</option>
-            <option value="canvas">Canvas</option>
-          </select>`,
+          ttSelect(
+            "Renderer",
+            [
+              ["webgl", "WebGL"],
+              ["canvas", "Canvas"],
+            ],
+            st.renderer,
+            (v) => {
+              st.renderer = v;
+            },
+            { id: "set-renderer" },
+          ),
         )}
         ${itemRow(
           "Scrollback",
@@ -246,13 +241,13 @@ export function collectGeneralSettings(root: HTMLElement): Partial<ConfigState> 
   const pasteWarnEl = root.querySelector("#set-paste-warning") as HTMLInputElement;
   const bellEl = root.querySelector("#set-bell") as HTMLInputElement;
   const pasteTrimEl = root.querySelector("#set-paste-trim") as HTMLInputElement;
-  const rendererEl = root.querySelector("#set-renderer") as HTMLSelectElement;
+  const rendererEl = root.querySelector<HTMLElement>("#set-renderer");
   const scrollbackEl = root.querySelector("#set-scrollback") as HTMLInputElement;
 
   if (pasteWarnEl) partial.pasteWarning = pasteWarnEl.getAttribute("aria-checked") === "true";
   if (pasteTrimEl) partial.pasteTrim = pasteTrimEl.getAttribute("aria-checked") === "true";
   if (bellEl) partial.terminalBell = bellEl.getAttribute("aria-checked") === "true";
-  if (rendererEl) partial.renderer = rendererEl.value;
+  if (rendererEl) partial.renderer = rendererEl.dataset.current ?? "webgl";
   if (scrollbackEl)
     partial.scrollback = Math.max(100, Math.min(100000, parseInt(scrollbackEl.value, 10) || 1000));
   const autoUpdateEl = root.querySelector("#set-auto-update") as HTMLInputElement;

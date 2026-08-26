@@ -143,9 +143,11 @@ body {
   z-index: 100;
   background: var(--tt-chrome);
   border: 1px solid var(--tt-line);
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   display: none;
+  font-family: var(--tt-mono);
+  font-size: 12px;
 }
 
 .profile-menu.open {
@@ -155,7 +157,7 @@ body {
 .profile-col {
   /* Equal-width columns (design: Local / SSH / Serial share the width). */
   flex: 1 1 0;
-  min-width: 170px;
+  min-width: 200px;
   max-height: 360px;
   overflow-y: auto;
   padding: 4px 0;
@@ -183,8 +185,10 @@ body {
   cursor: pointer;
 }
 
+/* Menu hovers use the neutral tab gray, never the theme accent (design:
+   menus belong to the fixed tab chrome, not the skin). */
 .profile-item:hover {
-  background: var(--tt-selected);
+  background: var(--tt-tab-active);
   color: var(--tt-text);
 }
 
@@ -294,8 +298,8 @@ body {
   border: none;
   outline: none;
   background: transparent;
-  /* Blue bolt: raise the visual weight of the quick-config affordance. */
-  color: var(--tt-bolt);
+  /* Neutral until state applies: blue while shared, red dot while down. */
+  color: var(--tt-chrome-text);
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -1133,8 +1137,8 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
      pressure, then #tabs scrolls. Truncated names are available via the
      hover tooltip. */
   flex: 1 1 0;
-  min-width: 120px;
-  max-width: 200px;
+  min-width: 108px;
+  max-width: 180px;
   height: 100%;
   padding: 0 0 0 12px;
   background: var(--tt-chrome);
@@ -1707,7 +1711,8 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 .profile-menu button.profile-item:focus-visible,
 .tab-context-menu button.menu-item:focus-visible,
 .tab-context-menu button.color-clear:focus-visible {
-  background: var(--tt-selected);
+  /* Same neutral slot as hover — menus belong to the fixed tab chrome. */
+  background: var(--tt-tab-active);
   color: var(--tt-text);
   outline: none;
 }
@@ -1759,7 +1764,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 }
 
 .tab-context-menu .menu-item:hover {
-  background: var(--tt-selected);
+  background: var(--tt-tab-active);
   color: var(--tt-text);
 }
 
@@ -1857,13 +1862,24 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
     0 0 0 3px var(--tt-text);
 }
 
-/* Live color preview at the right end of the "Change Tab Color" row. */
+/* Live color preview at the right end of the "Change Tab Color" row:
+   12×12 circle; uncolored tabs get the hollow hatch (design). */
 .menu-color-preview {
-  width: 24px;
-  height: 10px;
-  border-radius: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
   margin-left: auto;
   flex-shrink: 0;
+}
+
+.menu-color-preview.empty {
+  border: 1px solid var(--tt-chrome-muted);
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 2px,
+    var(--tt-chrome-muted) 2px 3px,
+    transparent 3px 5px
+  );
 }
 
 .color-clear {
@@ -1877,7 +1893,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 }
 
 .color-clear:hover {
-  background: var(--tt-selected);
+  background: var(--tt-tab-active);
   color: var(--tt-text);
 }
 
@@ -2073,7 +2089,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 
 .settings-section-title {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: var(--tt-title-weight);
   text-transform: uppercase;
   color: var(--tt-muted);
   letter-spacing: 0.5px;
@@ -2099,6 +2115,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 
 .settings-item-title {
   font-size: 13px;
+  font-weight: var(--tt-title-weight);
   color: var(--tt-text);
   margin-bottom: 4px;
 }
@@ -2222,19 +2239,6 @@ input[type="number"] {
   color: var(--tt-text);
 }
 
-.settings-select {
-  flex: 1;
-  background: var(--tt-inset);
-  border: 1px solid var(--tt-line-strong);
-  border-radius: var(--tt-radius-ctrl);
-  color: var(--tt-text);
-  padding: 6px 10px;
-  font-size: 13px;
-  font-family: inherit;
-  outline: none;
-  max-width: 320px;
-}
-
 /* theme gallery cards (Appearance > Color Scheme) */
 .theme-gallery {
   display: flex;
@@ -2282,6 +2286,56 @@ input[type="number"] {
 .skin-card:focus-visible {
   outline: 2px solid var(--tt-focus);
   outline-offset: 1px;
+}
+
+/* Diagonal two-tone preview (design: settings-preview .skin-swatch) —
+   left trapezoid = skin page color, right = skin accent. */
+.skin-swatch {
+  --skin-h: 40px;
+  --skin-skew: 40px;
+  position: relative;
+  height: var(--skin-h);
+  margin: 0 0 10px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.skin-swatch::before,
+.skin-swatch::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.skin-swatch::before {
+  background: var(--skin-a);
+  clip-path: polygon(
+    0 0,
+    calc(50% + (var(--skin-skew) / 2) + 0.5px) 0,
+    calc(50% - (var(--skin-skew) / 2) + 0.5px) 100%,
+    0 100%
+  );
+}
+
+.skin-swatch::after {
+  background: var(--skin-b);
+  clip-path: polygon(
+    calc(50% + (var(--skin-skew) / 2) - 0.5px) 0,
+    100% 0,
+    100% 100%,
+    calc(50% - (var(--skin-skew) / 2) - 0.5px) 100%
+  );
+}
+
+.skin-card[data-skin="cursor"] .skin-swatch {
+  --skin-a: #0f0f0f;
+  --skin-b: #f2f2f2;
+}
+
+.skin-card[data-skin="vscode"] .skin-swatch {
+  --skin-a: #1e1e1e;
+  --skin-b: #3794ff;
 }
 
 .skin-card-title {
@@ -2570,10 +2624,6 @@ input[type="number"] {
   border: 1px solid rgba(128, 128, 128, 0.3);
 }
 
-.settings-select:focus {
-  border-color: var(--tt-focus);
-}
-
 .settings-toggle-row {
   display: flex;
   align-items: center;
@@ -2703,12 +2753,16 @@ input[type="number"] {
 }
 
 .settings-btn {
+  /* Design: every solid row-end button shares the 148px footprint and the
+     title weight (Homepage / Check for Updates / Apply / Save SSH…). */
+  min-width: var(--tt-btn-width);
   padding: 6px 20px;
   background: var(--tt-accent-fill);
   border: none;
   border-radius: var(--tt-radius-ctrl);
   color: var(--tt-accent-text);
   font-size: 13px;
+  font-weight: var(--tt-title-weight);
   font-family: inherit;
   cursor: pointer;
   outline: none;
@@ -3365,255 +3419,8 @@ input[type="number"] {
 
 /* ===== Port Forwarding Dialog ===== */
 
-.fwd-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.fwd-dialog {
-  width: 480px;
-  max-width: 92vw;
-  max-height: 80vh;
-  background: var(--tt-well);
-  border: 1px solid var(--tt-line);
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.fwd-header {
-  padding: 14px 20px;
-  font-size: 13px;
-  font-weight: 600;
-  border-bottom: 1px solid var(--tt-line);
-  user-select: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.fwd-close {
-  background: none;
-  border: none;
-  color: var(--tt-text);
-  cursor: pointer;
-  font-size: 13px;
-  line-height: 1;
-  padding: 2px 4px;
-}
-
-.fwd-close:hover {
-  color: var(--tt-text);
-}
-
-.fwd-body {
-  padding: 16px 20px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.fwd-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.fwd-empty {
-  color: var(--tt-faint);
-  font-size: 12px;
-  padding: 4px 0;
-}
-
-.fwd-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--tt-inset);
-  border: 1px solid var(--tt-line);
-  border-radius: 4px;
-  padding: 6px 10px;
-  font-size: 12px;
-}
-
-.fwd-badge {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  flex-shrink: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-
-.fwd-badge-local {
-  background: var(--tt-accent-fill);
-  color: var(--tt-accent-text);
-}
-
-.fwd-badge-remote {
-  background: #7c3aed;
-  color: var(--tt-text);
-}
-
-.fwd-route {
-  flex: 1;
-  min-width: 0;
-  font-family: Consolas, "JetBrains Mono", monospace;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fwd-remove {
-  background: var(--tt-line-strong);
-  border: none;
-  border-radius: 3px;
-  color: var(--tt-text);
-  cursor: pointer;
-  font-size: 11px;
-  padding: 3px 8px;
-  flex-shrink: 0;
-}
-
-.fwd-remove:hover {
-  background: var(--tt-bad);
-  color: var(--tt-text);
-}
-
-.fwd-add-title {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--tt-muted);
-  margin-bottom: 6px;
-  user-select: none;
-}
-
-.fwd-form {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* Directional forward editor (ui/forwardeditor.ts) — shared by the
-   forwarding dialog, the quick panel and the SSH add-host form.
-   Horizontal by default; .xfe-stacked flips to one row per endpoint for
-   narrow containers. */
-.xfe {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-}
-
-.xfe-stacked {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-}
-
-.xfe-col {
-  flex: 1;
-  min-width: 0;
-}
-
-.xfe-col-title {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--tt-muted);
-  margin-bottom: 4px;
-  user-select: none;
-}
-
 /* Host+port read as ONE address group: shared border, radius only on the
    outer corners. */
-.xfe-fields {
-  display: flex;
-}
-
-.xfe-host,
-.xfe-port {
-  padding: 6px 8px;
-  background: var(--tt-inset);
-  border: 1px solid var(--tt-line-strong);
-  color: var(--tt-text);
-  font-size: 12px;
-  outline: none;
-}
-
-.xfe-host {
-  flex: 1;
-  min-width: 0;
-  border-radius: 4px 0 0 4px;
-}
-
-.xfe-host.xfe-locked {
-  opacity: 0.55;
-}
-
-.xfe-port {
-  width: 76px;
-  flex-shrink: 0;
-  border-radius: 0 4px 4px 0;
-  margin-left: -1px; /* collapse the shared edge */
-}
-
-.xfe-stacked .xfe-port {
-  width: 88px;
-}
-
-.xfe-host:focus,
-.xfe-port:focus {
-  border-color: var(--tt-accent);
-  position: relative; /* focused border wins over the joined edge */
-  z-index: 1;
-}
-
-.xfe-arrow {
-  background: transparent;
-  border: 1px solid var(--tt-line-strong);
-  border-radius: 4px;
-  color: var(--tt-accent);
-  font-size: 14px;
-  line-height: 1;
-  padding: 6px 10px;
-  margin-bottom: 1px;
-  cursor: pointer;
-  flex-shrink: 0;
-  user-select: none;
-}
-
-.xfe-stacked .xfe-arrow {
-  align-self: center;
-  margin-bottom: 0;
-}
-
-.xfe-arrow:hover {
-  background: var(--tt-hover);
-  border-color: var(--tt-accent);
-}
-
-.fwd-add-btn {
-  align-self: flex-end;
-  background: var(--tt-accent-fill);
-  border: none;
-  border-radius: var(--tt-radius-ctrl);
-  color: var(--tt-accent-text);
-  cursor: pointer;
-  font-size: 12px;
-  padding: 6px 14px;
-}
-
-.fwd-add-btn:hover {
-  background: var(--tt-accent);
-}
 
 /* SSH host editor modal (settings/sshhosteditor.ts). */
 .she-overlay {
@@ -3723,20 +3530,19 @@ input[type="number"] {
 .ft-group-title {
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
+/* Forward-direction colors are semantic, not skinned (design: fixed). */
 .ft-g-local {
-  color: var(--tt-accent);
+  color: #4da6ff;
 }
 .ft-g-remote {
   color: #b586d8;
 }
 .ft-g-dynamic {
-  color: var(--tt-share);
+  color: #4ec9b0;
 }
 
 .ft-group-desc {
@@ -4025,6 +3831,23 @@ input[type="number"] {
   max-height: 50vh;
   overflow-y: auto;
   padding: 4px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--tt-scroll-thumb) transparent;
+}
+
+.tab-switcher-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.tab-switcher-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tab-switcher-list::-webkit-scrollbar-thumb {
+  background: var(--tt-scroll-thumb);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 .tab-switcher-row {
