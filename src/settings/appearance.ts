@@ -9,11 +9,13 @@
 // state now; the dataset attribute is still mirrored onto the settings-page
 // root for the DOM contract (settings-theme tests read it).
 
+import { Copy, createElement } from "lucide";
 import { dedupeThemeName } from "../config/custom-themes";
 import { type ConfigState, configStore } from "../core/store";
 import {
   html,
   itemRow,
+  linkBtn,
   nothing,
   render,
   repeat,
@@ -172,11 +174,7 @@ function appearanceTemplate(panel: HTMLElement): TemplateResult {
             <div class="row-desc" id="set-font-family-desc">${configStore.get("fontFamily")}</div>
           </div>
           <div class="row-control">
-            <button
-              id="set-font-config"
-              class="tt-btn tt-btn-solid"
-              @click=${() => openFontPicker(panel)}
-            >Configure</button>
+            ${linkBtn("Configure", () => openFontPicker(panel), { id: "set-font-config" })}
           </div>
         </div>
         ${itemRow(
@@ -284,21 +282,23 @@ function themeCard(panel: HTMLElement, t: ThemeDef, current: string): TemplateRe
       <div class="theme-card-name">${t.source === "wt" ? `${t.name} (WT)` : t.name}</div>
       <div class="theme-card-actions">
         <button
-          class="theme-card-action"
+          class="theme-card-action theme-card-action-icon"
+          aria-label="Duplicate"
+          title="Duplicate"
           @click=${(e: MouseEvent) => {
             e.stopPropagation();
             openThemeEditor(panel, t, undefined);
           }}
-        >Duplicate</button>
+        >${createElement(Copy, { stroke: "currentColor", width: 14, height: 14 })}</button>
         ${
           t.source === "custom"
             ? html`<button
-              class="theme-card-action"
-              @click=${(e: MouseEvent) => {
-                e.stopPropagation();
-                openThemeEditor(panel, t, t.name);
-              }}
-            >Edit</button>`
+            class="theme-card-action"
+            @click=${(e: MouseEvent) => {
+              e.stopPropagation();
+              openThemeEditor(panel, t, t.name);
+            }}
+          >Edit</button>`
             : nothing
         }
       </div>

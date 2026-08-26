@@ -3,8 +3,9 @@
 //
 // Model: one overlay, a fixed chrome ">" (.pal-prefix) on the command root,
 // an input that holds only the filter/query (never the ">"), and a page STACK
-// for two-level flows (New Tab… → kind → target; Temporary Connect… → host →
-// password). Escape pops one level; at the root it closes. Backspace on an
+// for two-level flows (New Local/SSH/Serial Tab → target; Temporary Connect…
+// → open tab; password is typed in the terminal like any other SSH session).
+// Escape pops one level; at the root it closes. Backspace on an
 // empty command-root input flips back to quick open (tabs); typing ">" there
 // flips in — the two share one continuous input, VS Code style.
 //
@@ -17,7 +18,9 @@
 // imports TabManager, same acyclic pattern as quickpanel.ts.
 
 import { allSerialProfiles } from "../config/serial-profiles";
+import { entryLabel, entryToHost, listSshHistory, rememberSshHistory } from "../config/ssh-history";
 import { hostProp, SERIAL_BAUD_RATES } from "../core/common";
+import { logCatch } from "../core/errorlog";
 import { formatCombo, KEY_COMMANDS, resolveKeybindings, runCommand } from "../core/keymap";
 import { configStore } from "../core/store";
 import type { SerialFlowControl, SerialInputMode, SerialPort, SshHost } from "../core/types";
@@ -29,6 +32,7 @@ import {
   type NewForward,
   removeForward,
 } from "./forwarding";
+import { createPaletteShell } from "./kit/shell";
 import { showToast } from "./toast";
 
 export interface PaletteHandlers {
@@ -64,6 +68,13 @@ interface PaletteRow {
   kbd?: string;
   /** Command palette section (draft .pal-group). */
   group?: string;
+  /**
+   * Tab fills this into the input without running action (Temporary Connect
+   * Recent → edit port / user before connecting).
+   */
+  complete?: string;
+  /** Glyph chips shown only while selected (Recent: keycap + action word). */
+  selectHints?: { key: string; action: string }[];
   action: () => void;
 }
 
@@ -80,6 +91,11 @@ type PalettePage =
       title: string;
       placeholder: string;
       password?: boolean;
+      /** Optional section header above live rows (draft: AUTHENTICATE). */
+      group?: string;
+      /** Live rows under the input (draft temp-SSH host / password steps). */
+      rows?: (value: string) => PaletteRow[];
+      /** Enter always submits; row clicks run their own action. */
       submit: (value: string) => void;
     };
 
@@ -151,19 +167,6 @@ function commandRows(query: string): PaletteRow[] {
 
 // ---- Two-level flows ----
 
-function newTabKindPage(): PalettePage {
-  return {
-    kind: "list",
-    title: "Connection type",
-    placeholder: "New Tab — Local / SSH / Serial",
-    rows: () => [
-      { label: "Local", detail: "shell profiles", action: () => push(newTabLocalPage()) },
-      { label: "SSH", detail: "saved hosts", action: () => push(newTabSshPage()) },
-      { label: "Serial", detail: "COM ports", action: () => push(newTabSerialPage()) },
-    ],
-  };
-}
-
 function newTabLocalPage(): PalettePage {
   return {
     kind: "list",
@@ -195,18 +198,86 @@ function parseTempHost(input: string): SshHost | null {
   return host;
 }
 
-function tempSshPasswordPage(host: SshHost): PalettePage {
-  const who = host.user ? `${host.user}@${host.hostname || host.name}` : host.hostname || host.name;
+function tempHostLabel(host: SshHost): string {
+  const h = host.hostname || host.name;
+  const base = host.user ? `${host.user}@${h}` : h;
+  // Always show port (default 22) — matches draft Connect → sync row.
+  return `${base}:${host.port || "22"}`;
+}
+
+/** Value filled into the input on Tab (always includes port for easy edit). */
+function historyComplete(e: { user?: string; hostname: string; port?: string }): string {
+  const base = e.user ? `${e.user}@${e.hostname}` : e.hostname;
+  return `${base}:${e.port && e.port !== "22" ? e.port : "22"}`;
+}
+
+/** Open tab + bump local history. Password is typed in the terminal (unified). */
+function connectTempSsh(host: SshHost): void {
+  const h = _handlers;
+  if (!h) return;
+  rememberSshHistory(host).catch(logCatch("sshHistory.remember"));
+  close();
+  h.openSshTab(host);
+}
+
+/**
+ * Host step: row 0 is the live Connect → sync (or Examples when empty) —
+ * default-selected as the closest match. Recent ranked below; Tab on a
+ * history row completes into the input without connecting.
+ */
+function tempSshHostPage(): PalettePage {
   return {
     kind: "text",
-    title: `SSH · ${host.name}`,
-    placeholder: `Password for ${who} — empty for agent / key`,
-    password: true,
+    title: "SSH · Temporary Connect",
+    placeholder: "user@host[:port] — kept in connection history",
+    rows: (value) => {
+      const q = value.trim().toLowerCase();
+      const host = parseTempHost(value);
+      const recent = listSshHistory()
+        .filter((e) => {
+          if (!q) return true;
+          const label = entryLabel(e).toLowerCase();
+          return (
+            label.includes(q) ||
+            e.hostname.toLowerCase().includes(q) ||
+            (e.user ?? "").toLowerCase().includes(q) ||
+            (e.port ?? "").includes(q)
+          );
+        })
+        .map((e) => ({
+          label: entryLabel(e),
+          group: "Recent",
+          complete: historyComplete(e),
+          selectHints: [
+            { key: "Enter", action: "connect" },
+            { key: "Tab", action: "complete" },
+          ],
+          action: () => connectTempSsh(entryToHost(e)),
+        }));
+
+      const out: PaletteRow[] = [];
+      // Fixed first row: live Connect → (content-synced) or Examples hint.
+      if (host) {
+        out.push({
+          label: `Connect → ${tempHostLabel(host)}`,
+          action: () => connectTempSsh(host),
+        });
+      } else {
+        out.push({
+          label: "Examples: pi@example.raspi.lan · root@lab.example.com:2222",
+          action: () => {},
+        });
+      }
+      out.push(...recent);
+      return out;
+    },
     submit: (value) => {
-      const h = _handlers;
-      if (!h) return;
-      close();
-      h.openSshTab(host, value || undefined);
+      const host = parseTempHost(value);
+      if (!host) {
+        showToast("Use user@host[:port]", "error");
+        return;
+      }
+      connectTempSsh(host);
     },
   };
 }
@@ -221,21 +292,8 @@ function newTabSshPage(): PalettePage {
       if (!h) return [];
       const temp: PaletteRow = {
         label: "Temporary Connect…",
-        detail: "user@host · no config",
-        action: () =>
-          push({
-            kind: "text",
-            title: "SSH · Temporary Connect",
-            placeholder: "user@host[:port] — temporary, not saved",
-            submit: (value) => {
-              const host = parseTempHost(value);
-              if (!host) {
-                showToast(`Invalid host: ${value}`, "error");
-                return;
-              }
-              push(tempSshPasswordPage(host));
-            },
-          }),
+        detail: "user@host · local history",
+        action: () => push(tempSshHostPage()),
       };
       // Draft order: saved hosts first, Temporary Connect… last.
       return [
@@ -518,7 +576,7 @@ async function renderPage(): Promise<void> {
   if (page.kind === "commands") {
     pageRows = commandRows(inputQuery());
   } else if (page.kind === "text") {
-    pageRows = [];
+    pageRows = page.rows?.(inputQuery()) ?? [];
   } else {
     listEl.textContent = "";
     listEl.appendChild(el("div", "pal-empty", "Loading…"));
@@ -535,7 +593,7 @@ async function renderPage(): Promise<void> {
   selected = Math.min(selected, Math.max(0, rows.length - 1));
 
   listEl.textContent = "";
-  if (page.kind === "text") {
+  if (page.kind === "text" && !page.rows) {
     listEl.appendChild(
       el(
         "div",
@@ -549,30 +607,48 @@ async function renderPage(): Promise<void> {
     const empty =
       page.kind === "commands"
         ? "No matching commands"
-        : page.title === "Connection type"
-          ? "No matching kinds"
-          : page.title === "Local shells" ||
-              page.title === "SSH hosts" ||
-              page.title === "Serial ports"
-            ? "No matching targets"
-            : "No matching values";
+        : page.kind === "text"
+          ? page.password
+            ? "Type password, then Enter"
+            : "Enter user@host[:port]"
+          : page.title === "Connection type"
+            ? "No matching kinds"
+            : page.title === "Local shells" ||
+                page.title === "SSH hosts" ||
+                page.title === "Serial ports"
+              ? "No matching targets"
+              : "No matching values";
     listEl.appendChild(el("div", "pal-empty", empty));
     return;
   }
 
-  // Group headers: palette commands use KeyCommand.group; list pages use title.
+  // Group headers: palette commands / text live-rows use KeyCommand.group /
+  // PaletteRow.group; list pages use title.
   let lastGroup = "";
   rows.forEach((r, i) => {
-    if (page.kind === "commands" && r.group && r.group !== lastGroup) {
+    if ((page.kind === "commands" || page.kind === "text") && r.group && r.group !== lastGroup) {
       lastGroup = r.group;
       listEl?.appendChild(el("div", "pal-group", r.group));
     } else if (page.kind === "list" && i === 0 && page.title) {
       listEl?.appendChild(el("div", "pal-group", page.title));
+    } else if (page.kind === "text" && i === 0 && page.group) {
+      listEl?.appendChild(el("div", "pal-group", page.group));
     }
     const row = el("div", `pal-row${i === selected ? " selected" : ""}`);
     row.appendChild(el("span", "pal-label", r.label));
     if (r.kbd) row.appendChild(el("span", "pal-kbd", r.kbd));
     else if (r.detail) row.appendChild(el("span", "pal-meta", r.detail));
+    if (r.selectHints?.length) {
+      const hints = el("span", "pal-row-hints");
+      for (const h of r.selectHints) {
+        const item = el("span", "pal-hint");
+        item.appendChild(el("span", "pal-kbd", h.key));
+        item.appendChild(el("span", "pal-hint-action", h.action));
+        item.title = `${h.key} — ${h.action}`;
+        hints.appendChild(item);
+      }
+      row.appendChild(hints);
+    }
     row.addEventListener("click", () => r.action());
     row.addEventListener("mousemove", () => {
       if (selected !== i) {
@@ -618,14 +694,33 @@ function onKeydown(e: KeyboardEvent): void {
   if (e.key === "Enter") {
     e.preventDefault();
     if (page.kind === "text") {
-      page.submit(inputEl?.value ?? "");
+      const q = inputEl?.value ?? "";
+      // Live rows (Recent / Connect →): Enter activates the selection.
+      // Examples is a non-action hint — fall through to submit for the toast.
+      const row = page.rows ? rows[selected] : undefined;
+      if (row && !row.label.startsWith("Examples:")) {
+        row.action();
+        return;
+      }
+      page.submit(q);
       return;
     }
     rows[selected]?.action();
     return;
   }
+  // Temporary Connect Recent: Tab completes into the input (edit port) — no connect.
+  if (e.key === "Tab" && page.kind === "text" && page.rows) {
+    const row = rows[selected];
+    if (row?.complete != null && inputEl) {
+      e.preventDefault();
+      inputEl.value = row.complete;
+      selected = 0;
+      void renderPage();
+      return;
+    }
+  }
   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-    if (page.kind === "text") return;
+    if (page.kind === "text" && !page.rows) return;
     e.preventDefault();
     const len = rows.length;
     selected = len === 0 ? 0 : (((selected + (e.key === "ArrowDown" ? 1 : -1)) % len) + len) % len;
@@ -641,11 +736,13 @@ function onInput(): void {
 }
 
 /** Open the palette (if needed) and push a two-level flow page. Bound to
- *  the palette-first commands in wiring (New Tab…, Temporary Connect…,
- *  Serial setters). */
+ *  the palette-first commands in wiring (New Local/SSH/Serial Tab,
+ *  Temporary Connect…, Serial setters). */
 export function openPaletteFlow(
   flow:
-    | "newTab"
+    | "newLocal"
+    | "newSsh"
+    | "newSerial"
     | "tempSsh"
     | "serialProfile"
     | "serialBaud"
@@ -658,8 +755,14 @@ export function openPaletteFlow(
 ): void {
   openCommandPalette();
   switch (flow) {
-    case "newTab":
-      push(newTabKindPage());
+    case "newLocal":
+      push(newTabLocalPage());
+      break;
+    case "newSsh":
+      push(newTabSshPage());
+      break;
+    case "newSerial":
+      push(newTabSerialPage());
       break;
     case "forwards":
       if (activeEmbeddedSshTab()) push(forwardsPage());
@@ -676,19 +779,7 @@ export function openPaletteFlow(
       break;
     case "tempSsh":
       // Same page the SSH level-2 list's Temporary Connect… row opens.
-      push({
-        kind: "text",
-        title: "SSH · Temporary Connect",
-        placeholder: "user@host[:port] — temporary, not saved",
-        submit: (value) => {
-          const host = parseTempHost(value);
-          if (!host) {
-            showToast(`Invalid host: ${value}`, "error");
-            return;
-          }
-          push(tempSshPasswordPage(host));
-        },
-      });
+      push(tempSshHostPage());
       break;
     case "serialProfile":
       push(serialProfilePage());
@@ -711,24 +802,16 @@ export function openCommandPalette(query = ""): void {
   stack = [{ kind: "commands" }];
   selected = 0;
 
-  overlay = el("div", "pal-overlay");
-  const panel = el("div", "pal-panel");
-  const wrap = el("div", "pal-input-wrap");
-  prefixEl = el("span", "pal-prefix on", ">");
-  inputEl = document.createElement("input");
-  inputEl.className = "pal-input";
-  inputEl.spellcheck = false;
-  inputEl.autocomplete = "off";
+  const shell = createPaletteShell({ kind: "commands" });
+  overlay = shell.overlay;
+  prefixEl = shell.prefix;
+  inputEl = shell.input;
+  listEl = shell.list;
+  if (!inputEl || !listEl) return;
   inputEl.value = query;
   inputEl.setSelectionRange(query.length, query.length);
   inputEl.addEventListener("input", onInput);
   inputEl.addEventListener("keydown", onKeydown);
-  wrap.appendChild(prefixEl);
-  wrap.appendChild(inputEl);
-  panel.appendChild(wrap);
-  listEl = el("div", "pal-list");
-  panel.appendChild(listEl);
-  overlay.appendChild(panel);
   overlay.addEventListener("mousedown", (e) => {
     if (e.target === overlay) close();
   });

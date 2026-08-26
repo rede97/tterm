@@ -257,7 +257,7 @@ describe("Quick-status button and panel", () => {
     expect(signals.toggleLabels).toEqual(["RTS", "DTR"]);
     expect(signals.text).toContain("CTS");
     expect(signals.text).toContain("DSR");
-    expect(signals.text).toContain("RTS is driver-managed");
+    expect(signals.text).not.toContain("RTS is driver-managed");
 
     // Hardware flow: RTS switch is disabled; DTR stays clickable.
     const hwSwitches = await browser.execute(() => {

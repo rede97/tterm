@@ -36,7 +36,7 @@
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    box-shadow: var(--tt-shadow);
     display: flex;
     flex-direction: column;
   }
@@ -280,57 +280,44 @@
   .tab.active .tab-close { opacity: 0.7; }
   .tab-close:hover { opacity: 1; color: var(--tt-text); }
 
-  /* Close confirm — compact strip directly under the × */
-  .tab-close-pop {
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 200;
+  /* Close confirm — in-tab Confirm: + Close (no floating pop) */
+  .tab.confirming > .tab-badge,
+  .tab.confirming > .tab-label,
+  .tab.confirming > .tab-close {
     display: none;
+  }
+  .tab.confirming.shared::after { display: none; }
+  .tab-close-confirm-inline {
+    display: flex;
     align-items: center;
-    gap: 8px;
-    height: 30px;
-    min-width: 0;
-    max-width: 260px;
-    padding: 0 4px 0 10px;
-    background: #2d2d2d;
-    border: 1px solid rgba(255,255,255,0.14);
-    border-radius: 7px;
-    color: var(--tt-text);
-    font: 12px/1 Inter, "Segoe UI", system-ui, sans-serif;
-  }
-  .tab-close-pop.open { display: flex; }
-  .tab-close-pop-copy {
-    min-width: 0;
+    gap: 6px;
     flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--tt-chrome-text);
+    min-width: 0;
+    height: 100%;
+    padding-right: 6px;
+    font: var(--tt-fs-label) / 1 var(--tt-ui);
+    font-weight: var(--tt-ui-weight);
+    color: var(--chrome-text);
   }
-  .tab-close-pop-copy strong {
-    color: var(--tt-text);
-    font-weight: var(--tt-title-weight);
-  }
-  .tab-close-pop-copy .name {
-    color: var(--tt-muted);
-    font-family: Consolas, "JetBrains Mono", monospace;
-    font-size: var(--tt-fs-desc);
-  }
-  .tab-close-pop .confirm {
+  .tab-close-confirm-text {
     flex-shrink: 0;
+    color: var(--chrome-muted);
+  }
+  .tab-close-confirm-btn {
+    flex-shrink: 0;
+    margin-left: auto;
     height: 22px;
     padding: 0 10px;
-    border-radius: 5px;
     border: 0;
+    border-radius: 5px;
     background: #e81123;
-    color: var(--tt-text);
+    color: #fff;
     font: inherit;
     font-size: var(--tt-fs-label);
     font-weight: var(--tt-title-weight);
     cursor: pointer;
   }
-  .tab-close-pop .confirm:hover { filter: brightness(1.08); }
+  .tab-close-confirm-btn:hover { filter: brightness(1.08); }
 
   /* ---- Profile dropdown (new-tab ▾) — mirrors profilemenu.ts ---- */
   .profile-menu {
@@ -340,7 +327,7 @@
     background: #252526;
     border: 1px solid #3e3e42;
     border-radius: 6px;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+    box-shadow: var(--tt-shadow);
     max-height: min(360px, calc(100% - 40px));
     /* Same terminal mono as #term */
     font: 13px/1.45 var(--mono);
@@ -441,7 +428,7 @@
     background: #252526;
     border: 1px solid #3e3e42;
     border-radius: 6px;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+    box-shadow: var(--tt-shadow);
   }
   .tab-context-menu.open { display: block; }
   .tab-context-menu .menu-item {
@@ -523,7 +510,7 @@
     background: #252526;
     border: 1px solid #3e3e42;
     border-radius: 6px;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+    box-shadow: var(--tt-shadow);
   }
   .menu-submenu-wrap:hover .color-submenu,
   .menu-submenu-wrap.open .color-submenu { display: block; }
@@ -769,12 +756,7 @@
     <div class="term" id="term">rede@tterm:~$  # active tab content
 # Scroll the tab strip with the mouse wheel over the tabs.
 # Edge fades + +N show that more tabs exist off-screen.
-# Click × → confirm near cursor; Shift+× closes immediately.</div>
-
-    <div class="tab-close-pop" id="tab-close-pop" role="dialog" aria-label="Close tab" title="Shift+× skips · click away cancels">
-      <div class="tab-close-pop-copy">Close <span class="name" id="tab-close-pop-name"></span>?</div>
-      <button type="button" class="confirm" data-confirm>Close</button>
-    </div>
+# Click × → Confirm: + Close in the tab; Shift+× closes immediately.</div>
 
     <!-- Profiles dropdown (▾) -->
     <div class="profile-menu" id="profile-menu" role="menu" aria-label="New tab profiles">
@@ -977,8 +959,6 @@
   const qs = document.getElementById("quick-status");
   const newGroup = document.getElementById("new-tab-group");
   const appEl = document.querySelector(".app");
-  const closePop = document.getElementById("tab-close-pop");
-  const closePopName = document.getElementById("tab-close-pop-name");
 
   let active = 0;
   let nTabs = 12;
@@ -986,7 +966,35 @@
   /** Parallel to tabNames — hex or "" (none). Seed a couple for the draft. */
   let tabColors = tabNames.map((_, i) => (i === 0 ? "#61afef" : i === 2 ? "#98c379" : ""));
   let pendingClose = -1;
+  let confirmingTab = null;
   const colorPreview = document.getElementById("menu-color-preview");
+
+  function hideClosePop() {
+    if (confirmingTab) {
+      confirmingTab.classList.remove("confirming");
+      confirmingTab.querySelector(".tab-close-confirm-inline")?.remove();
+      confirmingTab = null;
+    }
+    pendingClose = -1;
+  }
+
+  function showClosePop(index, tabEl) {
+    hideClosePop();
+    pendingClose = index;
+    confirmingTab = tabEl;
+    tabEl.classList.add("confirming");
+    const inline = document.createElement("div");
+    inline.className = "tab-close-confirm-inline";
+    inline.innerHTML =
+      `<span class="tab-close-confirm-text">Confirm:</span>` +
+      `<button type="button" class="tab-close-confirm-btn" data-confirm>Close</button>`;
+    inline.addEventListener("click", (e) => e.stopPropagation());
+    inline.querySelector("[data-confirm]").addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (pendingClose >= 0) closeTabAt(pendingClose);
+    });
+    tabEl.appendChild(inline);
+  }
 
   function syncColorPreview(color) {
     if (!color) {
@@ -1002,31 +1010,6 @@
       const hex = (s.title || "").toLowerCase();
       s.classList.toggle("selected", !!color && hex === color.toLowerCase());
     });
-  }
-
-  function hideClosePop() {
-    closePop.classList.remove("open");
-    pendingClose = -1;
-  }
-
-  function showClosePop(index, closeBtn) {
-    pendingClose = index;
-    closePopName.textContent = tabNames[index] || `tab-${index + 1}`;
-    closePop.classList.add("open");
-
-    const appRect = appEl.getBoundingClientRect();
-    const xRect = closeBtn.getBoundingClientRect();
-    const popW = closePop.offsetWidth;
-    const popH = closePop.offsetHeight;
-
-    // Center under the ×, a few px below so top radius isn’t clipped by the tab bar
-    let left = xRect.left - appRect.left + xRect.width / 2 - popW / 2;
-    let top = xRect.bottom - appRect.top + 4;
-    left = Math.min(Math.max(0, left), appRect.width - popW);
-    top = Math.min(Math.max(0, top), appRect.height - popH);
-
-    closePop.style.left = `${left}px`;
-    closePop.style.top = `${top}px`;
   }
 
   function closeTabAt(index) {
@@ -1097,7 +1080,7 @@
             closeTabAt(i);
             return;
           }
-          showClosePop(i, closeBtn);
+          showClosePop(i, t);
           return;
         }
         active = i;
@@ -1123,10 +1106,6 @@
     }
     requestAnimationFrame(syncOverflow);
   }
-
-  closePop.querySelector("[data-confirm]").addEventListener("click", () => {
-    if (pendingClose >= 0) closeTabAt(pendingClose);
-  });
 
   // ---- Profile dropdown (▾) ----
   const profileMenu = document.getElementById("profile-menu");
@@ -1303,7 +1282,7 @@
     hideTermMenu();
   });
   document.addEventListener("mousedown", (e) => {
-    if (closePop.classList.contains("open") && !e.target.closest(".tab-close-pop") && !e.target.closest(".tab-close")) {
+    if (confirmingTab && !e.target.closest(".tab.confirming")) {
       hideClosePop();
     }
     if (profileMenu.classList.contains("open") && !e.target.closest(".profile-menu") && !e.target.closest("#new-tab-menu-btn")) {

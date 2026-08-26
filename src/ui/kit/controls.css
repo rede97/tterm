@@ -103,7 +103,7 @@
   background: #161616;
   border: 1px solid var(--tt-line-strong);
   border-radius: var(--tt-radius-sm);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--tt-shadow);
   display: none;
   box-sizing: border-box;
 }
@@ -124,7 +124,6 @@
 .tt-option {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   width: 100%;
   padding: 6px 8px;
@@ -152,20 +151,11 @@
   color: var(--tt-text);
 }
 
-.tt-option[aria-selected="true"]::after {
-  content: "";
-  width: 12px;
-  height: 12px;
-  flex-shrink: 0;
-  background:
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23f2f2f2' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6 9 17l-5-5'/></svg>")
-    center / contain no-repeat;
-}
-
 .tt-select-wrap {
   padding-bottom: 2px;
 }
 
+/* Hint type lives on .qp-hint (same as .qp-meta); this only clears kit padding. */
 .tt-select-hint {
   padding-top: 0;
 }
@@ -378,15 +368,31 @@
 }
 
 .tt-btn-danger-fill {
+  width: var(--tt-btn-width);
+  min-width: var(--tt-btn-width);
+  height: var(--tt-ctrl-h);
+  padding: 0 12px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--tt-radius-ctrl);
   background: var(--tt-bad);
-  border-color: var(--tt-bad);
-  color: var(--tt-text);
+  color: #fff;
+  font-family: var(--tt-ui);
+  font-size: var(--tt-fs-ctrl);
+  font-weight: var(--tt-title-weight);
+  cursor: pointer;
+  outline: none;
 }
 
 .tt-btn-danger-fill:hover {
   filter: brightness(1.08);
 }
 
+/* Legacy text-link class — keep for rare inline “Generate…” links; no underline. */
 .tt-btn-link {
   padding: 6px 12px;
   height: auto;
@@ -394,10 +400,11 @@
   background: transparent;
   border: none;
   border-radius: var(--tt-radius-ctrl);
-  color: var(--tt-accent);
+  color: var(--tt-text);
   font-size: var(--tt-fs-body);
   font-family: var(--tt-ui);
   font-weight: var(--tt-title-weight);
+  text-decoration: none;
   cursor: pointer;
   outline: none;
   display: inline-flex;
@@ -406,7 +413,7 @@
 
 .tt-btn-link:hover {
   background: var(--tt-hover);
-  color: var(--tt-accent);
+  color: var(--tt-text);
 }
 
 .tt-btn-link.tt-danger {
@@ -416,12 +423,6 @@
 .tt-btn-link.tt-danger:hover {
   background: var(--tt-hover);
   color: var(--tt-bad);
-}
-
-body[data-skin="cursor"] .tt-btn-link:not(.tt-danger) {
-  color: var(--tt-text);
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
 /* ===== Stepper ===== */

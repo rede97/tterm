@@ -57,6 +57,10 @@ body[data-skin="cursor"] {
   --tt-knob-off: #e8e8e8;
   --tt-knob-on: #0a0a0a;
 
+  /* ---- Elevation (one drop shadow for every floating surface) ---- */
+  /* Half the former panel drop (was ~0 16px 40px / 0 16px 48px). */
+  --tt-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
+
   /* ---- Radius / type / controls ---- */
   --tt-radius: 12px;
   --tt-radius-sm: 8px;

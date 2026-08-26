@@ -9,26 +9,22 @@
 //  - Handlers are injected by main.ts (setKeymapHandlers) so this module
 //    never imports TabManager — same acyclic pattern as quickpanel.ts.
 
+import { BLOCKED_BROWSER_COMBOS, comboFromEvent, resolveKeybindings } from "./commands";
 import { configStore } from "./store";
-import {
-  BLOCKED_BROWSER_COMBOS,
-  comboFromEvent,
-  resolveKeybindings,
-} from "./commands";
 
 export {
-  type KeyCommand,
-  type ParsedCombo,
-  KEY_COMMANDS,
   BLOCKED_BROWSER_COMBOS,
   comboFromEvent,
-  parseCombo,
   comboMatches,
-  formatCombo,
-  defaultKeybindings,
-  resolveKeybindings,
-  findConflict,
   commandTitle,
+  defaultKeybindings,
+  findConflict,
+  formatCombo,
+  KEY_COMMANDS,
+  type KeyCommand,
+  type ParsedCombo,
+  parseCombo,
+  resolveKeybindings,
 } from "./commands";
 
 // ---- Dispatcher ----

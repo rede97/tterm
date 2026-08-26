@@ -34,10 +34,24 @@ export interface KeyCommand {
 export const KEY_COMMANDS: readonly KeyCommand[] = [
   // ---- Tab ----
   {
-    id: "tterm.newTabPicker",
-    title: "New Tab…",
-    desc: "Pick Local / SSH / Serial, then a profile, host, or port.",
+    id: "tterm.newLocalTab",
+    title: "New Local Tab",
+    desc: "Open a local shell from the profile list.",
     default: "ctrl+t",
+    group: "Tab",
+  },
+  {
+    id: "tterm.newSshTab",
+    title: "New SSH Tab",
+    desc: "Open an SSH host from ~/.ssh/config, or Temporary Connect…",
+    default: "",
+    group: "Tab",
+  },
+  {
+    id: "tterm.newSerialTab",
+    title: "New Serial Tab",
+    desc: "Open a serial COM port.",
+    default: "",
     group: "Tab",
   },
   {
@@ -109,9 +123,9 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
   {
     id: "tterm.tempSsh",
     title: "SSH: Temporary Connect…",
-    desc: "Connect to a host without writing ~/.ssh/config (host, then password — empty for agent/key).",
+    desc: "Connect without ~/.ssh/config — also under New SSH Tab. Host goes to connection history.",
     default: "",
-    group: "SSH",
+    // No group: not a root palette row; open via New SSH Tab → Temporary Connect…
   },
   {
     id: "tterm.forwardAddLocal",

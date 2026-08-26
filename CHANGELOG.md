@@ -2,6 +2,11 @@
 
 Changes
 
+- **UI kit shells** — `src/ui/kit/shell.ts` builds palette / confirm
+  fixed chrome for both the app and design drafts (no duplicated overlay HTML)
+- **Quick panel one-render path** — `src/ui/kit/qp/view.ts` is the shared lit
+  view for app + `docs/quickpanel-preview.html`; modem DOM contracts live in
+  `tests/ui-contracts/` so draft↔app cannot drift on hardware RTS again
 - **Formal UI vocab (draft + kit)** — Settings layout `.section`/`.row`;
   controls `.tt-btn*` / `.tt-switch`; Confirm `.cf-overlay`; Palette `pal-*`;
   legacy button/switch/row class aliases removed

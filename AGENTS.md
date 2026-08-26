@@ -20,7 +20,7 @@ Current branch: `feat/ui-redesign-migration` — full chrome redesign (design to
 
 **Frontend boot** (`src/main.ts`): `configStore.load()` → WT/themes/serial profiles → first tab. `src/wiring.ts` is the composition root — feature modules declare `setXxxHandlers` and NEVER import TabManager (acyclicity invariant). Static ids live in `index.html` + `src/core/dom-ids.ts` (rename both together).
 
-**Config** (`src/core/store.ts`): declarative SCHEMA, `set()` validates + 300ms debounced atomic write (tmp+rename; `config.rs` whitelists `[config, themes, serial-profiles, keybindings]`); `RUNTIME_KEYS` never persisted; keybindings in own `keybindings.json`. Rust does raw I/O only — parsing/validation/migration is always frontend. Debug builds use `<config>/dev/`.
+**Config** (`src/core/store.ts`): declarative SCHEMA, `set()` validates + 300ms debounced atomic write (tmp+rename; `config.rs` whitelists `[config, themes, serial-profiles, keybindings, ssh-history]`); `RUNTIME_KEYS` never persisted; keybindings in own `keybindings.json`; Temporary Connect MRU in `ssh-history.json` (never `~/.ssh/config`, never passwords). Rust does raw I/O only — parsing/validation/migration is always frontend. Debug builds use `<config>/dev/`.
 
 **Settings** (`src/settings/`): pseudo-tab (not in `tabs` Map; suspend keeps DOM). Apply = all panels' `collectXxxSettings` → one `configStore.set`; SSH edits write `~/.ssh/config` in the same click. Revert = `configStore.load()` + refresh. Dirty via delegated `input/change` + bubbling `tterm-settings-changed` / `tterm-ssh-dirty` events.
 

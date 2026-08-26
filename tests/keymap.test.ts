@@ -222,9 +222,9 @@ describe("keymap dispatcher", () => {
     expect(fired).toEqual(["workbench.action.closeTab"]);
   });
 
-  it("Ctrl+T opens the New Tab picker by default", () => {
+  it("Ctrl+T opens New Local Tab by default", () => {
     const e = dispatch({ key: "t", ctrlKey: true });
-    expect(fired).toEqual(["tterm.newTabPicker"]);
+    expect(fired).toEqual(["tterm.newLocalTab"]);
     expect(e.defaultPrevented).toBe(true);
   });
 

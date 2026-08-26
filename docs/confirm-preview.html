@@ -7,10 +7,11 @@
 <link rel="stylesheet" href="/docs/ui/tokens.css" />
 <link rel="stylesheet" href="/docs/ui/aliases.css" />
 <link rel="stylesheet" href="/src/ui/kit/controls.css" />
+<link rel="stylesheet" href="/src/ui/kit/confirm.css" />
 <link rel="stylesheet" href="/docs/ui/scroll.css" />
 <link rel="stylesheet" href="/docs/ui/preview-chrome.css" />
 <style>
-  /* Page layout only — skins from docs/ui/tokens.css */
+  /* Page layout only — skins from docs/ui/tokens.css; .cf-* from kit/confirm.css */
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
@@ -36,7 +37,7 @@
     border: 1px solid var(--tt-line);
     border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--tt-shadow);
   }
   .tab-bar {
     display: flex;
@@ -81,115 +82,14 @@
   }
   .term .dim { color: var(--tt-faint); }
 
-  /* ---- Confirm overlay (shared chrome with app confirm.ts / sshauth) ---- */
-  .cf-overlay {
+  /* Draft keeps overlays mounted inside .app — kit uses fixed + always flex. */
+  .app .cf-overlay {
     position: absolute;
-    inset: 0;
     z-index: 50;
     display: none;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.5);
     padding: 24px;
   }
-  .cf-overlay.open { display: flex; }
-
-  .cf-dialog {
-    width: 420px;
-    max-width: 100%;
-    background: var(--tt-well);
-    border: 1px solid var(--tt-line);
-    border-radius: var(--tt-radius-sm);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
-  }
-  .cf-dialog.warn {
-    border-color: color-mix(in srgb, var(--tt-warn) 55%, var(--tt-line));
-  }
-  .cf-header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 14px 20px;
-    font-size: var(--tt-fs-body);
-    font-weight: var(--tt-title-weight);
-    border-bottom: 1px solid var(--tt-line);
-    user-select: none;
-  }
-  .cf-header-meta {
-    font-size: var(--tt-fs-label);
-    font-weight: var(--tt-ui-weight);
-    color: var(--tt-muted);
-    white-space: nowrap;
-  }
-  .cf-dialog.warn .cf-header {
-    color: var(--tt-warn);
-    border-bottom-color: color-mix(in srgb, var(--tt-warn) 40%, var(--tt-line));
-  }
-  .cf-body {
-    padding: 16px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-  /* Paste: preview fills body edge-to-edge (no gutter) */
-  .cf-body.cf-body-flush {
-    padding: 0;
-    gap: 0;
-  }
-  .cf-text {
-    font-size: var(--tt-fs-body);
-    color: var(--tt-text);
-    line-height: 1.5;
-    white-space: pre-line;
-  }
-  .cf-meta {
-    font-size: var(--tt-fs-label);
-    color: var(--tt-muted);
-    line-height: 1.45;
-  }
-  .cf-preview {
-    margin: 0;
-    padding: 10px 12px;
-    max-height: 120px;
-    overflow: auto;
-    background: var(--tt-inset);
-    border: 1px solid var(--tt-line);
-    border-radius: var(--tt-radius-ctrl);
-    font: 12.5px/1.45 var(--tt-mono);
-    color: var(--tt-text);
-    white-space: pre;
-  }
-  textarea.cf-preview {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    resize: none;
-    outline: none;
-    field-sizing: fixed;
-    tab-size: 4;
-  }
-  textarea.cf-preview:focus {
-    box-shadow: inset 0 0 0 1px var(--tt-focus);
-  }
-  .cf-body-flush .cf-preview {
-    border: 0;
-    border-radius: 0;
-    max-height: none;
-    height: min(42vh, 320px);
-    min-height: 220px;
-  }
-  .cf-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    padding: 12px 20px;
-    border-top: 1px solid var(--tt-line);
-  }
-  /* Buttons → src/ui/kit/controls.css (.tt-btn). */
+  .app .cf-overlay.open { display: flex; }
 
   /* ---- Settings snippet (General) ---- */
   .set-snippet {
@@ -332,53 +232,7 @@
     <div class="term" id="term"><span class="dim"># paste multi-line or close the window to preview confirms</span>
 rede@tterm:~$ █</div>
 
-    <!-- Paste confirm -->
-    <div class="cf-overlay" id="ov-paste" aria-hidden="true">
-      <div class="cf-dialog" role="dialog" aria-modal="true" aria-labelledby="paste-title">
-        <div class="cf-header">
-          <span id="paste-title">Paste multiple lines?</span>
-          <span class="cf-header-meta"><strong id="paste-lines">7</strong> lines</span>
-        </div>
-        <div class="cf-body cf-body-flush">
-          <textarea class="cf-preview tt-scroll" id="paste-preview" spellcheck="false" autocomplete="off" aria-label="Paste preview">cargo build --release
-cargo test
-git status
-git add -A
-git commit -m "wip"
-git push
-echo done
-# more sample lines — edit freely before Paste
-bun run lint
-bun run build
-bun run test
-cd src-tauri
-cargo fmt
-cargo clippy -- -D warnings
-cd ..
-git log -5 --oneline
-git diff --stat
-printf 'ready\n'</textarea>
-        </div>
-        <div class="cf-footer">
-          <button type="button" class="tt-btn tt-btn-ghost cf-cancel" data-close="ov-paste">Cancel</button>
-          <button type="button" class="tt-btn tt-btn-primary" id="paste-ok" data-close="ov-paste">Paste</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Close window confirm -->
-    <div class="cf-overlay" id="ov-close" aria-hidden="true">
-      <div class="cf-dialog warn" role="dialog" aria-modal="true" aria-labelledby="close-title">
-        <div class="cf-header" id="close-title">Close window?</div>
-        <div class="cf-body">
-          <div class="cf-text">This window has <strong id="close-tabs">3</strong> open tabs. Closing it ends those sessions.</div>
-        </div>
-        <div class="cf-footer">
-          <button type="button" class="tt-btn tt-btn-ghost cf-cancel" data-close="ov-close">Cancel</button>
-          <button type="button" class="tt-btn tt-btn-danger-fill" id="close-ok" data-close="ov-close">Close window</button>
-        </div>
-      </div>
-    </div>
+    <!-- Confirm shells mounted by kit/shell.ts — see script below. -->
   </div>
 
   <aside class="notes">
@@ -426,99 +280,154 @@ printf 'ready\n'</textarea>
     </ol>
 
     <div class="hint">
-      预览 only。关窗确认尚未进 <code>src/</code>；多行粘贴已在 <code>paste.ts</code>。设计对齐 <code>--tt-*</code> 皮肤，勿再抄 hex。
+      预览 only。壳与样式来自 <code>src/ui/kit/shell.ts</code> + <code>confirm.css</code>；多行粘贴已在 <code>paste.ts</code>。设计对齐 <code>--tt-*</code> 皮肤，勿再抄 hex。
     </div>
   </aside>
 </div>
 
-<script>
-(() => {
-  const skinPicker = document.getElementById("skin-picker");
-  skinPicker.addEventListener("click", (e) => {
-    const btn = e.target.closest("button[data-skin]");
-    if (!btn) return;
-    document.body.dataset.skin = btn.dataset.skin;
-    skinPicker.querySelectorAll("button").forEach((b) => {
-      b.setAttribute("aria-pressed", b === btn ? "true" : "false");
-    });
-  });
+<script type="module">
+import {
+  createConfirmMessageDialog,
+  createConfirmOverlay,
+  createConfirmPasteDialog,
+} from "/src/ui/kit/shell.ts";
 
-  function syncPasteLines() {
-    const ta = document.getElementById("paste-preview");
-    const el = document.getElementById("paste-lines");
-    if (!ta || !el) return;
-    const raw = ta.value;
-    const n = raw === "" ? 0 : raw.split(/\r\n|\n|\r/).length;
-    el.textContent = String(n);
+const PASTE_SAMPLE = `cargo build --release
+cargo test
+git status
+git add -A
+git commit -m "wip"
+git push
+echo done
+# more sample lines — edit freely before Paste
+bun run lint
+bun run build
+bun run test
+cd src-tauri
+cargo fmt
+cargo clippy -- -D warnings
+cd ..
+git log -5 --oneline
+git diff --stat
+printf 'ready\\n'`;
+
+const app = document.getElementById("app");
+
+const pasteOverlay = createConfirmOverlay({ id: "ov-paste" });
+const pasteShell = createConfirmPasteDialog({
+  lines: 7,
+  text: PASTE_SAMPLE,
+  ids: { title: "paste-title", lines: "paste-lines", preview: "paste-preview", ok: "paste-ok" },
+  cancelCloseAttr: "ov-paste",
+  okCloseAttr: "ov-paste",
+});
+pasteOverlay.appendChild(pasteShell.dialog);
+app.appendChild(pasteOverlay);
+
+const closeOverlayEl = createConfirmOverlay({ id: "ov-close" });
+const closeShell = createConfirmMessageDialog({
+  title: "Close window?",
+  message: "This window has 3 open tabs. Closing it ends those sessions.",
+  danger: true,
+  okLabel: "Close window",
+  ids: { title: "close-title", ok: "close-ok" },
+  cancelCloseAttr: "ov-close",
+  okCloseAttr: "ov-close",
+});
+closeShell.text.replaceChildren(
+  document.createTextNode("This window has "),
+  (() => {
+    const strong = document.createElement("strong");
+    strong.id = "close-tabs";
+    strong.textContent = "3";
+    return strong;
+  })(),
+  document.createTextNode(" open tabs. Closing it ends those sessions."),
+);
+closeOverlayEl.appendChild(closeShell.dialog);
+app.appendChild(closeOverlayEl);
+
+const skinPicker = document.getElementById("skin-picker");
+skinPicker.addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-skin]");
+  if (!btn) return;
+  document.body.dataset.skin = btn.dataset.skin;
+  skinPicker.querySelectorAll("button").forEach((b) => {
+    b.setAttribute("aria-pressed", b === btn ? "true" : "false");
+  });
+});
+
+function syncPasteLines() {
+  const ta = pasteShell.textarea;
+  const el = pasteShell.linesStrong;
+  const raw = ta.value;
+  const n = raw === "" ? 0 : raw.split(/\r\n|\n|\r/).length;
+  el.textContent = String(n);
+}
+
+function openOverlay(id) {
+  const el = document.getElementById(id);
+  el.classList.add("open");
+  el.setAttribute("aria-hidden", "false");
+  if (id === "ov-paste") {
+    syncPasteLines();
+    const ta = pasteShell.textarea;
+    ta.focus();
+    const len = ta.value.length;
+    ta.setSelectionRange(len, len);
+    return;
   }
+  el.querySelector(".tt-btn-primary, .tt-btn-danger-fill")?.focus();
+}
+function closeOverlay(id) {
+  const el = document.getElementById(id);
+  el.classList.remove("open");
+  el.setAttribute("aria-hidden", "true");
+}
 
-  function openOverlay(id) {
-    const el = document.getElementById(id);
-    el.classList.add("open");
-    el.setAttribute("aria-hidden", "false");
-    if (id === "ov-paste") {
-      syncPasteLines();
-      const ta = document.getElementById("paste-preview");
-      ta?.focus();
-      // Place caret at end so typing continues the buffer.
-      if (ta) {
-        const len = ta.value.length;
-        ta.setSelectionRange(len, len);
-      }
-      return;
-    }
-    el.querySelector(".tt-btn-primary, .tt-btn-danger-fill")?.focus();
-  }
-  function closeOverlay(id) {
-    const el = document.getElementById(id);
-    el.classList.remove("open");
-    el.setAttribute("aria-hidden", "true");
-  }
+document.querySelectorAll("[data-close]").forEach((btn) => {
+  btn.addEventListener("click", () => closeOverlay(btn.dataset.close));
+});
+document.querySelectorAll(".cf-overlay").forEach((ov) => {
+  ov.addEventListener("mousedown", (e) => {
+    if (e.target === ov) closeOverlay(ov.id);
+  });
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  document.querySelectorAll(".cf-overlay.open").forEach((ov) => closeOverlay(ov.id));
+});
 
-  document.querySelectorAll("[data-close]").forEach((btn) => {
-    btn.addEventListener("click", () => closeOverlay(btn.dataset.close));
-  });
-  document.querySelectorAll(".cf-overlay").forEach((ov) => {
-    ov.addEventListener("mousedown", (e) => {
-      if (e.target === ov) closeOverlay(ov.id);
-    });
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape") return;
-    document.querySelectorAll(".cf-overlay.open").forEach((ov) => closeOverlay(ov.id));
-  });
-
-  document.getElementById("paste-preview").addEventListener("input", syncPasteLines);
-  document.getElementById("demo-paste").addEventListener("click", () => openOverlay("ov-paste"));
-  document.getElementById("demo-close").addEventListener("click", () => {
-    const sw = document.getElementById("sw-close-confirm");
-    if (sw.getAttribute("aria-checked") !== "true") {
-      document.getElementById("term").innerHTML =
-        `<span class="dim"># confirmCloseWindow off — window would close immediately</span>\nrede@tterm:~$ █`;
-      return;
-    }
-    openOverlay("ov-close");
-  });
-  document.getElementById("btn-win-close").addEventListener("click", () => {
-    document.getElementById("demo-close").click();
-  });
-
-  document.querySelectorAll("[data-toggle]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const on = btn.classList.toggle("on");
-      btn.setAttribute("aria-checked", on ? "true" : "false");
-    });
-  });
-
-  document.getElementById("paste-ok").addEventListener("click", () => {
-    document.getElementById("term").textContent =
-      "cargo build --release\ncargo test\ngit status\n…\nrede@tterm:~$ █";
-  });
-  document.getElementById("close-ok").addEventListener("click", () => {
+pasteShell.textarea.addEventListener("input", syncPasteLines);
+document.getElementById("demo-paste").addEventListener("click", () => openOverlay("ov-paste"));
+document.getElementById("demo-close").addEventListener("click", () => {
+  const sw = document.getElementById("sw-close-confirm");
+  if (sw.getAttribute("aria-checked") !== "true") {
     document.getElementById("term").innerHTML =
-      `<span class="dim"># window would close (3 tabs ended)</span>`;
+      `<span class="dim"># confirmCloseWindow off — window would close immediately</span>\nrede@tterm:~$ █`;
+    return;
+  }
+  openOverlay("ov-close");
+});
+document.getElementById("btn-win-close").addEventListener("click", () => {
+  document.getElementById("demo-close").click();
+});
+
+document.querySelectorAll("[data-toggle]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const on = btn.classList.toggle("on");
+    btn.setAttribute("aria-checked", on ? "true" : "false");
   });
-})();
+});
+
+pasteShell.okBtn.addEventListener("click", () => {
+  document.getElementById("term").textContent =
+    "cargo build --release\ncargo test\ngit status\n…\nrede@tterm:~$ █";
+});
+closeShell.okBtn.addEventListener("click", () => {
+  document.getElementById("term").innerHTML =
+    `<span class="dim"># window would close (3 tabs ended)</span>`;
+});
 </script>
 </body>
 </html>

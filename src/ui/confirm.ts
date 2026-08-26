@@ -1,12 +1,11 @@
 // Generic in-app confirm dialog — the single way to ask yes/no, replacing
 // native OS dialogs (which clash with the app's own modal look). Built on
-// createModal with the cf-* shared chrome (docs/confirm-preview.html):
-// 420px well dialog, header / body (text + optional meta + optional mono
-// preview) / footer, OK or danger primary, warn border for destructive
-// actions. Every dismissal path (Cancel, Escape, backdrop) resolves
-// false: a dismissal never confirms.
+// createModal + kit shell (docs/confirm-preview.html): 420px well dialog,
+// header / body / footer, OK or danger primary, warn border for destructive
+// actions. Every dismissal path (Cancel, Escape, backdrop) resolves false:
+// a dismissal never confirms.
 
-import { mustQuery } from "./dom";
+import { createConfirmMessageDialog, createConfirmPasteDialog } from "./kit/shell";
 import { createModal } from "./modal";
 
 export interface ConfirmOptions {
@@ -38,34 +37,21 @@ export function confirmPaste(options: { lines: number; text: string }): Promise<
     className: "cf-overlay",
     onClose: () => answer(null),
   });
-  const overlay = modal.overlay;
+  const shell = createConfirmPasteDialog({
+    lines: options.lines,
+    text: options.text,
+  });
+  modal.overlay.appendChild(shell.dialog);
+  document.body.appendChild(modal.overlay);
 
-  overlay.innerHTML = `
-    <div class="cf-dialog" role="dialog" aria-modal="true" aria-labelledby="paste-title">
-      <div class="cf-header">
-        <span id="paste-title">Paste multiple lines?</span>
-        <span class="cf-header-meta"><strong>${options.lines}</strong> lines</span>
-      </div>
-      <div class="cf-body cf-body-flush">
-        <textarea class="cf-preview tt-scroll" spellcheck="false" autocomplete="off" aria-label="Paste preview"></textarea>
-      </div>
-      <div class="cf-footer">
-        <button class="tt-btn tt-btn-ghost cf-cancel" type="button">Cancel</button>
-        <button class="tt-btn tt-btn-primary" type="button">Paste</button>
-      </div>
-    </div>`;
-  const textarea = mustQuery<HTMLTextAreaElement>(overlay, "textarea.cf-preview");
-  textarea.value = options.text;
-  document.body.appendChild(overlay);
-
-  overlay.querySelector(".cf-cancel")?.addEventListener("click", () => modal.close());
-  overlay.querySelector(".tt-btn-primary")?.addEventListener("click", () => {
-    answer(textarea.value);
+  shell.cancelBtn.addEventListener("click", () => modal.close());
+  shell.okBtn.addEventListener("click", () => {
+    answer(shell.textarea.value);
     modal.close();
   });
-  textarea.focus();
+  shell.textarea.focus();
   // Caret at the end — review starts from the last command.
-  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+  shell.textarea.setSelectionRange(shell.textarea.value.length, shell.textarea.value.length);
 
   return promise;
 }
@@ -82,41 +68,24 @@ export function confirmDialog(options: ConfirmOptions): Promise<boolean> {
     className: "cf-overlay",
     onClose: () => answer(false),
   });
-  const overlay = modal.overlay;
+  const shell = createConfirmMessageDialog({
+    title: options.title,
+    message: options.message,
+    meta: options.meta,
+    preview: options.preview,
+    okLabel: options.okLabel,
+    cancelLabel: options.cancelLabel,
+    danger: options.danger,
+  });
+  modal.overlay.appendChild(shell.dialog);
+  document.body.appendChild(modal.overlay);
 
-  overlay.innerHTML = `
-    <div class="cf-dialog${options.danger ? " warn" : ""}" role="dialog" aria-modal="true">
-      <div class="cf-header"></div>
-      <div class="cf-body">
-        <div class="cf-text confirm-text"></div>
-        ${options.preview !== undefined ? `<pre class="cf-preview tt-scroll"></pre>` : ""}
-        ${options.meta !== undefined ? `<div class="cf-meta"></div>` : ""}
-      </div>
-      <div class="cf-footer">
-        <button class="tt-btn tt-btn-ghost cf-cancel" type="button"></button>
-        <button class="tt-btn ${options.danger ? "tt-btn-danger-fill" : "tt-btn-primary"}" type="button"></button>
-      </div>
-    </div>`;
-  mustQuery(overlay, ".cf-header").textContent = options.title;
-  mustQuery(overlay, ".confirm-text").textContent = options.message;
-  if (options.preview !== undefined) {
-    mustQuery(overlay, ".cf-preview").textContent = options.preview;
-  }
-  if (options.meta !== undefined) {
-    mustQuery(overlay, ".cf-meta").textContent = options.meta;
-  }
-  const cancelBtn = mustQuery<HTMLButtonElement>(overlay, ".cf-cancel");
-  cancelBtn.textContent = options.cancelLabel ?? "Cancel";
-  const okBtn = mustQuery<HTMLButtonElement>(overlay, ".cf-footer .tt-btn:last-child");
-  okBtn.textContent = options.okLabel ?? "OK";
-  document.body.appendChild(overlay);
-
-  cancelBtn.addEventListener("click", () => modal.close()); // onClose answers false
-  okBtn.addEventListener("click", () => {
+  shell.cancelBtn.addEventListener("click", () => modal.close());
+  shell.okBtn.addEventListener("click", () => {
     answer(true);
     modal.close();
   });
-  okBtn.focus();
+  shell.okBtn.focus();
 
   return promise;
 }

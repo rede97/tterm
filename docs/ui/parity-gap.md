@@ -6,11 +6,23 @@
 2. **Settings：布局与按钮严格 1:1**（row wells、间距、按钮宽 148px / 主次样式 / 落位、卡片与磁贴形态）。不得「语义接近即可」。
 3. **可见性列表用左侧 checkbox**（已定案，不用 toggle）。
 4. **控件同源：** [`src/ui/kit/`](../../src/ui/kit/)（`controls.css` + `select.ts` / `modal.ts` / …）；草稿链同一 CSS，禁止再内联一套 select/btn 皮。
+5. **产品 DOM 同源：** 可交互产品树必须来自共享 view / shell（`qp/view.ts`、`shell.ts`），禁止在 preview 里再贴一份 `.qp-section` / dialog HTML。DOM 不变量进 [`tests/ui-contracts/`](../../tests/ui-contracts/)。
 
 - App：`feat/ui-redesign-migration`
-- 审计：2026-08-26（Q8、Settings 全面板复审）；控件库：同日 kit 收口
+- 审计：2026-08-26（Q8、Settings 全面板复审）；控件库：同日 kit 收口；**one-render path**：同日 QP view 收口
 
-**结论一句话：** **CLOSED（2026-08-26 同日收口）** — Q8a（select fixed+portal）与 **Q8b（真 overlay 浮层滚动条，`ui/overlay-scroll.ts`）** 均落地并过实机验收；Settings L1–L3 / S4–S12、关窗确认、粘贴确认已落地；**轻量控件库**（`.tt-select` / buttons / toggle / stepper）app+drafts 同源。
+**结论一句话：** 视觉/控件审计 **CLOSED**；**共享渲染路径**按面推进（下表）。Q8a/Q8b、Settings L1–L3、关窗/粘贴确认、轻量控件库已落地。
+
+---
+
+## Shared view migration
+
+| Surface | Shared module | Preview | Contracts | Status |
+|---------|---------------|---------|-----------|--------|
+| Quick panel | [`src/ui/kit/qp/view.ts`](../../src/ui/kit/qp/view.ts) | mounts `qpPanelView` | [`tests/ui-contracts/qp-modem.ts`](../../tests/ui-contracts/qp-modem.ts) | **DONE** |
+| Palette shell | [`src/ui/kit/shell.ts`](../../src/ui/kit/shell.ts) `createPaletteShell` | mounts shell | (structure via kit) | **DONE** |
+| Confirm shell | `createConfirm*Dialog` | mounts shell | (structure via kit) | **DONE** |
+| Settings panels | [`src/ui/lit.ts`](../../src/ui/lit.ts) vocabulary | still static HTML | — | **OPEN** (phase 2) |
 
 ---
 
@@ -33,6 +45,7 @@
 | **Q5 / Q7** | Skin 即时；Select 键盘增强 | **OK\*** |
 | **Q8a** | 下拉 `fixed` + portal body，不进 panel `scrollHeight` | **DONE**（`select.ts` placeSelectMenu + portal；glass 兼容） |
 | **Q8b** | panel 滚动条 **overlay**，不挤 148 控件列 | **DONE** — 隐藏原生条 + JS 浮层 thumb（`ui/overlay-scroll.ts`，panel 与 Settings 全面板；e2e 验收：溢出时控件列 right 不动、无 classic gutter） |
+| **Q9** | 产品 DOM 同源（`qpPanelView`） | **DONE** — preview 不再贴静态 `.qp-section`；modem 契约测 app + fixture |
 
 **Q8b 核查（2026-08-26）：已闭环。** 结论同下表——CSS 无路可走，落地为隐藏原生条 + `ui/overlay-scroll.ts` 浮层 thumb（scroll/ResizeObserver 同步，Revert 全量重建自愈）。`.tt-scroll` 保留给无 148 约束的面（palette 等 classic 可接受处）。
 

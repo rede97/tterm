@@ -1,5 +1,6 @@
 @import "./ui/kit/controls.css";
 @import "./ui/kit/palette.css";
+@import "./ui/kit/confirm.css";
 
 * {
   margin: 0;
@@ -148,7 +149,7 @@ body {
   background: var(--tt-chrome);
   border: 1px solid var(--tt-line);
   border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--tt-shadow);
   display: none;
   font-family: var(--tt-mono);
   font-size: var(--tt-fs-label);
@@ -364,7 +365,7 @@ body {
   background: var(--tt-sidebar);
   border: 1px solid var(--tt-line-strong);
   border-radius: var(--tt-radius);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--tt-shadow);
   padding: 8px;
   display: none;
 }
@@ -391,7 +392,7 @@ body.qp-glass .quick-panel {
   border-color: rgba(255, 255, 255, 0.22);
   box-shadow:
     0 0 0 0.5px rgba(255, 255, 255, 0.08) inset,
-    0 16px 48px rgba(0, 0, 0, 0.4);
+    var(--tt-shadow);
 }
 
 body.qp-glass .qp-section {
@@ -463,11 +464,25 @@ body.qp-glass .qp-sharing {
   white-space: nowrap;
 }
 
-.qp-meta {
+.qp-meta,
+.qp-hint {
   display: block;
-  margin-top: 3px;
   font-size: var(--tt-fs-caption);
-  color: var(--tt-muted);
+  font-weight: var(--tt-ui-weight);
+  color: var(--tt-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qp-meta {
+  margin-top: 3px;
+}
+
+/* Under select rows — same type as .qp-meta; pad matches .qp-row labels. */
+.qp-hint {
+  margin: 0 2px;
+  padding: 0 10px 4px;
 }
 
 .qp-badges {
@@ -1016,7 +1031,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   overflow: hidden;
   white-space: pre-wrap;
   word-break: break-all;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--tt-shadow);
   pointer-events: none;
   z-index: 25;
   opacity: 0.8;
@@ -1084,7 +1099,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   background: var(--tt-well);
   border: 1px solid var(--tt-line);
   border-left: 2px solid var(--tt-faint);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--tt-shadow);
   opacity: 0;
   transform: translateY(8px);
   transition:
@@ -1214,37 +1229,48 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   color: var(--tt-text);
 }
 
-/* Close-tab confirmation: a low strip directly under the tab (design:
-   confirm-only, no Cancel, no shadow; outside click / Escape cancels). */
-.tab-close-confirm {
-  position: fixed;
-  z-index: 210;
+/* Close-tab confirmation: in-place on the tab (Confirm: + Close). */
+.tab.confirming > .tab-badge,
+.tab.confirming > .tab-label,
+.tab.confirming > .tab-close {
+  display: none;
+}
+
+.tab.confirming.shared::after {
+  display: none;
+}
+
+.tab-close-confirm-inline {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 6px 4px 10px;
-  background: var(--tt-chrome);
-  border: 1px solid var(--tt-line);
-  border-radius: var(--tt-radius-ctrl);
-  font-family: var(--tt-mono);
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding-right: 6px;
+  font-family: var(--tt-ui);
   font-size: var(--tt-fs-label);
+  font-weight: var(--tt-ui-weight);
   color: var(--tt-chrome-text);
 }
 
 .tab-close-confirm-text {
-  max-width: 260px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex-shrink: 0;
+  color: var(--tt-chrome-muted);
 }
 
 .tab-close-confirm-btn {
+  flex-shrink: 0;
+  margin-left: auto;
+  height: 22px;
+  padding: 0 10px;
   border: none;
   border-radius: var(--tt-radius-ctrl);
   background: var(--tt-bad);
-  color: var(--tt-text);
+  color: #fff;
   font: inherit;
-  padding: 2px 10px;
+  font-size: var(--tt-fs-label);
+  font-weight: var(--tt-title-weight);
   cursor: pointer;
 }
 
@@ -1537,7 +1563,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   background: var(--tt-chrome);
   border: 1px solid var(--tt-line);
   border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--tt-shadow);
   padding: 4px 0;
   min-width: 180px;
   display: none;
@@ -1656,7 +1682,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   background: var(--tt-chrome);
   border: 1px solid var(--tt-line);
   border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--tt-shadow);
   padding: 8px;
   z-index: 210;
 }
@@ -1674,7 +1700,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   background: var(--tt-chrome);
   border: 1px solid var(--tt-line);
   border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--tt-shadow);
   padding: 4px;
   z-index: 210;
   min-width: 110px;
@@ -2139,10 +2165,12 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   font-variant-numeric: tabular-nums;
 }
 
-.row > .input.input-narrow {
+.row > .input.input-narrow,
+.row-control > .input.input-narrow {
   width: var(--tt-btn-width);
   min-width: var(--tt-btn-width);
   max-width: var(--tt-btn-width);
+  box-sizing: border-box;
 }
 
 /* Number inputs: native spinner buttons render with the platform look and
@@ -2246,7 +2274,7 @@ input[type="number"] {
   color: var(--tt-text);
 }
 
-/* Card action buttons (Duplicate / Edit) — visible on hover. */
+/* Card action buttons (Duplicate icon / Edit) — visible on hover. */
 .theme-card-actions {
   position: absolute;
   top: 4px;
@@ -2267,6 +2295,18 @@ input[type="number"] {
   border: 1px solid #555;
   border-radius: 3px;
   cursor: pointer;
+}
+
+.theme-card-action-icon {
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.theme-card-action-icon svg {
+  display: block;
 }
 
 .theme-card-action:hover {
@@ -2505,7 +2545,6 @@ input[type="number"] {
   flex: 1;
 }
 
-
 /* theme preview swatches */
 .theme-preview {
   display: flex;
@@ -2631,7 +2670,7 @@ input[type="number"] {
   background: var(--tt-well);
   border: 1px solid var(--tt-line);
   border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--tt-shadow);
   z-index: 20;
   min-width: 160px;
   padding: 4px 0;
@@ -2855,7 +2894,7 @@ body[data-skin="cursor"] .check-box:checked::after {
   background: var(--tt-chrome);
   border: 1px solid var(--tt-line);
   border-radius: var(--tt-radius-sm);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--tt-shadow);
   display: none;
   flex-direction: column;
 }
@@ -2886,118 +2925,7 @@ body[data-skin="cursor"] .check-box:checked::after {
   color: var(--tt-text);
 }
 
-/* Confirm dialog chrome (docs/confirm-preview.html .cf-*): 420px well
-   dialog; warn border + danger primary for destructive actions. */
-.cf-dialog {
-  width: 420px;
-  max-width: 100%;
-  background: var(--tt-well);
-  border: 1px solid var(--tt-line);
-  border-radius: var(--tt-radius-sm);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
-}
-
-.cf-dialog.warn {
-  border-color: color-mix(in srgb, var(--tt-warn) 55%, var(--tt-line));
-}
-
-.cf-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 20px;
-  font-size: var(--tt-fs-body);
-  font-weight: var(--tt-title-weight);
-  border-bottom: 1px solid var(--tt-line);
-  user-select: none;
-}
-
-.cf-header-meta {
-  font-size: var(--tt-fs-label);
-  font-weight: var(--tt-ui-weight);
-  color: var(--tt-muted);
-  white-space: nowrap;
-}
-
-.cf-dialog.warn .cf-header {
-  color: var(--tt-warn);
-  border-bottom-color: color-mix(in srgb, var(--tt-warn) 40%, var(--tt-line));
-}
-
-.cf-body {
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* Paste: the editable preview fills the body edge-to-edge (no gutter). */
-.cf-body.cf-body-flush {
-  padding: 0;
-  gap: 0;
-}
-
-.cf-text {
-  font-size: var(--tt-fs-body);
-  color: var(--tt-text);
-  line-height: 1.5;
-  white-space: pre-line;
-}
-
-.cf-meta {
-  font-size: var(--tt-fs-label);
-  color: var(--tt-muted);
-  line-height: 1.45;
-}
-
-.cf-preview {
-  margin: 0;
-  padding: 10px 12px;
-  max-height: 120px;
-  overflow: auto;
-  background: var(--tt-inset);
-  border: 1px solid var(--tt-line);
-  border-radius: var(--tt-radius-ctrl);
-  font-family: var(--tt-mono);
-  font-size: var(--tt-fs-ctrl);
-  line-height: 1.45;
-  color: var(--tt-text);
-  white-space: pre;
-}
-
-textarea.cf-preview {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  resize: none;
-  outline: none;
-  field-sizing: fixed;
-  tab-size: 4;
-}
-
-textarea.cf-preview:focus {
-  box-shadow: inset 0 0 0 1px var(--tt-focus);
-}
-
-.cf-body-flush .cf-preview {
-  border: 0;
-  border-radius: 0;
-  max-height: none;
-  height: min(42vh, 320px);
-  min-height: 220px;
-}
-
-.cf-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 20px;
-  border-top: 1px solid var(--tt-line);
-}
+/* Confirm chrome → src/ui/kit/confirm.css */
 
 /* "New …" tile (design .theme-new): "+ New Theme" / "+ New Profile" — no separate + circle. */
 .theme-new {
@@ -3472,8 +3400,7 @@ textarea.cf-preview:focus {
 
 /* ===== SSH Auth Dialogs ===== */
 
-.sshauth-overlay,
-.cf-overlay {
+.sshauth-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
@@ -3481,11 +3408,6 @@ textarea.cf-preview:focus {
   align-items: center;
   justify-content: center;
   z-index: 1100;
-}
-
-/* Shared confirm dialog (src/ui/confirm.ts): multi-line messages. */
-.confirm-text {
-  white-space: pre-line;
 }
 
 .sshauth-dialog {

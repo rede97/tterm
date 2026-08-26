@@ -86,4 +86,14 @@ describe("custom select — floating menu (Q8)", () => {
     closeAllSelects();
     expect(b.root.classList.contains("open")).toBe(false);
   });
+
+  it("picking an option closes and unportals the menu", () => {
+    const { root } = mountSelect();
+    openSelect(root);
+    expect(menuOf(root).classList.contains("open")).toBe(true);
+    menuOf(root).querySelector<HTMLElement>('.tt-option[data-value="9600"]')!.click();
+    expect(root.classList.contains("open")).toBe(false);
+    expect(document.querySelector("body > .tt-select-menu.open")).toBeNull();
+    expect(root.querySelector(".tt-select-menu")).not.toBeNull();
+  });
 });

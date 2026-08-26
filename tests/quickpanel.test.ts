@@ -14,6 +14,7 @@ import {
   updateQuickButton,
 } from "../src/terminal/quickpanel";
 import type { TerminalTab } from "../src/terminal/tab";
+import { assertModemHardware, assertModemUnsupported } from "./ui-contracts/qp-modem";
 
 function fakeTab(over: Partial<TerminalTab> & { id: string }): TerminalTab {
   return {
@@ -314,10 +315,9 @@ describe("quick panel — serial tab", () => {
 
     // Hardware RTS/CTS: RTS is driver-owned (toggle disabled, no IPC).
     // DTR is not part of that handshake and stays software-controlled.
-    const rtsSwitch = switchOf(rowOf(sec, "RTS")!) as HTMLButtonElement;
-    expect(rtsSwitch.disabled).toBe(true);
-    expect(sec.textContent).toContain("RTS is driver-managed");
+    assertModemHardware(p);
     invokeMock.mockClear();
+    const rtsSwitch = switchOf(rowOf(sec, "RTS")!) as HTMLButtonElement;
     rtsSwitch.click();
     expect(invokeMock).not.toHaveBeenCalledWith("serial_set_rts", expect.anything());
 
@@ -350,11 +350,7 @@ describe("quick panel — serial tab", () => {
     await vi.waitFor(() => {
       expect(selectOf(flowRow).classList.contains("tt-disabled")).toBe(true);
     });
-    expect(flowRow.classList.contains("qp-disabled")).toBe(true);
-    expect(sec.textContent).toContain("not supported by this port");
-    // No signal block even though the profile asks for hardware flow control.
-    expect(rowOf(sec, "RTS")).toBeUndefined();
-    expect(rowOf(sec, "DSR")).toBeUndefined();
+    assertModemUnsupported(p);
   });
 
   it("greys out flow control when the line-status query fails", async () => {

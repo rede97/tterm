@@ -122,7 +122,9 @@ function pickOption(root: HTMLElement, opt: HTMLElement): void {
   // Settings panels collect from this attribute (the shell's input/change
   // delegation misses custom controls).
   root.dataset.current = opt.dataset.value ?? "";
-  root.classList.remove("open");
+  // Must unportal: the open menu lives on <body> with its own .open class;
+  // clearing only root.open leaves the list floating in place.
+  closeAllSelects();
   // One funnel for mouse and keyboard picks; the template's own listener
   // turns it into onPick. The second event is the settings shell's dirty
   // signal (its input/change delegation misses buttons).
@@ -153,7 +155,7 @@ function onSelectKeydown(root: HTMLElement, e: KeyboardEvent): void {
   if (e.key === "Escape" && open) {
     e.preventDefault();
     e.stopPropagation(); // don't close the surrounding panel/dialog
-    root.classList.remove("open");
+    closeAllSelects();
     root.querySelector<HTMLElement>(".tt-select-trigger")?.focus();
     return;
   }

@@ -203,9 +203,10 @@ export class TabManager {
     closeBtn.title = "Close tab (Shift-click skips confirmation)";
     closeBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      // Design: × asks via a small anchored strip; Shift+× closes at once.
-      // Other paths (Ctrl+W, context menu, session exit) never confirm.
-      if (e.shiftKey) {
+      // Design: × replaces the tab chrome with Confirm: + Close; Shift+×
+      // closes at once. Off via Settings → confirmCloseTab. Other paths
+      // (Ctrl+W, context menu, session exit) never confirm.
+      if (e.shiftKey || !configStore.get("confirmCloseTab")) {
         void this.closeTab(tab.id);
         return;
       }
@@ -314,8 +315,9 @@ export class TabManager {
 
   // Built-in client: open the tab first so password/passphrase can be
   // typed in xterm (OpenSSH-style). Host-key confirmation stays a modal.
-  // A pre-seeded password (palette Temporary Connect) skips the password
+  // A pre-seeded password (legacy) skips the password
   // prompt; a wrong one falls back to prompting (backend clears stale).
+  // Temporary Connect never pre-seeds — password is typed in the terminal.
   private async _createEmbeddedSshTab(
     host: SshHost,
     password?: string,

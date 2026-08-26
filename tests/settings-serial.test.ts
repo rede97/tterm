@@ -105,10 +105,10 @@ describe("settings — Serial profile gallery", () => {
       "line · Enter→CRLF · out cr-in-lf · flow none",
     );
 
-    // Every card has Duplicate; built-ins have no Edit.
+    // Every card has Duplicate (copy icon); built-ins have no Edit.
     for (const name of ["Normal", "Log", "AT"]) {
       const actions = [...card(panel, name).querySelectorAll(".theme-card-action")].map(
-        (b) => b.textContent,
+        (b) => b.getAttribute("aria-label") || b.textContent,
       );
       expect(actions).toEqual(["Duplicate"]);
     }
@@ -187,7 +187,7 @@ describe("settings — Serial profile gallery", () => {
       },
     ]);
     const actions = [...card(panel, "AT Copy").querySelectorAll(".theme-card-action")].map(
-      (b) => b.textContent,
+      (b) => b.getAttribute("aria-label") || b.textContent,
     );
     expect(actions).toEqual(["Duplicate", "Edit"]);
     // The new profile is also selectable as the default.

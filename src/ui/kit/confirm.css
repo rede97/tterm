@@ -1,0 +1,131 @@
+/* Confirm dialog chrome — shared by app confirm.ts and docs/confirm-preview.html.
+   Overlay positioning: app uses fixed (below); drafts may override to absolute
+   inside `.app` and toggle `.open` for demo visibility. */
+
+.cf-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.cf-dialog {
+  width: 420px;
+  max-width: 100%;
+  background: var(--tt-well);
+  border: 1px solid var(--tt-line);
+  border-radius: var(--tt-radius-sm);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--tt-shadow);
+}
+
+.cf-dialog.warn {
+  border-color: color-mix(in srgb, var(--tt-warn) 55%, var(--tt-line));
+}
+
+.cf-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  font-size: var(--tt-fs-body);
+  font-weight: var(--tt-title-weight);
+  border-bottom: 1px solid var(--tt-line);
+  user-select: none;
+}
+
+.cf-header-meta {
+  font-size: var(--tt-fs-label);
+  font-weight: var(--tt-ui-weight);
+  color: var(--tt-muted);
+  white-space: nowrap;
+}
+
+.cf-dialog.warn .cf-header {
+  color: var(--tt-warn);
+  border-bottom-color: color-mix(in srgb, var(--tt-warn) 40%, var(--tt-line));
+}
+
+.cf-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Paste: the editable preview fills the body edge-to-edge (no gutter). */
+.cf-body.cf-body-flush {
+  padding: 0;
+  gap: 0;
+}
+
+.cf-text {
+  font-size: var(--tt-fs-body);
+  color: var(--tt-text);
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.cf-meta {
+  font-size: var(--tt-fs-label);
+  color: var(--tt-muted);
+  line-height: 1.45;
+}
+
+.cf-preview {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 120px;
+  overflow: auto;
+  background: var(--tt-inset);
+  border: 1px solid var(--tt-line);
+  border-radius: var(--tt-radius-ctrl);
+  font-family: var(--tt-mono);
+  font-size: var(--tt-fs-ctrl);
+  line-height: 1.45;
+  color: var(--tt-text);
+  white-space: pre;
+}
+
+textarea.cf-preview {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  outline: none;
+  field-sizing: fixed;
+  tab-size: 4;
+}
+
+textarea.cf-preview:focus {
+  box-shadow: inset 0 0 0 1px var(--tt-focus);
+}
+
+.cf-body-flush .cf-preview {
+  border: 0;
+  border-radius: 0;
+  max-height: none;
+  height: min(42vh, 320px);
+  min-height: 220px;
+}
+
+.cf-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--tt-line);
+}
+
+/* Multi-line messages from confirmDialog(). */
+.confirm-text {
+  white-space: pre-line;
+}

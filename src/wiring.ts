@@ -106,7 +106,9 @@ export function initShortcutsWiring(): void {
     "workbench.action.showCommands": () => openCommandPalette(),
     "workbench.action.newTab": () => void tabManager.createLocalTab(),
     "workbench.action.openSettings": () => tabManager.toggleSettings(),
-    "tterm.newTabPicker": () => openPaletteFlow("newTab"),
+    "tterm.newLocalTab": () => openPaletteFlow("newLocal"),
+    "tterm.newSshTab": () => openPaletteFlow("newSsh"),
+    "tterm.newSerialTab": () => openPaletteFlow("newSerial"),
     "tterm.newWindow": () => invoke("open_new_window").catch(logCatch("window.openNew")),
     "tterm.toggleQuickPanel": () => {
       document.getElementById("quick-status")?.click();

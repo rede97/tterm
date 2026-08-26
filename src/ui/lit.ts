@@ -77,20 +77,20 @@ export function toggle(
   ><span class="tt-knob"></span></button>`;
 }
 
-/** Text / danger link button (.tt-btn-link). */
+/** Action button — same footprint as selects (`.tt-btn-solid`). */
 export function linkBtn(
   label: string,
   onClick: (e: MouseEvent) => void,
   opts?: { danger?: boolean; id?: string; title?: string; cls?: string },
 ): TemplateResult {
+  const kind = opts?.danger ? "tt-btn-solid tt-btn-danger-fill" : "tt-btn-solid";
   return html`<button
-    class="tt-btn-link ${opts?.danger ? "tt-danger" : ""} ${opts?.cls ?? ""}"
+    type="button"
+    class="${kind} ${opts?.cls ?? ""}"
     id=${ifDefined(opts?.id)}
     title=${ifDefined(opts?.title)}
     @click=${onClick}
-  >
-    ${label}
-  </button>`;
+  >${label}</button>`;
 }
 
 /** Plain-info settings block (description only). */

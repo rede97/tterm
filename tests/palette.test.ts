@@ -1,8 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(() => Promise.resolve(null)) }));
+const { sshHistoryFile } = vi.hoisted(() => ({ sshHistoryFile: { content: "[]" } }));
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn((cmd: string, args?: { name?: string; content?: string }) => {
+    if (cmd === "read_config_file" && args?.name === "ssh-history") {
+      return Promise.resolve(sshHistoryFile.content);
+    }
+    if (cmd === "write_config_file" && args?.name === "ssh-history") {
+      sshHistoryFile.content = args.content ?? "[]";
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(null);
+  }),
+}));
 
 import { invoke } from "@tauri-apps/api/core";
+import { setSshHistory } from "../src/config/ssh-history";
 import { initKeymap } from "../src/core/keymap";
 import { configStore } from "../src/core/store";
 import type { SshHost } from "../src/core/types";
@@ -79,6 +93,8 @@ beforeEach(() => {
   flippedTo = null;
   activeTab = { id: "tab-1", type: "local" };
   configStore.set({ keybindings: {} });
+  sshHistoryFile.content = "[]";
+  setSshHistory([]);
   document.querySelector(".pal-overlay")?.remove();
 });
 
@@ -90,10 +106,20 @@ describe("command palette — root", () => {
     // Draft: fixed chrome ">" — not part of the input value.
     expect(input().value).toBe("");
     expect(document.querySelector(".pal-prefix.on")?.textContent).toBe(">");
-    // Draft order/groups: New Tab… carries Ctrl+T; Show Palette is Settings-only.
-    expect(rowFullTexts().some((t) => t.includes("Ctrl+T"))).toBe(true);
     expect(document.querySelector(".pal-group")?.textContent).toBe("Tab");
-    expect(rowTexts().some((t) => t.includes("Temporary Connect"))).toBe(true);
+    // Temporary Connect lives under New SSH Tab, not the root list.
+    expect(rowTexts().some((t) => t.includes("Temporary Connect"))).toBe(false);
+  });
+
+  it("New Local Tab carries Ctrl+T; New SSH / Serial are palette entries", async () => {
+    openCommandPalette();
+    await vi.waitFor(() => expect(rowTexts().length).toBeGreaterThan(0));
+    expect(rowFullTexts().some((t) => t.includes("New Local Tab") && t.includes("Ctrl+T"))).toBe(
+      true,
+    );
+    expect(rowTexts()).toContain("New SSH Tab");
+    expect(rowTexts()).toContain("New Serial Tab");
+    expect(rowTexts().some((t) => t === "New Tab…")).toBe(false);
   });
 
   it("filters by title and runs the selected command with Enter", async () => {
@@ -127,12 +153,8 @@ describe("command palette — root", () => {
 });
 
 describe("command palette — two-level flows", () => {
-  it("New Tab… → SSH → Temporary Connect → host → password", async () => {
-    openPaletteFlow("newTab");
-    await vi.waitFor(() => expect(rowTexts()).toEqual(["Local", "SSH", "Serial"]));
-
-    key("ArrowDown");
-    key("Enter"); // SSH
+  it("New SSH Tab → Temporary Connect → host opens tab (password in terminal)", async () => {
+    openPaletteFlow("newSsh");
     await vi.waitFor(() => expect(rowTexts()).toContain("pi"));
     expect(rowTexts()).toContain("Temporary Connect…");
 
@@ -140,15 +162,14 @@ describe("command palette — two-level flows", () => {
     type("Temporary");
     await vi.waitFor(() => expect(rowTexts()[0]).toContain("Temporary Connect"));
     key("Enter");
-    await vi.waitFor(() => expect(input().placeholder).toContain("user@host"));
-    type("deploy@10.0.0.8:2222"); // text pages take free-form input, no chrome ">"
+    await vi.waitFor(() => expect(input().placeholder).toContain("connection history"));
+    // Empty host step: Examples (and Recent when present).
+    expect(rowTexts().some((t) => t.includes("Examples:"))).toBe(true);
+    type("deploy@10.0.0.8:2222");
+    await vi.waitFor(() => expect(rowTexts()[0]).toContain("Connect → deploy@10.0.0.8:2222"));
     key("Enter");
 
-    // Password page masks input.
-    await vi.waitFor(() => expect(input().type).toBe("password"));
-    type("s3cret");
-    key("Enter");
-
+    // No palette password step — tab opens immediately, password stays for terminal.
     expect(sshTabs).toHaveLength(1);
     expect(sshTabs[0].host).toEqual({
       name: "10.0.0.8",
@@ -156,18 +177,69 @@ describe("command palette — two-level flows", () => {
       user: "deploy",
       port: "2222",
     });
-    expect(sshTabs[0].password).toBe("s3cret");
+    expect(sshTabs[0].password).toBeUndefined();
+    expect(paletteOpen()).toBe(false);
+    await vi.waitFor(() => expect(sshHistoryFile.content).toContain("10.0.0.8"));
+  });
+
+  it("Temporary Connect shows Recent and reconnects without a password page", async () => {
+    setSshHistory([{ hostname: "lab", user: "pi", lastUsed: Date.now() }]);
+    openPaletteFlow("tempSsh");
+    await vi.waitFor(() => expect(rowTexts()).toContain("pi@lab"));
+    expect(document.querySelector(".pal-group")?.textContent).toBe("Recent");
+    expect(rowTexts().some((t) => t.includes("Examples:"))).toBe(true);
+
+    const recent = [...document.querySelectorAll<HTMLElement>(".pal-row")].find((r) =>
+      r.textContent?.includes("pi@lab"),
+    )!;
+    recent.click();
+    expect(sshTabs).toHaveLength(1);
+    expect(sshTabs[0].host).toEqual({ name: "lab", hostname: "lab", user: "pi" });
+    expect(sshTabs[0].password).toBeUndefined();
     expect(paletteOpen()).toBe(false);
   });
 
-  it("Escape pops one level instead of closing", async () => {
-    openPaletteFlow("newTab");
-    await vi.waitFor(() => expect(rowTexts()).toEqual(["Local", "SSH", "Serial"]));
-    key("Enter"); // Local level
-    await vi.waitFor(() => expect(rowTexts()).toContain("PowerShell"));
-    key("Escape");
-    await vi.waitFor(() => expect(rowTexts()).toEqual(["Local", "SSH", "Serial"]));
+  it("Temporary Connect filters Recent while typing a new host", async () => {
+    setSshHistory([
+      { hostname: "lab", user: "pi", lastUsed: 2 },
+      { hostname: "other.example", user: "root", port: "2222", lastUsed: 1 },
+    ]);
+    openPaletteFlow("tempSsh");
+    await vi.waitFor(() => expect(rowTexts()).toContain("pi@lab"));
+    type("lab");
+    // Connect → first (with default :22); matching Recent below; no Examples.
+    await vi.waitFor(() => {
+      expect(rowTexts()[0]).toContain("Connect → lab:22");
+      expect(rowTexts()).toContain("pi@lab");
+      expect(rowTexts().some((t) => t.includes("other.example"))).toBe(false);
+      expect(rowTexts().some((t) => t.includes("Examples:"))).toBe(false);
+    });
+  });
+
+  it("Temporary Connect Tab completes Recent into the input without connecting", async () => {
+    setSshHistory([{ hostname: "lab", user: "root", port: "2222", lastUsed: 1 }]);
+    openPaletteFlow("tempSsh");
+    await vi.waitFor(() => expect(rowTexts()).toContain("root@lab:2222"));
+    key("ArrowDown"); // Examples → first Recent
+    expect(
+      [...document.querySelectorAll(".pal-row.selected .pal-hint")].map((n) => n.textContent),
+    ).toEqual(["Enterconnect", "Tabcomplete"]);
+    expect(
+      [...document.querySelectorAll(".pal-row.selected .pal-hint .pal-kbd")].map((n) => n.textContent),
+    ).toEqual(["Enter", "Tab"]);
+    expect(
+      [...document.querySelectorAll(".pal-row.selected .pal-hint-action")].map((n) => n.textContent),
+    ).toEqual(["connect", "complete"]);
+    key("Tab");
     expect(paletteOpen()).toBe(true);
+    expect(sshTabs).toHaveLength(0);
+    expect(input().value).toBe("root@lab:2222");
+    await vi.waitFor(() => expect(rowTexts()[0]).toContain("Connect → root@lab:2222"));
+  });
+
+  it("Escape pops one level instead of closing", async () => {
+    openPaletteFlow("newLocal");
+    await vi.waitFor(() => expect(rowTexts()).toContain("PowerShell"));
     key("Escape"); // back at the command root: still open
     await vi.waitFor(() =>
       expect(rowTexts().some((t) => t.includes("Temporary Connect"))).toBe(true),

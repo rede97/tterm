@@ -1,15 +1,13 @@
-// Tab close confirmation — a low strip anchored directly under the tab
-// whose × was clicked. Design (docs/tabbar-preview.html): confirm-only
-// (no Cancel button), dismissed by clicking anywhere else or Escape, no
-// drop shadow; Shift+× skips it entirely (handled at the call site).
+// Tab close confirmation — replaces the tab's chrome in-place with
+// "Confirm:" + a Close button (docs/tabbar-preview.html). Confirm-only
+// (no Cancel); dismissed by clicking anywhere else or Escape. Shift+×
+// and Settings → confirmCloseTab=off skip this (handled at the call site).
 //
 // Deliberately NOT ui/confirm.ts: that is a centered modal with Cancel and
-// backdrop, used for destructive config actions. The tab strip is a
-// lightweight, spatially-anchored prompt. Only the × button routes here —
-// Ctrl+W, context-menu Close, and session-exited auto-close go straight to
-// TabManager.closeTab.
+// backdrop. Only the × button routes here — Ctrl+W, context-menu Close,
+// and session-exited auto-close go straight to TabManager.closeTab.
 
-// Only one strip exists at a time; opening for another tab replaces it.
+// Only one tab can be confirming at a time; opening for another replaces it.
 let active: { dismiss: () => void } | null = null;
 
 export function dismissTabCloseConfirm(): void {
@@ -17,51 +15,53 @@ export function dismissTabCloseConfirm(): void {
 }
 
 export function showTabCloseConfirm(
-  anchor: HTMLElement,
+  tabEl: HTMLElement,
   label: string,
   onConfirm: () => void,
 ): void {
   dismissTabCloseConfirm();
 
-  const rect = anchor.getBoundingClientRect();
-  const el = document.createElement("div");
-  el.className = "tab-close-confirm";
-  el.setAttribute("role", "alertdialog");
-  el.setAttribute("aria-label", `Close ${label}?`);
+  tabEl.classList.add("confirming");
+  tabEl.title = `Close ${label}? · Esc / click away cancels`;
+
+  const inline = document.createElement("div");
+  inline.className = "tab-close-confirm-inline";
+  inline.setAttribute("role", "alertdialog");
+  inline.setAttribute("aria-label", `Close ${label}?`);
 
   const text = document.createElement("span");
   text.className = "tab-close-confirm-text";
-  text.textContent = `Close ${label}?`;
-  el.appendChild(text);
+  text.textContent = "Confirm:";
+  inline.appendChild(text);
 
   const confirmBtn = document.createElement("button");
   confirmBtn.type = "button";
   confirmBtn.className = "tab-close-confirm-btn";
   confirmBtn.textContent = "Close";
-  el.appendChild(confirmBtn);
+  inline.appendChild(confirmBtn);
 
-  // Anchor directly under the tab, clamped inside the viewport.
-  document.body.appendChild(el);
-  const width = el.offsetWidth;
-  const left = Math.max(4, Math.min(rect.left, window.innerWidth - width - 4));
-  el.style.left = `${left}px`;
-  el.style.top = `${rect.bottom + 2}px`;
+  // Don't let the tab's switchTo / contextmenu handlers see these clicks.
+  inline.addEventListener("click", (e) => e.stopPropagation());
+  inline.addEventListener("contextmenu", (e) => e.stopPropagation());
+
+  tabEl.appendChild(inline);
 
   const dismiss = (): void => {
     document.removeEventListener("pointerdown", onPointerDown, true);
     document.removeEventListener("keydown", onKeyDown, true);
-    window.removeEventListener("resize", dismiss);
-    strip?.removeEventListener("scroll", dismiss);
     mo.disconnect();
-    el.remove();
+    inline.remove();
+    tabEl.classList.remove("confirming");
+    // Restore the hover tooltip to the tab label (badge/label still in DOM).
+    const labelEl = tabEl.querySelector(".tab-label");
+    tabEl.title = labelEl?.textContent ?? label;
     if (active?.dismiss === dismiss) active = null;
   };
 
-  // Any pointerdown outside the strip cancels (capture: fires even when the
-  // target stops propagation). The opening × click is safe — its pointerdown
-  // already happened before these listeners attached.
+  // Any pointerdown outside the confirming tab cancels. The opening ×
+  // click already finished before these listeners attached.
   const onPointerDown = (e: PointerEvent): void => {
-    if (!(e.target instanceof Node) || !el.contains(e.target)) dismiss();
+    if (!(e.target instanceof Node) || !tabEl.contains(e.target)) dismiss();
   };
   const onKeyDown = (e: KeyboardEvent): void => {
     if (e.key === "Escape") {
@@ -73,18 +73,14 @@ export function showTabCloseConfirm(
   document.addEventListener("pointerdown", onPointerDown, true);
   document.addEventListener("keydown", onKeyDown, true);
 
-  // The strip's position is a snapshot: any layout shift (window resize,
-  // strip scroll) or the tab going away (closed by another path, drag
-  // reorder detaching the node) invalidates it → dismiss.
-  window.addEventListener("resize", dismiss);
-  const strip = anchor.closest("#tabs");
-  strip?.addEventListener("scroll", dismiss, { passive: true });
+  // Tab removed by another path (Ctrl+W, session exit, drag detach) → clear.
   const mo = new MutationObserver(() => {
-    if (!anchor.isConnected) dismiss();
+    if (!tabEl.isConnected) dismiss();
   });
-  if (anchor.parentElement) mo.observe(anchor.parentElement, { childList: true });
+  if (tabEl.parentElement) mo.observe(tabEl.parentElement, { childList: true });
 
-  confirmBtn.addEventListener("click", () => {
+  confirmBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
     dismiss();
     onConfirm();
   });

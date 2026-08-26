@@ -10,6 +10,7 @@
 // DOM instead of rebuilding it, so pending choices and node identity
 // survive.
 
+import { Copy, createElement } from "lucide";
 import {
   allSerialProfiles,
   DEFAULT_SERIAL_PROFILE,
@@ -91,12 +92,14 @@ function profileCard(panel: HTMLElement, p: SerialProfileDef) {
     <div class="sp-card-summary">${serialProfileSummary(p)}</div>
     <div class="theme-card-actions">
       <button
-        class="theme-card-action"
+        class="theme-card-action theme-card-action-icon"
+        aria-label="Duplicate"
+        title="Duplicate"
         @click=${(e: MouseEvent) => {
           e.stopPropagation();
           openProfileEditor(panel, p, undefined);
         }}
-      >Duplicate</button>
+      >${createElement(Copy, { stroke: "currentColor", width: 14, height: 14 })}</button>
       ${
         p.source === "custom"
           ? html`<button

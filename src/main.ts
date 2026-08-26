@@ -14,6 +14,7 @@ import "@fontsource/ubuntu-mono";
 import { loadCustomThemes } from "./config/custom-themes";
 import { loadSerialProfiles } from "./config/serial-profiles";
 import { loadSshHosts } from "./config/ssh-config";
+import { loadSshHistory } from "./config/ssh-history";
 import { loadAllWtData } from "./config/wt-profiles";
 import { logCatch, logError, swallow } from "./core/errorlog";
 import "./core/devhooks";
@@ -252,6 +253,7 @@ configStore
     setWtThemes(wt.themes);
     await loadCustomThemes();
     await loadSerialProfiles();
+    await loadSshHistory();
     configStore.set({
       localProfiles: wt.profiles,
       vsInstalls: wt.vsInstalls,

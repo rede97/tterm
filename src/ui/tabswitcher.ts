@@ -13,6 +13,7 @@
 import { parseCombo, resolveKeybindings } from "../core/keymap";
 import { configStore } from "../core/store";
 import { el } from "./dom";
+import { createPaletteShell } from "./kit/shell";
 
 export interface SwitcherItem {
   id: string;
@@ -133,16 +134,11 @@ function open(nextMode: "quick" | "mru", startSelected: number): void {
   selected = startSelected;
 
   // Same shell as the command palette (preview: one .pal-overlay).
-  overlay = el("div", "pal-overlay");
-  const panel = el("div", "pal-panel");
-  const wrap = el("div", "pal-input-wrap");
-  if (mode === "quick") {
-    inputEl = document.createElement("input");
-    inputEl.className = "pal-input";
-    inputEl.type = "text";
-    inputEl.spellcheck = false;
-    inputEl.autocomplete = "off";
-    inputEl.placeholder = "Go to tab — number or name; > for commands";
+  const shell = createPaletteShell({ kind: mode === "quick" ? "quick" : "mru" });
+  overlay = shell.overlay;
+  listEl = shell.list;
+  inputEl = shell.input;
+  if (mode === "quick" && inputEl) {
     inputEl.addEventListener("input", () => {
       // ">" prefix flips into the command palette, carrying the query.
       const v = inputEl?.value ?? "";
@@ -158,14 +154,7 @@ function open(nextMode: "quick" | "mru", startSelected: number): void {
       renderList();
     });
     inputEl.addEventListener("keydown", onQuickKeydown);
-    wrap.appendChild(inputEl);
-  } else {
-    wrap.appendChild(el("span", "pal-mru-hint", "Release Ctrl to switch"));
   }
-  panel.appendChild(wrap);
-  listEl = el("div", "pal-list");
-  panel.appendChild(listEl);
-  overlay.appendChild(panel);
   // Click on the backdrop cancels (MRU: no switch; quick: just close).
   overlay.addEventListener("mousedown", (e) => {
     if (e.target === overlay) close();

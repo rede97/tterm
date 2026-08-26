@@ -39,7 +39,7 @@
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    box-shadow: var(--tt-shadow);
   }
 
   .tab-bar {
@@ -224,7 +224,7 @@
     background: var(--qp-bg);
     border: 1px solid var(--qp-line-strong);
     border-radius: var(--qp-radius);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+    box-shadow: var(--tt-shadow);
     padding: 8px;
   }
   @supports not (overflow: overlay) {
@@ -239,7 +239,7 @@
     border-color: rgba(255, 255, 255, 0.22);
     box-shadow:
       0 0 0 0.5px rgba(255, 255, 255, 0.08) inset,
-      0 16px 48px rgba(0, 0, 0, 0.4);
+      var(--tt-shadow);
   }
   body.qp-glass .qp-section {
     background: var(--qp-well);
@@ -299,11 +299,22 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .qp-meta {
+  .qp-meta,
+  .qp-hint {
     display: block;
-    margin-top: 3px;
     font-size: var(--tt-fs-caption);
-    color: var(--qp-muted);
+    font-weight: var(--tt-ui-weight);
+    color: var(--qp-faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .qp-meta {
+    margin-top: 3px;
+  }
+  .qp-hint {
+    margin: 0 2px;
+    padding: 0 10px 4px;
   }
 
   /* Status cluster: [sharing] [connected] — separate slots, fixed widths. */
@@ -719,223 +730,7 @@
   ▸ reading AGENT.md
   ▸ implementing serialctl</div>
 
-    <div class="quick-panel open tt-scroll" id="panel">
-
-      <div class="qp-header">
-        <div class="qp-ident">
-          <span class="qp-title" id="qp-title">pi</span>
-          <span class="qp-meta" id="qp-meta">Local shell</span>
-        </div>
-        <div class="qp-badges">
-          <span class="qp-sharing" id="qp-sharing" title="AI share off">SHARING</span>
-          <span class="qp-conn qp-conn-connected" id="qp-conn" data-conn="connected">CONNECTED</span>
-        </div>
-      </div>
-
-      <div class="qp-section" data-section="share">
-        <div class="qp-section-title">AI Share</div>
-        <div class="qp-row qp-toggle-row">
-          <span class="qp-label">Share this session</span>
-          <button type="button" class="tt-switch" role="switch" aria-label="Share this session" aria-checked="false" data-toggle="share">
-            <span class="tt-knob"></span>
-          </button>
-        </div>
-        <div class="qp-share-reveal" id="share-reveal">
-          <div class="qp-row qp-share-url-row">
-            <span class="qp-share-url" title="http://127.0.0.1:41789/share/3?token=8f2a…">http://127.0.0.1:41789/share/3?token=8f2a1c90b4</span>
-            <button type="button" class="tt-btn tt-btn-solid" id="copy-btn">Copy</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="qp-section hidden" data-section="ssh">
-        <div class="qp-section-title">Session</div>
-        <div class="qp-row qp-toggle-row">
-          <span class="qp-label">Auto-reconnect</span>
-          <button type="button" class="tt-switch" role="switch" aria-label="Auto-reconnect" aria-checked="false" data-toggle>
-            <span class="tt-knob"></span>
-          </button>
-        </div>
-        <div class="qp-fwd">
-          <div class="qp-sub-title">Port forwards</div>
-          <div class="qp-fwd-slot">
-            <div class="ft ft-compact">
-              <div class="ft-group">
-                <div class="ft-group-head">
-                  <span class="ft-group-title ft-g-local">Local (-L)</span>
-                </div>
-                <div class="ft-row">
-                  <span class="ft-cell ft-listen" title="127.0.0.1:8080">8080</span>
-                  <span class="ft-cell ft-target">127.0.0.1:3000</span>
-                  <span class="ft-cell ft-actions">
-                    <button type="button" class="ft-btn ft-del" title="Delete forward">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                    </button>
-                  </span>
-                </div>
-                <div class="ft-row ft-add-row">
-                  <span class="ft-cell ft-listen"><input class="ft-port" placeholder="Port" aria-label="Listen port"></span>
-                  <span class="ft-cell ft-target">
-                    <input class="ft-host" placeholder="127.0.0.1 (Remote)">
-                    <span style="color:#5c5c5c">:</span>
-                    <input class="ft-port" placeholder="Port">
-                  </span>
-                  <span class="ft-cell ft-actions">
-                    <button type="button" class="ft-btn ft-ok ft-add" title="Add local forward">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-                    </button>
-                  </span>
-                </div>
-              </div>
-              <div class="ft-group">
-                <div class="ft-group-head">
-                  <span class="ft-group-title ft-g-dynamic">Dynamic (-D)</span>
-                </div>
-                <div class="ft-row">
-                  <span class="ft-cell ft-listen">1080</span>
-                  <span class="ft-cell ft-target ft-socks">any destination (SOCKS5)</span>
-                  <span class="ft-cell ft-actions">
-                    <button type="button" class="ft-btn ft-del" title="Delete forward">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                    </button>
-                  </span>
-                </div>
-                <div class="ft-row ft-add-row">
-                  <span class="ft-cell ft-listen"><input class="ft-port" placeholder="Port"></span>
-                  <span class="ft-cell ft-target ft-socks">any destination (SOCKS5)</span>
-                  <span class="ft-cell ft-actions">
-                    <button type="button" class="ft-btn ft-ok ft-add">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-                    </button>
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="qp-section hidden" data-section="serial">
-        <div class="qp-section-title">Session</div>
-        <div class="qp-row">
-          <span class="qp-label">Connection</span>
-          <button type="button" class="tt-btn tt-btn-solid qp-connect-btn" data-kind="disconnect" id="conn-btn">Disconnect</button>
-        </div>
-        <div class="qp-row">
-          <span class="qp-label">Profile</span>
-          <div class="tt-select" data-select aria-label="Profile">
-            <button type="button" class="tt-select-trigger"><span class="tt-select-value">ESP32</span></button>
-            <div class="tt-select-menu" role="listbox">
-              <div class="tt-optgroup">Built-in</div>
-              <button type="button" class="tt-option" role="option" data-value="Arduino">Arduino</button>
-              <button type="button" class="tt-option" role="option" data-value="ESP32" aria-selected="true">ESP32</button>
-              <button type="button" class="tt-option" role="option" data-value="Pico">Pico</button>
-              <div class="tt-optgroup">Custom</div>
-              <button type="button" class="tt-option" role="option" data-value="lab-jtag">lab-jtag</button>
-            </div>
-          </div>
-        </div>
-        <div class="qp-row">
-          <span class="qp-label">Baud rate</span>
-          <div class="tt-select" data-select aria-label="Baud rate">
-            <button type="button" class="tt-select-trigger"><span class="tt-select-value">115200</span></button>
-            <div class="tt-select-menu" role="listbox">
-              <button type="button" class="tt-option" role="option" data-value="9600">9600</button>
-              <button type="button" class="tt-option" role="option" data-value="57600">57600</button>
-              <button type="button" class="tt-option" role="option" data-value="115200" aria-selected="true">115200</button>
-              <button type="button" class="tt-option" role="option" data-value="921600">921600</button>
-            </div>
-          </div>
-        </div>
-        <div class="qp-row qp-toggle-row">
-          <span class="qp-label">Auto-reconnect</span>
-          <button type="button" class="tt-switch on" role="switch" aria-checked="true" data-toggle>
-            <span class="tt-knob"></span>
-          </button>
-        </div>
-      </div>
-
-      <div class="qp-section hidden" data-section="serial-io">
-        <div class="qp-section-title">I/O</div>
-        <div class="qp-row">
-          <span class="qp-label">Input mode</span>
-          <div class="tt-select" data-select aria-label="Input mode">
-            <button type="button" class="tt-select-trigger"><span class="tt-select-value">Normal</span></button>
-            <div class="tt-select-menu" role="listbox">
-              <button type="button" class="tt-option" role="option" data-value="Normal" aria-selected="true">Normal</button>
-              <button type="button" class="tt-option" role="option" data-value="Echo">Echo</button>
-              <button type="button" class="tt-option" role="option" data-value="Line-by-line">Line-by-line</button>
-            </div>
-          </div>
-        </div>
-        <div class="qp-row">
-          <span class="qp-label">Enter sends</span>
-          <div class="tt-select" data-select aria-label="Enter sends">
-            <button type="button" class="tt-select-trigger"><span class="tt-select-value">CR (\r)</span></button>
-            <div class="tt-select-menu" role="listbox">
-              <button type="button" class="tt-option" role="option" data-value="cr" aria-selected="true">CR (\r)</button>
-              <button type="button" class="tt-option" role="option" data-value="lf">LF (\n)</button>
-              <button type="button" class="tt-option" role="option" data-value="crlf">CRLF (\r\n)</button>
-            </div>
-          </div>
-        </div>
-        <div class="tt-select-wrap">
-          <div class="qp-row">
-            <span class="qp-label">Output newlines</span>
-            <div class="tt-select" data-select="nl" aria-label="Output newlines">
-              <button type="button" class="tt-select-trigger"><span class="tt-select-value">Keep (raw)</span></button>
-              <div class="tt-select-menu" role="listbox">
-                <button type="button" class="tt-option" role="option" data-value="keep" aria-selected="true">Keep (raw)</button>
-                <button type="button" class="tt-option" role="option" data-value="cr-in-lf">Implicit CR in every LF</button>
-                <button type="button" class="tt-option" role="option" data-value="force-crlf">Force CRLF</button>
-                <button type="button" class="tt-option" role="option" data-value="strip">Strip</button>
-              </div>
-            </div>
-          </div>
-          <div class="qp-hint tt-select-hint" id="nl-hint">Pass through unchanged</div>
-        </div>
-      </div>
-
-      <div class="qp-section hidden" data-section="serial-modem">
-        <div class="qp-section-title">Modem lines</div>
-        <div class="qp-flow">
-          <div class="qp-row">
-            <span class="qp-label">Flow control</span>
-            <div class="tt-select" data-select="flow" aria-label="Flow control">
-              <button type="button" class="tt-select-trigger"><span class="tt-select-value">None</span></button>
-              <div class="tt-select-menu" role="listbox">
-                <button type="button" class="tt-option" role="option" data-value="none" aria-selected="true">None</button>
-                <button type="button" class="tt-option" role="option" data-value="software">Software (XON/XOFF)</button>
-                <button type="button" class="tt-option" role="option" data-value="hardware">Hardware (RTS/CTS)</button>
-              </div>
-            </div>
-          </div>
-          <div class="qp-signals">
-            <div class="qp-row qp-toggle-row" data-modem="rts">
-              <span class="qp-label">RTS</span>
-              <button type="button" class="tt-switch" role="switch" aria-label="RTS" aria-checked="false" data-toggle="rts">
-                <span class="tt-knob"></span>
-              </button>
-            </div>
-            <div class="qp-row">
-              <span class="qp-label">CTS</span>
-              <span class="qp-led on"><i></i>high</span>
-            </div>
-            <div class="qp-row qp-toggle-row" data-modem="dtr">
-              <span class="qp-label">DTR</span>
-              <button type="button" class="tt-switch on" role="switch" aria-label="DTR" aria-checked="true" data-toggle>
-                <span class="tt-knob"></span>
-              </button>
-            </div>
-            <div class="qp-row">
-              <span class="qp-label">DSR</span>
-              <span class="qp-led"><i></i>low</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </div>
+    <div class="quick-panel open" id="panel"></div>
   </div>
 
   <aside class="notes">
@@ -967,196 +762,196 @@
       <li>切皮肤时对比开关颜色与圆角；结构不应跳动。</li>
       <li><strong>下拉悬浮（Q8a）</strong>：菜单 <code>position:fixed</code> + portal，不进入 panel 滚动高度；打开下拉<strong>不得</strong>因此挤出 panel 滚动条。</li>
       <li><strong>panel 滚动条（Q8b · DONE）</strong>：app 用 <code>ui/overlay-scroll.ts</code> 真浮层 thumb（不挤 148 列）。本预览仍为静态示意；勿用设了 width 的 webkit 条冒充 overlay。</li>
-      <li><strong>Hardware flow</strong>：切到 Hardware (RTS/CTS) 时 <strong>禁用 RTS</strong>（置灰 + 驱动接管态），DTR 仍可拨；不隐藏、不加说明文案——置灰本身表达不可用。与落地 <code>quickpanel.ts</code> / <code>serial-design.md</code> 一致。</li>
+      <li><strong>Hardware flow</strong>：切到 Hardware (RTS/CTS) 时 <strong>禁用 RTS</strong>（置灰 + 驱动接管态），DTR 仍可拨；不隐藏、不加说明文案——置灰本身表达不可用。与共享 view <code>src/ui/kit/qp/view.ts</code>（app + 本预览同源）一致。</li>
     </ol>
   </aside>
 </div>
 
-<script src="/docs/ui/kit/select-preview.js"></script>
-<script>
-  const nlDescs = {
-    keep: "Pass through unchanged",
-    "cr-in-lf": "Lone \\n → \\r\\n",
-    "force-crlf": "\\r | \\n | \\r\\n → \\r\\n",
-    strip: "\\r | \\n → (removed)",
-  };
+<script type="module">
+import { render } from "/src/ui/lit.ts";
+import { qpPanelView } from "/src/ui/kit/qp/view.ts";
+import { syncSelectTexts, closeAllSelects } from "/src/ui/select.ts";
 
-  document.addEventListener("tt-pick", (e) => {
-    const root = e.target;
-    if (!(root instanceof Element)) return;
-    if (root.dataset.select === "nl") {
-      const hint = document.getElementById("nl-hint");
-      if (hint) hint.textContent = nlDescs[e.detail] ?? "";
-    }
-    if (root.dataset.select === "flow") {
-      syncHardwareFlow(e.detail);
-    }
+const panel = document.getElementById("panel");
+const SHARE_URL = "http://127.0.0.1:41789/share/3?token=8f2a1c90b4";
+
+const FWD_DEMO = `
+  <div class="ft ft-compact">
+    <div class="ft-group">
+      <div class="ft-group-head"><span class="ft-group-title ft-g-local">Local (-L)</span></div>
+      <div class="ft-row">
+        <span class="ft-cell ft-listen" title="127.0.0.1:8080">8080</span>
+        <span class="ft-cell ft-target">127.0.0.1:3000</span>
+        <span class="ft-cell ft-actions"><button type="button" class="ft-btn ft-del" title="Delete forward" tabindex="-1">×</button></span>
+      </div>
+    </div>
+    <div class="ft-group">
+      <div class="ft-group-head"><span class="ft-group-title ft-g-dynamic">Dynamic (-D)</span></div>
+      <div class="ft-row">
+        <span class="ft-cell ft-listen">1080</span>
+        <span class="ft-cell ft-target ft-socks">any destination (SOCKS5)</span>
+        <span class="ft-cell ft-actions"><button type="button" class="ft-btn ft-del" title="Delete forward" tabindex="-1">×</button></span>
+      </div>
+    </div>
+  </div>`;
+
+/** Mutable demo state — re-rendered through the same view as the app. */
+const state = {
+  kind: "local",
+  title: "pi",
+  meta: "Local shell",
+  conn: "connected",
+  shared: false,
+  shareUrl: SHARE_URL,
+  autoReconnect: false,
+  sshEmbedded: false,
+  reconnecting: false,
+  serialProfile: "Normal",
+  profileGroups: [
+    { label: "Built-in", items: [["Normal", "Normal"], ["Log", "Log"], ["AT", "AT"]] },
+  ],
+  baud: "115200",
+  inputMode: "normal",
+  enterNewline: "cr",
+  outputNewline: "keep",
+  flow: "none",
+  linesSupported: true,
+  lines: { rts: false, cts: true, dtr: true, dsr: false },
+};
+
+const variants = {
+  local: {
+    kind: "local", title: "pi", meta: "Local shell", tab: "pi",
+    conn: "connected", shared: false, sshEmbedded: false, reconnecting: false,
+    term: "rede@tterm:~$ pi\n  ▸ reading AGENT.md\n  ▸ implementing serialctl",
+  },
+  ssh: {
+    kind: "ssh", title: "github.com", meta: "SSH · git@github.com", tab: "github.com",
+    conn: "connected", shared: false, sshEmbedded: true, reconnecting: false,
+    term: "git@github.com:~$ ssh -T\nHi rede! You've successfully authenticated.",
+  },
+  serial: {
+    kind: "serial", title: "COM3", meta: "Serial · 115200 8N1", tab: "COM3",
+    conn: "connected", shared: false, sshEmbedded: false, reconnecting: false,
+    term: "ESP-ROM:esp32s3-20210327\nrst:0x1 (POWERON),boot:0x8 (SPI_FAST_FLASH_BOOT)",
+  },
+  down: {
+    kind: "serial", title: "COM3", meta: "Serial · 115200 8N1", tab: "COM3",
+    conn: "disconnected", shared: false, sshEmbedded: false, reconnecting: true,
+    term: "session ended — press Enter to reconnect",
+  },
+  shared: {
+    kind: "local", title: "pi", meta: "Local shell", tab: "pi",
+    conn: "connected", shared: true, sshEmbedded: false, reconnecting: false,
+    term: "rede@tterm:~$ pi\n  ▸ share url copied",
+  },
+};
+
+function syncQs() {
+  const btn = document.getElementById("qs-btn");
+  const dot = document.getElementById("qs-dot");
+  btn.classList.toggle("shared", state.shared);
+  dot.className = state.conn === "disconnected" ? "dot down" : "dot";
+}
+
+function paint() {
+  render(
+    qpPanelView(state, {
+      onShare: (on) => { state.shared = on; paint(); },
+      onCopyShareUrl: (_url, btn) => {
+        btn.textContent = "Copied";
+        setTimeout(() => { btn.textContent = "Copy"; }, 900);
+      },
+      onAutoReconnect: (on) => { state.autoReconnect = on; paint(); },
+      onConnectToggle: () => {
+        apply(state.reconnecting ? "serial" : "down");
+      },
+      onProfile: (v) => { state.serialProfile = v; paint(); },
+      onBaud: (v) => {
+        state.baud = v;
+        state.meta = `Serial · ${v} 8N1`;
+        paint();
+      },
+      onInputMode: (v) => { state.inputMode = v; paint(); },
+      onEnterNewline: (v) => { state.enterNewline = v; paint(); },
+      onOutputNewline: (v) => { state.outputNewline = v; paint(); },
+      onFlow: (v) => {
+        state.flow = v;
+        if (v === "hardware") state.lines = { ...state.lines, rts: true };
+        paint();
+      },
+      onRts: (on) => { state.lines = { ...state.lines, rts: on }; paint(); },
+      onDtr: (on) => { state.lines = { ...state.lines, dtr: on }; paint(); },
+    }),
+    panel,
+  );
+  syncSelectTexts(panel);
+  const slot = panel.querySelector(".qp-fwd-slot");
+  if (slot && state.sshEmbedded) slot.innerHTML = FWD_DEMO;
+  syncQs();
+}
+
+function apply(name) {
+  const v = variants[name];
+  Object.assign(state, {
+    kind: v.kind,
+    title: v.title,
+    meta: v.meta,
+    conn: v.conn,
+    shared: v.shared,
+    sshEmbedded: v.sshEmbedded,
+    reconnecting: v.reconnecting,
   });
-
-  /** Hardware RTS/CTS: driver owns RTS — disable toggle, keep row visible. */
-  let rtsManualOn = false;
-  function syncHardwareFlow(flow) {
-    const hw = flow === "hardware";
-    const row = document.querySelector('[data-modem="rts"]');
-    const sw = row?.querySelector('[data-toggle="rts"]');
-    if (!row || !sw) return;
-    if (!hw) {
-      sw.classList.toggle("on", rtsManualOn);
-      sw.setAttribute("aria-checked", rtsManualOn ? "true" : "false");
-    } else {
-      rtsManualOn = sw.classList.contains("on");
-      sw.classList.add("on");
-      sw.setAttribute("aria-checked", "true");
-    }
-    row.classList.toggle("qp-disabled", hw);
-    sw.disabled = hw;
-    sw.setAttribute("aria-disabled", hw ? "true" : "false");
-  }
-
-  document.querySelectorAll("[data-toggle]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      if (btn.disabled || btn.getAttribute("aria-disabled") === "true") return;
-      const on = btn.classList.toggle("on");
-      btn.setAttribute("aria-checked", on ? "true" : "false");
-      if (btn.dataset.toggle === "share") setShare(on);
-      if (btn.dataset.toggle === "rts") rtsManualOn = on;
-    });
+  if (v.kind !== "serial") state.flow = "none";
+  document.getElementById("tab-label").textContent = v.tab;
+  document.getElementById("term-bg").textContent = v.term;
+  picker.querySelectorAll("button").forEach((b) => {
+    b.setAttribute("aria-pressed", b.dataset.v === name ? "true" : "false");
   });
+  paint();
+}
 
-  const glassToggle = document.getElementById("glass-toggle");
-  glassToggle.addEventListener("click", () => {
-    const on = glassToggle.classList.toggle("on");
-    glassToggle.setAttribute("aria-checked", on ? "true" : "false");
-    document.body.classList.toggle("qp-glass", on);
+const skinPicker = document.getElementById("skin-picker");
+function setSkin(name) {
+  document.body.dataset.skin = name;
+  skinPicker.querySelectorAll("button").forEach((b) => {
+    b.setAttribute("aria-pressed", b.dataset.skin === name ? "true" : "false");
   });
+}
+skinPicker.addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (btn) setSkin(btn.dataset.skin);
+});
+setSkin("cursor");
 
-  const skinPicker = document.getElementById("skin-picker");
-  function setSkin(name) {
-    document.body.dataset.skin = name;
-    skinPicker.querySelectorAll("button").forEach((b) => {
-      b.setAttribute("aria-pressed", b.dataset.skin === name ? "true" : "false");
-    });
-  }
-  skinPicker.addEventListener("click", (e) => {
-    const btn = e.target.closest("button");
-    if (!btn) return;
-    setSkin(btn.dataset.skin);
-  });
-  setSkin("cursor");
-  // Glass default off so skin color difference is clearer; toggle to compare.
-  glassToggle.classList.remove("on");
-  glassToggle.setAttribute("aria-checked", "false");
-  document.body.classList.remove("qp-glass");
+const glassToggle = document.getElementById("glass-toggle");
+glassToggle.addEventListener("click", () => {
+  const on = glassToggle.classList.toggle("on");
+  glassToggle.setAttribute("aria-checked", on ? "true" : "false");
+  document.body.classList.toggle("qp-glass", on);
+});
+glassToggle.classList.remove("on");
+glassToggle.setAttribute("aria-checked", "false");
+document.body.classList.remove("qp-glass");
 
-  const copyBtn = document.getElementById("copy-btn");
-  copyBtn.addEventListener("click", () => {
-    copyBtn.textContent = "Copied";
-    setTimeout(() => { copyBtn.textContent = "Copy"; }, 900);
-  });
+const picker = document.getElementById("picker");
+picker.addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  apply(btn.dataset.v);
+});
 
-  const connBtn = document.getElementById("conn-btn");
-  connBtn.addEventListener("click", () => {
-    const down = connBtn.dataset.kind === "disconnect";
-    apply(down ? "down" : "serial");
-    picker.querySelectorAll("button").forEach((b) => {
-      b.setAttribute("aria-pressed", b.dataset.v === (down ? "down" : "serial") ? "true" : "false");
-    });
-  });
+document.addEventListener("click", (e) => {
+  const t = e.target;
+  if (!(t instanceof Node)) return;
+  const inSelect = t instanceof Element ? t.closest(".tt-select") : null;
+  if (!inSelect) closeAllSelects();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeAllSelects();
+});
 
-  const variants = {
-    local: {
-      title: "pi", meta: "Local shell", tab: "pi",
-      conn: "connected", sections: [],
-      term: "rede@tterm:~$ pi\n  ▸ reading AGENT.md\n  ▸ implementing serialctl",
-    },
-    ssh: {
-      title: "github.com", meta: "SSH · git@github.com", tab: "github.com",
-      conn: "connected", sections: ["ssh"],
-      term: "git@github.com:~$ ssh -T\nHi rede! You've successfully authenticated.",
-    },
-    serial: {
-      title: "COM3", meta: "Serial · 115200 8N1", tab: "COM3",
-      conn: "connected", sections: ["serial", "serial-io", "serial-modem"],
-      term: "ESP-ROM:esp32s3-20210327\nrst:0x1 (POWERON),boot:0x8 (SPI_FAST_FLASH_BOOT)",
-    },
-    down: {
-      title: "COM3", meta: "Serial · 115200 8N1", tab: "COM3",
-      conn: "disconnected", sections: ["serial", "serial-io", "serial-modem"],
-      term: "session ended — press Enter to reconnect",
-    },
-    shared: {
-      title: "pi", meta: "Local shell", tab: "pi",
-      conn: "connected", sections: [],
-      term: "rede@tterm:~$ pi\n  ▸ share url copied",
-      share: true,
-    },
-  };
-
-  let current = "local";
-  const picker = document.getElementById("picker");
-
-  function syncQs(conn, shareOn) {
-    const btn = document.getElementById("qs-btn");
-    const dot = document.getElementById("qs-dot");
-    btn.classList.toggle("shared", shareOn);
-    // Red badge only while disconnected. Sharing = blue bolt, no blue dot.
-    dot.className = conn === "disconnected" ? "dot down" : "dot";
-  }
-
-  function setConn(kind) {
-    const el = document.getElementById("qp-conn");
-    el.className = "qp-conn qp-conn-" + kind;
-    el.dataset.conn = kind;
-    el.textContent = kind.toUpperCase();
-    const shareOn = document.getElementById("qp-sharing").classList.contains("on");
-    syncQs(kind, shareOn);
-  }
-
-  function setShare(on) {
-    const pill = document.getElementById("qp-sharing");
-    pill.classList.toggle("on", on);
-    pill.title = on ? "AI share on" : "AI share off";
-    document.getElementById("share-reveal").classList.toggle("open", on);
-    const shareSw = document.querySelector('[data-toggle="share"]');
-    shareSw.classList.toggle("on", on);
-    shareSw.setAttribute("aria-checked", on ? "true" : "false");
-    const conn = document.getElementById("qp-conn").dataset.conn;
-    syncQs(conn, on);
-  }
-
-  function apply(name) {
-    current = name;
-    const v = variants[name];
-    document.getElementById("qp-title").textContent = v.title;
-    document.getElementById("qp-meta").textContent = v.meta;
-    document.getElementById("tab-label").textContent = v.tab;
-    document.getElementById("term-bg").textContent = v.term;
-    setConn(v.conn);
-    document.querySelectorAll(".qp-section[data-section]").forEach((s) => {
-      const key = s.dataset.section;
-      const show = key === "share" || v.sections.includes(key);
-      s.classList.toggle("hidden", !show);
-    });
-    setShare(!!v.share);
-    const down = name === "down";
-    connBtn.dataset.kind = down ? "reconnect" : "disconnect";
-    connBtn.textContent = down ? "Reconnect" : "Disconnect";
-    // Reset flow demo when leaving/entering serial so RTS isn't stuck disabled.
-    if (v.sections.includes("serial-modem")) {
-      const flowSel = document.querySelector('.tt-select[data-select="flow"]');
-      const selected = flowSel?.querySelector('.tt-option[aria-selected="true"]');
-      syncHardwareFlow(selected?.dataset.value || "none");
-    } else {
-      syncHardwareFlow("none");
-    }
-  }
-
-  picker.addEventListener("click", (e) => {
-    const btn = e.target.closest("button");
-    if (!btn) return;
-    picker.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b === btn ? "true" : "false"));
-    apply(btn.dataset.v);
-  });
+apply("local");
 </script>
-</body>
+
 </html>
