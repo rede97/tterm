@@ -732,7 +732,6 @@ body.qp-glass .qp-sharing {
   font-size: var(--tt-fs-label);
   font-weight: var(--tt-ui-weight);
   line-height: 1.3;
-  font-weight: var(--tt-ui-weight);
   text-align: left;
   cursor: pointer;
 }
@@ -3103,6 +3102,15 @@ body[data-skin="cursor"] .check-box:checked::after {
   font-weight: var(--tt-ui-weight);
 }
 
+/* Cancel is a ghost (design: primary / ghost / danger-fill). */
+.cf-btn.cf-cancel {
+  background: transparent;
+}
+
+.cf-btn.cf-cancel:hover {
+  background: var(--tt-hover);
+}
+
 .btn:hover,
 .te-btn:hover,
 .sp-btn:hover,
@@ -3328,7 +3336,10 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   border-radius: var(--tt-radius-ctrl);
   background: transparent;
   color: var(--tt-chrome-text);
-  font-family: var(--tt-ui); font-size: var(--tt-fs-label); font-weight: var(--tt-ui-weight); line-height: 1.3;
+  font-family: var(--tt-ui);
+  font-size: var(--tt-fs-label);
+  font-weight: var(--tt-ui-weight);
+  line-height: 1.3;
   text-align: left;
   cursor: pointer;
 }
@@ -3414,7 +3425,9 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   background: var(--tt-inset);
   border: 1px solid var(--tt-line);
   border-radius: var(--tt-radius-ctrl);
-  font-family: var(--tt-mono); font-size: var(--tt-fs-ctrl); line-height: 1.45;
+  font-family: var(--tt-mono);
+  font-size: var(--tt-fs-ctrl);
+  line-height: 1.45;
   color: var(--tt-text);
   white-space: pre;
 }
@@ -4303,7 +4316,8 @@ textarea.cf-preview:focus {
   background: var(--tt-accent-fill);
 }
 .ft-del:hover {
-  background: var(--tt-bad);
+  background: color-mix(in srgb, var(--tt-bad) 22%, transparent);
+  color: var(--tt-bad);
 }
 
 .ft-add {
