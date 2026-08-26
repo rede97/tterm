@@ -1039,7 +1039,7 @@
         <div class="qp-flow">
           <div class="qp-row">
             <span class="qp-label">Flow control</span>
-            <div class="qp-select" data-select aria-label="Flow control">
+            <div class="qp-select" data-select="flow" aria-label="Flow control">
               <button type="button" class="qp-select-trigger"><span class="qp-select-value">None</span></button>
               <div class="qp-select-menu" role="listbox">
                 <button type="button" class="qp-option" role="option" data-value="none" aria-selected="true">None</button>
@@ -1049,9 +1049,9 @@
             </div>
           </div>
           <div class="qp-signals">
-            <div class="qp-row qp-toggle-row">
+            <div class="qp-row qp-toggle-row" data-modem="rts">
               <span class="qp-label">RTS</span>
-              <button type="button" class="qp-switch" role="switch" aria-label="RTS" aria-checked="false" data-toggle>
+              <button type="button" class="qp-switch" role="switch" aria-label="RTS" aria-checked="false" data-toggle="rts">
                 <span class="qp-knob"></span>
               </button>
             </div>
@@ -1059,7 +1059,7 @@
               <span class="qp-label">CTS</span>
               <span class="qp-led on"><i></i>high</span>
             </div>
-            <div class="qp-row qp-toggle-row">
+            <div class="qp-row qp-toggle-row" data-modem="dtr">
               <span class="qp-label">DTR</span>
               <button type="button" class="qp-switch on" role="switch" aria-label="DTR" aria-checked="true" data-toggle>
                 <span class="qp-knob"></span>
@@ -1103,6 +1103,7 @@
       <li><code>Cursor</code>：黑白、大圆角、白开关、白 Reconnect。</li>
       <li><code>VS Code</code>：黑蓝、小圆角、蓝开关、蓝 Reconnect——骨架仍是新稿。</li>
       <li>切皮肤时对比开关颜色与圆角；结构不应跳动。</li>
+      <li><strong>Hardware flow</strong>：切到 Hardware (RTS/CTS) 时 <strong>禁用 RTS</strong>（置灰 + 驱动接管态），DTR 仍可拨；不隐藏、不加说明文案——置灰本身表达不可用。与落地 <code>quickpanel.ts</code> / <code>serial-design.md</code> 一致。</li>
     </ol>
   </aside>
 </div>
@@ -1148,6 +1149,9 @@
       if (root.dataset.select === "nl") {
         document.getElementById("nl-hint").textContent = nlDescs[opt.dataset.value] ?? "";
       }
+      if (root.dataset.select === "flow") {
+        syncHardwareFlow(opt.dataset.value);
+      }
     });
   });
 
@@ -1156,11 +1160,33 @@
     if (e.key === "Escape") closeAllSelects();
   });
 
+  /** Hardware RTS/CTS: driver owns RTS — disable toggle, keep row visible. */
+  let rtsManualOn = false;
+  function syncHardwareFlow(flow) {
+    const hw = flow === "hardware";
+    const row = document.querySelector('[data-modem="rts"]');
+    const sw = row?.querySelector('[data-toggle="rts"]');
+    if (!row || !sw) return;
+    if (!hw) {
+      sw.classList.toggle("on", rtsManualOn);
+      sw.setAttribute("aria-checked", rtsManualOn ? "true" : "false");
+    } else {
+      rtsManualOn = sw.classList.contains("on");
+      sw.classList.add("on");
+      sw.setAttribute("aria-checked", "true");
+    }
+    row.classList.toggle("qp-disabled", hw);
+    sw.disabled = hw;
+    sw.setAttribute("aria-disabled", hw ? "true" : "false");
+  }
+
   document.querySelectorAll("[data-toggle]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (btn.disabled || btn.getAttribute("aria-disabled") === "true") return;
       const on = btn.classList.toggle("on");
       btn.setAttribute("aria-checked", on ? "true" : "false");
       if (btn.dataset.toggle === "share") setShare(on);
+      if (btn.dataset.toggle === "rts") rtsManualOn = on;
     });
   });
 
@@ -1282,6 +1308,14 @@
     const down = name === "down";
     connBtn.dataset.kind = down ? "reconnect" : "disconnect";
     connBtn.textContent = down ? "Reconnect" : "Disconnect";
+    // Reset flow demo when leaving/entering serial so RTS isn't stuck disabled.
+    if (v.sections.includes("serial-modem")) {
+      const flowSel = document.querySelector('.qp-select[data-select="flow"]');
+      const selected = flowSel?.querySelector('.qp-option[aria-selected="true"]');
+      syncHardwareFlow(selected?.dataset.value || "none");
+    } else {
+      syncHardwareFlow("none");
+    }
   }
 
   picker.addEventListener("click", (e) => {

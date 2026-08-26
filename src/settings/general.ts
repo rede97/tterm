@@ -249,13 +249,13 @@ export function collectGeneralSettings(root: HTMLElement): Partial<ConfigState> 
   const rendererEl = root.querySelector("#set-renderer") as HTMLSelectElement;
   const scrollbackEl = root.querySelector("#set-scrollback") as HTMLInputElement;
 
-  if (pasteWarnEl) partial.pasteWarning = pasteWarnEl.checked;
-  if (pasteTrimEl) partial.pasteTrim = pasteTrimEl.checked;
-  if (bellEl) partial.terminalBell = bellEl.checked;
+  if (pasteWarnEl) partial.pasteWarning = pasteWarnEl.getAttribute("aria-checked") === "true";
+  if (pasteTrimEl) partial.pasteTrim = pasteTrimEl.getAttribute("aria-checked") === "true";
+  if (bellEl) partial.terminalBell = bellEl.getAttribute("aria-checked") === "true";
   if (rendererEl) partial.renderer = rendererEl.value;
   if (scrollbackEl)
     partial.scrollback = Math.max(100, Math.min(100000, parseInt(scrollbackEl.value, 10) || 1000));
   const autoUpdateEl = root.querySelector("#set-auto-update") as HTMLInputElement;
-  if (autoUpdateEl) partial.autoCheckUpdates = autoUpdateEl.checked;
+  if (autoUpdateEl) partial.autoCheckUpdates = autoUpdateEl.getAttribute("aria-checked") === "true";
   return partial;
 }

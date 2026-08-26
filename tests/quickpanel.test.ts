@@ -137,7 +137,7 @@ describe("quick panel — local tab", () => {
     expect(p.querySelector('[data-section="ssh"]')).toBeNull();
     expect(p.querySelector('[data-section="serial"]')).toBeNull();
     expect(p.querySelector(".qp-title")!.textContent).toBe("pwsh");
-    expect(p.querySelector(".qp-state-connected")).not.toBeNull();
+    expect(p.querySelector(".qp-conn-connected")).not.toBeNull();
   });
 
   it("share toggle calls shareTab and reveals the link row when shared", async () => {
@@ -175,84 +175,103 @@ describe("quick panel — serial tab", () => {
     );
   }
 
-  it("shows the profile select with built-in profiles first", () => {
+  // -- custom select helpers (design listbox, no native <select>) --
+  function selectOf(row: Element): HTMLElement {
+    const root = row.querySelector<HTMLElement>(".qp-select");
+    if (!root) throw new Error(".qp-select missing in row");
+    return root;
+  }
+  function selectText(row: Element): string {
+    return selectOf(row).querySelector(".qp-select-value")!.textContent!;
+  }
+  function pick(row: Element, value: string): void {
+    const root = selectOf(row);
+    root.querySelector<HTMLElement>(".qp-select-trigger")!.click();
+    expect(root.classList.contains("open")).toBe(true);
+    const opt = root.querySelector<HTMLElement>(`.qp-option[data-value="${value}"]`);
+    expect(opt, `option ${value}`).toBeTruthy();
+    opt!.click();
+    expect(root.classList.contains("open")).toBe(false);
+  }
+
+  const session = (p: HTMLElement) => p.querySelector('[data-section="serial"]')!;
+  const io = (p: HTMLElement) => p.querySelector('[data-section="serial-io"]')!;
+  const modem = (p: HTMLElement) => p.querySelector('[data-section="serial-modem"]')!;
+
+  it("splits into Session / I/O / Modem lines sections per the design", () => {
     const p = openPanel();
-    const sec = p.querySelector('[data-section="serial"]')!;
+    const sec = session(p);
     // Connection (manual release/reconnect) is the first row; Profile next.
     const firstRow = sec.querySelector<HTMLElement>(".qp-row")!;
     expect(firstRow.querySelector(".qp-label")!.textContent).toBe("Connection");
-    const profileRow = rowOf(sec, "Profile")!;
-    expect(profileRow).toBeDefined();
-    const sel = profileRow.querySelector("select")!;
-    expect(sel.value).toBe("Normal");
-    const builtin = sel.querySelector('optgroup[label="Built-in"]')!;
-    expect([...builtin.querySelectorAll("option")].map((o) => o.value)).toEqual([
-      "Normal",
-      "Log",
-      "AT",
-    ]);
+    expect(rowOf(sec, "Profile")).toBeDefined();
     expect(rowOf(sec, "Baud rate")).toBeDefined();
     expect(rowOf(sec, "Auto-reconnect")).toBeDefined();
-    expect(rowOf(sec, "Input mode")).toBeDefined();
-    expect(rowOf(sec, "Enter sends")).toBeDefined();
-    expect(rowOf(sec, "Output newlines")).toBeDefined();
-    expect(rowOf(sec, "Flow control")).toBeDefined();
+    expect(rowOf(io(p), "Input mode")).toBeDefined();
+    expect(rowOf(io(p), "Enter sends")).toBeDefined();
+    expect(rowOf(io(p), "Output newlines")).toBeDefined();
+    expect(rowOf(modem(p), "Flow control")).toBeDefined();
+  });
+
+  it("profile select shows the current value with built-in profiles first", () => {
+    const p = openPanel();
+    const profileRow = rowOf(session(p), "Profile")!;
+    expect(selectText(profileRow)).toBe("Normal");
+    const root = selectOf(profileRow);
+    const group = root.querySelector(".qp-optgroup")!;
+    expect(group.textContent).toBe("Built-in");
+    const values = [...root.querySelectorAll<HTMLElement>(".qp-option")].map(
+      (o) => o.dataset.value,
+    );
+    expect(values.slice(0, 3)).toEqual(["Normal", "Log", "AT"]);
+    // The current option carries the selected marker + check.
+    const selected = root.querySelector('.qp-option[aria-selected="true"]')!;
+    expect(selected.dataset.value).toBe("Normal");
   });
 
   it("selecting the AT profile calls setSerialProfile", () => {
     const p = openPanel();
-    const sec = p.querySelector('[data-section="serial"]')!;
-    const sel = rowOf(sec, "Profile")!.querySelector("select")!;
-    sel.value = "AT";
-    sel.dispatchEvent(new Event("change"));
+    pick(rowOf(session(p), "Profile")!, "AT");
     expect(handlers.setSerialProfile).toHaveBeenCalledWith("tab-7", "AT");
   });
 
-  it("baud select change calls setSerialBaud with a number", async () => {
+  it("baud select change calls setSerialBaud with a number", () => {
     const p = openPanel();
-    const sec = p.querySelector('[data-section="serial"]')!;
-    const sel = rowOf(sec, "Baud rate")!.querySelector("select")!;
-    expect(sel.value).toBe("115200");
-    sel.value = "9600";
-    sel.dispatchEvent(new Event("change"));
+    const baudRow = rowOf(session(p), "Baud rate")!;
+    expect(selectText(baudRow)).toBe("115200");
+    pick(baudRow, "9600");
     expect(handlers.setSerialBaud).toHaveBeenCalledWith("tab-7", 9600);
   });
 
   it("parameter selects call the live session-only handlers", () => {
     const p = openPanel();
-    const sec = p.querySelector('[data-section="serial"]')!;
-    const inputSel = rowOf(sec, "Input mode")!.querySelector("select")!;
-    expect(inputSel.value).toBe("normal");
-    inputSel.value = "echo";
-    inputSel.dispatchEvent(new Event("change"));
+    const inputRow = rowOf(io(p), "Input mode")!;
+    expect(selectText(inputRow)).toBe("Normal");
+    pick(inputRow, "echo");
     expect(handlers.setSerialInputMode).toHaveBeenCalledWith("tab-7", "echo");
 
-    const enterSel = rowOf(sec, "Enter sends")!.querySelector("select")!;
-    expect(enterSel.value).toBe("cr");
-    enterSel.value = "crlf";
-    enterSel.dispatchEvent(new Event("change"));
+    const enterRow = rowOf(io(p), "Enter sends")!;
+    expect(selectText(enterRow)).toBe("CR (\\r)");
+    pick(enterRow, "crlf");
     expect(handlers.setSerialEnterNewline).toHaveBeenCalledWith("tab-7", "crlf");
 
-    const outSel = rowOf(sec, "Output newlines")!.querySelector("select")!;
-    expect(outSel.value).toBe("keep");
-    outSel.value = "cr-in-lf";
-    outSel.dispatchEvent(new Event("change"));
+    const outRow = rowOf(io(p), "Output newlines")!;
+    expect(selectText(outRow)).toBe("Keep (raw)");
+    pick(outRow, "cr-in-lf");
     expect(handlers.setSerialOutputNewline).toHaveBeenCalledWith("tab-7", "cr-in-lf");
   });
 
   it("Output newlines select shows a live help line and per-option tooltips", () => {
     const p = openPanel();
-    const sec = p.querySelector('[data-section="serial"]')!;
-    const outSel = rowOf(sec, "Output newlines")!.querySelector("select")!;
-    const hint = sec.querySelector<HTMLElement>(".qp-select-hint")!;
+    const outRow = rowOf(io(p), "Output newlines")!;
+    const hint = io(p).querySelector<HTMLElement>(".qp-select-hint")!;
     // Default keep: hint explains the current selection.
     expect(hint.textContent).toContain("Pass through unchanged");
-    for (const opt of outSel.querySelectorAll("option")) {
+    for (const opt of outRow.querySelectorAll<HTMLElement>(".qp-option")) {
       expect(opt.title.length).toBeGreaterThan(0);
     }
     // Switching updates the hint; the handler still fires.
-    outSel.value = "force-crlf";
-    outSel.dispatchEvent(new Event("change"));
+    pick(outRow, "force-crlf");
     expect(hint.textContent).toBe("\\r | \\n | \\r\\n → \\r\\n");
     expect(handlers.setSerialOutputNewline).toHaveBeenCalledWith("tab-7", "force-crlf");
   });
@@ -260,12 +279,12 @@ describe("quick panel — serial tab", () => {
   it("queries modem lines on open; signal rows always visible; auto-reconnect toggle works", async () => {
     const p = openPanel();
     expect(invokeMock).toHaveBeenCalledWith("serial_line_status", { id: "tab-7" });
-    const sec = p.querySelector('[data-section="serial"]')!;
+    const sec = modem(p);
     // The signal block no longer hides at flow=none: open drives no modem
     // line, so the toggles are the only way to raise RTS/DTR.
     expect(rowOf(sec, "RTS")).toBeDefined();
     expect(rowOf(sec, "DTR")).toBeDefined();
-    switchOf(rowOf(sec, "Auto-reconnect")!).click();
+    switchOf(rowOf(session(p), "Auto-reconnect")!).click();
     expect(invokeMock).toHaveBeenCalledWith("session_set_auto_reconnect", {
       id: "tab-7",
       enabled: true,
@@ -274,21 +293,21 @@ describe("quick panel — serial tab", () => {
 
   it("flow control select calls serial_set_flow_control; signal rows reflect queried state", async () => {
     const p = openPanel();
-    const sec = p.querySelector('[data-section="serial"]')!;
-    const flowSel = rowOf(sec, "Flow control")!.querySelector("select")!;
-    expect(flowSel.value).toBe("none");
-    expect(flowSel.disabled).toBe(false);
-    flowSel.value = "hardware";
-    flowSel.dispatchEvent(new Event("change"));
+    const sec = modem(p);
+    const flowRow = rowOf(sec, "Flow control")!;
+    expect(selectText(flowRow)).toBe("None");
+    expect(selectOf(flowRow).classList.contains("qp-disabled")).toBe(false);
+    pick(flowRow, "hardware");
     expect(invokeMock).toHaveBeenCalledWith("serial_set_flow_control", {
       id: "tab-7",
       flow: "hardware",
     });
 
     await vi.waitFor(() => {
-      expect(rowOf(sec, "CTS")!.querySelector(".qp-line-val")!.textContent).toBe("asserted");
+      expect(rowOf(sec, "CTS")!.querySelector(".qp-led")!.textContent).toBe("high");
     });
-    expect(rowOf(sec, "DSR")!.querySelector(".qp-line-val")!.textContent).toBe("asserted");
+    expect(rowOf(sec, "CTS")!.querySelector(".qp-led")!.classList.contains("on")).toBe(true);
+    expect(rowOf(sec, "DSR")!.querySelector(".qp-led")!.textContent).toBe("high");
 
     // Hardware RTS/CTS: RTS is driver-owned (toggle disabled, no IPC).
     // DTR is not part of that handshake and stays software-controlled.
@@ -298,6 +317,7 @@ describe("quick panel — serial tab", () => {
     invokeMock.mockClear();
     rtsSwitch.click();
     expect(invokeMock).not.toHaveBeenCalledWith("serial_set_rts", expect.anything());
+
     switchOf(rowOf(sec, "DTR")!).click();
     expect(invokeMock).toHaveBeenCalledWith("serial_set_dtr", { id: "tab-7", on: false });
   });
@@ -322,10 +342,10 @@ describe("quick panel — serial tab", () => {
       flowControl: "hardware",
     });
     const p = openPanel();
-    const sec = p.querySelector('[data-section="serial"]')!;
+    const sec = modem(p);
     const flowRow = rowOf(sec, "Flow control")!;
     await vi.waitFor(() => {
-      expect(flowRow.querySelector("select")!.disabled).toBe(true);
+      expect(selectOf(flowRow).classList.contains("qp-disabled")).toBe(true);
     });
     expect(flowRow.classList.contains("qp-disabled")).toBe(true);
     expect(sec.textContent).toContain("not supported by this port");
@@ -341,10 +361,10 @@ describe("quick panel — serial tab", () => {
       return Promise.resolve(null);
     });
     const p = openPanel();
-    const sec = p.querySelector('[data-section="serial"]')!;
+    const sec = modem(p);
     const flowRow = rowOf(sec, "Flow control")!;
     await vi.waitFor(() => {
-      expect(flowRow.querySelector("select")!.disabled).toBe(true);
+      expect(selectOf(flowRow).classList.contains("qp-disabled")).toBe(true);
     });
     expect(flowRow.classList.contains("qp-disabled")).toBe(true);
   });

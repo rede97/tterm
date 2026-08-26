@@ -49,24 +49,40 @@ export function itemRow(title: string, desc: string, control: unknown): Template
   </div>`;
 }
 
-/** The settings toggle switch (checkbox in the shared row shell). Click
- *  propagation is stopped so a toggle inside a clickable row (e.g. an
- *  expandable card) doesn't trigger the row's own handler. */
+/** The settings toggle switch — the SAME control as the quick panel's
+ *  (docs/quickpanel-preview.html): .qp-switch + .qp-knob, role="switch",
+ *  skin-driven colors and transitions. Click propagation is stopped so a
+ *  toggle inside a clickable row (e.g. an expandable card) doesn't
+ *  trigger the row's own handler.
+ *
+ *  State flips in the DOM immediately: several panels collect from the
+ *  element (aria-checked) and not every onChange re-renders. A later
+ *  render re-asserts the same state from the model. */
 export function toggle(
   checked: boolean,
   onChange: (checked: boolean) => void,
-  opts?: { id?: string; value?: string },
+  opts?: { id?: string; value?: string; label?: string },
 ): TemplateResult {
-  return html`<label class="settings-toggle-row settings-toggle-flush">
-    <input
-      type="checkbox"
-      id=${ifDefined(opts?.id)}
-      value=${ifDefined(opts?.value)}
-      .checked=${checked}
-      @click=${(e: Event) => e.stopPropagation()}
-      @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked)}
-    />
-  </label>`;
+  return html`<button
+    type="button"
+    class="qp-switch ${checked ? "on" : ""}"
+    role="switch"
+    id=${ifDefined(opts?.id)}
+    value=${ifDefined(opts?.value)}
+    aria-label=${ifDefined(opts?.label)}
+    aria-checked=${checked ? "true" : "false"}
+    @click=${(e: Event) => {
+      e.stopPropagation();
+      const btn = e.currentTarget as HTMLElement;
+      const next = btn.getAttribute("aria-checked") !== "true";
+      btn.classList.toggle("on", next);
+      btn.setAttribute("aria-checked", next ? "true" : "false");
+      onChange(next);
+      // Non-native control: the settings shell tracks dirty state via this
+      // bubbling event (its input/change delegation misses buttons).
+      btn.dispatchEvent(new CustomEvent("tterm-settings-changed", { bubbles: true }));
+    }}
+  ><span class="qp-knob"></span></button>`;
 }
 
 /** The flat settings button. `danger` for destructive actions; `cls` adds

@@ -24,10 +24,14 @@ function generalPanel(root: HTMLElement): HTMLElement {
   return el!;
 }
 
-function autoUpdateToggle(root: HTMLElement): HTMLInputElement {
-  const el = generalPanel(root).querySelector<HTMLInputElement>("#set-auto-update");
+function autoUpdateToggle(root: HTMLElement): HTMLElement {
+  const el = generalPanel(root).querySelector<HTMLElement>("#set-auto-update");
   expect(el, "auto-update toggle").toBeTruthy();
   return el!;
+}
+
+function toggleOn(el: HTMLElement): boolean {
+  return el.getAttribute("aria-checked") === "true";
 }
 
 beforeEach(() => {
@@ -40,19 +44,19 @@ beforeEach(() => {
 describe("settings — updates", () => {
   it("renders the Updates section with the toggle reflecting config (default on)", () => {
     const root = createSettingsContent();
-    expect(autoUpdateToggle(root).checked).toBe(true);
+    expect(toggleOn(autoUpdateToggle(root))).toBe(true);
   });
 
   it("renders the toggle unchecked when auto-check is disabled", () => {
     configStore.set({ autoCheckUpdates: false });
     const root = createSettingsContent();
-    expect(autoUpdateToggle(root).checked).toBe(false);
+    expect(toggleOn(autoUpdateToggle(root))).toBe(false);
   });
 
   it("apply persists autoCheckUpdates=false to the config file", async () => {
     const root = createSettingsContent();
     document.body.appendChild(root);
-    autoUpdateToggle(root).checked = false;
+    autoUpdateToggle(root).click(); // flip off
     const applyBtn = [...root.querySelectorAll<HTMLButtonElement>(".settings-btn")].find(
       (b) => b.textContent === "Apply",
     )!;

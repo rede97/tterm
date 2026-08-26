@@ -376,6 +376,6 @@ export async function saveSshConfigToDisk(from: HTMLElement): Promise<void> {
 export function collectSshSettings(root: HTMLElement): Partial<ConfigState> {
   const partial: Partial<ConfigState> = {};
   const embeddedEl = root.querySelector<HTMLInputElement>("#set-ssh-embedded");
-  if (embeddedEl) partial.sshEmbedded = embeddedEl.checked;
+  if (embeddedEl) partial.sshEmbedded = embeddedEl.getAttribute("aria-checked") === "true";
   return partial;
 }

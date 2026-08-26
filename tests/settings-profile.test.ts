@@ -72,10 +72,10 @@ describe("settings — profile panel", () => {
     const sel = profileSelect(root);
     expect(sel.options).toHaveLength(3);
     expect(sel.value).toBe("CMD");
-    const checks = root.querySelectorAll<HTMLInputElement>(".wt-profile-check");
+    const checks = root.querySelectorAll<HTMLElement>(".wt-profile-check");
     expect(checks).toHaveLength(3);
-    const ps = [...checks].find((c) => c.value === "PowerShell")!;
-    expect(ps.checked).toBe(false);
+    const ps = [...checks].find((c) => c.getAttribute("value") === "PowerShell")!;
+    expect(ps.getAttribute("aria-checked")).toBe("false");
     // Panel-scoped: the settings page chrome survives the re-render.
     expect(root.querySelectorAll(".settings-nav-item")).toHaveLength(6);
   });

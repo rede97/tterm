@@ -394,30 +394,33 @@ describe("settings — SSH panel lit-html rendering (pilot acceptance)", () => {
   it("pending Built-in toggle survives internal re-renders (keepPending is dead)", () => {
     configStore.set({ sshHosts: twoHosts, sshEmbedded: true });
     const panel = openPanel();
-    const cb = panel.querySelector<HTMLInputElement>("#set-ssh-embedded")!;
-    expect(cb.checked).toBe(true);
-    cb.click(); // user unchecks, has NOT applied yet
-    expect(cb.checked).toBe(false);
+    const on = () =>
+      panel.querySelector<HTMLElement>("#set-ssh-embedded")!.getAttribute("aria-checked");
+    expect(on()).toBe("true");
+    panel.querySelector<HTMLElement>("#set-ssh-embedded")!.click(); // pending, not applied
+    expect(on()).toBe("false");
 
     // Any internal re-render (here: Delete) must not reset the toggle to
     // the stored value — the old keepPending hack's entire job.
     panel
       .querySelector<HTMLButtonElement>('.ssh-host-card[data-name="b"] .ssh-btn-delete')!
       .click();
-    expect(panel.querySelector<HTMLInputElement>("#set-ssh-embedded")!.checked).toBe(false);
+    expect(on()).toBe("false");
   });
 
   it("revert resets the pending toggle to the stored value", async () => {
     configStore.set({ sshHosts: twoHosts, sshEmbedded: true });
     const panel = openPanel();
-    panel.querySelector<HTMLInputElement>("#set-ssh-embedded")!.click();
+    panel.querySelector<HTMLElement>("#set-ssh-embedded")!.click();
     const { refreshSshPanel } = await import("../src/settings/ssh");
     // refreshSshPanel takes the settings page root; our bare panel works
     // because it IS the [data-panel="ssh"] element's own subtree root.
     const page = document.createElement("div");
     page.appendChild(panel);
     refreshSshPanel(page);
-    expect(panel.querySelector<HTMLInputElement>("#set-ssh-embedded")!.checked).toBe(true);
+    expect(
+      panel.querySelector<HTMLElement>("#set-ssh-embedded")!.getAttribute("aria-checked"),
+    ).toBe("true");
   });
 
   it("list element identity survives re-renders (Sortable binding stays live)", () => {

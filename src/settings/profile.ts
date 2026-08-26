@@ -76,14 +76,22 @@ function renderProfilePanel(panel: HTMLElement): void {
                 <div class="settings-item-desc" style="margin-bottom:0;">${p.command}</div>
               </div>
               <div class="settings-item-control">
-                <span class="settings-toggle-row settings-toggle-flush">
-                  <input
-                    type="checkbox"
-                    class="wt-profile-check"
-                    value=${p.name}
-                    .checked=${!hiddenProfiles.includes(p.name)}
-                  />
-                </span>
+                <button
+                  type="button"
+                  class="qp-switch wt-profile-check ${hiddenProfiles.includes(p.name) ? "" : "on"}"
+                  role="switch"
+                  value=${p.name}
+                  aria-label=${`Show ${p.name}`}
+                  aria-checked=${hiddenProfiles.includes(p.name) ? "false" : "true"}
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    const btn = e.currentTarget as HTMLElement;
+                    const next = btn.getAttribute("aria-checked") !== "true";
+                    btn.classList.toggle("on", next);
+                    btn.setAttribute("aria-checked", next ? "true" : "false");
+                    btn.dispatchEvent(new CustomEvent("tterm-settings-changed", { bubbles: true }));
+                  }}
+                ><span class="qp-knob"></span></button>
               </div>
             </label>`,
           )}
@@ -98,13 +106,13 @@ function renderProfilePanel(panel: HTMLElement): void {
 export function collectProfileSettings(root: HTMLElement): Partial<ConfigState> {
   const partial: Partial<ConfigState> = {};
   const profileEl = root.querySelector("#set-default-profile") as HTMLSelectElement;
-  const checks = root.querySelectorAll<HTMLInputElement>(".wt-profile-check");
+  const checks = root.querySelectorAll<HTMLElement>(".wt-profile-check");
   if (profileEl && profileEl.options.length > 0) {
     partial.defaultLocalProfile = profileEl.value;
   }
   const hidden: string[] = [];
   checks.forEach((c) => {
-    if (!c.checked) hidden.push(c.value);
+    if (c.getAttribute("aria-checked") !== "true") hidden.push(c.getAttribute("value") ?? "");
   });
   partial.hiddenProfiles = hidden;
   return partial;

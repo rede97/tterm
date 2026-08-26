@@ -2,6 +2,20 @@
 // Covers tab-bar placement, the AI Share toggle (real share creation), and
 // the serial section (mock loopback port) with live RTS/CTS and
 // auto-reconnect IPC roundtrips.
+
+// Browser-side helper: pick an option in a design listbox (.qp-select) —
+// the panel no longer uses native <select> (docs/quickpanel-preview.html).
+function qpPick(label, value) {
+  const root = [...document.querySelectorAll(".quick-panel .qp-select")].find(
+    (s) => s.getAttribute("aria-label") === label,
+  );
+  if (!root) throw new Error(`select ${label} not found`);
+  root.querySelector(".qp-select-trigger").click();
+  const opt = root.querySelector(`.qp-option[data-value="${value}"]`);
+  if (!opt) throw new Error(`option ${value} not found in ${label}`);
+  opt.click();
+}
+
 describe("Quick-status button and panel", () => {
   it("groups with the park-to-tray button ahead of the window controls, divided from minimize", async () => {
     await browser.waitUntil(async () => (await $$("#tabs .tab")).length >= 1, { timeout: 15000 });
@@ -76,11 +90,14 @@ describe("Quick-status button and panel", () => {
       const row = document.querySelector('.quick-panel [data-section="share"] .qp-toggle-row');
       row.querySelector(".qp-switch").click();
     });
+    // The row always exists (grid-rows reveal); the URL text fills in.
     await browser.waitUntil(
       async () => {
-        return await browser.execute(() => !!document.querySelector(".quick-panel .qp-share-url"));
+        return await browser.execute(
+          () => (document.querySelector(".quick-panel .qp-share-url")?.textContent ?? "") !== "",
+        );
       },
-      { timeout: 5000, timeoutMsg: "share URL row did not appear after toggle" },
+      { timeout: 5000, timeoutMsg: "share URL did not appear after toggle" },
     );
 
     const state = await browser.execute(() => {
@@ -134,11 +151,19 @@ describe("Quick-status button and panel", () => {
     const sec = await $('.quick-panel.open [data-section="serial"]');
     await sec.waitForExist({ timeout: 5000 });
 
-    // Row order: Profile first, then baud, auto-reconnect, live params, flow.
+    // Sections per the design: Session (serial), I/O (serial-io), Modem
+    // lines (serial-modem). Select order across the panel.
     const info = await browser.execute(() => {
-      const sec = document.querySelector('.quick-panel [data-section="serial"]');
-      const selects = [...sec.querySelectorAll("select")].map((s) => s.getAttribute("aria-label"));
-      return { selects, text: sec.textContent };
+      const panel = document.querySelector(".quick-panel");
+      const selects = [...panel.querySelectorAll(".qp-select")].map((s) =>
+        s.getAttribute("aria-label"),
+      );
+      return {
+        selects,
+        text: panel.textContent,
+        serialIo: !!panel.querySelector('[data-section="serial-io"]'),
+        serialModem: !!panel.querySelector('[data-section="serial-modem"]'),
+      };
     });
     expect(info.selects).toEqual([
       "Profile",
@@ -148,43 +173,36 @@ describe("Quick-status button and panel", () => {
       "Output newlines",
       "Flow control",
     ]);
+    expect(info.serialIo).toBe(true);
+    expect(info.serialModem).toBe(true);
     expect(info.text).toContain("Auto-reconnect");
 
     // Default profile Normal, flow none: the signal block is visible too —
     // open drives no modem line, so the toggles are the only way to raise
     // RTS/DTR (CDC-ACM devices that gate TX on DTR need this).
     const earlySignals = await browser.execute(() => {
-      const sec = document.querySelector('.quick-panel [data-section="serial"]');
+      const sec = document.querySelector('.quick-panel [data-section="serial-modem"]');
       return {
         toggles: sec.querySelectorAll(".qp-signals .qp-toggle-row").length,
-        vals: sec.querySelectorAll(".qp-signals .qp-line-val").length,
+        leds: sec.querySelectorAll(".qp-signals .qp-led").length,
       };
     });
     expect(earlySignals.toggles).toBe(2);
-    expect(earlySignals.vals).toBe(2);
+    expect(earlySignals.leds).toBe(2);
 
     // Switch profile to AT: the section re-renders with its parameters
     // (line-by-line input, CRLF enter) reflected in the live selects.
-    await browser.execute(() => {
-      const sel = document.querySelector(
-        '.quick-panel [data-section="serial"] select[aria-label="Profile"]',
-      );
-      sel.value = "AT";
-      sel.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    await browser.execute(qpPick, "Profile", "AT");
     await browser.waitUntil(
       () =>
         browser.execute(() => {
           const mgr = window.__tterm.mgr;
           const tab = mgr.get(mgr.activeTabId);
-          const inputSel = document.querySelector(
-            '.quick-panel [data-section="serial"] select[aria-label="Input mode"]',
-          );
+          const inputText = [...document.querySelectorAll(".quick-panel .qp-select")]
+            .find((s) => s.getAttribute("aria-label") === "Input mode")
+            ?.querySelector(".qp-select-value").textContent;
           return (
-            tab.serialProfile === "AT" &&
-            tab.inputMode === "line" &&
-            inputSel &&
-            inputSel.value === "line"
+            tab.serialProfile === "AT" && tab.inputMode === "line" && inputText === "Line-by-line"
           );
         }),
       { timeout: 5000, timeoutMsg: "AT profile did not apply to the live session" },
@@ -193,24 +211,18 @@ describe("Quick-status button and panel", () => {
     // Enable hardware flow control: round-trips through the backend; the
     // already-visible signal block keeps live CTS/DSR status (mock port
     // reports asserted).
-    await browser.execute(() => {
-      const sel = document.querySelector(
-        '.quick-panel [data-section="serial"] select[aria-label="Flow control"]',
-      );
-      sel.value = "hardware";
-      sel.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    await browser.execute(qpPick, "Flow control", "hardware");
     await browser.waitUntil(
       () =>
         browser.execute(
           () =>
-            document.querySelector('.quick-panel [data-section="serial"] .qp-line-val')
-              ?.textContent === "asserted",
+            document.querySelector('.quick-panel [data-section="serial-modem"] .qp-led')
+              ?.textContent === "high",
         ),
       { timeout: 5000, timeoutMsg: "CTS status never resolved" },
     );
     const signals = await browser.execute(() => {
-      const sec = document.querySelector('.quick-panel [data-section="serial"]');
+      const sec = document.querySelector('.quick-panel [data-section="serial-modem"]');
       return {
         text: sec.textContent,
         toggleLabels: [...sec.querySelectorAll(".qp-signals .qp-toggle-row")].map(
@@ -306,14 +318,7 @@ describe("Quick-status button and panel", () => {
     );
 
     // Baud select switches the live session and renames the tab.
-    await browser.execute(() => {
-      const sec = document.querySelector('.quick-panel [data-section="serial"]');
-      const sel = [...sec.querySelectorAll("select")].find(
-        (s) => s.getAttribute("aria-label") === "Baud rate",
-      );
-      sel.value = "9600";
-      sel.dispatchEvent(new Event("change"));
-    });
+    await browser.execute(qpPick, "Baud rate", "9600");
     await browser.waitUntil(
       async () => {
         return await browser.execute(() => {

@@ -320,180 +320,481 @@ body {
   display: none;
 }
 
+/* Down: small red badge (design: only disconnected gets a dot). */
 #quick-status[data-state="down"] .qs-dot {
   display: block;
   background: var(--tt-bad);
 }
 
-#quick-status[data-state="shared"] .qs-dot {
-  display: block;
-  background: var(--tt-bolt);
+/* Shared: the bolt itself turns blue — no separate dot. */
+#quick-status[data-state="shared"] {
+  color: var(--tt-bolt);
 }
 
+/* ==================================================================
+   Quick panel — 1:1 port of docs/quickpanel-preview.html
+   (aliases mapped: --qp-bg→--tt-sidebar, --qp-well→--tt-well,
+   --qp-inset→--tt-inset, --qp-accent-fill→--tt-selected, --qp-ctrl→
+   --tt-btn-width, --qp-ctrl-h→--tt-ctrl-h, --qp-weight→--tt-ui-weight)
+   ================================================================== */
 .quick-panel {
   position: fixed;
   z-index: 110;
-  /* Fixed width: content (e.g. the share link row) must not resize the
-     panel; long values ellipsize inside their rows instead. */
   width: var(--tt-qp-width);
-  /* qp-glass swaps in translucent surfaces (tokens.css --tt-qp-*); the
-     fallback keeps the opaque skin colors otherwise. */
-  background: var(--tt-qp-well, var(--tt-well));
-  border: 1px solid var(--tt-line);
-  border-radius: 6px;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
-  padding: 6px 0;
-  display: none;
-  font-size: 13px;
+  max-height: calc(100% - 48px);
+  overflow: auto;
   color: var(--tt-text);
+  font: 13px / 1.4 var(--tt-ui);
+  background: var(--tt-sidebar);
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  padding: 8px;
+  display: none;
 }
 
 .quick-panel.open {
   display: block;
 }
 
-/* Frosted quick panel (Settings → Appearance): translucency + blur behind
-   the panel only — the window itself stays opaque. */
+/* Apple-like vibrancy (Settings → Appearance → Frosted glass): blur +
+   slight saturate over the terminal only — window stays opaque. */
 body.qp-glass .quick-panel {
-  background: var(--tt-qp-well);
-  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: saturate(180%) blur(28px);
+  backdrop-filter: saturate(180%) blur(28px);
+  background: var(--tt-qp-sidebar);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.08) inset,
+    0 16px 48px rgba(0, 0, 0, 0.4);
 }
 
+body.qp-glass .qp-section {
+  background: var(--tt-qp-well);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.qp-glass .qp-select-menu {
+  -webkit-backdrop-filter: saturate(160%) blur(20px);
+  backdrop-filter: saturate(160%) blur(20px);
+  background: rgba(22, 22, 24, 0.72);
+}
+
+body.qp-glass .qp-select-trigger,
+body.qp-glass .qp-mini-btn:not(.qp-connect-btn[data-kind="reconnect"]),
+body.qp-glass .qp-share-url {
+  background: rgba(0, 0, 0, 0.28);
+}
+
+body.qp-glass .qp-connect-btn[data-kind="reconnect"] {
+  background: var(--tt-accent);
+  border-color: var(--tt-accent);
+  color: #0a0a0a;
+}
+
+body.qp-glass[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
+  background: var(--tt-selected);
+  border-color: var(--tt-accent);
+  color: #fff;
+}
+
+body.qp-glass .qp-connect-btn[data-kind="reconnect"]:hover {
+  filter: brightness(1.08);
+}
+
+body.qp-glass .qp-conn,
+body.qp-glass .qp-sharing {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Fallback when backdrop-filter unsupported — stay opaque. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  body.qp-glass .quick-panel {
+    background: #1c1c1e;
+  }
+}
+
+.quick-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.quick-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.quick-panel::-webkit-scrollbar-thumb {
+  background: var(--tt-scroll-thumb);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* -- header: title | status pills (separate slots, fixed widths) -- */
 .qp-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 4px 12px 8px;
-  border-bottom: 1px solid var(--tt-line);
+  gap: 10px;
+  padding: 6px 8px 10px;
+}
+
+.qp-ident {
+  min-width: 0;
 }
 
 .qp-title {
+  display: block;
+  font-size: 13px;
   font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #fff;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.qp-state {
+.qp-meta {
+  display: block;
+  margin-top: 3px;
   font-size: 11px;
-  margin-left: 8px;
+  color: var(--tt-muted);
+}
+
+.qp-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.qp-conn,
+.qp-sharing {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 22px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--tt-line);
+  background: var(--tt-well);
+  box-sizing: border-box;
+}
+
+/* Dot left, label right — balanced in fixed width. */
+.qp-conn {
+  width: var(--tt-qp-conn-w);
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 9px 0 8px;
+}
+
+.qp-sharing {
+  width: var(--tt-qp-share-w);
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 9px 0 8px;
+}
+
+.qp-conn::before {
+  content: "";
+  height: 6px;
+  border-radius: 99px;
+  background: currentColor;
+  flex-shrink: 0;
+  /* Disconnected: round dot. Connected: elongated bar to balance the
+     short label. The width morph IS the state-change animation. */
+  width: 6px;
+  transition:
+    width 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    background 180ms ease,
+    border-radius 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.qp-conn-connected {
+  color: var(--tt-ok);
+  border-color: color-mix(in srgb, var(--tt-ok) 40%, transparent);
+}
+
+.qp-conn-connected::before {
+  width: 18px;
+}
+
+.qp-conn-disconnected {
+  color: var(--tt-bad);
+  border-color: color-mix(in srgb, var(--tt-bad) 40%, transparent);
+}
+
+.qp-conn-disconnected::before {
+  width: 6px;
+}
+
+/* Sharing pill: off = muted; on = teal. Never merged with connection
+   state (UX-03). */
+.qp-sharing {
+  position: relative;
+  color: var(--tt-faint);
+}
+
+.qp-sharing::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
   flex-shrink: 0;
 }
 
-/* CONNECTED is green; the sharing badge is teal — separate dimensions,
-   never merged (design tokens rule 4 / UX-03). */
-.qp-state-connected {
-  color: var(--tt-ok);
-}
-
-.qp-state-disconnected {
-  color: var(--tt-bad);
-}
-
-.qp-state-shared {
+.qp-sharing.on {
   color: var(--tt-share);
-  margin-left: 6px;
+  border-color: color-mix(in srgb, var(--tt-share) 35%, transparent);
 }
 
+/* -- wells -- */
 .qp-section {
-  padding: 6px 0;
-  border-bottom: 1px solid var(--tt-line);
+  background: var(--tt-well);
+  border: 1px solid var(--tt-line);
+  border-radius: var(--tt-radius-sm);
+  padding: 6px 0 4px;
+  margin-bottom: 6px;
 }
 
 .qp-section:last-child {
-  border-bottom: none;
+  margin-bottom: 0;
 }
 
 .qp-section-title {
-  padding: 2px 12px 4px;
+  padding: 4px 10px 6px;
   font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
+  font-weight: var(--tt-ui-weight);
   color: var(--tt-muted);
-  letter-spacing: 0.5px;
 }
 
 .qp-sub-title {
-  padding: 4px 12px 2px;
-  font-size: 12px;
-  color: var(--tt-muted);
+  padding: 2px 10px 6px;
+  font-size: 11px;
+  font-weight: var(--tt-ui-weight);
+  color: var(--tt-faint);
 }
 
+/* -- rows: label | fixed control column -- */
 .qp-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 12px;
-  gap: 8px;
+  gap: 12px;
+  min-height: 32px;
+  padding: 2px 10px;
+  border-radius: var(--tt-radius-opt);
+  margin: 0 2px;
+}
+
+.qp-row:hover {
+  background: var(--tt-hover);
 }
 
 .qp-label {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #cfcfcf;
+  font-size: 12.5px;
+  font-weight: var(--tt-ui-weight);
+}
+
+/* -- custom select (no OS menu) -- */
+.qp-select {
+  position: relative;
+  width: var(--tt-btn-width);
+  height: var(--tt-ctrl-h);
+  flex-shrink: 0;
+}
+
+.qp-select-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0 26px 0 10px;
+  color: var(--tt-text);
+  background: var(--tt-inset);
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius-ctrl);
+  font: 12px / 1 var(--tt-ui);
+  font-weight: var(--tt-ui-weight);
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+}
+
+.qp-select-trigger::after {
+  content: "";
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translateY(-50%);
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>")
+    center / contain no-repeat;
+  pointer-events: none;
+}
+
+.qp-select-trigger:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.qp-select.open .qp-select-trigger,
+.qp-select-trigger:focus-visible {
+  border-color: var(--tt-focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tt-focus) 35%, transparent);
+}
+
+.qp-select-value {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.qp-select {
-  background: var(--tt-inset);
-  color: var(--tt-text);
-  border: 1px solid var(--tt-line);
-  border-radius: 3px;
-  font-size: 12px;
-  padding: 2px 4px;
-  max-width: 150px;
+.qp-select-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 220px;
+  overflow: auto;
+  padding: 4px;
+  background: #161616;
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius-sm);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+  display: none;
 }
 
-.qp-input {
-  background: var(--tt-inset);
-  color: var(--tt-text);
-  border: 1px solid var(--tt-line);
-  border-radius: 3px;
-  font-size: 12px;
-  padding: 2px 6px;
-  min-width: 0;
+.qp-select.open .qp-select-menu {
+  display: block;
 }
 
-.qp-mini-btn {
-  background: var(--tt-well);
+.qp-select-menu[data-drop="up"] {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+.qp-optgroup {
+  padding: 6px 8px 3px;
+  font-size: 10.5px;
+  font-weight: var(--tt-ui-weight);
+  color: var(--tt-faint);
+  letter-spacing: 0.02em;
+}
+
+.qp-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--tt-radius-opt);
+  background: transparent;
   color: var(--tt-text);
-  border: 1px solid var(--tt-line);
-  border-radius: 3px;
-  font-size: 12px;
-  padding: 2px 8px;
+  font: 12px / 1.3 var(--tt-ui);
+  font-weight: var(--tt-ui-weight);
+  text-align: left;
   cursor: pointer;
-  flex-shrink: 0;
 }
 
-.qp-mini-btn:hover {
+.qp-option:hover,
+.qp-option.active,
+.qp-option[aria-selected="true"]:hover {
+  background: var(--tt-hover);
+  color: #fff;
+}
+
+.qp-option[aria-selected="true"] {
   background: var(--tt-selected);
-  color: var(--tt-text);
+  color: #fff;
 }
 
-/* Toggle switch (role="switch"). */
+.qp-option[aria-selected="true"]::after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23f2f2f2' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6 9 17l-5-5'/></svg>")
+    center / contain no-repeat;
+}
+
+.qp-select-wrap {
+  padding-bottom: 2px;
+}
+
+.qp-hint {
+  font-size: 11px;
+  color: var(--tt-faint);
+  padding: 0 12px 6px;
+  line-height: 1.4;
+}
+
+.qp-select-hint {
+  padding-top: 0;
+}
+
+.qp-row.qp-disabled,
+.qp-select.qp-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* -- switch: the unified toggle control (settings uses the same classes);
+   animated; colors from skin tokens -- */
 .qp-switch {
   position: relative;
-  width: 32px;
-  height: 18px;
-  border-radius: 9px;
-  border: 1px solid var(--tt-switch-off-border);
+  width: 28px;
+  height: 16px;
+  border-radius: 99px;
   background: var(--tt-switch-off);
+  border: 1px solid var(--tt-switch-off-border);
   cursor: pointer;
   flex-shrink: 0;
   padding: 0;
+  transition:
+    background 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.qp-switch .qp-knob {
+.qp-knob {
   position: absolute;
   top: 1px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
+  left: 1px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--tt-knob-off);
   transition:
-    left 0.12s,
-    background 0.12s;
+    left 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    background 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.qp-switch:active .qp-knob {
+  transform: scaleX(1.15);
+  transform-origin: left center;
+}
+
+.qp-switch.on:active .qp-knob {
+  transform-origin: right center;
 }
 
 .qp-switch.on {
@@ -502,8 +803,38 @@ body.qp-glass .quick-panel {
 }
 
 .qp-switch.on .qp-knob {
-  left: 14px;
+  left: 13px;
   background: var(--tt-knob-on);
+}
+
+.qp-switch:focus-visible {
+  outline: 2px solid var(--tt-focus);
+  outline-offset: 2px;
+}
+
+/* Settings context: same control, settings-preview dimensions
+   (36×20, 14px knob, 160ms ease — docs/settings-preview.html .toggle). */
+.settings-page .qp-switch {
+  width: 36px;
+  height: 20px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.settings-page .qp-switch .qp-knob {
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  transition:
+    left 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.settings-page .qp-switch.on .qp-knob {
+  left: 18px;
 }
 
 .qp-switch:disabled {
@@ -511,59 +842,187 @@ body.qp-glass .quick-panel {
   cursor: not-allowed;
 }
 
+/* -- buttons: same footprint as selects -- */
+.qp-mini-btn {
+  width: var(--tt-btn-width);
+  height: var(--tt-ctrl-h);
+  padding: 0 10px;
+  flex-shrink: 0;
+  color: var(--tt-text);
+  background: var(--tt-inset);
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius-ctrl);
+  font: 12px / 1 var(--tt-ui);
+  font-weight: var(--tt-ui-weight);
+  cursor: pointer;
+  text-align: center;
+}
+
+.qp-mini-btn:hover {
+  border-color: color-mix(in srgb, var(--tt-text) 35%, transparent);
+  background: color-mix(in srgb, var(--tt-inset) 80%, #fff);
+  color: #fff;
+}
+
+.qp-connect-btn[data-kind="disconnect"]:hover {
+  border-color: color-mix(in srgb, var(--tt-bad) 45%, transparent);
+  color: #fca5a5;
+}
+
+/* Cursor skin: white CTA; VS Code: blue fill (design). */
+.qp-connect-btn[data-kind="reconnect"] {
+  background: var(--tt-accent);
+  border-color: var(--tt-accent);
+  color: #0a0a0a;
+  font-weight: var(--tt-ui-weight);
+}
+
+body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
+  background: var(--tt-selected);
+  border-color: var(--tt-accent);
+  color: #fff;
+}
+
+.qp-connect-btn[data-kind="reconnect"]:hover {
+  filter: brightness(1.08);
+}
+
+/* Share link: grid-rows expand under the toggle — the toggle stays put. */
+.qp-share-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.qp-share-reveal.open {
+  grid-template-rows: 1fr;
+}
+
+.qp-share-reveal > .qp-share-url-row {
+  overflow: hidden;
+  min-height: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.qp-share-reveal.open > .qp-share-url-row {
+  pointer-events: auto;
+  visibility: visible;
+}
+
 .qp-share-url-row {
-  gap: 6px;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 0 10px;
+  margin: 0;
+  opacity: 0;
+  transition:
+    opacity 160ms ease,
+    padding 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.qp-share-reveal.open > .qp-share-url-row {
+  opacity: 1;
+  padding: 2px 10px 8px;
+}
+
+.qp-share-url-row:hover {
+  background: transparent;
 }
 
 .qp-share-url {
   flex: 1;
-  font-size: 11px;
+  min-width: 0;
+  height: var(--tt-ctrl-h);
+  padding: 0 8px;
+  font: 11px / var(--tt-ctrl-h) var(--tt-mono);
   color: var(--tt-muted);
+  background: var(--tt-inset);
+  border: 1px solid var(--tt-line-strong);
+  border-right: 0;
+  border-radius: var(--tt-radius-ctrl) 0 0 var(--tt-radius-ctrl);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.qp-line-val {
-  font-size: 12px;
-  color: var(--tt-muted);
+.qp-share-url-row .qp-mini-btn {
+  width: auto;
+  min-width: 56px;
+  border-radius: 0 var(--tt-radius-ctrl) var(--tt-radius-ctrl) 0;
+  background: var(--tt-inset);
 }
 
-.qp-line-val.on {
-  color: var(--tt-share);
-}
-
-/* Flow control: unsupported-port hint and greyed-out control. */
-.qp-hint {
-  font-size: 11px;
-  color: var(--tt-muted);
-  padding: 2px 8px 4px;
-}
-
-/* Live help line under a select row (e.g. Output newlines). */
-.qp-select-hint {
-  line-height: 1.4;
-  padding-top: 0;
-}
-
-.qp-row.qp-disabled {
-  opacity: 0.45;
-  pointer-events: none;
-}
-
-.qp-signals {
-  border-top: 1px solid var(--tt-line);
-  margin-top: 2px;
+/* -- modem lines -- */
+.qp-flow {
   padding-top: 2px;
 }
 
-/* Quick-panel forwards: the grouped table (ui/forwardtable.ts) in compact
-   mode — rows stack listen / target on two lines so addresses never clip
-   in the narrow panel. */
+.qp-signals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 4px;
+  margin: 6px 8px 6px;
+  padding: 4px 2px 2px;
+  border-top: 1px solid var(--tt-line);
+}
+
+.qp-signals .qp-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--tt-qp-led-w);
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 2px 8px;
+  min-height: 28px;
+}
+
+.qp-signals .qp-switch,
+.qp-signals .qp-led {
+  justify-self: start;
+}
+
+.qp-led {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  width: var(--tt-qp-led-w);
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--tt-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.qp-led i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-style: normal;
+  flex-shrink: 0;
+}
+
+.qp-led.on {
+  color: var(--tt-ok);
+}
+
+.qp-led.on i {
+  background: var(--tt-ok);
+  border-color: var(--tt-ok);
+}
+
+/* -- forwards -- */
+.qp-fwd {
+  padding: 0 0 4px;
+}
+
 .qp-fwd-slot {
+  padding: 0 8px 8px;
   max-height: 320px;
   overflow-y: auto;
-  padding: 4px 8px 8px;
 }
 
 /* Compact rows are a single line: [Port] | [Host]:[Port] [+]. The listen

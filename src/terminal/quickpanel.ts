@@ -1,21 +1,23 @@
 // Quick-status button + dropdown panel at the right end of the tab bar.
-// Shows the ACTIVE tab's session state (disconnected / shared) and offers
-// quick actions per session type:
-//   every tab : AI share toggle (+ link copy)
+// Shows the ACTIVE tab's session state (connection pill / sharing pill)
+// and offers quick actions per session type:
+//   every tab : AI share toggle (+ animated link reveal, copy)
 //   ssh       : auto-reconnect toggle (timed retry); embedded client also
 //               lists port forwards and adds new ones inline
-//   serial    : profile select (built-in/custom), baud / input-mode /
-//               newline selects, auto-reconnect toggle (re-plug detection),
-//               flow control + modem lines (RTS/DTR drive, CTS/DSR status)
+//   serial    : profile / baud / input-mode / newline selects, auto-
+//               reconnect toggle, flow control + modem lines (RTS/DTR
+//               drive, CTS/DSR status)
 //
-// The panel body renders through lit-html (pilot: settings/ssh.ts):
-// session-state events and serial line-status
-// reads re-render via render(template, panel), which patches only the
-// bindings that changed — an in-flight select interaction is no longer
-// wiped by the innerHTML rebuilds this panel used to do on every event.
-// Live values are read from the tab object (the model); async backend
-// reads (auto-reconnect flag, modem line status) land in per-panel state
-// and trigger a re-render.
+// Layout/visuals are a 1:1 port of docs/quickpanel-preview.html: well
+// sections, custom listbox selects (no OS menu), animated switches,
+// grid-rows share reveal, animated CONNECTED bar. Serial splits into
+// Session / I/O / Modem lines sections (data-section: serial, serial-io,
+// serial-modem).
+//
+// The panel body renders through lit-html: session-state events and serial
+// line-status reads re-render via render(template, panel), which patches
+// only the bindings that changed. Live values are read from the tab object
+// (the model); async backend reads land in per-panel state and re-render.
 //
 // Like contextmenu, this module never imports TabManager: actions go
 // through handlers injected by main.ts (setQuickPanelHandlers), keeping the
@@ -28,6 +30,7 @@ import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-ma
 import { createElement, Zap } from "lucide";
 import { allSerialProfiles, DEFAULT_SERIAL_PROFILE } from "../config/serial-profiles";
 import {
+  hostProp,
   SERIAL_BAUD_RATES,
   SERIAL_ENTER_NEWLINES,
   SERIAL_OUTPUT_NEWLINE_DESCS,
@@ -45,7 +48,7 @@ import { el } from "../ui/dom";
 import type { ForwardEditorValue, ForwardKind } from "../ui/forwardeditor";
 import { addForward, listForwards, removeForward } from "../ui/forwarding";
 import { createForwardTable } from "../ui/forwardtable";
-import { html, ifDefined, nothing, render, syncSelectValues, type TemplateResult } from "../ui/lit";
+import { html, ifDefined, nothing, render, type TemplateResult } from "../ui/lit";
 import { showToast } from "../ui/toast";
 import type { TerminalTab } from "./tab";
 
@@ -144,6 +147,8 @@ function sectionTemplate(title: string, key: string, body: unknown): TemplateRes
 
 // Switch row (RTS/DTR, share, auto-reconnect). The visual state comes from
 // the model/state on every render — async corrections are just re-renders.
+// .qp-switch is the unified switch control — settings (ui/lit toggle) uses
+// the same classes and transitions (docs/quickpanel-preview.html).
 function qpToggle(
   label: string,
   on: boolean,
@@ -167,34 +172,177 @@ function qpToggle(
     ><span class="qp-knob"></span></button></div>`;
 }
 
-// Label + select. The current value rides on data-current and is synced to
-// select.value imperatively after every render (see renderPanel): lit
-// creates the options incrementally, and insertion-time selection resets
-// (jsdom in particular) can't track a value bound in-template, whether via
-// select.value, option.selected, or the selected attribute.
-// With `descs`: per-option tooltips + a live help line under the row that
-// follows the selection.
+// -- custom select (design: no OS menu; same control family as Settings) --
+// Structure: [data-select] root > trigger(.qp-select-value) + menu
+// (role=listbox, .qp-option[role=option][data-value][aria-selected],
+// .qp-optgroup headers). Open/close state is DOM-only (the .open class) so
+// lit re-renders never collapse an open menu; the picked value is written
+// back to the trigger/aria-selected immediately, then onPick runs — any
+// later re-render re-asserts the same state from the model.
+
+interface QpSelectGroup {
+  label: string;
+  items: readonly (readonly [string, string])[];
+}
+
+function closeAllSelects(except?: Element): void {
+  for (const root of document.querySelectorAll(".qp-select.open")) {
+    if (root !== except) root.classList.remove("open");
+  }
+}
+
+function pickOption(root: HTMLElement, opt: HTMLElement): void {
+  for (const o of root.querySelectorAll(".qp-option")) {
+    o.setAttribute("aria-selected", o === opt ? "true" : "false");
+  }
+  const valueEl = root.querySelector(".qp-select-value");
+  if (valueEl) valueEl.textContent = opt.textContent;
+  root.classList.remove("open");
+}
+
+function onSelectTriggerClick(root: HTMLElement): void {
+  const willOpen = !root.classList.contains("open");
+  closeAllSelects();
+  if (!willOpen) return;
+  root.classList.add("open");
+  // Flip upward when there is not enough room below (design: <180px).
+  const menu = root.querySelector<HTMLElement>(".qp-select-menu");
+  const trigger = root.querySelector<HTMLElement>(".qp-select-trigger");
+  if (menu && trigger) {
+    const spaceBelow = window.innerHeight - trigger.getBoundingClientRect().bottom;
+    menu.dataset.drop = spaceBelow < 180 ? "up" : "down";
+  }
+}
+
+function onSelectKeydown(root: HTMLElement, e: KeyboardEvent): void {
+  const options = [...root.querySelectorAll<HTMLElement>(".qp-option")];
+  if (options.length === 0) return;
+  const open = root.classList.contains("open");
+  const activeIdx = options.findIndex((o) => o.classList.contains("active"));
+  if (e.key === "Escape" && open) {
+    e.preventDefault();
+    e.stopPropagation(); // don't close the whole panel
+    root.classList.remove("open");
+    root.querySelector<HTMLElement>(".qp-select-trigger")?.focus();
+    return;
+  }
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    if (!open) {
+      onSelectTriggerClick(root);
+      return;
+    }
+    const opt = activeIdx >= 0 ? options[activeIdx] : null;
+    if (opt) {
+      pickOption(root, opt);
+      opt.dispatchEvent(new CustomEvent("qp-pick", { bubbles: true }));
+    }
+    return;
+  }
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    if (!open) {
+      onSelectTriggerClick(root);
+      return;
+    }
+    const delta = e.key === "ArrowDown" ? 1 : -1;
+    const next = activeIdx < 0 ? 0 : (activeIdx + delta + options.length) % options.length;
+    for (const [i, o] of options.entries()) o.classList.toggle("active", i === next);
+    options[next]?.scrollIntoView({ block: "nearest" });
+  }
+}
+
+function qpSelect(
+  label: string,
+  options: readonly (readonly [string, string])[],
+  current: string,
+  onPick: (value: string) => void,
+  opts?: {
+    descs?: Record<string, string>;
+    disabled?: boolean;
+    groups?: QpSelectGroup[];
+    id?: string;
+  },
+): TemplateResult {
+  const disabled = opts?.disabled ?? false;
+  const option = ([value, text]: readonly [string, string]): TemplateResult => html`
+    <button
+      type="button"
+      class="qp-option"
+      role="option"
+      data-value=${value}
+      title=${ifDefined(opts?.descs?.[value])}
+      aria-selected=${value === current ? "true" : "false"}
+      @click=${(e: Event) => {
+        e.stopPropagation();
+        const root = (e.currentTarget as HTMLElement).closest<HTMLElement>(".qp-select");
+        if (root) pickOption(root, e.currentTarget as HTMLElement);
+        onPick(value);
+      }}
+    >${text}</button>
+  `;
+  const menuBody = opts?.groups
+    ? opts.groups.map(
+        (g) => html`
+          <div class="qp-optgroup">${g.label}</div>
+          ${g.items.map(option)}
+        `,
+      )
+    : options.map(option);
+  const currentText =
+    options.find(([v]) => v === current)?.[1] ??
+    opts?.groups?.flatMap((g) => g.items).find(([v]) => v === current)?.[1] ??
+    current;
+  return html`
+    <div
+      class="qp-select ${disabled ? "qp-disabled" : ""}"
+      data-select=${ifDefined(opts?.id)}
+      aria-label=${label}
+      @keydown=${(e: KeyboardEvent) => {
+        if (!disabled) onSelectKeydown(e.currentTarget as HTMLElement, e);
+      }}
+    >
+      <button
+        type="button"
+        class="qp-select-trigger"
+        aria-haspopup="listbox"
+        ?disabled=${disabled}
+        @click=${(e: Event) => {
+          e.stopPropagation();
+          const root = (e.currentTarget as HTMLElement).parentElement;
+          if (!disabled && root) onSelectTriggerClick(root);
+        }}
+      ><span class="qp-select-value" data-current-text=${currentText}></span></button>
+      <div class="qp-select-menu" role="listbox">
+        ${menuBody}
+      </div>
+    </div>
+  `;
+}
+
+/** Select trigger texts can't ride the template: option picks write the
+ *  span imperatively (a lit-bound text part would be ejected by that
+ *  write), so the span starts empty and is synced after every render —
+ *  same convention as the old syncSelectValues. */
+function syncSelectTexts(root: ParentNode): void {
+  for (const span of root.querySelectorAll<HTMLElement>(".qp-select-value[data-current-text]")) {
+    const text = span.dataset.currentText ?? "";
+    if (span.textContent !== text) span.textContent = text;
+  }
+}
+
+// Label + custom select row. With `descs`: per-option tooltips + a live
+// help line under the row that follows the selection.
 function qpSelectRow(
   label: string,
   options: readonly (readonly [string, string])[],
   current: string,
-  onChange: (value: string) => void,
+  onPick: (value: string) => void,
   opts?: { descs?: Record<string, string>; disabled?: boolean; rowClass?: string },
 ): TemplateResult {
   const row = html`<div class="qp-row ${opts?.rowClass ?? ""}">
     <span class="qp-label">${label}</span>
-    <select
-      class="qp-select"
-      aria-label=${label}
-      data-current=${current}
-      ?disabled=${opts?.disabled ?? false}
-      @change=${(e: Event) => onChange((e.target as HTMLSelectElement).value)}
-    >
-      ${options.map(
-        ([value, text]) =>
-          html`<option value=${value} title=${ifDefined(opts?.descs?.[value])}>${text}</option>`,
-      )}
-    </select>
+    ${qpSelect(label, options, current, onPick, opts)}
   </div>`;
   if (!opts?.descs) return row;
   return html`<div class="qp-select-wrap">
@@ -224,23 +372,24 @@ function shareTemplate(tab: TerminalTab): TemplateResult {
           })
           .catch(logCatch("quickpanel.share"));
       })}
-      ${
-        url
-          ? html`<div class="qp-row qp-share-url-row">
-            <span class="qp-share-url" title=${url}>${url}</span>
-            <button
-              type="button"
-              class="qp-mini-btn"
-              @click=${() => {
-                clipboardWriteText(url)
-                  .then(() => showToast("Share link copied", "info"))
-                  .catch(logCatch("clipboard.write"));
-              }}
-              >Copy</button
-            >
-          </div>`
-          : nothing
-      }
+      <!-- Link row rides a grid-rows reveal (design): it stays in the DOM
+           so closing/opening animates instead of popping. -->
+      <div class="qp-share-reveal ${tab.shared ? "open" : ""}">
+        <div class="qp-row qp-share-url-row">
+          <span class="qp-share-url" title=${url ?? ""}>${url ?? ""}</span>
+          <button
+            type="button"
+            class="qp-mini-btn"
+            @click=${() => {
+              if (!url) return;
+              clipboardWriteText(url)
+                .then(() => showToast("Share link copied", "info"))
+                .catch(logCatch("clipboard.write"));
+            }}
+            >Copy</button
+          >
+        </div>
+      </div>
     `,
   );
 }
@@ -261,7 +410,7 @@ function autoReconnectTemplate(tab: TerminalTab, st: QuickPanelState): TemplateR
 
 function sshTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResult {
   return sectionTemplate(
-    "SSH",
+    "Session",
     "ssh",
     html`
       ${autoReconnectTemplate(tab, st)}
@@ -271,7 +420,7 @@ function sshTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResult {
         // leaves the slot's unmanaged children alone across re-renders.
         tab.sshEmbedded
           ? html`<div class="qp-fwd">
-              <div class="qp-sub-title">Port Forwards</div>
+              <div class="qp-sub-title">Port forwards</div>
               <div class="qp-fwd-slot"></div>
             </div>`
           : nothing
@@ -332,124 +481,10 @@ const SERIAL_FLOW_CONTROLS: [SerialFlowControl, string][] = [
   ["hardware", "Hardware (RTS/CTS)"],
 ];
 
-// Profile select, grouped Built-in/Custom like the theme gallery. Applying a
-// profile goes through the handler (live session apply + new global default),
-// then the section re-renders so the parameter rows reflect the profile.
-function serialProfileTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResult {
-  const profiles = allSerialProfiles();
-  const current = st.serialProfile ?? tab.serialProfile ?? DEFAULT_SERIAL_PROFILE;
-  const group = (label: string, source: "builtin" | "custom"): TemplateResult | typeof nothing => {
-    const list = profiles.filter((p) => p.source === source);
-    if (list.length === 0) return nothing;
-    return html`<optgroup label=${label}>
-      ${list.map((p) => html`<option value=${p.name}>${p.name}</option>`)}
-    </optgroup>`;
-  };
-  return html`<div class="qp-row">
-    <span class="qp-label">Profile</span>
-    <select
-      class="qp-select"
-      aria-label="Profile"
-      data-current=${current}
-      @change=${(e: Event) => {
-        const value = (e.target as HTMLSelectElement).value;
-        st.serialProfile = value;
-        if (!_handlers) return;
-        _handlers
-          .setSerialProfile(tab.id, value)
-          .then(() => {
-            if (panelTabId === tab.id) renderPanel(tab);
-          })
-          .catch(logCatch("serial.setProfile"));
-      }}
-    >
-      ${group("Built-in", "builtin")}
-      ${group("Custom", "custom")}
-    </select>
-  </div>`;
-}
-
-// Flow control + modem signal lines. Flow control is a link setting
-// (like baud), independent of the session profile. Open asserts DTR
-// (PuTTY/Tabby/pyserial); RTS is left deasserted so ESP32 USB-Serial/JTAG
-// cannot see RTS=1 with a DTR falling edge (the only pair that resets).
-// Hardware RTS/CTS: driver owns RTS (PuTTY HANDSHAKE, toggle disabled,
-// SetRts ignored); DTR stays software-controlled. Ports whose driver
-// lines (or a failed status query) grey the whole control out. Line
-// values live in panel state — the status read re-renders instead of
-// rebuilding rows.
-function serialFlowTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResult {
-  const flow = tab.flowControl ?? "none";
-  const supported = st.linesSupported;
-  const lines = st.lines;
-  const hw = flow === "hardware";
-  return html`<div class="qp-flow">
-    ${qpSelectRow(
-      "Flow control",
-      SERIAL_FLOW_CONTROLS,
-      flow,
-      (v) => {
-        tab.flowControl = v;
-        renderPanel(tab);
-        invoke("serial_set_flow_control", { id: tab.id, flow: v })
-          .then(() => queryLineStatus(tab, st))
-          .catch((e) => showToast(`Flow control: ${e}`, "error"));
-      },
-      { disabled: !supported, rowClass: supported ? "" : "qp-disabled" },
-    )}
-    <div class="qp-hint" style=${supported ? "display:none" : ""}>
-      Flow control not supported by this port
-    </div>
-    <div class="qp-signals">
-      ${
-        supported
-          ? html`
-            ${qpToggle(
-              "RTS",
-              hw ? true : (lines?.rts ?? false),
-              (on) => {
-                if (st.lines) st.lines = { ...st.lines, rts: on };
-                renderPanel(tab);
-                invoke("serial_set_rts", { id: tab.id, on }).catch((e) =>
-                  showToast(`RTS: ${e}`, "error"),
-                );
-              },
-              { disabled: hw },
-            )}
-            ${qpToggle("DTR", lines?.dtr ?? false, (on) => {
-              if (st.lines) st.lines = { ...st.lines, dtr: on };
-              renderPanel(tab);
-              invoke("serial_set_dtr", { id: tab.id, on }).catch((e) =>
-                showToast(`DTR: ${e}`, "error"),
-              );
-            })}
-            ${(
-              [
-                ["CTS", lines?.cts],
-                ["DSR", lines?.dsr],
-              ] as const
-            ).map(
-              ([label, on]) => html`<div class="qp-row">
-                <span class="qp-label">${label}</span>
-                <span class="qp-line-val ${on ? "on" : ""}"
-                  >${on === undefined ? "…" : on ? "asserted" : "deasserted"}</span
-                >
-              </div>`,
-            )}
-          `
-          : nothing
-      }
-    </div>
-    <div class="qp-hint" style=${supported && hw ? "" : "display:none"}>
-      RTS is driver-managed under hardware flow control; DTR stays software-controlled
-    </div>
-  </div>`;
-}
-
 // Manual release/reconnect of the port: Disconnect frees the device for
 // other tools (Arduino uploads…), Reconnect re-enters through the relay's
-// dead-mode respawn path. State comes from tab.disconnected (session-state
-// events); the panel re-renders shortly after the action lands.
+// dead-mode respawn path. data-kind drives the design's CTA styling
+// (Reconnect = accent; Disconnect = inset with red hover).
 function connectionTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResult {
   const reconnecting = tab.disconnected;
   return html`<div class="qp-row">
@@ -457,6 +492,7 @@ function connectionTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResu
     <button
       type="button"
       class="qp-mini-btn qp-connect-btn"
+      data-kind=${reconnecting ? "reconnect" : "disconnect"}
       @click=${() => {
         // Busy guard lives in the handler, not the disabled attribute: the
         // pre-lit panel re-enabled the button on every rebuild, and a click
@@ -482,35 +518,84 @@ function connectionTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResu
   </div>`;
 }
 
-function serialTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResult {
+// Session section: Connection, Profile (Built-in/Custom groups), Baud,
+// Auto-reconnect. Applying a profile goes through the handler (live
+// session apply + new global default), then the panel re-renders so the
+// parameter rows reflect the profile.
+function serialSessionTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResult {
+  const profiles = allSerialProfiles();
+  const current = st.serialProfile ?? tab.serialProfile ?? DEFAULT_SERIAL_PROFILE;
+  const groups: QpSelectGroup[] = (
+    [
+      ["Built-in", "builtin"],
+      ["Custom", "custom"],
+    ] as const
+  )
+    .map(([label, source]) => ({
+      label,
+      items: profiles.filter((p) => p.source === source).map((p) => [p.name, p.name] as const),
+    }))
+    .filter((g) => g.items.length > 0);
+
   return sectionTemplate(
-    "Serial",
+    "Session",
     "serial",
     html`
       ${connectionTemplate(tab, st)}
-      ${serialProfileTemplate(tab, st)}
+      <div class="qp-row">
+        <span class="qp-label">Profile</span>
+        ${qpSelect(
+          "Profile",
+          [],
+          current,
+          (value) => {
+            st.serialProfile = value;
+            if (!_handlers) return;
+            _handlers
+              .setSerialProfile(tab.id, value)
+              .then(() => {
+                if (panelTabId === tab.id) renderPanel(tab);
+              })
+              .catch(logCatch("serial.setProfile"));
+          },
+          { groups },
+        )}
+      </div>
       ${qpSelectRow(
         "Baud rate",
         SERIAL_BAUD_OPTIONS,
         st.baud ?? String(tab.serialBaud ?? 115200),
         (v) => {
           st.baud = v;
-          _handlers?.setSerialBaud(tab.id, parseInt(v, 10)).catch(logCatch("serial.setBaud"));
+          _handlers
+            ?.setSerialBaud(tab.id, parseInt(v, 10))
+            .then(() => {
+              // The header meta ("Serial · <baud> 8N1") follows the live baud.
+              if (panelTabId === tab.id) renderPanel(tab);
+            })
+            .catch(logCatch("serial.setBaud"));
         },
       )}
       ${autoReconnectTemplate(tab, st)}
-      ${
-        // Live, session-only profile parameter tweaks (not persisted).
-        qpSelectRow(
-          "Input mode",
-          SERIAL_INPUT_MODES,
-          st.inputMode ?? tab.inputMode ?? "normal",
-          (v) => {
-            st.inputMode = v;
-            _handlers?.setSerialInputMode(tab.id, v as SerialInputMode);
-          },
-        )
-      }
+    `,
+  );
+}
+
+// I/O section: live, session-only profile parameter tweaks (not persisted).
+function serialIoTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResult {
+  return sectionTemplate(
+    "I/O",
+    "serial-io",
+    html`
+      ${qpSelectRow(
+        "Input mode",
+        SERIAL_INPUT_MODES,
+        st.inputMode ?? tab.inputMode ?? "normal",
+        (v) => {
+          st.inputMode = v;
+          _handlers?.setSerialInputMode(tab.id, v as SerialInputMode);
+        },
+      )}
       ${qpSelectRow(
         "Enter sends",
         SERIAL_ENTER_NEWLINES,
@@ -536,28 +621,120 @@ function serialTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResult {
         },
         { descs: SERIAL_OUTPUT_NEWLINE_DESCS },
       )}
-      ${serialFlowTemplate(tab, st)}
+    `,
+  );
+}
+
+// Modem lines section. Flow control is a link setting (like baud),
+// independent of the session profile. Open asserts DTR (PuTTY/Tabby/
+// pyserial); RTS is left deasserted so ESP32 USB-Serial/JTAG cannot see
+// RTS=1 with a DTR falling edge (the only pair that resets). Hardware
+// RTS/CTS: driver owns RTS (toggle disabled, SetRts ignored); DTR stays
+// software-controlled. Ports whose driver can't report/drive lines (or a
+// failed status query) grey the whole control out.
+function serialModemTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResult {
+  const flow = tab.flowControl ?? "none";
+  const supported = st.linesSupported;
+  const lines = st.lines;
+  const hw = flow === "hardware";
+  const led = (label: string, on: boolean | undefined): TemplateResult => html`
+    <div class="qp-row">
+      <span class="qp-label">${label}</span>
+      <span class="qp-led ${on ? "on" : ""}"><i></i>${on === undefined ? "…" : on ? "high" : "low"}</span>
+    </div>
+  `;
+  return sectionTemplate(
+    "Modem lines",
+    "serial-modem",
+    html`
+      <div class="qp-flow">
+        ${qpSelectRow(
+          "Flow control",
+          SERIAL_FLOW_CONTROLS,
+          flow,
+          (v) => {
+            tab.flowControl = v as SerialFlowControl;
+            renderPanel(tab);
+            invoke("serial_set_flow_control", { id: tab.id, flow: v })
+              .then(() => queryLineStatus(tab, st))
+              .catch((e) => showToast(`Flow control: ${e}`, "error"));
+          },
+          { disabled: !supported, rowClass: supported ? "" : "qp-disabled" },
+        )}
+        <div class="qp-hint" style=${supported ? "display:none" : ""}>
+          Flow control not supported by this port
+        </div>
+        <div class="qp-signals">
+          ${
+            supported
+              ? html`
+                ${qpToggle(
+                  "RTS",
+                  hw ? true : (lines?.rts ?? false),
+                  (on) => {
+                    if (st.lines) st.lines = { ...st.lines, rts: on };
+                    renderPanel(tab);
+                    invoke("serial_set_rts", { id: tab.id, on }).catch((e) =>
+                      showToast(`RTS: ${e}`, "error"),
+                    );
+                  },
+                  { disabled: hw },
+                )}
+                ${led("CTS", lines?.cts)}
+                ${qpToggle("DTR", lines?.dtr ?? false, (on) => {
+                  if (st.lines) st.lines = { ...st.lines, dtr: on };
+                  renderPanel(tab);
+                  invoke("serial_set_dtr", { id: tab.id, on }).catch((e) =>
+                    showToast(`DTR: ${e}`, "error"),
+                  );
+                })}
+                ${led("DSR", lines?.dsr)}
+              `
+              : nothing
+          }
+        </div>
+        <div class="qp-hint" style=${supported && hw ? "" : "display:none"}>
+          RTS is driver-managed under hardware flow control; DTR stays software-controlled
+        </div>
+      </div>
     `,
   );
 }
 
 // -- panel frame --
 
+function metaFor(tab: TerminalTab): string {
+  if (tab.type === "ssh") {
+    const h = tab.sshHost;
+    const target = h ? `${hostProp(h, "user") || "root"}@${hostProp(h, "hostname") || h.name}` : "";
+    return target ? `SSH · ${target}` : "SSH";
+  }
+  if (tab.type === "serial") return `Serial · ${tab.serialBaud ?? 115200} 8N1`;
+  return "Local shell";
+}
+
 function panelTemplate(tab: TerminalTab, st: QuickPanelState): TemplateResult {
-  const state = tab.disconnected ? "disconnected" : "connected";
+  const conn = tab.disconnected ? "disconnected" : "connected";
   return html`
     <div class="qp-header">
-      <span class="qp-title">${tab.label}</span>
-      <span class="qp-state qp-state-${state}">${state}</span>
-      ${
-        // Connection state and share authorization are separate dimensions
-        // (UX-03): the teal sharing badge never replaces the green/red one.
-        tab.shared ? html`<span class="qp-state qp-state-shared">sharing</span>` : nothing
-      }
+      <div class="qp-ident">
+        <span class="qp-title">${tab.label}</span>
+        <span class="qp-meta">${metaFor(tab)}</span>
+      </div>
+      <div class="qp-badges">
+        <span
+          class="qp-sharing ${tab.shared ? "on" : ""}"
+          title=${tab.shared ? "AI share on" : "AI share off"}
+          >SHARING</span
+        >
+        <span class="qp-conn qp-conn-${conn}" data-conn=${conn}>${conn.toUpperCase()}</span>
+      </div>
     </div>
     ${shareTemplate(tab)}
     ${tab.type === "ssh" ? sshTemplate(tab, st) : nothing}
-    ${tab.type === "serial" ? serialTemplate(tab, st) : nothing}
+    ${tab.type === "serial" ? serialSessionTemplate(tab, st) : nothing}
+    ${tab.type === "serial" ? serialIoTemplate(tab, st) : nothing}
+    ${tab.type === "serial" ? serialModemTemplate(tab, st) : nothing}
   `;
 }
 
@@ -565,10 +742,7 @@ function renderPanel(tab: TerminalTab): void {
   if (!panel) return;
   const st = stateFor(tab);
   render(panelTemplate(tab, st), panel);
-  // Select values can't ride the template (see qpSelectRow) — sync them
-  // imperatively. Unchanged selects (including one with an open dropdown)
-  // are not touched.
-  syncSelectValues(panel);
+  syncSelectTexts(panel);
   // Async backend state reads, fired once per panel binding; their answers
   // land in state and re-render. Explicit re-reads (flow control change,
   // reconnect) reset the relevant flag first.
@@ -613,6 +787,7 @@ function queryLineStatus(tab: TerminalTab, st: QuickPanelState): void {
 export function closeQuickPanel(): void {
   panelTabId = null;
   panel?.classList.remove("open");
+  closeAllSelects();
 }
 
 /// Hide the panel if it is bound to the given (closing) tab — a panel
@@ -639,9 +814,9 @@ function togglePanel(): void {
 }
 
 // Reflect the active tab's state on the tab-bar button: red dot while the
-// session is down (dead mode), blue dot while AI-shared, dimmed with no tab.
-// The accessible name tracks the same state (P1-03) so the button reads
-// "no session / connected / disconnected / sharing with AI" out loud.
+// session is down (dead mode), blue bolt while AI-shared, dimmed with no
+// tab (design: sharing recolors the bolt itself — no separate dot).
+// The accessible name tracks the same state (P1-03).
 export function updateQuickButton(): void {
   const btn = qsButton();
   if (!btn) return;
@@ -685,13 +860,17 @@ export function initQuickPanel(): void {
   });
 
   document.addEventListener("click", (e) => {
-    if (
-      panelTabId !== null &&
-      panel &&
-      !panel.contains(e.target as Node) &&
-      !btn.contains(e.target as Node)
-    ) {
-      closeQuickPanel();
+    if (panelTabId !== null && panel) {
+      const target = e.target;
+      if (target instanceof Node && !panel.contains(target) && !btn.contains(target)) {
+        closeQuickPanel();
+      }
+      // An open select menu collapses on any outside click, even inside
+      // the panel (design behavior).
+      if (target instanceof Node) {
+        const inSelect = target instanceof Element ? target.closest(".qp-select") : null;
+        if (!inSelect) closeAllSelects();
+      }
     }
   });
   document.addEventListener("keydown", (e) => {
