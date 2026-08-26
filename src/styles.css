@@ -3062,6 +3062,7 @@ body[data-skin="cursor"] .check-box:checked::after {
   gap: 8px;
   margin-bottom: 10px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .host-toolbar .btn {
@@ -3109,10 +3110,18 @@ body[data-skin="cursor"] .check-box:checked::after {
   filter: none;
 }
 
-/* Tiny icon buttons in check-row actions (✎ / ⋯ / ×). */
+/* Section intro under a section-title (SSH Hosts / Keys, Profile, …). */
+.section-note {
+  font-size: 12px;
+  color: var(--tt-muted);
+  margin: -4px 0 12px;
+  line-height: 1.5;
+}
+
+/* Tiny icon buttons in check-row actions (✎ / ⋯ / ×). Design: 28×28 hit. */
 .icon-tiny {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

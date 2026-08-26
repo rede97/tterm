@@ -103,8 +103,9 @@ export function showInstallKeyModal(target: InstallTarget): void {
   const modal = createModal({ className: "she-overlay" });
   modal.overlay.innerHTML = `
     <div class="she-dialog" role="dialog" aria-modal="true" aria-label="Upload SSH Key">
-      <div class="she-header">Upload SSH Key → ${esc(target.user)}@${esc(target.hostname)}:${target.port}</div>
-      <div class="ski-body" style="padding:0 16px 8px;color:#ccc;font-size:13px;">Loading keys…</div>
+      <div class="she-header">Upload SSH Key</div>
+      <p class="ski-desc" style="margin:-6px 0 10px;font-size:12px;color:var(--tt-muted);">Install a local public key on ${esc(target.user)}@${esc(target.hostname)}:${target.port}. The private key never leaves this machine.</p>
+      <div class="ski-body" style="padding:0 0 8px;color:#ccc;font-size:13px;">Loading keys…</div>
       <div class="she-footer">
         <span class="she-spacer"></span>
         <button class="sp-btn ski-cancel" type="button">Cancel</button>
@@ -128,10 +129,10 @@ export function showInstallKeyModal(target: InstallTarget): void {
       return;
     }
     body.innerHTML = `
-      <div style="margin-bottom:8px;">Public key to authorize on the target:</div>
-      <div class="ski-key-slot" style="margin-bottom:10px;"></div>
-      <div style="margin-bottom:4px;">Target system:</div>
-      <div class="ski-os-slot"></div>
+      <div class="ski-field"><span style="display:block;font-size:12px;margin-bottom:4px;">Public key</span>
+        <div class="ski-key-slot" style="margin-bottom:10px;"></div></div>
+      <div class="ski-field"><span style="display:block;font-size:12px;margin-bottom:4px;">Target OS</span>
+        <div class="ski-os-slot"></div></div>
       <div style="font-size:12px;color:#888;margin-top:8px;">
         You may be asked for the login password once. Note: on Windows, managed
         (administrator) accounts may require administrators_authorized_keys instead.
@@ -156,9 +157,9 @@ export function showInstallKeyModal(target: InstallTarget): void {
     const osSlot = mustQuery<HTMLElement>(body, ".ski-os-slot");
     render(
       ttSelect(
-        "Target system",
+        "Target OS",
         [
-          ["auto", "Auto-detect (tries powershell → cmd → sh)"],
+          ["auto", "Auto"],
           ["windows", "Windows"],
           ["linux", "Linux"],
           ["macos", "macOS"],

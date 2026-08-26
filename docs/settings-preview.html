@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>TTerm Settings �?preview</title>
+<title>TTerm Settings â?preview</title>
 <link rel="stylesheet" href="/docs/ui/tokens.css" />
 <link rel="stylesheet" href="/docs/ui/scroll.css" />
 <link rel="stylesheet" href="/docs/ui/preview-chrome.css" />
 <style>
-  /* Page layout only �?skins come from docs/ui/tokens.css */
+  /* Page layout only â?skins come from docs/ui/tokens.css */
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     height: 100%;
@@ -99,7 +99,7 @@
   }
   .win-btn { width: 42px !important; }
 
-  /* ---- settings page �?must fill the mock window under the tab bar ---- */
+  /* ---- settings page â?must fill the mock window under the tab bar ---- */
   .settings-page {
     flex: 1 1 auto;
     min-height: 0;
@@ -215,7 +215,7 @@
     max-width: 100%;
   }
 
-  /* About �?original layout: copy left, Homepage right */
+  /* About â?original layout: copy left, Homepage right */
   .about-row {
     display: flex;
     justify-content: space-between;
@@ -283,7 +283,7 @@
     background: var(--set-knob-on);
   }
 
-  /* Custom select �?same language as quickpanel (no OS chrome) */
+  /* Custom select â?same language as quickpanel (no OS chrome) */
   .set-select {
     position: relative;
     width: var(--set-btn-width);
@@ -378,7 +378,7 @@
   }
   .input:focus { border-color: var(--set-focus); }
   .input-narrow { min-width: 72px; width: 72px; text-align: center; }
-  /* Numeric fields �?same weight as Settings controls */
+  /* Numeric fields â?same weight as Settings controls */
   .input-narrow,
   input[type="number"],
   .ft-port {
@@ -392,7 +392,7 @@
     box-sizing: border-box;
   }
 
-  /* Hide OS number spinners �?use .stepper instead (matches app stepper.ts) */
+  /* Hide OS number spinners â?use .stepper instead (matches app stepper.ts) */
   input[type="number"]::-webkit-outer-spin-button,
   input[type="number"]::-webkit-inner-spin-button {
     -webkit-appearance: none;
@@ -510,7 +510,7 @@
     border-color: var(--set-accent);
     box-shadow: inset 0 0 0 1px var(--set-accent);
   }
-  /* Two trapezoids filling the rect; 45° mid seam (skew = height) */
+  /* Two trapezoids filling the rect; 45Â° mid seam (skew = height) */
   .skin-swatch {
     --skin-h: 40px;
     --skin-skew: 40px;
@@ -528,7 +528,7 @@
     position: absolute;
     inset: 0;
   }
-  /* Left trapezoid: vertical left edge, 45° right edge */
+  /* Left trapezoid: vertical left edge, 45Â° right edge */
   .skin-swatch::before {
     background: var(--skin-a);
     clip-path: polygon(
@@ -538,7 +538,7 @@
       0 100%
     );
   }
-  /* Right trapezoid: 45° left edge, vertical right edge */
+  /* Right trapezoid: 45Â° left edge, vertical right edge */
   .skin-swatch::after {
     background: var(--skin-b);
     clip-path: polygon(
@@ -636,7 +636,7 @@
     cursor: pointer;
   }
   .theme-card-action:hover { background: #333; color: #fff; }
-  /* Create tile �?solid well, not dashed empty */
+  /* Create tile â?solid well, not dashed empty */
   .theme-new {
     display: flex;
     flex-direction: column;
@@ -825,7 +825,7 @@
   .te-spacer { flex: 1; }
   .te-footer .btn { min-width: var(--set-btn-width); }
 
-  /* ---- Shared visibility check rows (Profile + SSH) �?checkbox LEFT ---- */
+  /* ---- Shared visibility check rows (Profile + SSH) â?checkbox LEFT ---- */
   .check-list,
   .host-list {
     display: grid;
@@ -1021,14 +1021,76 @@
     margin-top: 16px;
     justify-content: flex-end;
   }
+  .ski-footer .btn,
+  .skg-footer .btn,
+  .she-footer .btn {
+    width: var(--set-btn-width);
+    min-width: var(--set-btn-width);
+    box-sizing: border-box;
+    justify-content: center;
+  }
+
+  /* Generate SSH key modal (preview of sshkeys.ts showKeygenModal) */
+  .skg-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 95;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+  }
+  .skg-overlay.open { display: flex; }
+  .skg-dialog {
+    width: min(420px, calc(100% - 40px));
+    background: var(--set-well);
+    border: 1px solid var(--set-line-strong);
+    border-radius: var(--set-radius);
+    padding: 16px 20px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.55);
+  }
+  .skg-header {
+    font-size: 15px;
+    font-weight: var(--set-title-weight);
+    color: var(--set-text);
+    margin-bottom: 14px;
+  }
+  .skg-grid {
+    display: grid;
+    gap: 12px;
+  }
+  .skg-field span {
+    display: block;
+    font-size: 11px;
+    color: var(--set-muted);
+    margin-bottom: 4px;
+  }
+  .skg-field .input,
+  .skg-field .set-select {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    box-sizing: border-box;
+  }
+  .skg-opt {
+    color: var(--set-faint);
+    font-weight: 400;
+  }
+  .skg-footer {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    justify-content: flex-end;
+  }
 
   .host-toolbar {
     display: flex;
     gap: 8px;
     margin-bottom: 10px;
     align-items: center;
+    flex-wrap: wrap;
   }
-  /* Equal-width toolbar actions �?same token as row buttons */
+  /* Equal-width toolbar actions — same token as row buttons */
   .host-toolbar .btn {
     width: var(--set-btn-width);
     min-width: var(--set-btn-width);
@@ -1141,7 +1203,7 @@
     margin-left: 6px;
   }
 
-  /* Port forwards �?QuickPanel ft-compact: listen | target columns align */
+  /* Port forwards â?QuickPanel ft-compact: listen | target columns align */
   .ft {
     display: flex;
     flex-direction: column;
@@ -1931,7 +1993,7 @@
             <div class="row">
               <div class="row-info">
                 <div class="row-title">Frosted glass</div>
-                <div class="row-desc">Blur terminal behind the panel only �?window stays opaque</div>
+                <div class="row-desc">Blur terminal behind the panel only â?window stays opaque</div>
               </div>
               <button type="button" class="toggle" id="glass-toggle" role="switch" aria-checked="true" aria-label="Frosted glass"></button>
             </div>
@@ -1952,7 +2014,7 @@
                 <div class="row-desc">Size of the terminal font in pixels.</div>
               </div>
               <div class="stepper" data-stepper>
-                <button type="button" class="stepper-btn" aria-label="Decrease" tabindex="-1">�?/button>
+                <button type="button" class="stepper-btn" aria-label="Decrease" tabindex="-1">â?/button>
                 <input class="input input-narrow" type="number" value="13" min="10" max="32" data-dirty>
                 <button type="button" class="stepper-btn" aria-label="Increase" tabindex="-1">+</button>
               </div>
@@ -1961,7 +2023,7 @@
 
           <div class="section">
             <div class="section-title">Color scheme</div>
-            <p class="section-note">Terminal content only �?does not recolor Settings or the tab bar. Cards match the live Appearance gallery.</p>
+            <p class="section-note">Terminal content only â?does not recolor Settings or the tab bar. Cards match the live Appearance gallery.</p>
             <div class="theme-grid" id="theme-grid">
               <div class="theme-card" role="button" tabindex="0" aria-pressed="true" data-theme="TTerm Dark">
                 <div class="theme-card-preview" style="background:#1e1e1e;color:#d4d4d4">
@@ -2079,7 +2141,7 @@
             <div class="row">
               <div class="row-info">
                 <div class="row-title">Built-in SSH client</div>
-                <div class="row-desc">Use embedded russh instead of system ssh</div>
+                <div class="row-desc">Use embedded russh instead of system ssh (password prompts, host-key confirm, port forwards).</div>
               </div>
               <button type="button" class="toggle" role="switch" aria-checked="true" data-dirty aria-label="Built-in SSH"></button>
             </div>
@@ -2087,10 +2149,11 @@
 
           <div class="section">
             <div class="section-title">Hosts from ~/.ssh/config</div>
-            <p class="section-note">Edits join the same Apply as app settings. No separate Save �?writing config is silent (optional backup).</p>
+            <p class="section-note">Edits join the same Apply as app settings. No separate Save — writing config is silent (a config.tt.bak backup is kept).</p>
             <div class="host-toolbar">
               <button type="button" class="btn btn-primary" id="add-host">+ Add Host</button>
               <button type="button" class="btn btn-ghost" id="reload-hosts">Reload from disk</button>
+              <button type="button" class="btn btn-ghost" id="open-ssh-config">Open File</button>
             </div>
             <div class="host-list" id="host-list">
               <div class="check-row">
@@ -2102,7 +2165,7 @@
                   </div>
                 </label>
                 <div class="check-actions">
-                  <button type="button" class="icon-tiny" title="Edit" data-edit>�?/button>
+                  <button type="button" class="icon-tiny" title="Edit" data-edit>✎</button>
                   <div class="host-more">
                     <button type="button" class="icon-tiny" title="More" data-more aria-haspopup="true" aria-expanded="false">
                       <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="13" cy="8" r="1.4" fill="currentColor"/></svg>
@@ -2124,7 +2187,7 @@
                   </div>
                 </label>
                 <div class="check-actions">
-                  <button type="button" class="icon-tiny" title="Edit" data-edit>�?/button>
+                  <button type="button" class="icon-tiny" title="Edit" data-edit>✎</button>
                   <div class="host-more">
                     <button type="button" class="icon-tiny" title="More" data-more aria-haspopup="true" aria-expanded="false">
                       <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="13" cy="8" r="1.4" fill="currentColor"/></svg>
@@ -2146,7 +2209,7 @@
                   </div>
                 </label>
                 <div class="check-actions">
-                  <button type="button" class="icon-tiny" title="Edit" data-edit>�?/button>
+                  <button type="button" class="icon-tiny" title="Edit" data-edit>✎</button>
                   <div class="host-more">
                     <button type="button" class="icon-tiny" title="More" data-more aria-haspopup="true" aria-expanded="false">
                       <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="13" cy="8" r="1.4" fill="currentColor"/></svg>
@@ -2164,7 +2227,10 @@
 
           <div class="section">
             <div class="section-title">Keys</div>
-            <p class="section-note">Key pairs in ~/.ssh. Upload a public key from a host’s �?menu �?the private key never leaves this machine.</p>
+            <p class="section-note">Key pairs in ~/.ssh. Upload a public key from a host’s ⋯ menu — the private key never leaves this machine.</p>
+            <div class="host-toolbar" style="margin-bottom:10px">
+              <button type="button" class="btn btn-primary" id="gen-ssh-key">+ Generate Key</button>
+            </div>
             <div class="ssh-key-list" id="ssh-key-list">
               <div class="row">
                 <div class="row-info">
@@ -2187,9 +2253,6 @@
                 </div>
                 <button type="button" class="link-btn solid" data-copy-pubkey>Copy</button>
               </div>
-            </div>
-            <div class="host-toolbar" style="margin-top:10px;margin-bottom:0">
-              <button type="button" class="btn btn-primary" id="gen-ssh-key">+ Generate Key</button>
             </div>
           </div>
         </div>
@@ -2301,7 +2364,7 @@
           </div>
           <div class="section">
             <div class="section-title">Imported from Windows Terminal</div>
-            <p class="section-note">Toggle visibility in the new-tab menu. Checkbox on the left �?same pattern as SSH hosts.</p>
+            <p class="section-note">Toggle visibility in the new-tab menu. Checkbox on the left â?same pattern as SSH hosts.</p>
             <div class="check-list" id="profile-list">
               <div class="check-row">
                 <label class="check-hit">
@@ -2353,7 +2416,7 @@
                   <input type="checkbox" class="check-box" data-dirty value="Developer PowerShell">
                   <div class="check-main">
                     <div class="check-title">Developer PowerShell for VS 2022</div>
-                    <div class="check-meta">Import-Module …\Microsoft.VisualStudio.DevShell.dll</div>
+                    <div class="check-meta">Import-Module â¦\Microsoft.VisualStudio.DevShell.dll</div>
                   </div>
                 </label>
               </div>
@@ -2407,7 +2470,7 @@
           <div class="section">
             <div class="section-title">Keyboard Shortcuts</div>
             <p class="kb-hint">Click a keybinding to change it. Search matches title, description, command id, and combo. Changes join the same Apply as other settings.</p>
-            <input type="search" class="kb-search" id="kb-search" placeholder="Search keybindings�? autocomplete="off" />
+            <input type="search" class="kb-search" id="kb-search" placeholder="Search keybindingsâ? autocomplete="off" />
             <div class="kb-table">
               <div class="kb-row kb-row-head">
                 <div class="kb-info">Command</div>
@@ -2444,7 +2507,7 @@
             <div class="fp-list-col">
               <div class="fp-list-title">System <span class="fp-system-count" id="fp-system-count"></span></div>
               <div class="fp-list tt-scroll" id="fp-system"></div>
-              <a class="fp-nf-link" href="https://www.nerdfonts.com/" target="_blank" rel="noopener">Install more Nerd Fonts �?/a>
+              <a class="fp-nf-link" href="https://www.nerdfonts.com/" target="_blank" rel="noopener">Install more Nerd Fonts â?/a>
             </div>
           </div>
           <div class="fp-selected-section">
@@ -2624,6 +2687,33 @@
       </div>
     </div>
 
+        <div class="skg-overlay" id="skg-overlay" aria-hidden="true">
+      <div class="skg-dialog" role="dialog" aria-modal="true" aria-labelledby="skg-title">
+        <div class="skg-header" id="skg-title">Generate SSH Key</div>
+        <div class="skg-grid">
+          <label class="skg-field"><span>Name</span>
+            <input class="input" id="skg-name" type="text" spellcheck="false" value="id_ed25519" />
+          </label>
+          <label class="skg-field"><span>Algorithm</span>
+            <div class="set-select" data-select id="skg-algo-select">
+              <button type="button" class="set-select-trigger"><span class="set-select-value">Ed25519 (recommended)</span></button>
+              <div class="set-select-menu">
+                <button type="button" class="set-select-opt" aria-selected="true" data-value="ed25519">Ed25519 (recommended)</button>
+                <button type="button" class="set-select-opt" data-value="rsa">RSA 4096</button>
+              </div>
+            </div>
+          </label>
+          <label class="skg-field"><span>Passphrase <span class="skg-opt">(optional)</span></span>
+            <input class="input" id="skg-pass" type="password" placeholder="empty = no passphrase" autocomplete="new-password" />
+          </label>
+        </div>
+        <div class="skg-footer">
+          <button type="button" class="btn btn-ghost" id="skg-cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="skg-generate">Generate</button>
+        </div>
+      </div>
+    </div>
+
     <div class="ski-overlay" id="ski-overlay" aria-hidden="true">
       <div class="ski-dialog" role="dialog" aria-modal="true" aria-labelledby="ski-title">
         <div class="ski-header" id="ski-title">Upload SSH Key</div>
@@ -2638,12 +2728,15 @@
             </div>
           </div>
         </label>
+        <p class="ski-empty-hint" style="display:none;margin:0 0 10px;font-size:12px;color:var(--set-muted)">No keys yet. <button type="button" class="link-btn" id="ski-gen-one">Generate one…</button></p>
         <label class="ski-field"><span>Target OS</span>
           <div class="set-select" data-select id="ski-os-select">
-            <button type="button" class="set-select-trigger"><span class="set-select-value">Linux / macOS</span></button>
+            <button type="button" class="set-select-trigger"><span class="set-select-value">Auto</span></button>
             <div class="set-select-menu">
-              <button type="button" class="set-select-opt" aria-selected="true" data-value="unix">Linux / macOS</button>
+              <button type="button" class="set-select-opt" aria-selected="true" data-value="auto">Auto</button>
               <button type="button" class="set-select-opt" data-value="windows">Windows</button>
+              <button type="button" class="set-select-opt" data-value="linux">Linux</button>
+              <button type="button" class="set-select-opt" data-value="macos">macOS</button>
             </div>
           </div>
         </label>
@@ -2656,8 +2749,8 @@
   </div>
 
   <aside class="notes">
-    <h1>Settings �?design draft</h1>
-    <p>�?quickpanel / tabbar 稿同级。只�?chrome token；Tab 栏固定深色；终端 scheme 独立�?/p>
+    <h1>Settings — design draft</h1>
+    <p>Same tier as quickpanel / tabbar drafts. Chrome tokens only; tab bar stays fixed dark; terminal schemes independent.</p>
 
     <div class="picker" id="skin-picker">
       <button type="button" aria-pressed="true" data-skin="cursor">Cursor Mono</button>
@@ -2671,20 +2764,21 @@
     </div>
 
     <ol>
-      <li><strong>落地标准</strong>：布局与按�?strong>严格 1:1</strong>（见 <code>docs/ui/parity-gap.md</code> L1–L3）。可见性列�?= <strong>左侧 checkbox</strong>；单一功能开/关才�?toggle�?/li>
-      <li><strong>Footer</strong> 只表 dirty / Apply / Revert；成功反馈走左下 toast�?/li>
-      <li><strong>SSH</strong> 无独�?Save；Apply 一次写 app config + <code>~/.ssh/config</code>。Add Host 为主按钮�?48�? 配置对话框；host 行左 checkbox + �?�?×�?/li>
-      <li><strong>About</strong> 左文�?/ �?Homepage（GitHub�?strong>148 灰实�?/strong>�?/li>
-      <li><strong>Font</strong> 保留 Configure 对话框；行尾 Configure �?<strong>148 实心</strong>�?/li>
-      <li><strong>Keyboard</strong> 可搜索快捷键表（对齐 <code>shortcuts.ts</code> / <code>KEY_COMMANDS</code>）：�?<strong>Ctrl+P</strong> Go to Tab�?strong>Ctrl+Shift+P</strong> Command Palette；点�?chip 改绑�?Apply�?/li>
-      <li><strong>Select</strong> 自定义下拉（�?quickpanel 同族），不用系统菜单；菜�?<code>fixed</code> 悬浮不挤布局�?/li>
-      <li><strong>Serial</strong>：默认波特率 / 默认 profile、Built-in+Custom 卡片�?strong>New Profile 磁贴</strong>（非文字链）、Duplicate/Edit、profile 编辑器�?/li>
-      <li><strong>Theme</strong>�?strong>New Theme 磁贴</strong>、Core+Palette、live preview；Duplicate / Save 进画廊；编辑器脚按钮 148�?/li>
+      <li><strong>SSH</strong> — toolbar: Add Host + Reload + Open File (148); Keys: Generate above list; Generate modal Name/Algo/Passphrase; Upload OS Auto|Windows|Linux|macOS; host row checkbox + edit/more/delete. See <code>docs/ui/parity-gap.md</code> D4.</li>
+      <li><strong>Landing rule</strong>: layout and buttons are strict 1:1 (parity-gap L1–L3). Visibility columns = left checkbox; toggles only for single on/off.</li>
+      <li><strong>Footer</strong> shows dirty / Apply / Revert only; success feedback goes to bottom-left toast.</li>
+      <li><strong>About</strong> left copy / right Homepage (GitHub) as solid 148.</li>
+      <li><strong>Font</strong> keeps the Configure dialog; row-end Configure is solid 148.</li>
+      <li><strong>Keyboard</strong> searchable shortcuts (aligned with <code>shortcuts.ts</code> / <code>KEY_COMMANDS</code>): <strong>Ctrl+P</strong> Go to Tab, <strong>Ctrl+Shift+P</strong> Command Palette; click a chip to rebind until Apply.</li>
+      <li><strong>Select</strong> custom dropdown (same family as quickpanel), not native menus; menus use <code>fixed</code> so they float without squeezing layout.</li>
+      <li><strong>Serial</strong>: default baud / default profile, Built-in+Custom cards, <strong>New Profile tile</strong> (not a text link), Duplicate/Edit, profile editor.</li>
+      <li><strong>Theme</strong>: <strong>New Theme tile</strong>, Core+Palette, live preview; Duplicate / Save in gallery; editor foot buttons 148.</li>
     </ol>
 
     <div class="hint">
-      落地时：<code>data-skin</code> �?全局 chrome CSS 变量；toast 左下；SSH Save 并入 Apply；字体对话框继续用现�?<code>fontpicker.ts</code>。差异跟踪：<code>docs/ui/parity-gap.md</code>�?    </div>
-  </aside>
+      When landing: <code>data-skin</code> → global chrome CSS variables; toast bottom-left; SSH writes via Apply; font dialog stays on <code>fontpicker.ts</code>. Diff tracker: <code>docs/ui/parity-gap.md</code>.
+    </div>
+</aside>
 </div>
 
 <script>
@@ -2692,9 +2786,9 @@
     general: ["General", "App version, updates, renderer, paste behavior."],
     appearance: ["Appearance", "Chrome skin, fonts, and terminal color schemes."],
     profile: ["Profile", "Local shell profiles and the default new-tab target."],
-    ssh: ["SSH", "Hosts from ~/.ssh/config �?Apply writes the file."],
+    ssh: ["SSH", "Hosts from ~/.ssh/config â?Apply writes the file."],
     serial: ["Serial", "Default baud, named session profiles, and the profile editor."],
-    keyboard: ["Keyboard", "Searchable keybindings �?click a chip to rebind."],
+    keyboard: ["Keyboard", "Searchable keybindings â?click a chip to rebind."],
   };
 
   const titleEl = document.getElementById("panel-title");
@@ -2709,7 +2803,7 @@
   function syncDirty() {
     const on = appDirty || sshDirty;
     dirtyHint.classList.toggle("on", on);
-    if (sshDirty && appDirty) dirtyText.textContent = "Unsaved changes · SSH config will be written";
+    if (sshDirty && appDirty) dirtyText.textContent = "Unsaved changes Â· SSH config will be written";
     else if (sshDirty) dirtyText.textContent = "SSH config will be written on Apply";
     else dirtyText.textContent = "Unsaved changes";
   }
@@ -2798,7 +2892,7 @@
     syncDirty();
   });
 
-  // Number steppers (hide native spinners; �?/ + match chrome tokens)
+  // Number steppers (hide native spinners; â?/ + match chrome tokens)
   document.querySelectorAll("[data-stepper]").forEach((wrap) => {
     const input = wrap.querySelector('input[type="number"]');
     if (!input) return;
@@ -2820,18 +2914,18 @@
     });
   });
 
-  // Keyboard shortcuts �?searchable table (preview of shortcuts.ts)
+  // Keyboard shortcuts â?searchable table (preview of shortcuts.ts)
   const KB_COMMANDS = [
     {
       id: "workbench.action.quickOpen",
-      title: "Quick Open: Go to Tab�?,
+      title: "Quick Open: Go to Tabâ?,
       desc: "Show a searchable list of all tabs; type a number or name to jump.",
       combo: "Ctrl+P",
       defaultCombo: "Ctrl+P",
     },
     {
       id: "workbench.action.showCommands",
-      title: "Show Command Palette�?,
+      title: "Show Command Paletteâ?,
       desc: "Open the > command palette (New Tab, Serial, SSH, and other actions).",
       combo: "Ctrl+Shift+P",
       defaultCombo: "Ctrl+Shift+P",
@@ -2874,7 +2968,7 @@
     {
       id: "workbench.action.toggleFullScreen",
       title: "View: Toggle Full Screen",
-      desc: "Browser-style full screen: tab bar hidden �?terminal content only.",
+      desc: "Browser-style full screen: tab bar hidden â?terminal content only.",
       combo: "F11",
       defaultCombo: "F11",
     },
@@ -2917,7 +3011,7 @@
           (cmd.combo ? "" : " kb-chip-empty") +
           (modified ? " kb-chip-modified" : "");
         const reset = modified
-          ? `<button type="button" class="kb-reset" data-reset="${cmd.id}" title="Reset to default">�?/button>`
+          ? `<button type="button" class="kb-reset" data-reset="${cmd.id}" title="Reset to default">â?/button>`
           : "";
         return `<div class="kb-row" data-command="${cmd.id}">
           <div class="kb-info">
@@ -2958,7 +3052,7 @@
     appDirty = true;
     syncDirty();
     renderKbRows();
-    showToast("Keybinding changed �?pending until Apply", "info");
+    showToast("Keybinding changed â?pending until Apply", "info");
   });
   renderKbRows();
 
@@ -3278,7 +3372,7 @@
     appDirty = true;
     syncDirty();
     closeTe();
-    showToast(wasEdit ? "Theme updated �?pending until Apply" : "Theme saved �?pending until Apply", "info");
+    showToast(wasEdit ? "Theme updated â?pending until Apply" : "Theme saved â?pending until Apply", "info");
   });
 
   document.getElementById("te-delete").addEventListener("click", () => {
@@ -3301,12 +3395,12 @@
   // ---- Serial profiles (preview of serial.ts / serialprofileeditor.ts) ----
   const SERIAL_OUTPUT_NEWLINE_DESCS = {
     keep: "Pass through unchanged",
-    "cr-in-lf": "Lone \\n �?\\r\\n",
-    "lf-in-cr": "\\r �?\\r\\n",
-    "force-crlf": "\\r | \\n | \\r\\n �?\\r\\n",
-    "force-lf": "\\r | \\n | \\r\\n �?\\n",
-    "force-cr": "\\r | \\n | \\r\\n �?\\r",
-    strip: "\\r | \\n �?(removed)",
+    "cr-in-lf": "Lone \\n â?\\r\\n",
+    "lf-in-cr": "\\r â?\\r\\n",
+    "force-crlf": "\\r | \\n | \\r\\n â?\\r\\n",
+    "force-lf": "\\r | \\n | \\r\\n â?\\n",
+    "force-cr": "\\r | \\n | \\r\\n â?\\r",
+    strip: "\\r | \\n â?(removed)",
   };
 
   const BUILTIN_SERIAL_PROFILES = [
@@ -3338,7 +3432,7 @@
   }
 
   function serialProfileSummary(p) {
-    return `${p.inputMode} · Enter�?{p.enterNewline.toUpperCase()} · out ${p.outputNewline} · flow ${p.flowControl}`;
+    return `${p.inputMode} Â· Enterâ?{p.enterNewline.toUpperCase()} Â· out ${p.outputNewline} Â· flow ${p.flowControl}`;
   }
 
   function dedupeSerialProfileName(base) {
@@ -3511,7 +3605,7 @@
     syncDirty();
     renderSerialGallery();
     closeSp();
-    showToast(wasEdit ? "Profile updated �?pending until Apply" : "Profile saved �?pending until Apply", "info");
+    showToast(wasEdit ? "Profile updated â?pending until Apply" : "Profile saved â?pending until Apply", "info");
   });
 
   document.getElementById("sp-delete").addEventListener("click", () => {
@@ -3639,8 +3733,8 @@
   }
 
   function parseHostMeta(meta) {
-    // "user@host:port · �? or "host:port"
-    const main = (meta || "").split("·")[0].trim();
+    // "user@host:port Â· â? or "host:port"
+    const main = (meta || "").split("\u00b7")[0].trim();
     const m = main.match(/^(?:([^@]+)@)?([^:]+)(?::(\d+))?$/);
     return {
       user: m?.[1] || "",
@@ -3667,7 +3761,7 @@
         </div>
       </label>
       <div class="check-actions">
-        <button type="button" class="icon-tiny" title="Edit" data-edit>�?/button>
+        <button type="button" class="icon-tiny" title="Edit" data-edit>✎</button>
         <div class="host-more">
           <button type="button" class="icon-tiny" title="More" data-more aria-haspopup="true" aria-expanded="false">
             <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="13" cy="8" r="1.4" fill="currentColor"/></svg>
@@ -3694,7 +3788,8 @@
   });
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    if (skiOverlay.classList.contains("open")) closeSki();
+    if (document.getElementById("skg-overlay")?.classList.contains("open")) closeSkg();
+    else if (skiOverlay.classList.contains("open")) closeSki();
     else if (teOverlay.classList.contains("open")) closeTe();
     else if (spOverlay.classList.contains("open")) closeSp();
     else if (sheOverlay.classList.contains("open")) closeShe();
@@ -3736,7 +3831,7 @@
     sshDirty = true;
     syncDirty();
     closeShe();
-    showToast(wasEdit ? "Host updated �?pending until Apply" : "Host added �?pending until Apply", "info");
+    showToast(wasEdit ? "Host updated â?pending until Apply" : "Host added â?pending until Apply", "info");
   });
 
   // SSH host actions
@@ -3827,7 +3922,9 @@
   let skiTarget = null;
   function openSki(target) {
     skiTarget = target;
-    skiDesc.textContent = `Install a local public key on ${target.user}@${target.hostname}:${target.port}. The private key never leaves this machine.`;
+    const who = `${target.user}@${target.hostname}:${target.port}`;
+    document.getElementById("ski-title").textContent = `Upload SSH Key → ${who}`;
+    skiDesc.textContent = `Install a local public key on ${who}. The private key never leaves this machine.`;
     skiOverlay.classList.add("open");
     skiOverlay.setAttribute("aria-hidden", "false");
   }
@@ -3849,11 +3946,58 @@
   document.getElementById("ssh-key-list")?.addEventListener("click", (e) => {
     if (!e.target.closest("[data-copy-pubkey]")) return;
     const name = e.target.closest(".row")?.querySelector(".row-title")?.textContent || "key";
-    showToast(`Public key copied �?${name}`, "ok");
+    showToast(`Public key copied â?${name}`, "ok");
   });
-  document.getElementById("gen-ssh-key")?.addEventListener("click", () => {
-    showToast("Keygen dialog would open", "info");
+  document.getElementById("open-ssh-config")?.addEventListener("click", () => {
+    showToast("Would open ~/.ssh/config in the system editor", "info");
   });
+
+  const skgOverlay = document.getElementById("skg-overlay");
+  function openSkg() {
+    skgOverlay.classList.add("open");
+    skgOverlay.setAttribute("aria-hidden", "false");
+    document.getElementById("skg-name")?.focus();
+    document.getElementById("skg-name")?.select();
+  }
+  function closeSkg() {
+    skgOverlay.classList.remove("open");
+    skgOverlay.setAttribute("aria-hidden", "true");
+  }
+  document.getElementById("skg-cancel")?.addEventListener("click", closeSkg);
+  skgOverlay?.addEventListener("click", (e) => {
+    if (e.target === skgOverlay) closeSkg();
+  });
+  document.getElementById("skg-generate")?.addEventListener("click", () => {
+    const name = document.getElementById("skg-name")?.value.trim() || "id_ed25519";
+    const algo =
+      document.querySelector('#skg-algo-select .set-select-opt[aria-selected="true"]')?.dataset.value ||
+      "ed25519";
+    closeSkg();
+    const list = document.getElementById("ssh-key-list");
+    if (list) {
+      const row = document.createElement("div");
+      row.className = "row";
+      const title = document.createElement("div");
+      title.className = "row-title";
+      title.textContent = name;
+      const desc = document.createElement("div");
+      desc.className = "row-desc";
+      desc.textContent = "SHA256:(preview) newly generated · " + algo;
+      const info = document.createElement("div");
+      info.className = "row-info";
+      info.append(title, desc);
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.className = "link-btn solid";
+      copy.setAttribute("data-copy-pubkey", "");
+      copy.textContent = "Copy";
+      row.append(info, copy);
+      list.prepend(row);
+    }
+    showToast("Key generated: " + name + " (" + algo + ")", "ok");
+  });
+  document.getElementById("gen-ssh-key")?.addEventListener("click", openSkg);
+  document.getElementById("ski-gen-one")?.addEventListener("click", () => { closeSki(); openSkg(); });
 
   document.getElementById("host-list").addEventListener("change", (e) => {
     if (e.target.matches(".check-box")) {
@@ -3875,7 +4019,7 @@
     sshDirty = false;
     syncDirty();
     showToast(
-      wroteSsh ? "Config saved · ~/.ssh/config written" : "Config saved",
+      wroteSsh ? "Config saved Â· ~/.ssh/config written" : "Config saved",
       "ok",
     );
   });
@@ -3890,11 +4034,11 @@
     syncDirty();
   });
   document.getElementById("demo-update").addEventListener("click", () => {
-    showToast("Downloading update�?, "info", { progress: true });
+    showToast("Downloading updateâ?, "info", { progress: true });
   });
 
   document.getElementById("demo-check-update")?.addEventListener("click", () => {
-    showToast("Downloading update�?, "info", { progress: true });
+    showToast("Downloading updateâ?, "info", { progress: true });
   });
   document.getElementById("set-homepage")?.addEventListener("click", () => {
     showToast("Would open https://github.com/rede97/tterm", "info");
@@ -3947,9 +4091,9 @@
     "drwxr-xr-x  12 user  staff   384 May 18 10:30 .",
     "-rw-r--r--   1 user  staff  2048 May 16 22:01 README.md",
     "",
-    "�?Build passed in 2.4s",
+    "â?Build passed in 2.4s",
     "abcdefghijklmnopqrstuvwxyz 0123456789",
-    "Hello, 世界！한국어 日本�?,
+    "Hello, ä¸çï¼íêµ­ì´ æ¥æ¬èª?,
   ].join("\n");
 
   const fpOverlay = document.getElementById("font-picker");
@@ -4015,7 +4159,7 @@
       row.className = "fp-selected-item";
       row.draggable = true;
       row.dataset.index = String(i);
-      row.innerHTML = `<span class="fp-drag-grip">�?/span><span class="fp-selected-name" style="font-family:'${name}',monospace">${name}</span><button type="button" class="fp-remove-btn" title="Remove">${ICO_X}</button>`;
+      row.innerHTML = `<span class="fp-drag-grip">â ?/span><span class="fp-selected-name" style="font-family:'${name}',monospace">${name}</span><button type="button" class="fp-remove-btn" title="Remove">${ICO_X}</button>`;
       row.addEventListener("dragstart", () => { dragFrom = i; row.style.opacity = "0.5"; });
       row.addEventListener("dragend", () => { row.style.opacity = "1"; dragFrom = -1; });
       row.addEventListener("dragover", (e) => e.preventDefault());
@@ -4071,7 +4215,7 @@
     appDirty = true;
     syncDirty();
     closeFontPicker();
-    showToast("Font stack pending �?Apply in footer to save", "info");
+    showToast("Font stack pending â?Apply in footer to save", "info");
   });
   fpOverlay.addEventListener("click", (e) => {
     if (e.target === fpOverlay) closeFontPicker();

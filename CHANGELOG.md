@@ -32,6 +32,10 @@ Changes
 
 Fixes
 
+- **SSH Settings: section notes and icon hit size** — Hosts/Keys intro
+  copy was unstyled (missing `.section-note`); ✎/⋯/× hit targets were
+  22px vs the design's 28px
+
 - **Stale theme e2e assertions** — the Settings overlay keeps the 2px
   terminal gutter (v2.2.7), and the active-tab color assertion now matches
   the redesigned chrome

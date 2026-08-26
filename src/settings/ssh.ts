@@ -167,7 +167,7 @@ function sshTemplate(panel: HTMLElement) {
       "Client",
       itemRow(
         "Built-in SSH client",
-        "Use embedded russh instead of system ssh — in-terminal password prompts, host-key confirmation, and dynamic port forwarding (quick panel).",
+        "Use embedded russh instead of system ssh (password prompts, host-key confirm, port forwards).",
         toggle(
           st.embedded,
           (v) => {
@@ -225,10 +225,10 @@ function sshTemplate(panel: HTMLElement) {
     ${section(
       "Keys",
       html`
-        <div class="section-note">
+        <p class="section-note">
           Key pairs in ~/.ssh. Upload a public key from a host's ⋯ menu — the
           private key never leaves this machine.
-        </div>
+        </p>
         <div class="host-toolbar">
           <button
             type="button"

@@ -72,7 +72,7 @@
 |---|----|------|
 | **S1–S3** | 自定义 select / skin swatch / 按钮 token 已挂一部分 | **DONE\***（实心 148 与 row well 仍缺 → 见下） |
 | **S4** | Profile / SSH host **可见性 → 左侧 checkbox** | **DONE**（`.check-row`/`.check-box` 全套；pending 至 Apply） |
-| **S5** | SSH 面板 layout + 按钮 1:1 | **DONE**（Client/Hosts/Keys 分区、toolbar 主+ghost 148、✎/⋯/×、编辑走 modal、字段序 Alias\|User·HostName\|Port、upload/keygen 自定义下拉） |
+| **S5** | SSH 面板 layout + 按钮 1:1 | **DONE\***（Open File / Generate 弹窗已入稿；section-note + icon-tiny 28 已落地；余量见 D4 OK\*） |
 | **S6** | Appearance 主题 gallery + New Theme 磁贴 1:1 | **DONE**（`.theme-new` 磁贴；gallery 保留 Built-in/Custom 分组 = OK\*，稿扁平与产品分组取舍已定） |
 | **S7** | Serial Profile gallery + New Profile 磁贴 + editor 按钮 1:1 | **DONE** |
 | **S8** | Shell：panel header、row wells、sidebar/padding | **DONE**（header 随 nav、well 行、侧栏 188、20/24/28、dirty dot） |
@@ -130,19 +130,30 @@
 | **可见性控件** | **左 checkbox** + `check-row` / `is-off` | **右 `qp-switch`** + 临时灰底 | **控件 · LOCKED** |
 | check-row CSS | 稿完整 `.check-*` | **`styles.css` 无对应** | layout |
 
-### D4. SSH（S5）
+### D4. SSH（S5）— 2026-08-26 复审（稿已补 Open File / Generate 弹窗）
+
+稿：`docs/settings-preview.html` 已含 **Open File**、**Generate Key 弹窗**（Name / Algorithm / Passphrase）、Upload Target OS = Auto|Windows|Linux|macOS、Keys 工具条在列表**上方**、host 行 ✎/⋯/×。
 
 | 差异 | 稿 | 实现 | 级别 |
 |------|----|------|------|
-| 分区标题 | Client / Hosts from ~/.ssh/config / Keys | SSH Configuration / Imported Hosts / SSH Keys | layout / copy |
-| Host 工具条 | **主色 + Add Host** + **ghost Reload**，均约 **148** | Add 在 titleEnd；Reload 与 Open File 链在一行 | layout · 按钮 |
-| Open File | 稿工具条无 | 有 | layout（可保留但勿破坏工具条 1:1） |
-| Host 行 | **左 checkbox** + meta；✎ / **⋯** / × | **左 toggle** + 展开；文案 Edit/Delete | 控件 · layout |
-| 编辑交互 | 点 ✎ → **modal**；列表不靠展开承载 Clear/Upload | 行展开出详情；Clear/Upload 在展开区 | layout |
-| Host 编辑器字段序 | Alias\|User，HostName\|Port | Alias\|HostName，User\|Port | layout |
-| Keys Copy / Generate | 实心 148；Generate 主按钮工具条 | accent Copy；Generate titleEnd | 按钮 · layout |
-| Upload/Keygen 下拉 | 自定义 select | **native `<select>`** | 控件 |
-| Editor 脚按钮 | min 148 | 无 | 按钮 |
+| 分区标题 | Client / Hosts from ~/.ssh/config / Keys | **一致** | DONE |
+| Host 工具条 | Add + Reload + **Open File**，均 **148** | **一致** | DONE |
+| Host 行 | 左 checkbox + meta；✎ / ⋯ / ×；⋯→Clear / Upload | **一致**（modal 编辑） | DONE |
+| Host 编辑器字段序 | Alias\|User · HostName\|Port | **一致** | DONE |
+| Keys | Generate **上方** + 列表；Copy 实心 148 | **一致** | DONE |
+| Generate 弹窗 | `.skg-*`：Name / Algo / Passphrase / Generate | 有（共用 `.she-*` 壳） | DONE\* 壳类名不同 |
+| Upload 弹窗 | `.ski-*`；标题含 `user@host:port`；OS Auto… | 有（共用 `.she-*`）；OS 一致 | DONE\* 壳类名不同 |
+| `.section-note` | 有样式 | **已补** `styles.css` | DONE |
+| `.icon-tiny` | **28×28** | **已对齐 28** | DONE |
+| More 开态 class | `.host-more-menu.open`（稿 JS） | `.host-more-menu.open` | DONE |
+| More 字形 | SVG 三点（静态行） | Unicode **⋯** | OK\* |
+| Upload 空态 | **Generate one…** → keygen | **Generate one…** → keygen | DONE |
+| Upload OS 文案 | Target OS / Auto | Target system / Auto-detect… | copy |
+| Client 说明句 | 稿略短 | 实现多一句 forwards | copy |
+| Host 拖拽排序 | 稿无 | Sortable 有 | OK\* 产品增强 |
+| 脚按钮宽 | SHE/SKI/SKG 均 148 | `.sp-btn` 148 | DONE |
+
+**S5 状态：** 主布局 / 按钮 / section-note / icon-tiny 28 / Open File / Generate 弹窗 **已对齐**；余量 = modal 壳类名（`.skg-*` vs 复用 `.she-*`）、More 字形（SVG vs ⋯）、Upload OS 文案（copy）、Host 拖拽（产品增强）。
 
 ### D5. Serial（S7）
 

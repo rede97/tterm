@@ -227,7 +227,9 @@ describe("settings — SSH key management", () => {
     const panel = openPanel();
     panel.querySelector<HTMLButtonElement>(".ssh-btn-copy-id")!.click();
     const overlay = document.querySelector<HTMLElement>(".she-overlay")!;
-    expect(overlay.querySelector(".she-header")!.textContent).toContain("mxq@122.51.226.5:5862");
+    // Design: plain header; the target lives in the desc line.
+    expect(overlay.querySelector(".she-header")!.textContent).toBe("Upload SSH Key");
+    expect(overlay.querySelector(".ski-desc")!.textContent).toContain("mxq@122.51.226.5:5862");
 
     const installBtn = overlay.querySelector<HTMLButtonElement>(".ski-install")!;
     await vi.waitFor(() => expect(installBtn.disabled).toBe(false));
