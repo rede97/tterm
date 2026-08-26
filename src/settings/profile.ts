@@ -6,7 +6,7 @@
 // re-render resets them.
 
 import { type ConfigState, configStore } from "../core/store";
-import { html, nothing, render, repeat, section } from "../ui/lit";
+import { html, itemRow, nothing, render, repeat, section } from "../ui/lit";
 import { syncSelectTexts, ttSelect } from "../ui/select";
 
 export function createProfilePanel(): HTMLElement {
@@ -44,23 +44,20 @@ function renderProfilePanel(panel: HTMLElement): void {
     html`
       ${section(
         "Default Profile",
-        html`<div class="settings-item settings-item-row">
-          <div class="settings-item-info">
-            <div class="settings-item-title">Default Profile</div>
-          </div>
-          <div class="settings-item-control">
-            ${ttSelect(
-              "Default Profile",
-              localProfiles.map((p) => [p.name, p.name] as const),
-              defaultProfile,
-              () => {
-                // Pending lives in the DOM (data-current) until Apply —
-                // same contract the native select had.
-              },
-              { id: "set-default-profile" },
-            )}
-          </div>
-        </div>`,
+        itemRow(
+          "Default Profile",
+          "Used when opening a new local tab.",
+          ttSelect(
+            "Default Profile",
+            localProfiles.map((p) => [p.name, p.name] as const),
+            defaultProfile,
+            () => {
+              // Pending lives in the DOM (data-current) until Apply —
+              // same contract the native select had.
+            },
+            { id: "set-default-profile" },
+          ),
+        ),
       )}
       ${section(
         "Imported from Windows Terminal",

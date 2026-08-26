@@ -452,7 +452,7 @@ async function renderPage(): Promise<void> {
 
   inputEl.placeholder =
     page.kind === "commands"
-      ? "Type a command"
+      ? "Type a command…"
       : page.kind === "text"
         ? page.placeholder
         : `${page.title} — type to filter`;

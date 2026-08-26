@@ -87,48 +87,46 @@
 
 对照：`docs/settings-preview.html` ↔ `src/settings/*` + `src/styles.css` + `src/ui/lit.ts`。
 
-### D0. Shell
+### D0. Shell — metrics pass 2026-08-26
+
+对照来源：[Compare Settings layout metrics](e975c347-ad41-4f0c-a041-d2eb8363cbd1)。共享 token（148 / 28 / Inter / 550）本就一致；下列为 `styles.css` 追平项。
 
 | 差异 | 稿 | 实现 | 级别 |
 |------|----|------|------|
-| 面板标题区 | `.settings-header`（h2 + 描述随 nav 变） | **无** | layout |
-| 行容器 | `.row`：well 底 + 边框 + `padding: 10px 12px` | `.settings-item-row`：裸 flex，**无 well** | layout |
-| 侧栏宽 | 188px | 200px | polish |
-| 内容 padding | `20px 24px 28px` | `24px` | polish |
-| section 间距 | 28px | 24px | polish |
-| dirty 提示 | 文案 + `.dot` | 仅文案 | polish |
-| Apply/Revert | 主 / ghost | 有 `min-width: 148`；样式类名不同，接近 | 按钮 · 接近 |
+| 面板标题区 | `.settings-header` | **有** | DONE |
+| 行容器 | `.row` well `10×12` | `.settings-item-row` well · `align center` | DONE |
+| 侧栏 | `188` · pad `14px 0` · nav muted/550 | **对齐** | DONE |
+| 内容 / section | `20 24 28` / mb 28 | **对齐** | DONE |
+| Footer | sidebar bg · gap 10 · btn 28×12.5 | **对齐** | DONE |
+| Input / stepper / Settings select | 28h · 12.5/550 · stepper 52/28 · select center | **对齐** | DONE |
+| Modals | radius token · pad 16×20 · header 550 · foot 148×28 | **对齐** | DONE |
+| Keygen shell 宽 | draft `.skg` 420 | app 复用 `.she` 560 | OK\* |
 
 ### D1. General
 
 | 差异 | 稿 | 实现 | 级别 |
 |------|----|------|------|
-| Homepage | `.homepage-btn` **148×28** 灰实心 | `.settings-link-btn`，**无 148** | 按钮 |
-| Check for Updates | `.link-btn.solid` 148 灰 | accent link 风，无固定宽 | 按钮 |
-| Scrollback | 窄 input **宽 148** | stepper（±） | layout / 控件 |
-| Bell / Paste | 稿注「稍后」stub | **已完整实现** | OK\*（保留；row 须井格化） |
-| Data（Open / Reset） | 稿无 | **有** | OK\* 或搬出；若留则跟 row/按钮规范 |
+| Homepage / Check for Updates | `.link-btn.solid` 148×28 | `.settings-link-btn.solid` **对齐** | DONE |
+| Scrollback | 窄 input / stepper | stepper（±） | OK\* |
+| Bell / Paste / Data | — | 完整 | OK\* |
 
 ### D2. Appearance（S6）
 
 | 差异 | 稿 | 实现 | 级别 |
 |------|----|------|------|
-| Frosted / Font / Size 行 | `.row` well | 无 well | layout |
-| Configure 字体 | `.link-btn.solid` 148 | `.settings-link-btn` | 按钮 |
-| 主题说明文案 | 强调「只改终端，不改 Settings/tab」 | WT 导入说明为主 | copy |
-| Gallery 分组 | 稿静态为**扁平** grid | Built-in / Custom **分组标题** | layout（若 1:1 扁平则去分组；或改稿承认分组） |
-| **New Theme** | `.theme-new` 磁贴（+ 圆、标题、hint） | `+ New Theme` **link 按钮** | layout |
-| Theme Editor 脚 | Save/Cancel **min 148** | `.te-btn` 无 148 | 按钮 |
-| Skin 卡 | 有 swatch | **DONE** | — |
+| Frosted / Font / Size 行 | `.row` well | `.settings-item-row` well | DONE |
+| Configure | `.link-btn.solid` 148 | `.settings-link-btn.solid` | DONE |
+| Gallery | Built-in / Custom + New Theme 磁贴 | **一致**（`+ New Theme`，无单独 + 圆） | DONE |
+| Theme / Font / Host / Serial editor 脚 | 148×28 | `.te-btn` / `.fp-btn` / `.sp-btn` **对齐** | DONE |
+| Skin 卡 | minmax 190 · pad 12 · desc 11.5 | **对齐** | DONE |
 
 ### D3. Profile（S4）
 
 | 差异 | 稿 | 实现 | 级别 |
 |------|----|------|------|
-| 默认 profile 行 | 有 desc + `.set-select` | 无 desc | copy / layout |
-| 可见性说明 | 「Checkbox on the left — same as SSH」 | 「Uncheck to hide」（toggle 话术） | copy |
-| **可见性控件** | **左 checkbox** + `check-row` / `is-off` | **右 `qp-switch`** + 临时灰底 | **控件 · LOCKED** |
-| check-row CSS | 稿完整 `.check-*` | **`styles.css` 无对应** | layout |
+| 默认 profile 行 | desc「Used when opening…」 | **已补** | DONE |
+| 可见性 | 左 checkbox | **一致** | DONE |
+| check-row | `.check-*` | **一致**（meta mono） | DONE |
 
 ### D4. SSH（S5）— 2026-08-26 复审（稿已补 Open File / Generate 弹窗）
 
@@ -166,7 +164,12 @@
 
 ### D6. Keyboard
 
-结构 / 搜索 / chip 捕获：**大体 DONE**。Hint 文案略长 → copy。
+| 差异 | 稿 | 实现 | 级别 |
+|------|----|------|------|
+| 搜索 / 表宽 | `width:100%`，无 max-width | **已对齐**（去掉 420/860 上限） | DONE |
+| 搜索高 | 32px + `padding:8px 10px` | **已对齐** | DONE |
+| Hint 文案 | 短（search matches…） | **已对齐短文案** | DONE |
+| chip 捕获 / 表结构 | — | **一致** | DONE |
 
 ### D7. 控件对照（LOCKED）
 

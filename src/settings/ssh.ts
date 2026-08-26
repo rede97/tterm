@@ -273,12 +273,6 @@ function hostRow(panel: HTMLElement, h: SshHost, hidden: string[]) {
       </div>
     </label>
     <div class="check-actions">
-      <button
-        type="button"
-        class="icon-tiny ssh-btn-edit"
-        title="Edit"
-        @click=${() => showSshHostEditor({ base: h, onSaved: saveHost(panel) })}
-      >✎</button>
       <div class="host-more">
         <button
           type="button"
@@ -329,6 +323,12 @@ function hostRow(panel: HTMLElement, h: SshHost, hidden: string[]) {
           >Upload SSH Key</button>
         </div>
       </div>
+      <button
+        type="button"
+        class="icon-tiny ssh-btn-edit"
+        title="Edit"
+        @click=${() => showSshHostEditor({ base: h, onSaved: saveHost(panel) })}
+      >✎</button>
       <button
         type="button"
         class="icon-tiny ssh-btn-delete"

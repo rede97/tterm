@@ -32,6 +32,15 @@ Changes
 
 Fixes
 
+- **Settings chrome metrics vs design** — sidebar padding 14, muted nav
+  weight 550, row desc 11.5 / center align, inputs·stepper·footer·modals
+  on shared 28h / 12.5px / radius tokens (see parity-gap)
+- **Command palette hint bar removed** — Go to Tab / commands / secondary
+  pickers put guidance in the input placeholder only (design draft + app)
+- **Settings Profile default-row description** — "Used when opening a new
+  local tab." was missing under Default Profile
+- **Settings Keyboard search width** — search + table were capped
+  (`max-width: 420/860`) instead of full panel width like the design
 - **SSH Settings: section notes and icon hit size** — Hosts/Keys intro
   copy was unstyled (missing `.section-note`); ✎/⋯/× hit targets were
   22px vs the design's 28px

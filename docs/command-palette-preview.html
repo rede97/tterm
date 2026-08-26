@@ -12,9 +12,9 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
-    font: 13px/1.45 var(--ui);
+    font: var(--tt-fs-body)/1.45 var(--tt-ui); font-weight: var(--tt-ui-weight);
     background: #0a0a0a;
-    color: #c8c8c8;
+    color: var(--tt-text);
     overflow: hidden;
   }
 
@@ -46,9 +46,9 @@
     padding: 0 10px;
     border-radius: 6px;
     background: transparent;
-    color: #aaa;
+    color: var(--tt-muted);
     font: inherit;
-    font-size: 12px;
+    font-size: var(--tt-fs-label);
     border: 0;
     cursor: pointer;
     display: inline-flex;
@@ -56,23 +56,23 @@
     gap: 6px;
     max-width: 160px;
   }
-  .tab-pill.active { background: #2d2d2d; color: #eee; }
+  .tab-pill.active { background: #2d2d2d; color: var(--tt-text); }
   .tab-pill .idx {
     font-family: var(--mono);
-    font-size: 10px;
-    color: #777;
+    font-size: var(--tt-fs-micro);
+    color: var(--tt-faint);
   }
   .tab-pill.disconnected { opacity: 0.55; text-decoration: line-through; }
   .tab-spacer { flex: 1; }
   .term {
     flex: 1;
     padding: 16px 18px;
-    font: 12.5px/1.55 var(--mono);
-    color: #d4d4d4;
+    font: var(--tt-fs-ctrl)/1.55 var(--tt-mono);
+    color: var(--tt-text);
     white-space: pre-wrap;
     overflow: auto;
   }
-  .term .dim { color: #6a6a6a; }
+  .term .dim { color: var(--tt-faint); }
 
   /* ---- Palette overlay ---- */
   .pal-overlay {
@@ -105,8 +105,8 @@
   .pal-prefix {
     flex: 0 0 auto;
     padding: 0 0 0 12px;
-    font: 13px/1 var(--mono);
-    font-weight: 600;
+    font: var(--tt-fs-body)/1 var(--tt-mono);
+    font-weight: var(--tt-title-weight);
     color: var(--pal-accent);
     display: none;
   }
@@ -119,17 +119,11 @@
     border: 0;
     color: var(--pal-text);
     font: inherit;
-    font-size: 13.5px;
-    font-weight: var(--weight);
+    font-size: var(--tt-fs-body);
+    font-weight: var(--tt-ui-weight);
     outline: none;
   }
   .pal-input::placeholder { color: var(--pal-faint); }
-  .pal-hint {
-    padding: 7px 12px;
-    font-size: 11px;
-    color: var(--pal-muted);
-    border-bottom: 1px solid var(--pal-line);
-  }
   /* List scrolls with shared .tt-scroll (docs/ui/scroll.css) */
   .pal-list {
     max-height: min(52vh, 420px);
@@ -138,8 +132,8 @@
   }
   .pal-group {
     padding: 8px 12px 4px;
-    font-size: 10.5px;
-    font-weight: 600;
+    font-size: var(--tt-fs-caption);
+    font-weight: var(--tt-title-weight);
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--pal-faint);
@@ -151,13 +145,13 @@
     padding: 7px 12px;
     cursor: pointer;
     color: var(--pal-text);
-    font-size: 13px;
-    font-weight: var(--weight);
+    font-size: var(--tt-fs-body);
+    font-weight: var(--tt-ui-weight);
   }
   .pal-row:hover { background: var(--pal-hover); }
   .pal-row.selected {
     background: var(--pal-selected);
-    color: #fff;
+    color: var(--tt-text);
   }
   .pal-badge {
     min-width: 20px;
@@ -168,13 +162,13 @@
     justify-content: center;
     background: var(--pal-badge);
     border-radius: var(--pal-radius-sm);
-    font: 11px/1 var(--mono);
+    font: var(--tt-fs-caption)/1 var(--tt-mono);
     color: var(--pal-muted);
     flex-shrink: 0;
   }
   .pal-row.selected .pal-badge {
     background: var(--pal-badge-sel);
-    color: #fff;
+    color: var(--tt-text);
   }
   .pal-label {
     flex: 1;
@@ -185,7 +179,7 @@
   }
   .pal-row.is-tab .pal-label {
     font-family: var(--mono);
-    font-weight: 500;
+    font-weight: var(--tt-ui-weight);
   }
   .pal-label.disconnected {
     text-decoration: line-through;
@@ -193,14 +187,14 @@
   }
   .pal-meta {
     flex-shrink: 0;
-    font-size: 11px;
+    font-size: var(--tt-fs-caption);
     color: var(--pal-muted);
     font-family: var(--mono);
   }
   .pal-row.selected .pal-meta { color: rgba(255,255,255,0.72); }
   .pal-kbd {
     flex-shrink: 0;
-    font: 11px/1 var(--mono);
+    font: var(--tt-fs-caption)/1 var(--tt-mono);
     color: var(--pal-faint);
     letter-spacing: 0.02em;
   }
@@ -208,7 +202,7 @@
   .pal-empty {
     padding: 16px 12px;
     text-align: center;
-    font-size: 12px;
+    font-size: var(--tt-fs-label);
     color: var(--pal-muted);
   }
   .pal-footer {
@@ -216,11 +210,11 @@
     gap: 14px;
     padding: 7px 12px;
     border-top: 1px solid var(--pal-line);
-    font-size: 11px;
+    font-size: var(--tt-fs-caption);
     color: var(--pal-faint);
   }
   .pal-footer kbd {
-    font: 10.5px/1 var(--mono);
+    font: var(--tt-fs-caption)/1 var(--tt-mono);
     padding: 1px 5px;
     border: 1px solid var(--pal-line);
     border-radius: 3px;
@@ -232,15 +226,15 @@
     padding: 20px 18px 28px;
     overflow-y: auto;
     background: #0f0f0f;
-    color: #b0b0b0;
+    color: var(--tt-muted);
   }
   .notes h1 {
-    font-size: 15px;
-    font-weight: 600;
-    color: #f2f2f2;
+    font-size: var(--tt-fs-lg);
+    font-weight: var(--tt-title-weight);
+    color: var(--tt-text);
     margin-bottom: 6px;
   }
-  .notes p { font-size: 12.5px; color: #8a8a8a; margin-bottom: 14px; line-height: 1.5; }
+  .notes p { font-size: var(--tt-fs-ctrl); color: var(--tt-muted); margin-bottom: 14px; line-height: 1.5; }
   .picker {
     display: flex;
     flex-wrap: wrap;
@@ -253,16 +247,16 @@
     border-radius: 999px;
     border: 1px solid rgba(255,255,255,0.1);
     background: transparent;
-    color: #9a9a9a;
+    color: var(--tt-muted);
     font: inherit;
-    font-size: 12px;
+    font-size: var(--tt-fs-label);
     cursor: pointer;
   }
   .picker button[aria-pressed="true"] {
-    background: #f2f2f2;
-    color: #0a0a0a;
+    background: var(--tt-accent-fill);
+    color: var(--tt-accent-text);
     border-color: transparent;
-    font-weight: 550;
+    font-weight: var(--tt-title-weight);
   }
   .demo-actions {
     display: flex;
@@ -275,10 +269,10 @@
     border-radius: 8px;
     border: 1px solid rgba(255,255,255,0.12);
     background: #1a1a1a;
-    color: #e8e8e8;
+    color: var(--tt-text);
     font: inherit;
-    font-size: 12.5px;
-    font-weight: 550;
+    font-size: var(--tt-fs-ctrl);
+    font-weight: var(--tt-title-weight);
     cursor: pointer;
     text-align: left;
     padding: 0 12px;
@@ -286,23 +280,23 @@
   .demo-actions button:hover { background: #222; }
   .demo-actions .combo {
     float: right;
-    font: 11px/32px var(--mono);
-    color: #777;
+    font: var(--tt-fs-caption)/32px var(--tt-mono);
+    color: var(--tt-faint);
   }
   .notes ol {
     padding-left: 18px;
-    font-size: 12.5px;
+    font-size: var(--tt-fs-ctrl);
     line-height: 1.55;
-    color: #9a9a9a;
+    color: var(--tt-muted);
   }
   .notes li { margin-bottom: 8px; }
   .notes code {
     font-family: var(--mono);
-    font-size: 11px;
+    font-size: var(--tt-fs-caption);
     background: #1a1a1a;
     padding: 1px 5px;
     border-radius: 4px;
-    color: #ccc;
+    color: var(--tt-chrome-text);
   }
   .notes .hint {
     margin-top: 14px;
@@ -310,8 +304,8 @@
     background: #141414;
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 8px;
-    font-size: 11.5px;
-    color: #aaa;
+    font-size: var(--tt-fs-desc);
+    color: var(--tt-muted);
     line-height: 1.5;
   }
 
@@ -331,10 +325,10 @@
     padding: 10px 12px;
     background: #1a1a1a;
     border: 1px solid rgba(255,255,255,0.12);
-    border-left: 3px solid #888;
+    border-left: 3px solid var(--tt-chrome-muted);
     border-radius: 8px;
-    color: #e8e8e8;
-    font-size: 12.5px;
+    color: var(--tt-text);
+    font-size: var(--tt-fs-ctrl);
     opacity: 0;
     transform: translateY(6px);
     transition: opacity 160ms ease, transform 160ms ease;
@@ -342,7 +336,7 @@
   }
   .toast.visible { opacity: 1; transform: none; }
   .toast-ok { border-left-color: var(--pal-ok); }
-  .toast-info { border-left-color: #3794ff; }
+  .toast-info { border-left-color: var(--tt-bolt); }
 </style>
 </head>
 <body data-skin="cursor">
@@ -372,7 +366,6 @@ Type &gt; inside Ctrl+P to flip into commands (VS Code).</span></div>
           <span class="pal-prefix" id="pal-prefix">&gt;</span>
           <input class="pal-input" id="pal-input" type="text" spellcheck="false" autocomplete="off" />
         </div>
-        <div class="pal-hint" id="pal-hint"></div>
         <div class="pal-list tt-scroll" id="pal-list"></div>
         <div class="pal-footer">
           <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
@@ -401,8 +394,8 @@ Type &gt; inside Ctrl+P to flip into commands (VS Code).</span></div>
     </div>
 
     <ol>
-      <li><strong>Ctrl+P</strong>：编号 + 标题过滤（纯数字按 tab 序号）；点选 / Enter 跳转。</li>
-      <li><strong>Ctrl+Shift+P</strong>：输入框固定 <code>&gt;</code> 前缀；命令按分类列出，右侧可显示默认快捷键。</li>
+      <li><strong>Ctrl+P</strong>：编号 + 标题过滤；说明只放在输入框 placeholder（无单独 hint 栏）。</li>
+      <li><strong>Ctrl+Shift+P</strong>：固定 <code>&gt;</code> 前缀；命令按分类列出。二级菜单（New Tab / Baud / 临时 SSH…）同一风格：<code>标题 — type to filter</code>。</li>
       <li><strong>中断式命令</strong>：Baud / Profile / Flow、临时 SSH（host → <strong>password 二级</strong>）均在同一面板；Esc 逐级返回。</li>
       <li><strong>New Tab…</strong>：先选 Local / SSH / Serial，再选具体 profile / host / COM（同 Profiles ▾）；SSH 含 Temporary Connect…。</li>
       <li><strong>覆盖面</strong>：New Window / New Tab、Quick Panel、Share、<strong>临时 SSH</strong>（不必写配置）、SSH Port Forwards、Serial Profile·波特率·流控。</li>
@@ -517,7 +510,6 @@ Type &gt; inside Ctrl+P to flip into commands (VS Code).</span></div>
   const overlay = document.getElementById("pal-overlay");
   const input = document.getElementById("pal-input");
   const prefix = document.getElementById("pal-prefix");
-  const hint = document.getElementById("pal-hint");
   const listEl = document.getElementById("pal-list");
   const tabBar = document.getElementById("tab-bar");
   const term = document.getElementById("term");
@@ -668,12 +660,12 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
     const isCmd = mode === "commands";
     prefix.classList.toggle("on", isCmd);
     setPalInputSecret(mode === "adhocSshPass");
+    // Guidance lives in the input placeholder only (same as src/ui/palette.ts /
+    // tabswitcher.ts) — no separate hint bar; secondary menus share one pattern.
     if (mode === "tabs") {
-      hint.textContent = "Go to tab — type a number or name. Prefix with > for commands.";
-      input.placeholder = "Search tabs…";
+      input.placeholder = "Go to tab — number or name; > for commands";
     } else if (mode === "commands") {
-      hint.textContent = "Run a command — filter by title or category.";
-      input.placeholder = "type a command…";
+      input.placeholder = "Type a command…";
     } else if (mode === "picker") {
       const labels = {
         baud: "Baud rate",
@@ -681,29 +673,17 @@ Type &gt; inside Ctrl+P to flip into commands.</span>`;
         flow: "Flow control",
         inputMode: "Input mode",
       };
-      hint.textContent = `Choose ${labels[pickerKind] || "value"} — Esc returns to commands.`;
-      input.placeholder = "filter…";
+      input.placeholder = `${labels[pickerKind] || "Value"} — type to filter`;
     } else if (mode === "newTabKind") {
-      hint.textContent = "New Tab — pick Local, SSH, or Serial. Esc returns to commands.";
-      input.placeholder = "Local · SSH · Serial…";
+      input.placeholder = "New Tab — Local / SSH / Serial";
     } else if (mode === "newTabPick") {
-      const labels = { local: "shell", ssh: "host", serial: "port" };
-      hint.textContent = `New Tab · ${newTabKind || "…"} — pick a ${labels[newTabKind] || "target"}. Esc back.`;
-      input.placeholder =
-        newTabKind === "local"
-          ? "Filter shells…"
-          : newTabKind === "ssh"
-            ? "Filter hosts…"
-            : "Filter ports…";
+      const titles = { local: "Local shell", ssh: "SSH host", serial: "Serial port" };
+      input.placeholder = `${titles[newTabKind] || "Target"} — type to filter`;
     } else if (mode === "adhocSsh") {
-      hint.textContent = newTabKind
-        ? "Temporary SSH — not saved. Esc returns to SSH targets."
-        : "Temporary SSH — not saved to ~/.ssh/config. Esc returns to commands.";
-      input.placeholder = "user@host[:port]";
+      input.placeholder = "user@host[:port] — temporary, not saved";
     } else if (mode === "adhocSshPass") {
       const who = adhocTarget?.label || "host";
-      hint.textContent = `Password for ${who} — same palette step · Esc back to host · empty = agent/key`;
-      input.placeholder = "password";
+      input.placeholder = `Password for ${who} — empty for agent / key`;
     }
   }
 

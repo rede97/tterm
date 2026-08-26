@@ -21,7 +21,8 @@ body {
   background: var(--term-bg);
   color: var(--tt-text);
   font-family: var(--tt-ui);
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
+  font-weight: var(--tt-ui-weight);
 }
 
 body {
@@ -147,7 +148,7 @@ body {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   display: none;
   font-family: var(--tt-mono);
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
 }
 
 .profile-menu.open {
@@ -169,8 +170,8 @@ body {
 
 .profile-section-title {
   padding: 4px 12px 2px;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--tt-fs-caption);
+  font-weight: var(--tt-title-weight);
   text-transform: uppercase;
   color: var(--tt-chrome-muted);
   letter-spacing: 0.5px;
@@ -180,7 +181,7 @@ body {
   display: flex;
   align-items: center;
   padding: 6px 12px;
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   color: var(--tt-chrome-text);
   cursor: pointer;
 }
@@ -217,7 +218,7 @@ body {
 }
 
 .profile-item .item-subline {
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   color: var(--tt-chrome-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -226,7 +227,7 @@ body {
 
 .profile-item .item-detail {
   margin-left: 8px;
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   color: var(--tt-chrome-muted);
   flex-shrink: 0;
 }
@@ -353,7 +354,10 @@ body {
   overflow-y: auto;
   scrollbar-gutter: auto;
   color: var(--tt-text);
-  font: 13px / 1.4 var(--tt-ui);
+  font-family: var(--tt-ui);
+  font-size: var(--tt-fs-body);
+  font-weight: var(--tt-ui-weight);
+  line-height: 1.4;
   background: var(--tt-sidebar);
   border: 1px solid var(--tt-line-strong);
   border-radius: var(--tt-radius);
@@ -407,13 +411,13 @@ body.qp-glass .qp-share-url {
 body.qp-glass .qp-connect-btn[data-kind="reconnect"] {
   background: var(--tt-accent);
   border-color: var(--tt-accent);
-  color: #0a0a0a;
+  color: var(--tt-accent-text);
 }
 
 body.qp-glass[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   background: var(--tt-selected);
   border-color: var(--tt-accent);
-  color: #fff;
+  color: var(--tt-text);
 }
 
 body.qp-glass .qp-connect-btn[data-kind="reconnect"]:hover {
@@ -447,10 +451,10 @@ body.qp-glass .qp-sharing {
 
 .qp-title {
   display: block;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--tt-fs-body);
+  font-weight: var(--tt-title-weight);
   letter-spacing: -0.02em;
-  color: #fff;
+  color: var(--tt-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -459,7 +463,7 @@ body.qp-glass .qp-sharing {
 .qp-meta {
   display: block;
   margin-top: 3px;
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   color: var(--tt-muted);
 }
 
@@ -478,8 +482,8 @@ body.qp-glass .qp-sharing {
   flex-shrink: 0;
   height: 22px;
   border-radius: 999px;
-  font-size: 10px;
-  font-weight: 600;
+  font-size: var(--tt-fs-micro);
+  font-weight: var(--tt-title-weight);
   line-height: 1;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -572,14 +576,14 @@ body.qp-glass .qp-sharing {
 
 .qp-section-title {
   padding: 4px 10px 6px;
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   font-weight: var(--tt-ui-weight);
   color: var(--tt-muted);
 }
 
 .qp-sub-title {
   padding: 2px 10px 6px;
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   font-weight: var(--tt-ui-weight);
   color: var(--tt-faint);
 }
@@ -606,8 +610,8 @@ body.qp-glass .qp-sharing {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #cfcfcf;
-  font-size: 12.5px;
+  color: var(--tt-text);
+  font-size: var(--tt-fs-ctrl);
   font-weight: var(--tt-ui-weight);
 }
 
@@ -630,8 +634,10 @@ body.qp-glass .qp-sharing {
   background: var(--tt-inset);
   border: 1px solid var(--tt-line-strong);
   border-radius: var(--tt-radius-ctrl);
-  font: 12px / 1 var(--tt-ui);
+  font-family: var(--tt-ui);
+  font-size: var(--tt-fs-label);
   font-weight: var(--tt-ui-weight);
+  line-height: 1;
   text-align: left;
   cursor: pointer;
   outline: none;
@@ -659,6 +665,15 @@ body.qp-glass .qp-sharing {
 .qp-select-trigger:focus-visible {
   border-color: var(--tt-focus);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--tt-focus) 35%, transparent);
+}
+
+/* Settings selects match draft: 12.5px / weight 550 / centered label. */
+.settings-page .qp-select-trigger {
+  justify-content: center;
+  text-align: center;
+  padding: 0 26px;
+  font-size: var(--tt-fs-ctrl);
+  font-weight: var(--tt-title-weight);
 }
 
 .qp-select-value {
@@ -696,7 +711,7 @@ body.qp-glass .qp-sharing {
 
 .qp-optgroup {
   padding: 6px 8px 3px;
-  font-size: 10.5px;
+  font-size: var(--tt-fs-caption);
   font-weight: var(--tt-ui-weight);
   color: var(--tt-faint);
   letter-spacing: 0.02em;
@@ -713,7 +728,10 @@ body.qp-glass .qp-sharing {
   border-radius: var(--tt-radius-opt);
   background: transparent;
   color: var(--tt-text);
-  font: 12px / 1.3 var(--tt-ui);
+  font-family: var(--tt-ui);
+  font-size: var(--tt-fs-label);
+  font-weight: var(--tt-ui-weight);
+  line-height: 1.3;
   font-weight: var(--tt-ui-weight);
   text-align: left;
   cursor: pointer;
@@ -723,12 +741,12 @@ body.qp-glass .qp-sharing {
 .qp-option.active,
 .qp-option[aria-selected="true"]:hover {
   background: var(--tt-hover);
-  color: #fff;
+  color: var(--tt-text);
 }
 
 .qp-option[aria-selected="true"] {
   background: var(--tt-selected);
-  color: #fff;
+  color: var(--tt-text);
 }
 
 .qp-option[aria-selected="true"]::after {
@@ -746,7 +764,7 @@ body.qp-glass .qp-sharing {
 }
 
 .qp-hint {
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   color: var(--tt-faint);
   padding: 0 12px 6px;
   line-height: 1.4;
@@ -857,8 +875,10 @@ body.qp-glass .qp-sharing {
   background: var(--tt-inset);
   border: 1px solid var(--tt-line-strong);
   border-radius: var(--tt-radius-ctrl);
-  font: 12px / 1 var(--tt-ui);
-  font-weight: var(--tt-ui-weight);
+  font-family: var(--tt-ui);
+  font-size: var(--tt-fs-ctrl);
+  font-weight: var(--tt-title-weight);
+  line-height: 1;
   cursor: pointer;
   text-align: center;
 }
@@ -866,26 +886,26 @@ body.qp-glass .qp-sharing {
 .qp-mini-btn:hover {
   border-color: color-mix(in srgb, var(--tt-text) 35%, transparent);
   background: color-mix(in srgb, var(--tt-inset) 80%, #fff);
-  color: #fff;
+  color: var(--tt-text);
 }
 
 .qp-connect-btn[data-kind="disconnect"]:hover {
   border-color: color-mix(in srgb, var(--tt-bad) 45%, transparent);
-  color: #fca5a5;
+  color: var(--tt-bad);
 }
 
 /* Cursor skin: white CTA; VS Code: blue fill (design). */
 .qp-connect-btn[data-kind="reconnect"] {
   background: var(--tt-accent);
   border-color: var(--tt-accent);
-  color: #0a0a0a;
-  font-weight: var(--tt-ui-weight);
+  color: var(--tt-accent-text);
+  font-weight: var(--tt-title-weight);
 }
 
 body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   background: var(--tt-selected);
   border-color: var(--tt-accent);
-  color: #fff;
+  color: var(--tt-text);
 }
 
 .qp-connect-btn[data-kind="reconnect"]:hover {
@@ -941,7 +961,9 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   min-width: 0;
   height: var(--tt-ctrl-h);
   padding: 0 8px;
-  font: 11px / var(--tt-ctrl-h) var(--tt-mono);
+  font-family: var(--tt-mono);
+  font-size: var(--tt-fs-caption);
+  line-height: var(--tt-ctrl-h);
   color: var(--tt-muted);
   background: var(--tt-inset);
   border: 1px solid var(--tt-line-strong);
@@ -953,8 +975,9 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 }
 
 .qp-share-url-row .qp-mini-btn {
-  width: auto;
-  min-width: 56px;
+  /* Fixed width for Copy ↔ Copied so the URL field doesn't reflow. */
+  width: 68px;
+  min-width: 68px;
   border-radius: 0 var(--tt-radius-ctrl) var(--tt-radius-ctrl) 0;
   background: var(--tt-inset);
 }
@@ -995,7 +1018,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   gap: 7px;
   width: var(--tt-qp-led-w);
   flex-shrink: 0;
-  font-size: 11.5px;
+  font-size: var(--tt-fs-desc);
   color: var(--tt-faint);
   font-variant-numeric: tabular-nums;
 }
@@ -1147,7 +1170,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   cursor: pointer;
   user-select: none;
   font-family: var(--tt-mono);
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
 }
 
 /* AI session sharing indicator: small teal dot on the shared tab. */
@@ -1210,8 +1233,8 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   align-items: center;
   padding: 0 6px;
   font-family: var(--tt-mono);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--tt-fs-caption);
+  font-weight: var(--tt-title-weight);
   color: var(--tt-chrome-muted);
   user-select: none;
 }
@@ -1233,7 +1256,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   border: none;
   border-radius: 4px;
   color: var(--tt-text);
-  font-size: 14px;
+  font-size: var(--tt-fs-md);
   line-height: 1.4;
   min-width: 48px;
   max-width: 60%;
@@ -1273,8 +1296,8 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   padding: 4px 14px;
   background: rgba(0, 0, 0, 0.65);
   color: var(--tt-text);
-  font-size: 14px;
-  font-family: monospace;
+  font-size: var(--tt-fs-md);
+  font-family: var(--tt-mono);
   border-radius: 4px;
   opacity: 0;
   transition: opacity 0.15s ease;
@@ -1301,7 +1324,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   max-width: 320px;
   padding: 7px 12px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   color: var(--tt-muted);
   /* Quiet: well surface, severity shown only by a
      thin left accent bar instead of a loud solid block. */
@@ -1324,7 +1347,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 
 .toast-error {
   border-left-color: var(--tt-bad);
-  color: #e0b0a8;
+  color: var(--tt-bad);
 }
 
 /* OSC 9;4 progress bar on tabs */
@@ -1380,8 +1403,8 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   padding: 0 3px;
   background: rgba(255, 255, 255, 0.08);
   border-radius: 3px;
-  font-size: 10px;
-  font-weight: 600;
+  font-size: var(--tt-fs-micro);
+  font-weight: var(--tt-title-weight);
   color: var(--tt-chrome-muted);
   line-height: 1;
 }
@@ -1395,8 +1418,8 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--tt-fs-label);
+  font-weight: var(--tt-title-weight);
 }
 
 .tab-rename-input {
@@ -1421,7 +1444,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   outline: none;
   background: transparent;
   color: var(--tt-chrome-text);
-  font-size: 14px;
+  font-size: var(--tt-fs-md);
   line-height: 1;
   cursor: pointer;
   opacity: 0;
@@ -1451,7 +1474,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   border: 1px solid var(--tt-line);
   border-radius: var(--tt-radius-ctrl);
   font-family: var(--tt-mono);
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   color: var(--tt-chrome-text);
 }
 
@@ -1466,7 +1489,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   border: none;
   border-radius: var(--tt-radius-ctrl);
   background: var(--tt-bad);
-  color: #ffffff;
+  color: var(--tt-text);
   font: inherit;
   padding: 2px 10px;
   cursor: pointer;
@@ -1824,7 +1847,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   display: flex;
   align-items: center;
   padding: 6px 16px;
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   color: var(--tt-chrome-text);
   cursor: pointer;
   white-space: nowrap;
@@ -1852,7 +1875,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 .tab-context-menu .menu-arrow {
   margin-left: auto;
   padding-left: 24px;
-  font-size: 14px;
+  font-size: var(--tt-fs-md);
   color: var(--tt-chrome-muted);
 }
 
@@ -1910,7 +1933,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 
 .baud-submenu .baud-option {
   padding: 4px 12px;
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -1966,7 +1989,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 .color-clear {
   margin-top: 6px;
   padding: 4px 8px;
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   color: var(--tt-chrome-muted);
   cursor: pointer;
   border-radius: 3px;
@@ -2000,7 +2023,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   border-radius: var(--tt-radius-ctrl);
   color: var(--tt-text);
   padding: 3px 8px;
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   font-family: var(--tt-mono);
   outline: none;
   width: 160px;
@@ -2017,7 +2040,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   color: var(--tt-text);
   cursor: pointer;
   padding: 2px 6px;
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   line-height: 1;
 }
 
@@ -2027,12 +2050,12 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 }
 
 #search-bar .search-close {
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
 }
 
 #search-results {
   color: var(--tt-muted);
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   min-width: 36px;
   text-align: center;
 }
@@ -2055,7 +2078,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 
 #welcome .welcome-title {
   font-size: 72px;
-  font-weight: 300;
+  font-weight: var(--tt-ui-weight);
   color: rgba(212, 212, 212, 0.08);
   letter-spacing: 4px;
   user-select: none;
@@ -2066,8 +2089,8 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 }
 
 #welcome .welcome-version {
-  font-size: 14px;
-  font-weight: 400;
+  font-size: var(--tt-fs-md);
+  font-weight: var(--tt-ui-weight);
   color: rgba(212, 212, 212, 0.06);
   margin-top: -12px;
   user-select: none;
@@ -2109,6 +2132,11 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   z-index: 1; /* above the #welcome backdrop */
   background: var(--tt-page);
   overflow: hidden;
+  font-family: var(--tt-ui);
+  font-size: var(--tt-fs-body);
+  font-weight: var(--tt-ui-weight);
+  line-height: 1.45;
+  color: var(--tt-text);
 }
 
 /* -- sidebar -- */
@@ -2118,7 +2146,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   min-width: 188px;
   background: var(--tt-sidebar);
   border-right: 1px solid var(--tt-line);
-  padding: 12px 0;
+  padding: 14px 0;
   flex-shrink: 0;
   overflow-y: auto;
 }
@@ -2130,9 +2158,10 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   background: transparent;
   border: none;
   border-left: 3px solid transparent;
-  color: var(--tt-text);
-  font-size: 13px;
-  font-family: inherit;
+  color: var(--tt-muted);
+  font-size: var(--tt-fs-body);
+  font-weight: var(--tt-title-weight);
+  font-family: var(--tt-ui);
   cursor: pointer;
   outline: none;
   text-align: left;
@@ -2166,7 +2195,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 }
 
 .settings-header h2 {
-  font-size: 16px;
+  font-size: var(--tt-fs-xl);
   font-weight: var(--tt-title-weight);
   letter-spacing: -0.02em;
   color: var(--tt-text);
@@ -2174,7 +2203,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 
 .settings-header p {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   color: var(--tt-muted);
 }
 
@@ -2189,7 +2218,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 }
 
 .settings-section-title {
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   font-weight: var(--tt-title-weight);
   text-transform: uppercase;
   color: var(--tt-muted);
@@ -2202,8 +2231,8 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 }
 
 .settings-subsection-title {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--tt-fs-label);
+  font-weight: var(--tt-title-weight);
   color: var(--tt-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -2215,17 +2244,29 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 }
 
 .settings-item-title {
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   font-weight: var(--tt-title-weight);
   color: var(--tt-text);
-  margin-bottom: 4px;
+  margin-bottom: 0;
+}
+
+.settings-item-row .settings-item-title {
+  margin-bottom: 0;
 }
 
 .settings-item-desc {
-  font-size: 11px;
+  font-size: var(--tt-fs-desc);
   color: var(--tt-muted);
-  margin-bottom: 6px;
-  line-height: 1.4;
+  margin-top: 2px;
+  margin-bottom: 0;
+  line-height: 1.45;
+}
+
+.settings-item-row .settings-item-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .settings-about-row {
@@ -2239,7 +2280,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 .settings-item-row {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 16px;
   padding: 10px 12px;
   background: var(--tt-well);
@@ -2267,31 +2308,33 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 
 .settings-row-header {
   justify-content: space-between;
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   color: var(--tt-text);
 }
 
 .settings-hint {
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   color: var(--tt-muted);
 }
 
 .settings-label {
   width: 80px;
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   color: var(--tt-text);
 }
 
 .settings-input {
   flex: 1;
+  height: var(--tt-ctrl-h);
+  box-sizing: border-box;
   background: var(--tt-inset);
   border: 1px solid var(--tt-line-strong);
   border-radius: var(--tt-radius-ctrl);
   color: var(--tt-text);
-  padding: 6px 10px;
-  font-size: 13px;
-  font-family: inherit;
+  padding: 0 10px;
+  font-size: var(--tt-fs-ctrl);
+  font-family: var(--tt-ui);
   outline: none;
   max-width: 320px;
 }
@@ -2301,7 +2344,19 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 }
 
 .settings-input-narrow {
-  max-width: 120px;
+  width: 72px;
+  min-width: 72px;
+  max-width: 72px;
+  text-align: center;
+  font-weight: var(--tt-title-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-item-row > .settings-input-narrow,
+.settings-item-control > .settings-input-narrow {
+  width: var(--tt-btn-width);
+  min-width: var(--tt-btn-width);
+  max-width: var(--tt-btn-width);
 }
 
 /* Number inputs: native spinner buttons render with the platform look and
@@ -2324,17 +2379,19 @@ input[type="number"] {
 }
 
 .stepper .settings-input-narrow {
-  max-width: 64px;
+  width: 52px;
+  min-width: 52px;
+  max-width: 52px;
   text-align: center;
 }
 
 .stepper-btn {
-  width: 26px;
-  background: var(--tt-well);
+  width: 28px;
+  background: var(--tt-inset);
   border: 1px solid var(--tt-line-strong);
   border-radius: var(--tt-radius-ctrl);
-  color: var(--tt-text);
-  font-size: 14px;
+  color: var(--tt-muted);
+  font-size: var(--tt-fs-md);
   line-height: 1;
   cursor: pointer;
   outline: none;
@@ -2342,8 +2399,8 @@ input[type="number"] {
 }
 
 .stepper-btn:hover {
-  background: var(--tt-selected);
-  border-color: var(--tt-selected);
+  background: var(--tt-hover);
+  border-color: color-mix(in srgb, var(--tt-muted) 45%, transparent);
   color: var(--tt-text);
 }
 
@@ -2356,20 +2413,116 @@ input[type="number"] {
 }
 
 .theme-group-title {
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   color: var(--tt-muted);
   margin: 8px 0 2px;
 }
 
 .theme-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--tt-theme-card-min-w), 1fr));
   gap: 10px;
+  align-items: stretch;
+}
+
+.theme-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--tt-well);
+  width: 100%;
+  min-width: var(--tt-theme-card-min-w);
+  height: var(--tt-theme-card-h);
+  min-height: var(--tt-theme-card-h);
+  max-height: var(--tt-theme-card-h);
+  box-sizing: border-box;
+}
+
+.theme-card:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.theme-card.selected {
+  border-color: var(--tt-accent-fill);
+  box-shadow: 0 0 0 1px var(--tt-accent-fill);
+}
+
+.theme-card-preview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-size: var(--tt-fs-caption);
+  padding: 8px 10px;
+  line-height: 1.6;
+  white-space: nowrap;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.theme-card-swatches {
+  display: flex;
+  gap: 2px;
+  margin-top: 5px;
+}
+
+.theme-card-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.theme-card-name {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  font-size: var(--tt-fs-label);
+  color: var(--tt-text);
+  background: color-mix(in srgb, var(--tt-well) 70%, #000);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.theme-card.selected .theme-card-name {
+  color: var(--tt-text);
+}
+
+/* Card action buttons (Duplicate / Edit) — visible on hover. */
+.theme-card-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: none;
+  gap: 4px;
+}
+
+.theme-card:hover .theme-card-actions {
+  display: flex;
+}
+
+.theme-card-action {
+  padding: 2px 8px;
+  font-size: var(--tt-fs-caption);
+  background: rgba(30, 30, 30, 0.9);
+  color: var(--tt-chrome-text);
+  border: 1px solid #555;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.theme-card-action:hover {
+  background: #333;
+  color: var(--tt-text);
 }
 /* skin picker cards (Appearance > Chrome Skin) */
 .skin-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 10px;
   padding: 8px 0;
 }
@@ -2378,7 +2531,7 @@ input[type="number"] {
   border: 1px solid var(--tt-line);
   border-radius: var(--tt-radius-sm);
   background: var(--tt-well);
-  padding: 10px 12px;
+  padding: 12px;
   cursor: pointer;
 }
 
@@ -2447,105 +2600,15 @@ input[type="number"] {
 }
 
 .skin-card-title {
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   font-weight: var(--tt-title-weight);
   color: var(--tt-text);
 }
 
 .skin-card-desc {
-  font-size: 12px;
+  font-size: var(--tt-fs-desc);
   color: var(--tt-muted);
   margin-top: 2px;
-}
-
-.theme-card {
-  border: 1px solid var(--tt-line);
-  border-radius: var(--tt-radius-sm);
-  overflow: hidden;
-  cursor: pointer;
-  background: var(--tt-well);
-}
-
-.theme-card:hover {
-  border-color: var(--tt-line-strong);
-}
-
-.theme-card.selected {
-  border-color: var(--tt-accent-fill);
-  box-shadow: 0 0 0 1px var(--tt-accent-fill);
-}
-
-.theme-card-preview {
-  font-size: 11px;
-  padding: 8px 10px;
-  line-height: 1.6;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.theme-card-swatches {
-  display: flex;
-  gap: 2px;
-  margin-top: 5px;
-}
-
-.theme-card-swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-.theme-card-name {
-  padding: 5px 10px;
-  font-size: 12px;
-  color: var(--tt-text);
-  background: var(--tt-well);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.theme-card.selected .theme-card-name {
-  color: var(--tt-text);
-}
-
-/* Card action buttons (Duplicate / Edit) — visible on hover. */
-.theme-card {
-  position: relative;
-}
-
-.theme-card-actions {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  display: none;
-  gap: 4px;
-}
-
-.theme-card:hover .theme-card-actions {
-  display: flex;
-}
-
-.theme-card-action {
-  padding: 2px 8px;
-  font-size: 11px;
-  background: rgba(30, 30, 30, 0.9);
-  color: var(--tt-text);
-  border: 1px solid var(--tt-line-strong);
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-.theme-card-action:hover {
-  background: var(--tt-hover);
-  color: var(--tt-text);
-}
-
-#set-theme-new {
-  align-self: center;
-  justify-self: center;
-  padding: 8px 16px;
 }
 
 /* Theme editor modal */
@@ -2561,20 +2624,20 @@ input[type="number"] {
 
 .te-dialog {
   background: var(--tt-well);
-  border: 1px solid var(--tt-line);
-  border-radius: 8px;
-  padding: 16px;
-  width: 640px;
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius);
+  padding: 16px 20px;
+  width: min(640px, calc(100% - 40px));
   max-width: 92vw;
   max-height: 86vh;
   overflow-y: auto;
   color: var(--tt-text);
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
 }
 
 .te-header {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--tt-fs-lg);
+  font-weight: var(--tt-title-weight);
   color: var(--tt-text);
   margin-bottom: 12px;
 }
@@ -2593,7 +2656,7 @@ input[type="number"] {
   border-radius: var(--tt-radius-ctrl);
   color: var(--tt-text);
   padding: 5px 8px;
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
 }
 
 .te-preview {
@@ -2601,8 +2664,8 @@ input[type="number"] {
   border-radius: 4px;
   padding: 8px 10px;
   margin-bottom: 12px;
-  font-family: monospace;
-  font-size: 12px;
+  font-family: var(--tt-mono);
+  font-size: var(--tt-fs-label);
 }
 
 .te-swatches {
@@ -2625,7 +2688,7 @@ input[type="number"] {
 }
 
 .te-group-title {
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   color: var(--tt-muted);
   margin: 4px 0;
 }
@@ -2640,7 +2703,7 @@ input[type="number"] {
 .te-label {
   flex: 1;
   color: var(--tt-muted);
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2657,14 +2720,25 @@ input[type="number"] {
 }
 
 .te-hex {
-  width: 72px;
+  width: 78px;
+  height: 24px;
+  padding: 0 6px;
+  box-sizing: border-box;
   background: var(--tt-inset);
-  border: 1px solid var(--tt-line);
+  border: 1px solid var(--tt-line-strong);
   border-radius: var(--tt-radius-ctrl);
   color: var(--tt-text);
-  padding: 2px 6px;
-  font-family: monospace;
-  font-size: 12px;
+  font-family: var(--tt-mono);
+  font-size: var(--tt-fs-label);
+  font-weight: var(--tt-title-weight);
+  font-variant-numeric: tabular-nums;
+  line-height: 22px;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.te-hex:focus {
+  border-color: var(--tt-focus);
 }
 
 .te-footer {
@@ -2677,37 +2751,7 @@ input[type="number"] {
   flex: 1;
 }
 
-/* Modal footer buttons share the 148px footprint (design L2: Theme /
-   Serial / Host editor Save·Cancel同宽). */
-.te-btn {
-  min-width: var(--tt-btn-width);
-  padding: 6px 16px;
-  border-radius: var(--tt-radius-ctrl);
-  border: 1px solid var(--tt-line);
-  background: var(--tt-well);
-  color: var(--tt-text);
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.te-btn:hover {
-  background: var(--tt-hover);
-}
-
-.te-save {
-  background: var(--tt-accent-fill);
-  border-color: var(--tt-accent-fill);
-  color: var(--tt-accent-text);
-}
-
-.te-save:hover {
-  background: var(--tt-accent);
-}
-
-.te-delete {
-  border-color: var(--tt-bad);
-  color: var(--tt-bad);
-}
+/* Theme editor footer buttons → Button design language (.te-btn / .te-save / .te-delete). */
 
 /* theme preview swatches */
 .theme-preview {
@@ -2719,8 +2763,8 @@ input[type="number"] {
 
 .theme-preview-term {
   flex-basis: 100%;
-  font-family: monospace;
-  font-size: 12px;
+  font-family: var(--tt-mono);
+  font-size: var(--tt-fs-label);
   padding: 8px 10px;
   border-radius: 4px;
   margin-bottom: 4px;
@@ -2739,7 +2783,7 @@ input[type="number"] {
   display: flex;
   align-items: center;
   padding: 6px 0;
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   color: var(--tt-text);
   cursor: pointer;
   gap: 8px;
@@ -2759,7 +2803,7 @@ input[type="number"] {
 
 .settings-detail {
   margin-left: auto;
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   color: var(--tt-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2770,16 +2814,18 @@ input[type="number"] {
 .settings-footer {
   padding: 12px 24px;
   border-top: 1px solid var(--tt-line);
+  background: var(--tt-sidebar);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
 /* Footer dirty hint (design: footer carries only dirty state + Revert +
    Apply; feedback went to the bottom-left toast). */
 #dirty-hint {
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
+  font-weight: var(--tt-title-weight);
   color: var(--tt-warn);
   flex-shrink: 0;
   display: none;
@@ -2810,7 +2856,7 @@ input[type="number"] {
   border-radius: var(--tt-radius-ctrl);
   background: var(--tt-well);
   color: var(--tt-text);
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   cursor: pointer;
   outline: none;
   display: flex;
@@ -2845,8 +2891,8 @@ input[type="number"] {
   background: transparent;
   border: none;
   color: var(--tt-text);
-  font-size: 13px;
-  font-family: inherit;
+  font-size: var(--tt-fs-body);
+  font-family: var(--tt-ui);
   cursor: pointer;
   outline: none;
   text-align: left;
@@ -2859,80 +2905,18 @@ input[type="number"] {
 
 .settings-value {
   color: var(--tt-text);
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
 }
 
 .settings-link {
   color: var(--tt-accent);
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   text-decoration: none;
 }
 
 .settings-link:hover {
   color: var(--tt-accent);
   text-decoration: underline;
-}
-
-.settings-btn {
-  /* Design: every solid row-end button shares the 148px footprint and the
-     title weight (Homepage / Check for Updates / Apply / Save SSH…). */
-  min-width: var(--tt-btn-width);
-  padding: 6px 20px;
-  background: var(--tt-accent-fill);
-  border: none;
-  border-radius: var(--tt-radius-ctrl);
-  color: var(--tt-accent-text);
-  font-size: 13px;
-  font-weight: var(--tt-title-weight);
-  font-family: inherit;
-  cursor: pointer;
-  outline: none;
-}
-
-.settings-btn:hover {
-  background: var(--tt-accent);
-}
-
-.settings-btn.applied {
-  background: var(--tt-faint);
-  color: var(--tt-muted);
-  cursor: default;
-}
-
-.settings-btn-revert {
-  background: var(--tt-well);
-  color: var(--tt-text);
-}
-
-.settings-btn-revert:hover {
-  background: var(--tt-hover);
-  color: var(--tt-text);
-}
-
-.settings-link-btn {
-  padding: 6px 12px;
-  background: transparent;
-  border: none;
-  border-radius: var(--tt-radius-ctrl);
-  color: var(--tt-accent);
-  font-size: 13px;
-  font-family: inherit;
-  cursor: pointer;
-  outline: none;
-}
-
-.settings-link-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--tt-accent);
-}
-
-.settings-link-btn-danger {
-  color: var(--tt-bad);
-}
-
-.settings-link-btn-danger:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--tt-bad);
 }
 
 /* Visibility lists (LOCKED L3): multi-item "show in new-tab menu" lists
@@ -3021,7 +3005,7 @@ input[type="number"] {
 
 body[data-skin="cursor"] .check-box:checked {
   background: #f2f2f2;
-  border-color: #f2f2f2;
+  border-color: var(--tt-accent);
 }
 
 body[data-skin="cursor"] .check-box:checked::after {
@@ -3035,14 +3019,16 @@ body[data-skin="cursor"] .check-box:checked::after {
 }
 
 .check-title {
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   font-weight: var(--tt-title-weight);
   color: var(--tt-text);
+  margin-bottom: 1px;
 }
 
 .check-meta {
-  font-size: 11.5px;
+  font-size: var(--tt-fs-desc);
   color: var(--tt-muted);
+  font-family: var(--tt-mono);
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3072,9 +3058,28 @@ body[data-skin="cursor"] .check-box:checked::after {
   justify-content: center;
 }
 
-.btn {
+/* ===== Button design language (Settings / modals / confirm) =====
+   Tokens: --tt-btn-width · --tt-ctrl-h · --tt-btn-solid-bg · accent/* · bad
+   Variants (do not invent new skins):
+     primary     Apply / Save / Add Host / Generate / Install
+     ghost       Cancel / Revert / Reload / Open File
+     solid       Configure / Homepage / Copy / Check for Updates (148×28)
+     danger      Delete (outline)
+     danger-fill confirm destructive OK
+     link        text affordance ("Generate one…")
+   Legacy class names below are aliases of those variants. */
+
+.btn,
+.te-btn,
+.sp-btn,
+.fp-btn,
+.settings-btn,
+.settings-btn-revert,
+.cf-btn {
   height: var(--tt-ctrl-h);
+  min-width: var(--tt-btn-width);
   padding: 0 14px;
+  box-sizing: border-box;
   border: 1px solid var(--tt-line-strong);
   border-radius: var(--tt-radius-ctrl);
   cursor: pointer;
@@ -3082,37 +3087,188 @@ body[data-skin="cursor"] .check-box:checked::after {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  font: 12.5px / 1 var(--tt-ui);
+  font-family: var(--tt-ui);
+  font-size: var(--tt-fs-ctrl);
   font-weight: var(--tt-title-weight);
+  line-height: 1;
   background: var(--tt-well);
   color: var(--tt-text);
+  outline: none;
 }
 
-.btn:hover {
-  filter: brightness(1.08);
+/* Confirm dialog keeps a tighter min-width. */
+.cf-btn {
+  min-width: 88px;
+  padding: 0 16px;
+  font-weight: var(--tt-ui-weight);
 }
 
-.btn-primary {
+.btn:hover,
+.te-btn:hover,
+.sp-btn:hover,
+.fp-btn:hover,
+.settings-btn-revert:hover,
+.cf-btn:hover {
+  background: var(--tt-hover);
+  filter: none;
+}
+
+.cf-btn:focus-visible {
+  outline: 2px solid var(--tt-focus);
+  outline-offset: 2px;
+}
+
+/* --- primary --- */
+.btn-primary,
+.te-save,
+.sp-save,
+.fp-btn-apply,
+.settings-btn:not(.settings-btn-revert),
+.cf-btn-ok {
   background: var(--tt-accent-fill);
-  border-color: transparent;
+  border-color: var(--tt-accent-fill);
   color: var(--tt-accent-text);
 }
 
-.btn-ghost {
+.btn-primary:hover,
+.te-save:hover,
+.sp-save:hover,
+.fp-btn-apply:hover,
+.settings-btn:not(.settings-btn-revert):hover,
+.cf-btn-ok:hover {
+  background: var(--tt-accent);
+  border-color: var(--tt-accent);
+  filter: none;
+}
+
+body[data-skin="vscode"] .cf-btn-ok:hover {
+  filter: none;
+  background: var(--tt-accent);
+}
+
+.settings-btn.applied {
+  background: var(--tt-faint);
+  border-color: transparent;
+  color: var(--tt-muted);
+  cursor: default;
+}
+
+/* --- ghost --- */
+.btn-ghost,
+.settings-btn-revert,
+.te-cancel,
+.sp-cancel,
+.fp-btn-cancel,
+.cf-cancel {
   background: transparent;
   border-color: transparent;
   color: var(--tt-muted);
 }
 
-.btn-ghost:hover {
+.btn-ghost:hover,
+.settings-btn-revert:hover,
+.te-cancel:hover,
+.sp-cancel:hover,
+.fp-btn-cancel:hover,
+.cf-cancel:hover {
   color: var(--tt-text);
   background: var(--tt-hover);
   filter: none;
 }
 
+/* --- solid (secondary CTA, always 148×28) --- */
+.settings-link-btn.solid {
+  width: var(--tt-btn-width);
+  min-width: var(--tt-btn-width);
+  height: var(--tt-ctrl-h);
+  padding: 0 12px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  border-radius: var(--tt-radius-ctrl);
+  background: var(--tt-btn-solid-bg);
+  color: var(--tt-text);
+  font-family: var(--tt-ui);
+  font-size: var(--tt-fs-ctrl);
+  font-weight: var(--tt-title-weight);
+  text-decoration: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.settings-link-btn.solid:hover {
+  background: var(--tt-btn-solid-bg);
+  color: var(--tt-text);
+  filter: brightness(1.1);
+}
+
+/* --- danger (outline) --- */
+.te-delete,
+.sp-delete,
+.btn-danger {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--tt-bad) 45%, transparent);
+  color: var(--tt-bad);
+}
+
+.te-delete:hover,
+.sp-delete:hover,
+.btn-danger:hover {
+  background: color-mix(in srgb, var(--tt-bad) 14%, transparent);
+  color: var(--tt-bad);
+  filter: none;
+}
+
+/* --- danger-fill (confirm destructive) --- */
+.cf-btn-danger {
+  background: var(--tt-bad);
+  border-color: var(--tt-bad);
+  color: var(--tt-text);
+}
+
+.cf-btn-danger:hover {
+  filter: brightness(1.08);
+}
+
+/* --- link (text) --- */
+.settings-link-btn:not(.solid) {
+  padding: 6px 12px;
+  height: auto;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--tt-radius-ctrl);
+  color: var(--tt-accent);
+  font-size: var(--tt-fs-body);
+  font-family: var(--tt-ui);
+  font-weight: var(--tt-title-weight);
+  cursor: pointer;
+  outline: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.settings-link-btn:not(.solid):hover {
+  background: var(--tt-hover);
+  color: var(--tt-accent);
+}
+
+.settings-link-btn-danger {
+  color: var(--tt-bad);
+}
+
+.settings-link-btn-danger:hover {
+  background: var(--tt-hover);
+  color: var(--tt-bad);
+}
+
 /* Section intro under a section-title (SSH Hosts / Keys, Profile, …). */
 .section-note {
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   color: var(--tt-muted);
   margin: -4px 0 12px;
   line-height: 1.5;
@@ -3129,7 +3285,7 @@ body[data-skin="cursor"] .check-box:checked::after {
   border-radius: var(--tt-radius-ctrl);
   background: transparent;
   color: var(--tt-muted);
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   cursor: pointer;
   padding: 0;
 }
@@ -3172,7 +3328,7 @@ body[data-skin="cursor"] .check-box:checked::after {
   border-radius: var(--tt-radius-ctrl);
   background: transparent;
   color: var(--tt-chrome-text);
-  font: 12px / 1.3 var(--tt-ui);
+  font-family: var(--tt-ui); font-size: var(--tt-fs-label); font-weight: var(--tt-ui-weight); line-height: 1.3;
   text-align: left;
   cursor: pointer;
 }
@@ -3206,14 +3362,14 @@ body[data-skin="cursor"] .check-box:checked::after {
   justify-content: space-between;
   gap: 12px;
   padding: 14px 20px;
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   font-weight: var(--tt-title-weight);
   border-bottom: 1px solid var(--tt-line);
   user-select: none;
 }
 
 .cf-header-meta {
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   font-weight: var(--tt-ui-weight);
   color: var(--tt-muted);
   white-space: nowrap;
@@ -3238,14 +3394,14 @@ body[data-skin="cursor"] .check-box:checked::after {
 }
 
 .cf-text {
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   color: var(--tt-text);
   line-height: 1.5;
   white-space: pre-line;
 }
 
 .cf-meta {
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   color: var(--tt-muted);
   line-height: 1.45;
 }
@@ -3258,7 +3414,7 @@ body[data-skin="cursor"] .check-box:checked::after {
   background: var(--tt-inset);
   border: 1px solid var(--tt-line);
   border-radius: var(--tt-radius-ctrl);
-  font: 12.5px / 1.45 var(--tt-mono);
+  font-family: var(--tt-mono); font-size: var(--tt-fs-ctrl); line-height: 1.45;
   color: var(--tt-text);
   white-space: pre;
 }
@@ -3293,62 +3449,20 @@ textarea.cf-preview:focus {
   border-top: 1px solid var(--tt-line);
 }
 
-.cf-btn {
-  min-width: 88px;
-  height: var(--tt-ctrl-h);
-  padding: 0 16px;
-  border: 1px solid var(--tt-line-strong);
-  border-radius: var(--tt-radius-ctrl);
-  background: var(--tt-well);
-  color: var(--tt-text);
-  font: 12px / 1 var(--tt-ui);
-  font-weight: var(--tt-ui-weight);
-  cursor: pointer;
-}
+/* Confirm footer buttons → Button design language (.cf-btn / .cf-btn-ok / .cf-btn-danger). */
 
-.cf-btn:hover {
-  background: var(--tt-hover);
-}
-
-.cf-btn:focus-visible {
-  outline: 2px solid var(--tt-focus);
-  outline-offset: 2px;
-}
-
-.cf-btn-ok {
-  background: var(--tt-accent-fill);
-  border-color: var(--tt-accent);
-  color: var(--tt-accent-text);
-}
-
-.cf-btn-ok:hover {
-  filter: brightness(1.06);
-}
-
-body[data-skin="vscode"] .cf-btn-ok:hover {
-  filter: none;
-  background: var(--tt-accent);
-}
-
-.cf-btn-danger {
-  background: var(--tt-bad);
-  border-color: var(--tt-bad);
-  color: #fff;
-}
-
-.cf-btn-danger:hover {
-  filter: brightness(1.08);
-}
-
-/* "New …" tile (design .theme-new): New Theme / New Profile live in the
-   gallery grid as a tile, not a text link. */
+/* "New …" tile (design .theme-new): "+ New Theme" / "+ New Profile" — no separate + circle. */
 .theme-new {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 88px;
+  gap: 4px;
+  width: 100%;
+  min-width: var(--tt-theme-card-min-w);
+  height: var(--tt-theme-card-h);
+  min-height: var(--tt-theme-card-h);
+  max-height: var(--tt-theme-card-h);
   padding: 14px 12px;
   border: 1px solid var(--tt-line-strong);
   border-radius: var(--tt-radius-sm);
@@ -3368,51 +3482,16 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   background: color-mix(in srgb, var(--tt-well) 70%, #fff 4%);
 }
 
-.theme-new-plus {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--tt-inset);
-  border: 1px solid var(--tt-line-strong);
-  font-size: 18px;
-  line-height: 1;
-  color: var(--tt-text);
-  font-weight: 400;
-}
-
 .theme-new-label {
-  font-size: 12.5px;
+  font-size: var(--tt-fs-ctrl);
   font-weight: var(--tt-title-weight);
   color: var(--tt-text);
 }
 
 .theme-new-hint {
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   color: var(--tt-muted);
-  font-weight: 400;
-}
-
-/* Solid secondary CTA (design .link-btn.solid): the shared 148×28 row-end
-   button — Homepage / Configure / Check for Updates / Copy / Reload… */
-.settings-link-btn.solid {
-  width: var(--tt-btn-width);
-  height: var(--tt-ctrl-h);
-  padding: 0 12px;
-  background: #3a3a3a;
-  color: var(--tt-text);
-  font-weight: var(--tt-title-weight);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-}
-
-.settings-link-btn.solid:hover {
-  background: #3a3a3a;
-  color: var(--tt-text);
-  filter: brightness(1.1);
+  font-weight: var(--tt-ui-weight);
 }
 
 /* ===== Settings — SSH host list ===== */
@@ -3478,7 +3557,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 }
 
 .ssh-host-extra {
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   color: var(--tt-muted);
   margin-bottom: 6px;
   padding-left: 28px;
@@ -3528,12 +3607,12 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 }
 
 .font-picker {
-  width: 720px;
+  width: min(720px, calc(100% - 40px));
   max-height: 85vh;
-  min-height: 560px;
+  min-height: 520px;
   background: var(--tt-well);
-  border: 1px solid var(--tt-line);
-  border-radius: 8px;
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -3541,8 +3620,8 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 
 .font-picker-header {
   padding: 14px 20px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--tt-fs-body);
+  font-weight: var(--tt-title-weight);
   border-bottom: 1px solid var(--tt-line);
   user-select: none;
 }
@@ -3562,12 +3641,14 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 
 .fp-search {
   width: 100%;
-  padding: 7px 10px;
+  height: var(--tt-ctrl-h);
+  box-sizing: border-box;
+  padding: 0 10px;
   background: var(--tt-inset);
   border: 1px solid var(--tt-line-strong);
   border-radius: var(--tt-radius-ctrl);
   color: var(--tt-text);
-  font-size: 13px;
+  font-size: var(--tt-fs-ctrl);
   outline: none;
 }
 
@@ -3590,7 +3671,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 }
 
 .fp-list-title {
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--tt-muted);
@@ -3616,7 +3697,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   display: block;
   padding: 10px 12px;
   color: var(--tt-faint);
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
 }
 
 .fp-font-item {
@@ -3627,7 +3708,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   cursor: pointer;
   user-select: none;
   border-bottom: 1px solid var(--tt-line);
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
 }
 
 .fp-font-item:last-child {
@@ -3652,7 +3733,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: var(--tt-fs-ctrl);
 }
 
 .fp-font-add {
@@ -3666,7 +3747,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   border-radius: 3px;
   color: var(--tt-text);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--tt-fs-md);
   line-height: 1;
   flex-shrink: 0;
 }
@@ -3682,7 +3763,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 }
 
 .fp-badge {
-  font-size: 10px;
+  font-size: var(--tt-fs-micro);
   padding: 1px 4px;
   border-radius: 3px;
   flex-shrink: 0;
@@ -3701,7 +3782,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 .fp-nf-link {
   display: inline-block;
   margin-top: 6px;
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   color: var(--tt-accent);
   text-decoration: none;
 }
@@ -3717,7 +3798,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 }
 
 .fp-selected-title {
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--tt-muted);
@@ -3738,19 +3819,20 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   display: block;
   padding: 8px 10px;
   color: var(--tt-faint);
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
 }
 
 .fp-selected-item {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 8px;
+  padding: 6px 8px;
   margin: 2px;
   background: var(--tt-well);
   border-radius: 3px;
   user-select: none;
   cursor: grab;
+  font-size: var(--tt-fs-ctrl);
 }
 
 .fp-selected-item:active {
@@ -3759,7 +3841,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 
 .fp-drag-grip {
   color: var(--tt-faint);
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   flex-shrink: 0;
 }
 
@@ -3776,30 +3858,34 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 
 .fp-selected-name {
   flex: 1;
-  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .fp-remove-btn {
-  width: 20px;
-  height: 20px;
-  display: flex;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   background: transparent;
   border: none;
-  border-radius: 3px;
-  color: var(--tt-muted);
+  border-radius: var(--tt-radius-ctrl);
+  color: var(--tt-faint);
   cursor: pointer;
-  font-size: 16px;
+  font-size: var(--tt-fs-xl);
   line-height: 1;
   flex-shrink: 0;
+  padding: 0;
+}
+
+.fp-selected-item:hover .fp-remove-btn {
+  color: var(--tt-muted);
 }
 
 .fp-remove-btn:hover {
-  background: var(--tt-hover);
+  background: color-mix(in srgb, var(--tt-bad) 12%, transparent);
   color: var(--tt-bad);
 }
 
@@ -3810,7 +3896,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 }
 
 .fp-preview-title {
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--tt-muted);
@@ -3836,28 +3922,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   gap: 8px;
 }
 
-.fp-btn {
-  padding: 6px 16px;
-  border: 1px solid var(--tt-line-strong);
-  border-radius: var(--tt-radius-ctrl);
-  background: var(--tt-well);
-  color: var(--tt-text);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.fp-btn:hover {
-  background: var(--tt-hover);
-}
-
-.fp-btn-apply {
-  background: var(--tt-accent-fill);
-  border-color: var(--tt-accent-fill);
-}
-
-.fp-btn-apply:hover {
-  background: var(--tt-accent);
-}
+/* Font-picker footer buttons → Button design language (.fp-btn / .fp-btn-apply). */
 
 /* ===== SSH Auth Dialogs ===== */
 
@@ -3894,8 +3959,8 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 
 .sshauth-header {
   padding: 14px 20px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--tt-fs-body);
+  font-weight: var(--tt-title-weight);
   border-bottom: 1px solid var(--tt-line);
   user-select: none;
 }
@@ -3913,13 +3978,13 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 }
 
 .sshauth-label {
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   color: var(--tt-text);
   word-break: break-all;
 }
 
 .sshauth-text {
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   color: var(--tt-text);
   line-height: 1.5;
 }
@@ -3931,7 +3996,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   border: 1px solid var(--tt-line-strong);
   border-radius: var(--tt-radius-ctrl);
   color: var(--tt-text);
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   outline: none;
   box-sizing: border-box;
 }
@@ -3953,7 +4018,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 .sshauth-detail-row {
   display: flex;
   gap: 10px;
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
 }
 
 .sshauth-detail-key {
@@ -3968,7 +4033,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 }
 
 .sshauth-mono {
-  font-family: "JetBrains Mono", "Cascadia Mono", monospace;
+  font-family: var(--tt-mono);
 }
 
 .sshauth-footer {
@@ -3985,7 +4050,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   border-radius: var(--tt-radius-ctrl);
   background: var(--tt-well);
   color: var(--tt-text);
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   cursor: pointer;
 }
 
@@ -4036,18 +4101,18 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 
 .she-dialog {
   background: var(--tt-well);
-  border: 1px solid var(--tt-line);
-  border-radius: 8px;
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius);
   padding: 16px 20px;
-  width: 560px;
+  width: min(560px, calc(100% - 40px));
   max-width: 92vw;
   max-height: 86vh;
   overflow-y: auto;
 }
 
 .she-header {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--tt-fs-lg);
+  font-weight: var(--tt-title-weight);
   color: var(--tt-text);
   margin-bottom: 14px;
 }
@@ -4060,7 +4125,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 
 .she-field span {
   display: block;
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   color: var(--tt-muted);
   margin-bottom: 4px;
 }
@@ -4077,19 +4142,19 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 }
 
 .she-opt {
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
 }
 
 .she-fwd-title {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--tt-fs-label);
+  font-weight: var(--tt-title-weight);
   color: var(--tt-text);
   margin: 14px 0 6px;
 }
 
 .she-fwd-hint {
-  font-weight: 400;
-  font-size: 11px;
+  font-weight: var(--tt-ui-weight);
+  font-size: var(--tt-fs-caption);
   color: var(--tt-muted);
   margin-left: 6px;
 }
@@ -4110,7 +4175,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
 }
 
 .ft-group {
@@ -4129,25 +4194,25 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 }
 
 .ft-group-title {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--tt-fs-caption);
+  font-weight: var(--tt-title-weight);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 /* Forward-direction colors are semantic, not skinned (design: fixed). */
 .ft-g-local {
-  color: #4da6ff;
+  color: var(--tt-fwd-local);
 }
 .ft-g-remote {
-  color: #b586d8;
+  color: var(--tt-fwd-remote);
 }
 .ft-g-dynamic {
-  color: #4ec9b0;
+  color: var(--tt-share);
 }
 
 .ft-group-desc {
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   color: var(--tt-muted);
 }
 
@@ -4162,7 +4227,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 
 .ft-listen,
 .ft-target {
-  font-family: Consolas, "JetBrains Mono", monospace;
+  font-family: var(--tt-mono);
   color: var(--tt-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4179,7 +4244,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 
 .ft-pin {
   color: var(--tt-faint);
-  font-family: Consolas, "JetBrains Mono", monospace;
+  font-family: var(--tt-mono);
   user-select: none;
 }
 
@@ -4188,7 +4253,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   border: 1px solid var(--tt-line-strong);
   border-radius: var(--tt-radius-ctrl);
   color: var(--tt-text);
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   padding: 4px 6px;
   outline: none;
   min-width: 0;
@@ -4225,7 +4290,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   border-radius: 3px;
   color: var(--tt-text);
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   padding: 3px 8px;
 }
 
@@ -4255,10 +4320,23 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   background: var(--tt-inset);
 }
 
-/* Serial profile cards (gallery reuses .theme-card/.theme-grid) */
+/* Serial profile cards (gallery reuses .theme-card/.theme-grid).
+   Shorter than theme cards — no preview swatch strip. */
+.sp-card.theme-card {
+  height: 72px;
+  min-height: 72px;
+  max-height: 72px;
+}
+#set-serial-profile-new.theme-new {
+  height: 72px;
+  min-height: 72px;
+  max-height: 72px;
+  padding: 10px 12px;
+}
+
 .sp-card-summary {
   padding: 0 10px 6px;
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   color: var(--tt-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -4278,20 +4356,21 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 
 .sp-dialog {
   background: var(--tt-well);
-  border: 1px solid var(--tt-line);
-  border-radius: 8px;
-  padding: 16px;
-  width: 440px;
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius);
+  padding: 16px 20px;
+  width: min(440px, calc(100% - 40px));
   max-width: 92vw;
   max-height: 86vh;
+  overflow-x: hidden;
   overflow-y: auto;
   color: var(--tt-text);
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
 }
 
 .sp-header {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--tt-fs-lg);
+  font-weight: var(--tt-title-weight);
   color: var(--tt-text);
   margin-bottom: 12px;
 }
@@ -4310,7 +4389,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   border-radius: var(--tt-radius-ctrl);
   color: var(--tt-text);
   padding: 5px 8px;
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
 }
 
 .sp-row {
@@ -4323,26 +4402,31 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 .sp-label {
   flex: 1;
   color: var(--tt-muted);
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
+  font-weight: var(--tt-title-weight);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.sp-select {
+/* Shared ttSelect (qp-select) in the serial profile editor. */
+.sp-select-slot {
   flex: 1.4;
-  background: var(--tt-inset);
-  border: 1px solid var(--tt-line);
-  border-radius: var(--tt-radius-ctrl);
-  color: var(--tt-text);
-  padding: 4px 6px;
-  font-size: 12px;
+  min-width: 0;
+}
+.sp-select-slot .qp-select {
+  width: 100%;
+}
+.sp-select-slot .qp-select-trigger {
+  height: var(--tt-ctrl-h);
+  font-size: var(--tt-fs-ctrl);
+  font-weight: var(--tt-title-weight);
 }
 
 /* Live help line under the Output newlines select. */
 .sp-hint {
   margin: -2px 0 8px;
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   line-height: 1.4;
   color: var(--tt-muted);
 }
@@ -4357,35 +4441,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   flex: 1;
 }
 
-.sp-btn {
-  min-width: var(--tt-btn-width);
-  padding: 6px 16px;
-  border-radius: var(--tt-radius-ctrl);
-  border: 1px solid var(--tt-line);
-  background: var(--tt-well);
-  color: var(--tt-text);
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.sp-btn:hover {
-  background: var(--tt-hover);
-}
-
-.sp-save {
-  background: var(--tt-accent-fill);
-  border-color: var(--tt-accent-fill);
-  color: var(--tt-accent-text);
-}
-
-.sp-save:hover {
-  background: var(--tt-accent);
-}
-
-.sp-delete {
-  border-color: var(--tt-bad);
-  color: var(--tt-bad);
-}
+/* Serial / SSH modal footer buttons → Button design language (.sp-btn / .sp-save / .sp-delete). */
 
 /* ---- Tab switcher overlay (Ctrl+P quick open / Ctrl+Tab MRU) ---- */
 
@@ -4417,14 +4473,14 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   border: none;
   border-bottom: 1px solid var(--tt-line);
   color: var(--tt-text);
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   outline: none;
   box-sizing: border-box;
 }
 
 .tab-switcher-hint {
   padding: 7px 12px;
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   color: var(--tt-muted);
   border-bottom: 1px solid var(--tt-line);
 }
@@ -4442,7 +4498,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   padding: 6px 12px;
   cursor: pointer;
   color: var(--tt-text);
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
 }
 
 .tab-switcher-row.selected {
@@ -4459,7 +4515,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   justify-content: center;
   background: var(--tt-well);
   border-radius: 3px;
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   color: var(--tt-muted);
   flex-shrink: 0;
 }
@@ -4486,8 +4542,8 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 
 .pal-cat {
   padding: 6px 12px 2px;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--tt-fs-caption);
+  font-weight: var(--tt-title-weight);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--tt-faint);
@@ -4500,7 +4556,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   background: var(--tt-switch-off);
   border: 1px solid var(--tt-switch-off-border);
   font-family: var(--tt-mono);
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   color: var(--tt-muted);
 }
 
@@ -4515,19 +4571,19 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   color: var(--tt-muted);
 }
 
 .tab-switcher-current {
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   color: var(--tt-muted);
   flex-shrink: 0;
 }
 
 .tab-switcher-empty {
   padding: 12px;
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   color: var(--tt-muted);
   text-align: center;
 }
@@ -4535,19 +4591,39 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 /* ---- Settings: Keyboard panel ---- */
 
 .kb-hint {
-  margin-bottom: 12px;
+  margin: -4px 0 12px;
+  font-size: var(--tt-fs-label);
+  color: var(--tt-muted);
+  line-height: 1.5;
 }
 
 .kb-search {
+  width: 100%;
+  max-width: none;
   margin-bottom: 12px;
-  max-width: 420px;
+  padding: 8px 10px;
+  height: 32px;
+  box-sizing: border-box;
+  background: var(--tt-inset);
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius-ctrl);
+  color: var(--tt-text);
+  font: inherit;
+  font-size: var(--tt-fs-body);
+  outline: none;
+}
+
+.kb-search:focus {
+  border-color: var(--tt-focus);
 }
 
 .kb-table {
-  border: 1px solid var(--tt-line);
-  border-radius: 4px;
+  width: 100%;
+  max-width: none;
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius-sm);
   overflow: hidden;
-  max-width: 860px;
+  box-sizing: border-box;
 }
 
 .kb-row {
@@ -4565,8 +4641,8 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 
 .kb-row-head {
   background: var(--tt-well);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--tt-fs-caption);
+  font-weight: var(--tt-title-weight);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--tt-muted);
@@ -4579,12 +4655,12 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 }
 
 .kb-title {
-  font-size: 13px;
+  font-size: var(--tt-fs-body);
   color: var(--tt-text);
 }
 
 .kb-desc {
-  font-size: 11px;
+  font-size: var(--tt-fs-caption);
   color: var(--tt-muted);
   margin-top: 2px;
 }
@@ -4604,8 +4680,8 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   border: 1px solid var(--tt-line-strong);
   border-radius: var(--tt-radius-ctrl);
   color: var(--tt-text);
-  font-size: 12px;
-  font-family: inherit;
+  font-size: var(--tt-fs-label);
+  font-family: var(--tt-ui);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -4630,7 +4706,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
   border: none;
   color: var(--tt-muted);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--tt-fs-md);
   padding: 2px 4px;
   border-radius: 3px;
 }
@@ -4642,7 +4718,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 
 .kb-capture {
   max-width: 240px;
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   padding: 4px 8px;
 }
 
@@ -4670,7 +4746,7 @@ body[data-skin="vscode"] .cf-btn-ok:hover {
 
 .kb-empty {
   padding: 14px;
-  font-size: 12px;
+  font-size: var(--tt-fs-label);
   color: var(--tt-muted);
   text-align: center;
 }

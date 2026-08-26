@@ -39,6 +39,9 @@ body[data-skin="cursor"] {
   --tt-bad: #ef4444;
   --tt-warn: #e8a33d;
   --tt-bolt: #3794ff;
+  /* Port-forward direction chips (Settings / QP) */
+  --tt-fwd-local: #4da6ff;
+  --tt-fwd-remote: #b586d8;
 
   /* ---- Switch ---- */
   --tt-switch-off: #2a2a2a;
@@ -57,6 +60,23 @@ body[data-skin="cursor"] {
   --tt-ui-weight: 500;
   --tt-btn-width: 148px;
   --tt-ctrl-h: 28px;
+  /* Button surfaces (Settings / modals / confirm) */
+  --tt-btn-solid-bg: #3a3a3a; /* secondary filled CTA — Configure / Homepage / Copy */
+
+  /* Type scale — only allowed UI font sizes (no ad-hoc px). */
+  --tt-fs-micro: 10px; /* badges, uppercase group labels */
+  --tt-fs-caption: 11px; /* hints, captions, card actions */
+  --tt-fs-desc: 11.5px; /* row / about descriptions */
+  --tt-fs-label: 12px; /* field labels, subsection titles */
+  --tt-fs-ctrl: 12.5px; /* inputs, selects, buttons */
+  --tt-fs-body: 13px; /* body, row titles */
+  --tt-fs-md: 14px; /* secondary headers */
+  --tt-fs-lg: 15px; /* dialog headers */
+  --tt-fs-xl: 16px; /* panel titles */
+
+  /* Theme / serial gallery cards */
+  --tt-theme-card-h: 101px;
+  --tt-theme-card-min-w: 212px; /* 16×10px swatches + gaps + pad — no clip */
 
   --tt-ui: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
   --tt-mono: "JetBrains Mono", Consolas, ui-monospace, monospace;
@@ -206,7 +226,23 @@ body {
   --set-scroll-thumb: var(--tt-scroll-thumb);
   --set-scroll-thumb-hover: var(--tt-scroll-thumb-hover);
   --set-title-weight: var(--tt-title-weight);
+  --set-ui-weight: var(--tt-ui-weight);
   --set-btn-width: var(--tt-btn-width);
+  --set-ctrl-h: var(--tt-ctrl-h);
+  --set-btn-solid-bg: var(--tt-btn-solid-bg);
+  --set-fs-micro: var(--tt-fs-micro);
+  --set-fs-caption: var(--tt-fs-caption);
+  --set-fs-desc: var(--tt-fs-desc);
+  --set-fs-label: var(--tt-fs-label);
+  --set-fs-ctrl: var(--tt-fs-ctrl);
+  --set-fs-body: var(--tt-fs-body);
+  --set-fs-md: var(--tt-fs-md);
+  --set-fs-lg: var(--tt-fs-lg);
+  --set-fs-xl: var(--tt-fs-xl);
+  --set-ui: var(--tt-ui);
+  --set-mono: var(--tt-mono);
+  --set-theme-card-h: var(--tt-theme-card-h);
+  --set-theme-card-min-w: var(--tt-theme-card-min-w);
 
   /* Quick panel */
   --qp-bg: var(--tt-sidebar);
@@ -244,6 +280,7 @@ body {
   --qp-ui: var(--tt-ui);
   --qp-mono: var(--tt-mono);
   --qp-weight: var(--tt-ui-weight);
+  --qp-title-weight: var(--tt-title-weight);
 
   /* Command palette */
   --pal-bg: var(--tt-well);

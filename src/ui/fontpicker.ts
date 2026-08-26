@@ -15,6 +15,10 @@ import {
 
 const NERDFONT_URL = "https://www.nerdfonts.com/";
 
+// Design (settings-preview font picker): + adds, ✓ marks in-use.
+const ICO_PLUS = `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M8 3.5v9M3.5 8h9"/></svg>`;
+const ICO_CHECK = `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M3.5 8.2 6.6 11.2 12.5 4.8"/></svg>`;
+
 const PREVIEW_CONTENT = [
   "\x1b[32muser@host\x1b[0m:\x1b[34m~/projects\x1b[0m$ ls -la",
   "total 128",
@@ -71,8 +75,8 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
         </div>
       </div>
       <div class="font-picker-footer">
-        <button class="fp-btn fp-btn-cancel">Cancel</button>
-        <button class="fp-btn fp-btn-apply">Apply</button>
+        <button type="button" class="btn btn-ghost fp-btn-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary fp-btn-apply">Apply</button>
       </div>
     </div>
   `;
@@ -108,9 +112,10 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
 
     const badge = f.source === "builtin" ? `<span class="fp-badge builtin">in</span>` : "";
 
+    // Names render in their own typeface (design); in-use shows a check.
     row.innerHTML = `
-      <span class="fp-font-name">${esc(f.label)}</span>${badge}
-      <button class="fp-font-add${inUse ? " in-use" : ""}" title="Add to font list">+</button>
+      <span class="fp-font-name" style="font-family:'${esc(f.family)}',monospace">${esc(f.label)}</span>${badge}
+      <button type="button" class="fp-font-add${inUse ? " in-use" : ""}" title="${inUse ? "Remove from font list" : "Add to font list"}">${inUse ? ICO_CHECK : ICO_PLUS}</button>
     `;
 
     // click font name → select for preview
@@ -151,8 +156,8 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
 
     row.innerHTML = `
       <span class="fp-drag-grip" title="Drag to reorder">⠿</span>
-      <span class="fp-selected-name">${esc(def?.label ?? family)}</span>
-      <span class="fp-remove-btn" data-family="${esc(family)}">×</span>
+      <span class="fp-selected-name" style="font-family:'${esc(family)}',monospace">${esc(def?.label ?? family)}</span>
+      <button type="button" class="fp-remove-btn" title="Remove" data-family="${esc(family)}">×</button>
     `;
 
     row.querySelector(".fp-remove-btn")?.addEventListener("click", (e) => {

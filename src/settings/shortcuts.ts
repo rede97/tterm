@@ -167,11 +167,13 @@ function shortcutsTemplate(panel: HTMLElement) {
   return section(
     "Keyboard Shortcuts",
     html`
-      <div class="settings-item-desc kb-hint">Click a keybinding to change it: press the new combination, Enter to confirm, Escape to cancel, Backspace to remove. Changes take effect with the Apply button below. Ctrl+D is deliberately not captured — it reaches the shell and ends the session (the tab then closes itself).</div>
+      <div class="settings-item-desc kb-hint">Click a keybinding to change it. Search matches title, description, command id, and combo. Changes join the same Apply as other settings.</div>
       <input
+        type="search"
         id="kb-search"
-        class="settings-input kb-search"
+        class="kb-search"
         placeholder="Search keybindings…"
+        autocomplete="off"
         .value=${st.query}
         @input=${(e: Event) => {
           st.query = (e.target as HTMLInputElement).value;

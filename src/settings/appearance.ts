@@ -232,8 +232,7 @@ function galleryTemplate(panel: HTMLElement, current: string): TemplateResult {
         class="theme-new"
         @click=${() => openThemeEditor(panel, findTheme(pendingThemeName(panel)), undefined)}
       >
-        <span class="theme-new-plus" aria-hidden="true">+</span>
-        <span class="theme-new-label">New Theme</span>
+        <span class="theme-new-label">+ New Theme</span>
         <span class="theme-new-hint">Start from current scheme</span>
       </button>
     </div>

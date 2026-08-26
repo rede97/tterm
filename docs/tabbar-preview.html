@@ -14,7 +14,7 @@
   html, body {
     height: 100%;
     background: #0a0a0a;
-    color: #c8c8c8;
+    color: var(--tt-text);
     font: 13px/1.45 var(--ui);
     -webkit-font-smoothing: antialiased;
   }
@@ -70,11 +70,11 @@
   }
   #settings-btn:hover {
     background: var(--tab-hover);
-    color: #fff;
+    color: var(--tt-text);
   }
   #settings-btn[aria-pressed="true"] {
     background: var(--tab-active);
-    color: #fff;
+    color: var(--tt-text);
   }
 
   #tabs {
@@ -154,8 +154,8 @@
     height: 100%;
     margin: 0;
     padding: 0 0 0 6px;
-    font-size: 11px;
-    font-weight: 600;
+    font-size: var(--tt-fs-caption);
+    font-weight: var(--tt-title-weight);
     letter-spacing: -0.02em;
     color: var(--chrome-muted);
     background: var(--tab-bar-bg);
@@ -190,7 +190,7 @@
   }
   .icon-btn:hover {
     background: #333333;
-    color: #fff;
+    color: var(--tt-text);
   }
   .overflow-chip + .icon-btn { width: 28px; }
 
@@ -216,7 +216,7 @@
   .tab.active {
     z-index: 3;
     background: var(--tab-active);
-    color: #fff;
+    color: var(--tt-text);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 
@@ -229,14 +229,14 @@
     display: grid;
     place-items: center;
     font-family: var(--mono);
-    font-size: 10px;
-    font-weight: 600;
+    font-size: var(--tt-fs-micro);
+    font-weight: var(--tt-title-weight);
     line-height: 1;
     color: var(--chrome-muted);
     background: rgba(255,255,255,0.07);
     border-radius: 3px;
   }
-  .tab.active .tab-badge { color: #aaa; }
+  .tab.active .tab-badge { color: var(--tt-muted); }
 
   .tab-label {
     flex: 1;
@@ -245,13 +245,13 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-family: var(--mono);
-    font-size: 12px;
-    font-weight: 600;
+    font-size: var(--tt-fs-label);
+    font-weight: var(--tt-title-weight);
   }
   .tab.disconnected .tab-label {
     font-family: var(--mono);
-    font-size: 11.5px;
-    color: #f14c4c;
+    font-size: var(--tt-fs-desc);
+    color: var(--tt-bad);
     text-decoration: line-through;
   }
   .tab.shared::after {
@@ -270,13 +270,13 @@
     color: var(--chrome-text);
     opacity: 0;
     cursor: pointer;
-    font-size: 14px;
+    font-size: var(--tt-fs-md);
     flex-shrink: 0;
     order: 4;
   }
   .tab:hover .tab-close,
   .tab.active .tab-close { opacity: 0.7; }
-  .tab-close:hover { opacity: 1; color: #fff; }
+  .tab-close:hover { opacity: 1; color: var(--tt-text); }
 
   /* Close confirm — compact strip directly under the × */
   .tab-close-pop {
@@ -294,7 +294,7 @@
     background: #2d2d2d;
     border: 1px solid rgba(255,255,255,0.14);
     border-radius: 7px;
-    color: #e8e8e8;
+    color: var(--tt-text);
     font: 12px/1 Inter, "Segoe UI", system-ui, sans-serif;
   }
   .tab-close-pop.open { display: flex; }
@@ -304,16 +304,16 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: #ddd;
+    color: var(--tt-chrome-text);
   }
   .tab-close-pop-copy strong {
-    color: #f2f2f2;
-    font-weight: 550;
+    color: var(--tt-text);
+    font-weight: var(--tt-title-weight);
   }
   .tab-close-pop-copy .name {
-    color: #aaa;
+    color: var(--tt-muted);
     font-family: Consolas, "JetBrains Mono", monospace;
-    font-size: 11.5px;
+    font-size: var(--tt-fs-desc);
   }
   .tab-close-pop .confirm {
     flex-shrink: 0;
@@ -322,10 +322,10 @@
     border-radius: 5px;
     border: 0;
     background: #e81123;
-    color: #fff;
+    color: var(--tt-text);
     font: inherit;
-    font-size: 12px;
-    font-weight: 550;
+    font-size: var(--tt-fs-label);
+    font-weight: var(--tt-title-weight);
     cursor: pointer;
   }
   .tab-close-pop .confirm:hover { filter: brightness(1.08); }
@@ -342,7 +342,7 @@
     max-height: min(360px, calc(100% - 40px));
     /* Same terminal mono as #term */
     font: 13px/1.45 var(--mono);
-    color: #ccc;
+    color: var(--tt-chrome-text);
   }
   .profile-menu.open { display: flex; align-items: stretch; }
   .profile-col {
@@ -358,10 +358,10 @@
   .profile-section-title {
     padding: 6px 12px 4px;
     font: inherit;
-    font-size: 11px;
-    font-weight: 600;
+    font-size: var(--tt-fs-caption);
+    font-weight: var(--tt-title-weight);
     text-transform: uppercase;
-    color: #888;
+    color: var(--tt-chrome-muted);
     letter-spacing: 0.5px;
   }
   .profile-item {
@@ -372,13 +372,13 @@
     border: 0;
     background: transparent;
     font: inherit;
-    color: #ccc;
+    color: var(--tt-chrome-text);
     text-align: left;
     cursor: pointer;
   }
   .profile-item:hover {
     background: var(--tab-active);
-    color: #fff;
+    color: var(--tt-text);
   }
   .profile-item .item-icon {
     width: 16px;
@@ -387,9 +387,9 @@
     flex-shrink: 0;
     display: grid;
     place-items: center;
-    color: #999;
+    color: var(--tt-muted);
   }
-  .profile-item:hover .item-icon { color: #ddd; }
+  .profile-item:hover .item-icon { color: var(--tt-chrome-text); }
   .profile-item .item-icon svg { display: block; }
   .profile-item .item-label {
     flex: 1;
@@ -409,25 +409,25 @@
     line-height: 1.25;
   }
   .profile-item .item-subline {
-    font-size: 11px;
+    font-size: var(--tt-fs-caption);
     line-height: 1.25;
-    color: #888;
+    color: var(--tt-chrome-muted);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .profile-item:hover .item-subline { color: #bbb; }
+  .profile-item:hover .item-subline { color: var(--tt-muted); }
   .profile-item .item-detail {
     margin-left: 8px;
-    font-size: 11px;
-    color: #888;
+    font-size: var(--tt-fs-caption);
+    color: var(--tt-chrome-muted);
     flex-shrink: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .profile-item:hover .item-detail { color: #ccc; }
+  .profile-item:hover .item-detail { color: var(--tt-chrome-text); }
 
   /* ---- Tab right-click menu — mirrors contextmenu.ts tab group ---- */
   .tab-context-menu {
@@ -450,16 +450,16 @@
     border: 0;
     background: transparent;
     font-family: var(--ui);
-    font-size: 13px;
-    font-weight: 500;
-    color: #ccc;
+    font-size: var(--tt-fs-body);
+    font-weight: var(--tt-ui-weight);
+    color: var(--tt-chrome-text);
     text-align: left;
     cursor: pointer;
     white-space: nowrap;
   }
   .tab-context-menu .menu-item:hover {
     background: var(--tab-active);
-    color: #fff;
+    color: var(--tt-text);
   }
   .tab-context-menu .menu-icon {
     width: 14px;
@@ -468,17 +468,17 @@
     display: grid;
     place-items: center;
     flex-shrink: 0;
-    color: #999;
+    color: var(--tt-muted);
   }
-  .tab-context-menu .menu-item:hover .menu-icon { color: #ddd; }
+  .tab-context-menu .menu-item:hover .menu-icon { color: var(--tt-chrome-text); }
   .tab-context-menu .menu-icon svg { display: block; }
   .tab-context-menu .menu-arrow {
     margin-left: 4px;
-    font-size: 14px;
-    color: #888;
+    font-size: var(--tt-fs-md);
+    color: var(--tt-chrome-muted);
     flex-shrink: 0;
   }
-  .tab-context-menu .menu-item:hover .menu-arrow { color: #ccc; }
+  .tab-context-menu .menu-item:hover .menu-arrow { color: var(--tt-chrome-text); }
   /* Current tab color chip — sits before › on “Change Tab Color” */
   .menu-color-preview {
     width: 12px;
@@ -547,13 +547,13 @@
     border: 0;
     border-radius: 4px;
     background: transparent;
-    color: #ccc;
+    color: var(--tt-chrome-text);
     font: inherit;
-    font-size: 12px;
+    font-size: var(--tt-fs-label);
     text-align: left;
     cursor: pointer;
   }
-  .color-clear:hover { background: var(--tab-active); color: #fff; }
+  .color-clear:hover { background: var(--tab-active); color: var(--tt-text); }
 
   /* Safe drag zone — plain belt; min 70px for window dragging. */
   #drag-spacer {
@@ -602,14 +602,14 @@
     justify-content: center;
     flex-shrink: 0;
   }
-  #quick-status { color: #3794ff; }
+  #quick-status { color: var(--tt-bolt); }
   #quick-status:hover {
     background: #333333;
-    color: #6bb8ff;
+    color: var(--tt-bolt);
   }
   #btn-park-tray:hover {
     background: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    color: var(--tt-text);
   }
   #quick-status .qs-dot {
     position: absolute; right: 5px; bottom: 5px;
@@ -637,11 +637,11 @@
   }
   .win-btn:hover {
     background: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    color: var(--tt-text);
   }
   #btn-close:hover {
     background: #e81123;
-    color: #fff;
+    color: var(--tt-text);
   }
   .win-btn svg { display: block; }
 
@@ -653,7 +653,7 @@
     padding: 14px 16px;
     background: var(--term-bg);
     font: 13px/1.5 var(--mono);
-    color: #9cdcfe;
+    color: var(--tt-bolt);
     opacity: 0.65;
     white-space: pre;
     overflow: hidden;
@@ -662,19 +662,19 @@
   /* ---- notes ---- */
   .notes {
     padding: 28px 24px 40px 8px;
-    color: #9a9a9a;
-    font-size: 12.5px;
+    color: var(--tt-muted);
+    font-size: var(--tt-fs-ctrl);
     line-height: 1.55;
   }
   .notes h1 {
-    font-size: 13px; font-weight: 600; color: #f2f2f2;
+    font-size: var(--tt-fs-body); font-weight: var(--tt-title-weight); color: var(--tt-text);
     letter-spacing: -0.02em; margin-bottom: 6px;
   }
   .notes p { margin: 0 0 12px; }
   .notes ol { padding-left: 16px; display: grid; gap: 8px; margin-bottom: 16px; }
   .notes code {
-    font-family: var(--mono); font-size: 11px;
-    color: #c8c8c8; background: #141414;
+    font-family: var(--mono); font-size: var(--tt-fs-caption);
+    color: var(--tt-text); background: #141414;
     padding: 1px 5px; border-radius: 4px;
   }
   .picker {
@@ -683,7 +683,7 @@
   }
   .picker button {
     font: 11.5px/1 var(--ui);
-    color: #c8c8c8;
+    color: var(--tt-text);
     background: #141414;
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 999px;
@@ -691,7 +691,7 @@
     cursor: pointer;
   }
   .picker button[aria-pressed="true"] {
-    color: #0a0a0a;
+    color: var(--tt-accent-text);
     background: #f2f2f2;
     border-color: #f2f2f2;
   }
@@ -701,8 +701,8 @@
     background: #141414;
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 8px;
-    font-size: 11.5px;
-    color: #aaa;
+    font-size: var(--tt-fs-desc);
+    color: var(--tt-muted);
   }
 </style>
 </head>

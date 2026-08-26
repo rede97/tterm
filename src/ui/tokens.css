@@ -42,6 +42,9 @@ body[data-skin="cursor"] {
   --tt-bad: #ef4444;
   --tt-warn: #e8a33d;
   --tt-bolt: #3794ff;
+  /* Port-forward direction chips (Settings / QP) */
+  --tt-fwd-local: #4da6ff;
+  --tt-fwd-remote: #b586d8;
 
   /* ---- Switch ---- */
   --tt-switch-off: #2a2a2a;
@@ -60,6 +63,23 @@ body[data-skin="cursor"] {
   --tt-ui-weight: 500;
   --tt-btn-width: 148px;
   --tt-ctrl-h: 28px;
+  /* Button surfaces (Settings / modals / confirm) */
+  --tt-btn-solid-bg: #3a3a3a; /* secondary filled CTA */
+
+  /* Type scale — only allowed UI font sizes (no ad-hoc px). */
+  --tt-fs-micro: 10px; /* badges, uppercase group labels */
+  --tt-fs-caption: 11px; /* hints, captions, card actions */
+  --tt-fs-desc: 11.5px; /* row / about descriptions */
+  --tt-fs-label: 12px; /* field labels, subsection titles */
+  --tt-fs-ctrl: 12.5px; /* inputs, selects, buttons */
+  --tt-fs-body: 13px; /* body, row titles */
+  --tt-fs-md: 14px; /* secondary headers */
+  --tt-fs-lg: 15px; /* dialog headers */
+  --tt-fs-xl: 16px; /* panel titles */
+
+  /* Theme / serial gallery cards */
+  --tt-theme-card-h: 101px;
+  --tt-theme-card-min-w: 212px; /* 16×10px swatches + gaps + pad — no clip */
 
   --tt-ui: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
   --tt-mono: "JetBrains Mono", Consolas, ui-monospace, monospace;

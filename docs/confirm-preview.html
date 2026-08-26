@@ -54,10 +54,10 @@
     background: var(--tt-tab-active);
     border-right: 1px solid #1e1e1e;
     color: var(--tt-chrome-text);
-    font-size: 12px;
+    font-size: var(--tt-fs-label);
     font-family: var(--tt-mono);
   }
-  .tab.active { background: var(--tt-term-bg); color: #fff; }
+  .tab.active { background: var(--tt-term-bg); color: var(--tt-text); }
   .tab .x { margin-left: 10px; opacity: 0.45; }
   .drag { flex: 1; height: 100%; }
   .win { display: flex; height: 100%; margin-left: 8px; flex-shrink: 0; }
@@ -66,18 +66,18 @@
     color: var(--tt-chrome-text); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
   }
-  .win-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
-  .win-btn.close:hover { background: #e81123; color: #fff; }
+  .win-btn:hover { background: rgba(255,255,255,0.1); color: var(--tt-text); }
+  .win-btn.close:hover { background: #e81123; color: var(--tt-text); }
 
   .term {
     flex: 1;
     padding: 14px 16px;
     font: 13px/1.5 var(--tt-mono);
-    color: #9cdcfe;
+    color: var(--tt-bolt);
     white-space: pre-wrap;
     overflow: auto;
   }
-  .term .dim { color: #6a6a6a; }
+  .term .dim { color: var(--tt-faint); }
 
   /* ---- Confirm overlay (shared chrome with app confirm.ts / sshauth) ---- */
   .cf-overlay {
@@ -112,13 +112,13 @@
     justify-content: space-between;
     gap: 12px;
     padding: 14px 20px;
-    font-size: 13px;
+    font-size: var(--tt-fs-body);
     font-weight: var(--tt-title-weight);
     border-bottom: 1px solid var(--tt-line);
     user-select: none;
   }
   .cf-header-meta {
-    font-size: 12px;
+    font-size: var(--tt-fs-label);
     font-weight: var(--tt-ui-weight);
     color: var(--tt-muted);
     white-space: nowrap;
@@ -139,13 +139,13 @@
     gap: 0;
   }
   .cf-text {
-    font-size: 13px;
+    font-size: var(--tt-fs-body);
     color: var(--tt-text);
     line-height: 1.5;
     white-space: pre-line;
   }
   .cf-meta {
-    font-size: 12px;
+    font-size: var(--tt-fs-label);
     color: var(--tt-muted);
     line-height: 1.45;
   }
@@ -187,29 +187,48 @@
     padding: 12px 20px;
     border-top: 1px solid var(--tt-line);
   }
+  /* Buttons → shared design language (primary / ghost / danger-fill). */
   .cf-btn {
     min-width: 88px;
     height: var(--tt-ctrl-h);
     padding: 0 16px;
+    box-sizing: border-box;
     border: 1px solid var(--tt-line-strong);
     border-radius: var(--tt-radius-ctrl);
     background: var(--tt-well);
     color: var(--tt-text);
-    font: 12px/1 var(--tt-ui);
+    font-family: var(--tt-ui);
+    font-size: var(--tt-fs-ctrl);
     font-weight: var(--tt-ui-weight);
+    line-height: 1;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
-  .cf-btn:hover { background: var(--tt-hover); }
+  .cf-btn:hover { background: var(--tt-hover); filter: none; }
   .cf-btn:focus-visible {
     outline: 2px solid var(--tt-focus);
     outline-offset: 2px;
   }
+  .cf-btn.cf-cancel,
+  .cf-btn:not(.cf-btn-ok):not(.cf-btn-danger) {
+    background: transparent;
+    border-color: transparent;
+    color: var(--tt-muted);
+  }
+  .cf-btn.cf-cancel:hover,
+  .cf-btn:not(.cf-btn-ok):not(.cf-btn-danger):hover {
+    color: var(--tt-text);
+    background: var(--tt-hover);
+  }
   .cf-btn-ok {
     background: var(--tt-accent-fill);
-    border-color: var(--tt-accent);
+    border-color: var(--tt-accent-fill);
     color: var(--tt-accent-text);
+    font-weight: var(--tt-title-weight);
   }
-  .cf-btn-ok:hover { filter: brightness(1.06); }
+  .cf-btn-ok:hover { background: var(--tt-accent); border-color: var(--tt-accent); filter: none; }
   body[data-skin="vscode"] .cf-btn-ok:hover {
     filter: none;
     background: var(--tt-accent);
@@ -217,7 +236,8 @@
   .cf-btn-danger {
     background: var(--tt-bad);
     border-color: var(--tt-bad);
-    color: #fff;
+    color: var(--tt-text);
+    font-weight: var(--tt-title-weight);
   }
   .cf-btn-danger:hover { filter: brightness(1.08); }
 
@@ -230,8 +250,8 @@
     border-radius: var(--tt-radius-sm);
   }
   .set-snippet .snip-kicker {
-    font-size: 10px;
-    font-weight: 600;
+    font-size: var(--tt-fs-micro);
+    font-weight: var(--tt-title-weight);
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--tt-faint);
@@ -249,13 +269,13 @@
   }
   .set-row + .set-row { margin-top: 6px; }
   .set-row-title {
-    font-size: 13px;
+    font-size: var(--tt-fs-body);
     font-weight: var(--tt-title-weight);
     color: var(--tt-text);
   }
   .set-row-desc {
     margin-top: 4px;
-    font-size: 12px;
+    font-size: var(--tt-fs-label);
     color: var(--tt-muted);
     line-height: 1.4;
   }
@@ -290,57 +310,69 @@
     background: #0c0c0c;
   }
   .notes h1 {
-    font-size: 16px;
-    font-weight: 600;
-    color: #f2f2f2;
+    font-size: var(--tt-fs-xl);
+    font-weight: var(--tt-title-weight);
+    color: var(--tt-text);
     margin-bottom: 8px;
   }
   .notes p { margin: 0 0 14px; color: var(--tt-muted); line-height: 1.5; }
-  .notes ol { padding-left: 16px; display: grid; gap: 8px; color: #b0b0b0; }
+  .notes ol { padding-left: 16px; display: grid; gap: 8px; color: var(--tt-muted); }
   .notes code {
-    font: 11px/1 var(--tt-mono);
-    color: #aaa;
-    background: #141414;
+    font-family: var(--tt-mono);
+    font-size: var(--tt-fs-caption);
+    color: var(--tt-muted);
+    background: var(--tt-sidebar);
     padding: 1px 5px;
-    border-radius: 4px;
+    border-radius: var(--tt-radius-opt);
   }
   .picker {
     display: flex; flex-wrap: wrap; gap: 6px;
     margin-bottom: 12px;
   }
   .picker button {
-    height: 28px; padding: 0 12px;
+    height: var(--tt-ctrl-h); padding: 0 12px;
     border-radius: 999px; border: 1px solid var(--tt-line);
     background: transparent; color: var(--tt-muted);
-    font: 11.5px/1 var(--tt-ui); cursor: pointer;
+    font-family: var(--tt-ui);
+    font-size: var(--tt-fs-desc);
+    font-weight: var(--tt-ui-weight);
+    cursor: pointer;
   }
   .picker button[aria-pressed="true"] {
-    color: #0a0a0a; background: #f2f2f2; border-color: #f2f2f2; font-weight: 550;
+    color: var(--tt-accent-text);
+    background: var(--tt-accent-fill);
+    border-color: var(--tt-accent-fill);
+    font-weight: var(--tt-title-weight);
   }
   body[data-skin="vscode"] .picker button[aria-pressed="true"] {
-    color: #fff; background: #0e639c; border-color: #0e639c;
+    color: var(--tt-accent-text);
+    background: var(--tt-accent-fill);
+    border-color: var(--tt-accent-fill);
   }
   .demo-actions {
     display: grid; gap: 8px; margin: 14px 0 18px;
   }
   .demo-actions button {
-    height: 32px; padding: 0 12px;
+    height: var(--tt-ctrl-h); padding: 0 12px;
     border-radius: var(--tt-radius-ctrl);
     border: 1px solid var(--tt-line-strong);
     background: var(--tt-well); color: var(--tt-text);
-    font: 12.5px/1 var(--tt-ui); font-weight: var(--tt-ui-weight);
+    font-family: var(--tt-ui);
+    font-size: var(--tt-fs-ctrl);
+    font-weight: var(--tt-title-weight);
     cursor: pointer; text-align: left;
+    display: inline-flex; align-items: center;
   }
   .demo-actions button:hover { background: var(--tt-hover); }
   .demo-actions .combo {
-    float: right; color: var(--tt-faint); font-size: 11px;
+    float: right; color: var(--tt-faint); font-size: var(--tt-fs-caption);
   }
   .hint {
     margin-top: 16px; padding: 10px 12px;
     border-radius: var(--tt-radius-sm);
     background: var(--tt-well);
     border: 1px solid var(--tt-line);
-    font-size: 12px; color: var(--tt-muted); line-height: 1.45;
+    font-size: var(--tt-fs-label); color: var(--tt-muted); line-height: 1.45;
   }
 </style>
 </head>

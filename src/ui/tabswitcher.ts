@@ -133,7 +133,7 @@ function open(nextMode: "quick" | "mru", startSelected: number): void {
   if (mode === "quick") {
     inputEl = document.createElement("input");
     inputEl.className = "tab-switcher-input";
-    inputEl.placeholder = "Go to tab — type a number or name; > for commands";
+    inputEl.placeholder = "Go to tab — number or name; > for commands";
     inputEl.addEventListener("input", () => {
       // ">" prefix flips into the command palette, carrying the query.
       const v = inputEl?.value ?? "";

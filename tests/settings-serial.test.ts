@@ -126,10 +126,12 @@ describe("settings — Serial profile gallery", () => {
     expect(overlay, "profile editor modal").toBeTruthy();
     expect(overlay!.querySelector<HTMLInputElement>(".sp-name")!.value).toBe("AT Copy");
     expect(
-      overlay!.querySelector<HTMLSelectElement>('.sp-select[data-field="inputMode"]')!.value,
+      overlay!.querySelector<HTMLElement>('.sp-select-slot[data-field="inputMode"] .qp-select')!
+        .dataset.current,
     ).toBe("line");
     expect(
-      overlay!.querySelector<HTMLSelectElement>('.sp-select[data-field="enterNewline"]')!.value,
+      overlay!.querySelector<HTMLElement>('.sp-select-slot[data-field="enterNewline"] .qp-select')!
+        .dataset.current,
     ).toBe("crlf");
     // No summary preview in the editor (removed by design).
     expect(overlay!.querySelector(".sp-preview")).toBeNull();
@@ -140,21 +142,27 @@ describe("settings — Serial profile gallery", () => {
     card(panel, "AT").querySelector<HTMLButtonElement>(".theme-card-action")!.click();
     const overlay = document.body.querySelector(".sp-overlay")!;
 
-    const sel = overlay.querySelector<HTMLSelectElement>('.sp-select[data-field="outputNewline"]')!;
+    const sel = overlay.querySelector<HTMLElement>(
+      '.sp-select-slot[data-field="outputNewline"] .qp-select',
+    )!;
     const hint = overlay.querySelector<HTMLElement>(".sp-hint")!;
     // AT profile is out=cr-in-lf: hint explains the current selection.
-    expect(sel.value).toBe("cr-in-lf");
+    expect(sel.dataset.current).toBe("cr-in-lf");
     expect(hint.textContent).toBe("Lone \\n → \\r\\n");
     // Every option carries its description as a hover tooltip.
-    for (const opt of sel.querySelectorAll("option")) {
-      expect(opt.title.length).toBeGreaterThan(0);
+    for (const opt of sel.querySelectorAll<HTMLElement>(".qp-option")) {
+      expect((opt.title || "").length).toBeGreaterThan(0);
     }
     // Switching the select updates the hint to the new mode's description.
-    sel.value = "keep";
-    sel.dispatchEvent(new Event("change"));
+    function pick(value: string): void {
+      sel.querySelector<HTMLElement>(".qp-select-trigger")!.click();
+      document
+        .querySelector<HTMLElement>(`body > .qp-select-menu .qp-option[data-value="${value}"]`)!
+        .click();
+    }
+    pick("keep");
     expect(hint.textContent).toContain("Pass through unchanged");
-    sel.value = "strip";
-    sel.dispatchEvent(new Event("change"));
+    pick("strip");
     expect(hint.textContent).toBe("\\r | \\n → (removed)");
   });
 
