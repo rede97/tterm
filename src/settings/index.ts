@@ -3,6 +3,7 @@
 
 import { loadAllWtData } from "../config/wt-profiles";
 import { configStore } from "../core/store";
+import { attachOverlayScrollbar } from "../ui/overlay-scroll";
 import { showToast } from "../ui/toast";
 import { parseFontFamily, updateFontStack } from "../util/fontconfig";
 import { setWtThemes } from "../util/themes";
@@ -187,6 +188,12 @@ export function createSettingsContent(): HTMLElement {
         syncDirty();
       }
     });
+  }
+
+  // Floating overlay scrollbars on every scrollable panel (Q8b): a classic
+  // bar would squeeze the 148px control column when content overflows.
+  for (const panel of body.querySelectorAll<HTMLElement>(".settings-panel-content")) {
+    attachOverlayScrollbar(panel);
   }
 
   // Sidebar navigation

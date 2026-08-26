@@ -1105,7 +1105,8 @@
       <li><code>Cursor</code>：黑白、大圆角、白开关、白 Reconnect。</li>
       <li><code>VS Code</code>：黑蓝、小圆角、蓝开关、蓝 Reconnect——骨架仍是新稿。</li>
       <li>切皮肤时对比开关颜色与圆角；结构不应跳动。</li>
-      <li><strong>下拉悬浮</strong>：菜单 <code>position:fixed</code>，不进入 panel 滚动高度；打开下拉<strong>不得</strong>挤出 panel 滚动条、不得横向挤占控件列。内容本身过高时，panel 滚动条须为 overlay（不预留 gutter）。</li>
+      <li><strong>下拉悬浮（Q8a）</strong>：菜单 <code>position:fixed</code> + portal，不进入 panel 滚动高度；打开下拉<strong>不得</strong>因此挤出 panel 滚动条。</li>
+      <li><strong>panel 滚动条（Q8b · 未闭环）</strong>：内容过高时现行 <code>::-webkit-scrollbar &#123; width &#125;</code> 在 Chromium 上是 <strong>classic gutter</strong>（会挤 148 控件列）。<code>overflow-y: overlay</code> 已不可靠；真 overlay 需自定义浮层 thumb 或接受固定右侧 padding 预留。</li>
       <li><strong>Hardware flow</strong>：切到 Hardware (RTS/CTS) 时 <strong>禁用 RTS</strong>（置灰 + 驱动接管态），DTR 仍可拨；不隐藏、不加说明文案——置灰本身表达不可用。与落地 <code>quickpanel.ts</code> / <code>serial-design.md</code> 一致。</li>
     </ol>
   </aside>

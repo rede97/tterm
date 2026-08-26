@@ -5,7 +5,7 @@ Preview HTML under `docs/*-preview.html` shares **one token sheet**:
 | File | Role |
 |------|------|
 | [`tokens.css`](./tokens.css) | Canonical `--tt-*` skins (`cursor` / `vscode`) + feature aliases (`--set-*`, `--qp-*`, `--pal-*`, tab chrome) |
-| [`scroll.css`](./scroll.css) | Shared overlay scrollbar (`.tt-scroll`) — floating thumb, no arrows, no gutter |
+| [`scroll.css`](./scroll.css) | Shared thin scrollbar (`.tt-scroll`) — no arrows; **classic gutter on Chromium** (see parity-gap **Q8b**) |
 | [`preview-chrome.css`](./preview-chrome.css) | Shared draft top nav |
 
 ## Rules
@@ -23,7 +23,7 @@ Preview HTML under `docs/*-preview.html` shares **one token sheet**:
 <style>/* page-local layout only */</style>
 ```
 
-6. Scrollable surfaces use class **`tt-scroll`** (do not re-copy `::-webkit-scrollbar` rules in each preview). On Chromium, do **not** set `scrollbar-width` / `scrollbar-color` together with webkit pseudos — that restores Windows arrows (Chrome 121+).
+6. Scrollable surfaces use class **`tt-scroll`**. On Chromium, do **not** set `scrollbar-width` / `scrollbar-color` with webkit pseudos (arrows return). Setting `::-webkit-scrollbar` **width** forces a **classic** gutter — not true overlay (Quick panel **Q8b** still OPEN).
 ## Skins
 
 - `body[data-skin="cursor"]` — near-black, white CTA, soft radius  

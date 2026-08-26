@@ -1,20 +1,22 @@
 /**
- * Shared overlay scrollbar — one fact source for draft surfaces.
+ * Shared thin scrollbar — draft fact source (colors from --tt-scroll-*).
  *
  * Goals:
- *  - Floating thumb (transparent track; no reserved gutter)
- *  - No Windows up/down arrow buttons
- *  - Colors from --tt-scroll-* (tokens.css)
+ *  - No Windows up/down arrow buttons (Chromium: webkit pseudos only)
+ *  - Transparent track; thin thumb
+ *
+ * NOT a true overlay: setting ::-webkit-scrollbar { width } forces a
+ * classic gutter on Chromium (content width shrinks when the bar appears).
+ * See parity-gap Q8b. Do not claim "no layout impact" for this sheet alone.
  *
  * Chrome 121+: setting scrollbar-width / scrollbar-color forces the native
- * Windows scrollbar (with arrows) and overrides ::-webkit-scrollbar-*.
- * Use webkit pseudo-elements on Chromium; reserve scrollbar-* for Firefox.
+ * Windows bar (with arrows) and overrides ::-webkit-*. Reserve scrollbar-*
+ * for Firefox only (@supports not selector(::-webkit-scrollbar)).
  *
- * Usage: add class `tt-scroll` on any overflow:auto / overflow-y:auto node.
+ * Usage: add class `tt-scroll` on overflow:auto surfaces.
  */
 
 .tt-scroll {
-  /* Prefer no reserved gutter — thumb paints over the edge of content */
   scrollbar-gutter: auto;
 }
 

@@ -1650,10 +1650,10 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   scrollbar-width: none;
 }
 
-/* Unified overlay scrollbar (parity with docs/ui/scroll.css `.tt-scroll`):
-   floating thumb, transparent track, no Windows arrow buttons.
-   Chrome 121+: do NOT set scrollbar-width/color on Chromium — that forces
-   the native Windows bar (with arrows) and overrides ::-webkit-*. */
+/* Unified thin scrollbar (parity with docs/ui/scroll.css `.tt-scroll`):
+   no Windows arrow buttons. NOT true overlay on Chromium: setting
+   ::-webkit-scrollbar width forces a classic gutter (parity-gap Q8b).
+   Chrome 121+: do NOT set scrollbar-width/color here — that restores arrows. */
 .tt-scroll,
 .quick-panel,
 .settings-sidebar,
@@ -1709,6 +1709,48 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 
 ::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* True overlay scrollbar (parity-gap Q8b): native bar hidden on .ov-scroll
+   surfaces; a JS-driven floating thumb (ui/overlay-scroll.ts) paints over
+   the edge and never takes layout width — the 148px control column does
+   not shift when content overflows. */
+.ov-scroll {
+  scrollbar-width: none;
+}
+
+.ov-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.ov-sb {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 10px;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.ov-sb-thumb {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  width: 5px;
+  border-radius: 3px;
+  background: var(--tt-scroll-thumb);
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.ov-sb.on .ov-sb-thumb {
+  opacity: 0.9;
+}
+
+.ov-sb.on .ov-sb-thumb:hover {
+  background: var(--tt-scroll-thumb-hover);
 }
 
 /* -- tab context menu -- */

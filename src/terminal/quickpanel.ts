@@ -49,6 +49,7 @@ import type { ForwardEditorValue, ForwardKind } from "../ui/forwardeditor";
 import { addForward, listForwards, removeForward } from "../ui/forwarding";
 import { createForwardTable } from "../ui/forwardtable";
 import { html, nothing, render, type TemplateResult } from "../ui/lit";
+import { attachOverlayScrollbar } from "../ui/overlay-scroll";
 import { closeAllSelects, syncSelectTexts, type TtSelectGroup, ttSelect } from "../ui/select";
 import { showToast } from "../ui/toast";
 import type { TerminalTab } from "./tab";
@@ -704,6 +705,8 @@ export function initQuickPanel(): void {
   panel = document.createElement("div");
   panel.className = "quick-panel";
   document.body.appendChild(panel);
+  // Q8b: floating thumb — a classic bar would squeeze the 148px column.
+  attachOverlayScrollbar(panel);
 
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
