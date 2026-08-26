@@ -118,6 +118,14 @@ describe("settings — Revert", () => {
     expect(root.querySelectorAll(".settings-nav-item")).toHaveLength(6);
     expect(root.querySelectorAll('.settings-panel-content[data-panel="ssh"]')).toHaveLength(1);
     expect(root.querySelectorAll(".check-row")).toHaveLength(1);
+    // Regression: refreshShortcutsPanel must not render the keyboard panel
+    // into the sidebar nav button (both carry data-panel="keyboard"; the
+    // nav button precedes the panels in DOM order).
+    const kbNav = [...root.querySelectorAll<HTMLElement>(".settings-nav-item")].find(
+      (n) => n.dataset.panel === "keyboard",
+    )!;
+    expect(kbNav.textContent).toBe("Keyboard");
+    expect(kbNav.querySelector(".kb-search")).toBeNull();
   });
 });
 

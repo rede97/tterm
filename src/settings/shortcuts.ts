@@ -265,7 +265,10 @@ export function createShortcutsPanel(): HTMLElement {
 
 export function refreshShortcutsPanel(root: HTMLElement): void {
   _pending = { ...configStore.get("keybindings") };
-  const panel = root.querySelector<HTMLElement>('[data-panel="keyboard"]');
+  // MUST scope to .settings-panel-content: the sidebar nav items carry the
+  // same data-panel attribute and come first in DOM order — an unscoped
+  // query renders the whole keyboard panel INTO the nav button (Revert).
+  const panel = root.querySelector<HTMLElement>('.settings-panel-content[data-panel="keyboard"]');
   if (!panel) return;
   const st = stateOf(panel);
   st.query = "";
