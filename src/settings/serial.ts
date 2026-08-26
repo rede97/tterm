@@ -184,10 +184,14 @@ function serialTemplate(panel: HTMLElement, st: SerialPanelState) {
             )}
             <button
               id="set-serial-profile-new"
-              class="settings-link-btn"
+              class="theme-new"
               @click=${() =>
                 openProfileEditor(panel, findSerialProfile(DEFAULT_SERIAL_PROFILE), undefined)}
-            >+ New Profile</button>
+            >
+              <span class="theme-new-plus" aria-hidden="true">+</span>
+              <span class="theme-new-label">New Profile</span>
+              <span class="theme-new-hint">Start from Normal</span>
+            </button>
           </div>
         </div>
       `,

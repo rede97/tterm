@@ -231,7 +231,11 @@ describe("settings — SSH key management", () => {
 
     const installBtn = overlay.querySelector<HTMLButtonElement>(".ski-install")!;
     await vi.waitFor(() => expect(installBtn.disabled).toBe(false));
-    overlay.querySelector<HTMLSelectElement>(".ski-os")!.value = "linux";
+    // Target system is a custom listbox now: trigger → option.
+    overlay.querySelector<HTMLElement>("#ski-os .qp-select-trigger")!.click();
+    document
+      .querySelector<HTMLElement>('body > .qp-select-menu .qp-option[data-value="linux"]')!
+      .click();
     installBtn.click();
     await vi.waitFor(() => {
       expect(invokeMock).toHaveBeenCalledWith("ssh_install_pubkey", {
@@ -279,9 +283,9 @@ describe("settings — SSH host list order & detail", () => {
     });
     const panel = openPanel();
     const list = panel.querySelector<HTMLElement>(".ssh-host-list")!;
-    const cards = list.querySelectorAll<HTMLElement>(".ssh-host-card");
-    expect(cards).toHaveLength(3);
-    list.insertBefore(cards[2], cards[0]); // Sortable's DOM move: c, a, b
+    const rows = list.querySelectorAll<HTMLElement>(".check-row");
+    expect(rows).toHaveLength(3);
+    list.insertBefore(rows[2], rows[0]); // Sortable's DOM move: c, a, b
     syncSshHostOrder(list);
     expect(configStore.get("sshHosts").map((h) => h.name)).toEqual(["c", "a", "b"]);
   });
@@ -295,25 +299,37 @@ describe("settings — SSH host list order & detail", () => {
     });
     const panel = openPanel();
     const list = panel.querySelector<HTMLElement>(".ssh-host-list")!;
-    list.querySelector<HTMLElement>('.ssh-host-card[data-name="b"]')!.remove();
+    list.querySelector<HTMLElement>('.check-row[data-name="b"]')!.remove();
     syncSshHostOrder(list);
     expect(configStore.get("sshHosts").map((h) => h.name)).toEqual(["a", "b"]);
   });
 
-  it("expanding marks the card non-draggable and lists one property per line", () => {
+  it("host row: meta line, visibility checkbox, and ⋯ menu with both actions", () => {
     configStore.set({
       sshHosts: [
-        { name: "a", HostName: "10.0.0.1", IdentityFile: "~/.ssh/id_ed25519", ForwardAgent: "yes" },
+        { name: "a", HostName: "10.0.0.1", IdentityFile: "~/.ssh/id_ed25519", User: "pi" },
       ],
     });
     const panel = openPanel();
-    const card = panel.querySelector<HTMLElement>(".ssh-host-card")!;
-    expect(card.classList.contains("expanded")).toBe(false);
-    card.querySelector<HTMLElement>(".ssh-host-row")!.click();
-    expect(card.classList.contains("expanded")).toBe(true);
-    const lines = card.querySelectorAll(".ssh-host-extra > div");
-    expect(lines.length).toBe(2); // one per line, not joined with separators
-    expect(card.querySelector(".ssh-host-extra")!.textContent).not.toContain("·");
+    const row = panel.querySelector<HTMLElement>(".check-row")!;
+    // Meta carries identity inline (design: no expansion).
+    expect(row.querySelector(".ssh-host-target")!.textContent).toBe(
+      "pi@10.0.0.1:22 · IdentityFile ~/.ssh/id_ed25519",
+    );
+    // Visibility checkbox on the left, checked by default.
+    const box = row.querySelector<HTMLInputElement>(".ssh-host-vis")!;
+    expect(box.checked).toBe(true);
+    // Unchecking dims the row (pending until Apply).
+    box.click();
+    expect(row.classList.contains("is-off")).toBe(true);
+    // ⋯ menu offers Clear KnownHosts + Upload SSH Key.
+    expect(row.querySelector(".host-more-menu")).toBeTruthy();
+    const items = [...row.querySelectorAll<HTMLElement>(".host-more-menu [role='menuitem']")].map(
+      (b) => b.textContent,
+    );
+    expect(items).toEqual(["Clear KnownHosts", "Upload SSH Key"]);
+    row.querySelector<HTMLElement>(".ssh-btn-more")!.click();
+    expect(row.querySelector(".host-more-menu")!.classList.contains("open")).toBe(true);
   });
 });
 
@@ -351,8 +367,8 @@ describe("settings — SSH config dirty state", () => {
     const events: boolean[] = [];
     panel.addEventListener("tterm-ssh-dirty", (e) => events.push((e as CustomEvent).detail));
     const list = panel.querySelector<HTMLElement>(".ssh-host-list")!;
-    const cards = list.querySelectorAll<HTMLElement>(".ssh-host-card");
-    list.insertBefore(cards[1], cards[0]);
+    const rows = list.querySelectorAll<HTMLElement>(".check-row");
+    list.insertBefore(rows[1], rows[0]);
     syncSshHostOrder(list);
     expect(isSshConfigDirty()).toBe(true);
     expect(events).toEqual([true]);
@@ -374,21 +390,19 @@ describe("settings — SSH panel lit-html rendering (pilot acceptance)", () => {
     { name: "b", HostName: "10.0.0.2" },
   ];
 
-  it("re-render after Delete keeps sibling cards expanded (no collapse)", () => {
+  it("re-render after Delete keeps the surviving row's node and meta", () => {
     configStore.set({ sshHosts: twoHosts });
     const panel = openPanel();
-    const cardA = panel.querySelector<HTMLElement>('.ssh-host-card[data-name="a"]')!;
-    cardA.querySelector<HTMLElement>(".ssh-host-row")!.click();
-    expect(cardA.classList.contains("expanded")).toBe(true);
+    const rowA = panel.querySelector<HTMLElement>('.check-row[data-name="a"]')!;
 
-    panel
-      .querySelector<HTMLButtonElement>('.ssh-host-card[data-name="b"] .ssh-btn-delete')!
-      .click();
+    panel.querySelector<HTMLButtonElement>('.check-row[data-name="b"] .ssh-btn-delete')!.click();
 
-    const after = panel.querySelector<HTMLElement>('.ssh-host-card[data-name="a"]')!;
-    expect(after.classList.contains("expanded")).toBe(true);
-    // The surviving card's detail DOM is the SAME node — not rebuilt.
-    expect(after.querySelector(".ssh-host-extra")!.textContent).toContain("IdentityFile");
+    // Keyed repeat: the surviving row is the SAME node — not rebuilt.
+    const after = panel.querySelector<HTMLElement>('.check-row[data-name="a"]')!;
+    expect(after).toBe(rowA);
+    expect(after.querySelector(".ssh-host-target")!.textContent).toContain(
+      "IdentityFile ~/.ssh/id_a",
+    );
   });
 
   it("pending Built-in toggle survives internal re-renders (keepPending is dead)", () => {
@@ -402,9 +416,7 @@ describe("settings — SSH panel lit-html rendering (pilot acceptance)", () => {
 
     // Any internal re-render (here: Delete) must not reset the toggle to
     // the stored value — the old keepPending hack's entire job.
-    panel
-      .querySelector<HTMLButtonElement>('.ssh-host-card[data-name="b"] .ssh-btn-delete')!
-      .click();
+    panel.querySelector<HTMLButtonElement>('.check-row[data-name="b"] .ssh-btn-delete')!.click();
     expect(on()).toBe("false");
   });
 
@@ -427,14 +439,12 @@ describe("settings — SSH panel lit-html rendering (pilot acceptance)", () => {
     configStore.set({ sshHosts: twoHosts });
     const panel = openPanel();
     const listBefore = panel.querySelector<HTMLElement>(".ssh-host-list")!;
-    const cardABefore = panel.querySelector<HTMLElement>('.ssh-host-card[data-name="a"]')!;
+    const rowABefore = panel.querySelector<HTMLElement>('.check-row[data-name="a"]')!;
 
-    panel
-      .querySelector<HTMLButtonElement>('.ssh-host-card[data-name="b"] .ssh-btn-delete')!
-      .click();
+    panel.querySelector<HTMLButtonElement>('.check-row[data-name="b"] .ssh-btn-delete')!.click();
 
     expect(panel.querySelector<HTMLElement>(".ssh-host-list")).toBe(listBefore);
-    // Keyed repeat: surviving card node is patched, not replaced.
-    expect(panel.querySelector<HTMLElement>('.ssh-host-card[data-name="a"]')).toBe(cardABefore);
+    // Keyed repeat: surviving row node is patched, not replaced.
+    expect(panel.querySelector<HTMLElement>('.check-row[data-name="a"]')).toBe(rowABefore);
   });
 });

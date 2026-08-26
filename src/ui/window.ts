@@ -73,7 +73,9 @@ function initWindowButtons() {
         invoke("window_toggle_maximize");
         break;
       case "btn-close":
-        invoke("window_close");
+        // Unconfirmed attempt — the close-requested hook routes it to the
+        // frontend confirm (Alt+F4 takes the same path).
+        invoke("window_request_close");
         break;
     }
   });

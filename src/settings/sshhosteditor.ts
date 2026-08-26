@@ -70,12 +70,12 @@ export function showSshHostEditor(opts: SshHostEditorOptions): void {
         <label class="she-field"><span>Alias</span>
           <input class="settings-input she-alias" type="text" spellcheck="false" placeholder="myserver"
                  value="${esc(base?.name ?? "")}" /></label>
-        <label class="she-field"><span>HostName</span>
-          <input class="settings-input she-hostname" type="text" spellcheck="false" placeholder="default: alias"
-                 value="${esc(base ? (hostProp(base, "hostname") ?? "") : "")}" /></label>
         <label class="she-field"><span>User</span>
           <input class="settings-input she-user" type="text" spellcheck="false" placeholder="root"
                  value="${esc(base ? (hostProp(base, "user") ?? "") : "")}" /></label>
+        <label class="she-field"><span>HostName</span>
+          <input class="settings-input she-hostname" type="text" spellcheck="false" placeholder="default: alias"
+                 value="${esc(base ? (hostProp(base, "hostname") ?? "") : "")}" /></label>
         <label class="she-field"><span>Port</span>
           <input class="settings-input she-port" type="number" min="1" max="65535" placeholder="22"
                  value="${esc(base ? (hostProp(base, "port") ?? "") : "")}" /></label>

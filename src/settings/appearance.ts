@@ -174,7 +174,7 @@ function appearanceTemplate(panel: HTMLElement): TemplateResult {
           <div class="settings-item-control">
             <button
               id="set-font-config"
-              class="settings-link-btn"
+              class="settings-link-btn solid"
               @click=${() => openFontPicker(panel)}
             >Configure</button>
           </div>
@@ -198,7 +198,8 @@ function appearanceTemplate(panel: HTMLElement): TemplateResult {
       "Color Scheme",
       html`
         <div class="settings-item-desc" style="margin-bottom:6px">
-          Click a card to choose. Windows Terminal schemes are imported automatically.
+          Terminal content only — does not recolor Settings or the tab bar.
+          Windows Terminal schemes are imported automatically.
         </div>
         <div id="set-theme-gallery" class="theme-gallery">${galleryTemplate(panel, current)}</div>
       `,
@@ -228,9 +229,13 @@ function galleryTemplate(panel: HTMLElement, current: string): TemplateResult {
       )}
       <button
         id="set-theme-new"
-        class="settings-link-btn"
+        class="theme-new"
         @click=${() => openThemeEditor(panel, findTheme(pendingThemeName(panel)), undefined)}
-      >+ New Theme</button>
+      >
+        <span class="theme-new-plus" aria-hidden="true">+</span>
+        <span class="theme-new-label">New Theme</span>
+        <span class="theme-new-hint">Start from current scheme</span>
+      </button>
     </div>
   `;
 }

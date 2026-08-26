@@ -41,7 +41,7 @@ describe("pasteIntoTerminal (pasteTrim / pasteWarning)", () => {
     const overlay = document.querySelector(".confirm-overlay");
     expect(overlay).toBeTruthy();
     expect(overlay!.textContent).toContain("2 lines");
-    overlay!.querySelector<HTMLButtonElement>(".sshauth-footer .sshauth-btn:last-child")!.click();
+    overlay!.querySelector<HTMLButtonElement>(".cf-footer .cf-btn:last-child")!.click();
     await flushMicrotasks();
     expect(t.pasted).toEqual(["echo a\necho b"]);
   });
@@ -49,7 +49,7 @@ describe("pasteIntoTerminal (pasteTrim / pasteWarning)", () => {
   it("multi-line paste warns; cancelling pastes nothing", async () => {
     const t = target();
     pasteIntoTerminal(t, "echo a\necho b");
-    document.querySelector<HTMLButtonElement>(".sshauth-btn-cancel")!.click();
+    document.querySelector<HTMLButtonElement>(".cf-cancel")!.click();
     await flushMicrotasks();
     expect(t.pasted).toEqual([]);
   });

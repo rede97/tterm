@@ -40,6 +40,7 @@ macro_rules! tterm_commands {
             window::window_unmaximize,
             window::window_set_fullscreen,
             window::window_close,
+            window::window_request_close,
             window::window_start_drag,
             window::open_new_window,
             window::pick_directory,
@@ -107,6 +108,20 @@ pub fn run() {
         )
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // Close requests (X button, Alt+F4, taskbar) route through the
+        // frontend: prevent, ask via event, and let the frontend's confirm
+        // flow re-issue window_close (which sets the confirmed flag) when
+        // the user approves.
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window::take_close_confirmed() {
+                    return; // approved close — let it through
+                }
+                api.prevent_close();
+                use tauri::Emitter;
+                let _ = window.emit("window-close-requested", ());
+            }
+        })
         .setup(|app| {
             // verify PTY system is available
             let _pty_sys = portable_pty::native_pty_system();

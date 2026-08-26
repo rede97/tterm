@@ -29,6 +29,10 @@ export function pasteIntoTerminal(target: PasteTarget, raw: string): void {
   confirmDialog({
     title: "Paste multiple lines?",
     message: `The clipboard contains ${lines} lines. Pasting runs them in the terminal one by one.`,
+    // First lines verbatim (design .cf-preview); the meta names the risk
+    // and the way out (UX-06).
+    preview: body.split("\n").slice(0, 8).join("\n"),
+    meta: "Security · multi-line paste can execute unintended commands. Disable in Settings → General → Paste warning.",
     okLabel: "Paste",
   }).then((ok) => {
     if (ok) target.paste(text);

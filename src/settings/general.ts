@@ -31,6 +31,7 @@ interface GeneralPanelState {
   bell: boolean;
   pasteWarning: boolean;
   pasteTrim: boolean;
+  confirmCloseWindow: boolean;
 }
 
 const panelStates = new WeakMap<HTMLElement, GeneralPanelState>();
@@ -44,6 +45,7 @@ function readStore() {
     bell: configStore.get("terminalBell"),
     pasteWarning: configStore.get("pasteWarning"),
     pasteTrim: configStore.get("pasteTrim"),
+    confirmCloseWindow: configStore.get("confirmCloseWindow"),
   };
 }
 
@@ -116,8 +118,8 @@ function generalTemplate(panel: HTMLElement, st: GeneralPanelState) {
           </div>
           <button
             id="set-homepage"
-            class="settings-link-btn"
-            style="flex-shrink:0;background:#3a3a3a;"
+            class="settings-link-btn solid"
+            style="flex-shrink:0;"
             @click=${(e: Event) => {
               e.preventDefault();
               openUrl("https://github.com/rede97/tterm");
@@ -147,7 +149,7 @@ function generalTemplate(panel: HTMLElement, st: GeneralPanelState) {
                 .then((m) => m.checkForUpdates(true))
                 .catch(logCatch("updater.manual"));
             },
-            { id: "set-check-update" },
+            { id: "set-check-update", cls: "solid" },
           ),
         )}
       `,
@@ -202,6 +204,13 @@ function generalTemplate(panel: HTMLElement, st: GeneralPanelState) {
             "Strip leading, trailing, and blank lines from pasted content.",
             toggle(st.pasteTrim, (v) => (st.pasteTrim = v), { id: "set-paste-trim" }),
           )}
+          ${itemRow(
+            "Confirm before closing window",
+            "When any tab is open, ask before closing the window. Off = quit immediately.",
+            toggle(st.confirmCloseWindow, (v) => (st.confirmCloseWindow = v), {
+              id: "set-confirm-close-window",
+            }),
+          )}
         </div>
       `,
     )}
@@ -217,7 +226,7 @@ function generalTemplate(panel: HTMLElement, st: GeneralPanelState) {
             () => {
               invoke("open_config_dir").catch(logError.bind(null, "config.openDir"));
             },
-            { id: "set-open-config-dir" },
+            { id: "set-open-config-dir", cls: "solid" },
           )}
           ${linkBtn(
             "Reset All",
@@ -228,7 +237,7 @@ function generalTemplate(panel: HTMLElement, st: GeneralPanelState) {
               // Notify parent to refresh
               panel.dispatchEvent(new CustomEvent("tterm-settings-reset"));
             },
-            { danger: true, id: "set-reset-all" },
+            { danger: true, id: "set-reset-all", cls: "solid" },
           )}
         </div>
       </div>`,
@@ -241,11 +250,14 @@ export function collectGeneralSettings(root: HTMLElement): Partial<ConfigState> 
   const pasteWarnEl = root.querySelector("#set-paste-warning") as HTMLInputElement;
   const bellEl = root.querySelector("#set-bell") as HTMLInputElement;
   const pasteTrimEl = root.querySelector("#set-paste-trim") as HTMLInputElement;
+  const confirmCloseEl = root.querySelector("#set-confirm-close-window") as HTMLInputElement;
   const rendererEl = root.querySelector<HTMLElement>("#set-renderer");
   const scrollbackEl = root.querySelector("#set-scrollback") as HTMLInputElement;
 
   if (pasteWarnEl) partial.pasteWarning = pasteWarnEl.getAttribute("aria-checked") === "true";
   if (pasteTrimEl) partial.pasteTrim = pasteTrimEl.getAttribute("aria-checked") === "true";
+  if (confirmCloseEl)
+    partial.confirmCloseWindow = confirmCloseEl.getAttribute("aria-checked") === "true";
   if (bellEl) partial.terminalBell = bellEl.getAttribute("aria-checked") === "true";
   if (rendererEl) partial.renderer = rendererEl.dataset.current ?? "webgl";
   if (scrollbackEl)

@@ -43,10 +43,13 @@ beforeEach(() => {
 });
 
 describe("settings — Serial panel defaults", () => {
-  // Custom listbox picks: open the trigger, click the option.
+  // Custom listbox picks: open the trigger, click the option (open menus
+  // are portaled to <body>).
   function pick(sel: HTMLElement, value: string): void {
     sel.querySelector<HTMLElement>(".qp-select-trigger")!.click();
-    sel.querySelector<HTMLElement>(`.qp-option[data-value="${value}"]`)!.click();
+    document
+      .querySelector<HTMLElement>(`body > .qp-select-menu .qp-option[data-value="${value}"]`)!
+      .click();
   }
 
   it("default baud select reflects config and is collected on Apply", () => {
@@ -109,8 +112,10 @@ describe("settings — Serial profile gallery", () => {
       );
       expect(actions).toEqual(["Duplicate"]);
     }
-    // The custom grid always offers the New Profile affordance.
-    expect(panel.querySelector("#set-serial-profile-new")!.textContent).toBe("+ New Profile");
+    // The custom grid always offers the New Profile tile affordance.
+    const tile = panel.querySelector("#set-serial-profile-new")!;
+    expect(tile.classList.contains("theme-new")).toBe(true);
+    expect(tile.textContent).toContain("New Profile");
   });
 
   it("Duplicate on AT opens the editor prefilled as a copy", () => {
@@ -228,9 +233,7 @@ describe("settings — Serial profile gallery", () => {
         expect(document.body.querySelector(".confirm-overlay")).toBeTruthy();
       });
       document.body
-        .querySelector<HTMLButtonElement>(
-          ".confirm-overlay .sshauth-footer .sshauth-btn:last-child",
-        )!
+        .querySelector<HTMLButtonElement>(".confirm-overlay .cf-footer .cf-btn:last-child")!
         .click();
 
       await vi.waitFor(() => {

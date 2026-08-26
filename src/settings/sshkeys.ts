@@ -8,7 +8,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { esc } from "../core/common";
 import { mustQuery } from "../ui/dom";
+import { render } from "../ui/lit";
 import { createModal } from "../ui/modal";
+import { syncSelectTexts, ttSelect } from "../ui/select";
 import { showToast } from "../ui/toast";
 
 export interface SshKeyInfo {
@@ -43,10 +45,7 @@ export function showKeygenModal(opts: { onSaved: (key: SshKeyInfo) => void }): v
         <label class="she-field"><span>Name</span>
           <input class="settings-input skg-name" type="text" spellcheck="false" value="id_ed25519" /></label>
         <label class="she-field"><span>Algorithm</span>
-          <select class="settings-input skg-algo">
-            <option value="ed25519" selected>Ed25519 (recommended)</option>
-            <option value="rsa">RSA 4096</option>
-          </select></label>
+          <span class="skg-algo-slot"></span></label>
         <label class="she-field"><span>Passphrase <span style="color:#888">(optional)</span></span>
           <input class="settings-input skg-pass" type="password" placeholder="empty = no passphrase" /></label>
       </div>
@@ -59,13 +58,31 @@ export function showKeygenModal(opts: { onSaved: (key: SshKeyInfo) => void }): v
   document.body.appendChild(modal.overlay);
 
   const nameInput = mustQuery<HTMLInputElement>(modal.overlay, ".skg-name");
-  const algoInput = mustQuery<HTMLSelectElement>(modal.overlay, ".skg-algo");
   const passInput = mustQuery<HTMLInputElement>(modal.overlay, ".skg-pass");
+  // Shared custom select (design: no native menus in settings).
+  let algo = "ed25519";
+  const algoSlot = mustQuery<HTMLElement>(modal.overlay, ".skg-algo-slot");
+  render(
+    ttSelect(
+      "Algorithm",
+      [
+        ["ed25519", "Ed25519 (recommended)"],
+        ["rsa", "RSA 4096"],
+      ],
+      algo,
+      (v) => {
+        algo = v;
+      },
+      { id: "skg-algo" },
+    ),
+    algoSlot,
+  );
+  syncSelectTexts(algoSlot);
   modal.overlay.querySelector(".skg-cancel")?.addEventListener("click", modal.close);
   modal.overlay.querySelector(".skg-save")?.addEventListener("click", async () => {
     try {
       const key = await invoke<SshKeyInfo>("ssh_keygen", {
-        algorithm: algoInput.value,
+        algorithm: algo,
         name: nameInput.value,
         passphrase: passInput.value || null,
       });
@@ -112,26 +129,53 @@ export function showInstallKeyModal(target: InstallTarget): void {
     }
     body.innerHTML = `
       <div style="margin-bottom:8px;">Public key to authorize on the target:</div>
-      <select class="settings-input ski-key" style="width:100%;margin-bottom:10px;">
-        ${keys.map((k, i) => `<option value="${i}">${esc(k.name)} — ${esc(k.fingerprint)}</option>`).join("")}
-      </select>
+      <div class="ski-key-slot" style="margin-bottom:10px;"></div>
       <div style="margin-bottom:4px;">Target system:</div>
-      <select class="settings-input ski-os" style="width:100%;">
-        <option value="auto" selected>Auto-detect (tries powershell → cmd → sh)</option>
-        <option value="windows">Windows</option>
-        <option value="linux">Linux</option>
-        <option value="macos">macOS</option>
-      </select>
+      <div class="ski-os-slot"></div>
       <div style="font-size:12px;color:#888;margin-top:8px;">
         You may be asked for the login password once. Note: on Windows, managed
         (administrator) accounts may require administrators_authorized_keys instead.
       </div>`;
+    // Shared custom selects (design: no native menus in settings).
+    let keyIdx = "0";
+    let os = "auto";
+    const keySlot = mustQuery<HTMLElement>(body, ".ski-key-slot");
+    render(
+      ttSelect(
+        "Public key",
+        keys.map((k, i) => [String(i), `${k.name} — ${k.fingerprint}`] as const),
+        keyIdx,
+        (v) => {
+          keyIdx = v;
+        },
+        { id: "ski-key" },
+      ),
+      keySlot,
+    );
+    syncSelectTexts(keySlot);
+    const osSlot = mustQuery<HTMLElement>(body, ".ski-os-slot");
+    render(
+      ttSelect(
+        "Target system",
+        [
+          ["auto", "Auto-detect (tries powershell → cmd → sh)"],
+          ["windows", "Windows"],
+          ["linux", "Linux"],
+          ["macos", "macOS"],
+        ],
+        os,
+        (v) => {
+          os = v;
+        },
+        { id: "ski-os" },
+      ),
+      osSlot,
+    );
+    syncSelectTexts(osSlot);
     installBtn.disabled = false;
     installBtn.addEventListener("click", async () => {
-      const keySel = body.querySelector<HTMLSelectElement>(".ski-key");
-      const key = keySel ? keys[keySel.selectedIndex] : undefined;
+      const key = keys[parseInt(keyIdx, 10)];
       if (!key) return;
-      const os = body.querySelector<HTMLSelectElement>(".ski-os")?.value;
       installBtn.disabled = true;
       installBtn.textContent = "Installing…";
       try {

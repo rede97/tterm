@@ -6,6 +6,7 @@
 // functions at startup instead of carrying the inline blocks.
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { loadSerialPorts } from "./config/wt-profiles";
 import { logCatch } from "./core/errorlog";
 import { initKeymap } from "./core/keymap";
@@ -16,6 +17,7 @@ import { setSearchHandlers } from "./terminal/search";
 import { setSshAuthTabLookup } from "./terminal/sshauth";
 import type { TerminalTab } from "./terminal/tab";
 import { tabManager } from "./terminal/tabmanager";
+import { confirmDialog } from "./ui/confirm";
 import { listForwards, removeForward } from "./ui/forwarding";
 import { openCommandPalette, openPaletteFlow, setPaletteHandlers } from "./ui/palette";
 import { openQuickOpen, setTabSwitcherHandlers, stepMruSwitcher } from "./ui/tabswitcher";
@@ -118,7 +120,7 @@ export function initShortcutsWiring(): void {
     "tterm.duplicateTab": () => {
       if (tabManager.activeTabId) tabManager.duplicateTab(tabManager.activeTabId);
     },
-    "tterm.closeWindow": () => invoke("window_close").catch(logCatch("window.close")),
+    "tterm.closeWindow": () => invoke("window_request_close").catch(logCatch("window.close")),
     "tterm.sshAutoReconnect": () => {
       const t = tabManager.activeTab;
       if (t?.type !== "ssh") return;
@@ -193,6 +195,33 @@ export function initContextMenuWiring(): void {
 
 export function initSearchWiring(): void {
   setSearchHandlers({ getTab: (id) => tabManager.get(id) });
+}
+
+// Close-window confirmation (docs/confirm-preview.html): the backend
+// prevents every close request (X button, Alt+F4, taskbar) and asks via
+// event. Confirm only when the setting is on AND tabs are open — anything
+// else re-issues window_close, whose confirmed flag lets the close pass.
+export function initWindowCloseConfirm(): void {
+  // De-dupe: a confirm is already up (e.g. double Alt+F4).
+  let asking = false;
+  void listen("window-close-requested", () => {
+    const tabCount = tabManager.tabs.size;
+    if (!configStore.get("confirmCloseWindow") || tabCount === 0 || asking) {
+      if (!asking) void invoke("window_close").catch(logCatch("window.close"));
+      return;
+    }
+    asking = true;
+    void confirmDialog({
+      title: "Close window?",
+      message: `This window has ${tabCount} open tab${tabCount === 1 ? "" : "s"}. Closing it ends those sessions.`,
+      meta: "You can turn this prompt off in Settings → General → Confirm before closing window.",
+      okLabel: "Close window",
+      danger: true,
+    }).then((ok) => {
+      asking = false;
+      if (ok) void invoke("window_close").catch(logCatch("window.close"));
+    });
+  });
 }
 
 export function initDirMenuWiring(): void {

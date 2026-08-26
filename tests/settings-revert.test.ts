@@ -97,8 +97,8 @@ describe("settings — Revert", () => {
     // …and the SSH panel re-rendered inside its own container (host list
     // reflects the reloaded store, not duplicated or orphaned markup).
     const sshPanel = root.querySelector<HTMLElement>('.settings-panel-content[data-panel="ssh"]')!;
-    expect(sshPanel.textContent).toContain("Imported Hosts (1)");
-    expect(sshPanel.querySelectorAll(".ssh-host-card")).toHaveLength(1);
+    expect(sshPanel.textContent).toContain("Hosts from ~/.ssh/config");
+    expect(sshPanel.querySelectorAll(".check-row")).toHaveLength(1);
     expect(sshPanel.textContent).toContain("LocalMyPC");
   });
 
@@ -117,7 +117,7 @@ describe("settings — Revert", () => {
 
     expect(root.querySelectorAll(".settings-nav-item")).toHaveLength(6);
     expect(root.querySelectorAll('.settings-panel-content[data-panel="ssh"]')).toHaveLength(1);
-    expect(root.querySelectorAll(".ssh-host-card")).toHaveLength(1);
+    expect(root.querySelectorAll(".check-row")).toHaveLength(1);
   });
 });
 

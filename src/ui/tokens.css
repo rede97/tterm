@@ -65,6 +65,7 @@ body[data-skin="cursor"] {
   --tt-mono: "JetBrains Mono", Consolas, ui-monospace, monospace;
 
   /* ---- Scroll ---- */
+  /* ---- Scroll (colors only — chrome via .tt-scroll / styles.css unified block) ---- */
   --tt-scroll-track: transparent;
   --tt-scroll-thumb: rgba(255, 255, 255, 0.14);
   --tt-scroll-thumb-hover: rgba(255, 255, 255, 0.28);

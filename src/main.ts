@@ -37,6 +37,7 @@ import {
   initSearchWiring,
   initShortcutsWiring,
   initSshAuthWiring,
+  initWindowCloseConfirm,
 } from "./wiring";
 
 // -- DOM refs ---
@@ -177,6 +178,7 @@ initQuickPanelWiring();
 initContextMenuWiring();
 initSearchWiring();
 initDirMenuWiring();
+initWindowCloseConfirm();
 
 // AI session sharing: the hub asks the frontend for a screen snapshot —
 // the xterm buffer is the ground-truth character grid.

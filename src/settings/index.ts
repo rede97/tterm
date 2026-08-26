@@ -24,6 +24,17 @@ import {
   saveSshConfigToDisk,
 } from "./ssh";
 
+// Panel header copy (design: docs/settings-preview.html META) — the header
+// above the scroll area follows the active nav item.
+const PANEL_META: Record<string, [string, string]> = {
+  general: ["General", "App version, updates, renderer, paste behavior."],
+  appearance: ["Appearance", "Chrome skin, fonts, and terminal color schemes."],
+  profile: ["Profile", "Local shell profiles and the default new-tab target."],
+  ssh: ["SSH", "Hosts from ~/.ssh/config — Apply writes the file."],
+  serial: ["Serial", "Default baud, named session profiles, and the profile editor."],
+  keyboard: ["Keyboard", "Searchable keybindings — click a chip to rebind."],
+};
+
 export function createSettingsContent(): HTMLElement {
   const root = document.createElement("div");
   root.className = "settings-page";
@@ -54,6 +65,21 @@ export function createSettingsContent(): HTMLElement {
   // -- Body --
   const body = document.createElement("div");
   body.className = "settings-body";
+
+  // Panel header (h2 + description, follows the active nav).
+  const header = document.createElement("div");
+  header.className = "settings-header";
+  const headerTitle = document.createElement("h2");
+  const headerDesc = document.createElement("p");
+  header.appendChild(headerTitle);
+  header.appendChild(headerDesc);
+  const syncHeader = (id: string): void => {
+    const [title, desc] = PANEL_META[id] ?? ["Settings", ""];
+    headerTitle.textContent = title;
+    headerDesc.textContent = desc;
+  };
+  syncHeader("general");
+  body.appendChild(header);
 
   // Create panels
   const panelGeneral = createGeneralPanel();
@@ -173,6 +199,7 @@ export function createSettingsContent(): HTMLElement {
       t.classList.add("active");
       const name = (t as HTMLElement).dataset.panel;
       if (!name) return;
+      syncHeader(name);
       root.querySelectorAll(".settings-panel-content").forEach((p) => {
         (p as HTMLElement).style.display = p.getAttribute("data-panel") === name ? "" : "none";
       });

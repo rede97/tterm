@@ -147,6 +147,14 @@ describe("custom themes", () => {
     );
     expect(groupTitles).toEqual(["Built-in", "Custom"]);
 
+    // Self-clean: a previous crashed run may have left "E2E Custom" behind —
+    // the save below collides on name and the editor never closes.
+    await browser.executeAsync((done) => {
+      import("/src/config/custom-themes.ts").then((m) =>
+        m.deleteCustomTheme("E2E Custom").finally(done),
+      );
+    });
+
     // Duplicate Solarized Light into a custom copy.
     await browser.execute(() => {
       const card = [...document.querySelectorAll("#set-theme-gallery .theme-card")].find(
@@ -219,7 +227,7 @@ describe("custom themes", () => {
       timeoutMsg: "delete confirmation did not appear",
     });
     await browser.execute(() => {
-      document.querySelector(".confirm-overlay .sshauth-footer .sshauth-btn:last-child")?.click();
+      document.querySelector(".confirm-overlay .cf-footer .cf-btn:last-child")?.click();
     });
     await browser.waitUntil(
       async () =>

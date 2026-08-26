@@ -158,8 +158,28 @@ pub fn window_set_fullscreen(window: tauri::Window, on: bool) {
     let _ = window.set_fullscreen(on);
 }
 
+/// One-shot flag: set when the frontend's confirm flow approves a close.
+/// The close-requested hook checks and clears it, letting exactly that
+/// close through while every unconfirmed request is prevented.
+static CLOSE_CONFIRMED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+pub fn take_close_confirmed() -> bool {
+    CLOSE_CONFIRMED.swap(false, std::sync::atomic::Ordering::SeqCst)
+}
+
+/// Confirmed close: the frontend's confirm flow re-issues this after
+/// approval — the flag lets exactly one close through the hook.
 #[tauri::command]
 pub fn window_close(window: tauri::Window) {
+    CLOSE_CONFIRMED.store(true, std::sync::atomic::Ordering::SeqCst);
+    let _ = window.close();
+}
+
+/// UNCONFIRMED close attempt (the X button): goes through the
+/// close-requested hook like Alt+F4, so the frontend confirm decides.
+#[tauri::command]
+pub fn window_request_close(window: tauri::Window) {
     let _ = window.close();
 }
 

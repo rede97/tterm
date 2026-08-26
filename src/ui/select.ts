@@ -25,10 +25,91 @@ export function closeAllSelects(except?: Element): void {
   for (const root of document.querySelectorAll(".qp-select.open")) {
     if (root !== except) root.classList.remove("open");
   }
+  unportalMenu();
+}
+
+// Fixed menus don't track scrolling containers — close on any scroll
+// outside the menu itself (the menu's own max-height scrolling exempt),
+// and on window resize (same rule as the context menu).
+document.addEventListener(
+  "scroll",
+  (e) => {
+    if (e.target instanceof Element && e.target.closest(".qp-select-menu")) return;
+    closeAllSelects();
+  },
+  true,
+);
+window.addEventListener("resize", () => closeAllSelects());
+// Escape closes an open menu (design Q2: never the surrounding panel).
+// CAPTURE phase: xterm's textarea stops key propagation at the target, so
+// a bubble-phase listener never sees Escape while the terminal has focus.
+window.addEventListener(
+  "keydown",
+  (e) => {
+    if (e.key === "Escape") closeAllSelects();
+  },
+  true,
+);
+
+/** Pin the listbox to the trigger in VIEWPORT space: position:fixed means
+ *  the menu never contributes to the panel's scrollHeight — opening a
+ *  select must not spawn a panel scrollbar or shift the control column
+ *  (design Q8, docs/quickpanel-preview.html placeSelectMenu).
+ *
+ *  The menu is PORTALED to <body> while open: a backdrop-filtered panel
+ *  (glass mode) becomes the containing block for fixed descendants, which
+ *  would misplace the menu and let it grow the panel's scrollHeight. */
+let portalReturn: { menu: HTMLElement; parent: Node; next: Node | null } | null = null;
+// The currently open select (single-open rule) — the portaled menu no
+// longer sits inside its root, so lookups go through this instead of
+// closest()/querySelector.
+let openSelect: { root: HTMLElement; menu: HTMLElement } | null = null;
+
+function unportalMenu(): void {
+  if (!portalReturn) return;
+  const { menu, parent, next } = portalReturn;
+  parent.insertBefore(menu, next);
+  portalReturn = null;
+  openSelect = null;
+}
+
+function portalMenu(root: HTMLElement, menu: HTMLElement): void {
+  unportalMenu(); // single-open rule: return the previous menu first
+  const parent = menu.parentNode;
+  if (!parent) return;
+  portalReturn = { menu, parent, next: menu.nextSibling };
+  document.body.appendChild(menu);
+  openSelect = { root, menu };
+}
+
+/** Options of the root's menu, wherever the menu currently lives. */
+function menuOptions(root: HTMLElement): HTMLElement[] {
+  const menu =
+    openSelect?.root === root
+      ? openSelect.menu
+      : root.querySelector<HTMLElement>(".qp-select-menu");
+  return menu ? [...menu.querySelectorAll<HTMLElement>(".qp-option")] : [];
+}
+
+function placeSelectMenu(trigger: HTMLElement, menu: HTMLElement): void {
+  const rect = trigger.getBoundingClientRect();
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const dropUp = spaceBelow < 180;
+  menu.dataset.drop = dropUp ? "up" : "down";
+  menu.style.width = `${rect.width}px`;
+  menu.style.left = `${rect.left}px`;
+  menu.style.right = "auto";
+  if (dropUp) {
+    menu.style.top = "auto";
+    menu.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+  } else {
+    menu.style.bottom = "auto";
+    menu.style.top = `${rect.bottom + 4}px`;
+  }
 }
 
 function pickOption(root: HTMLElement, opt: HTMLElement): void {
-  for (const o of root.querySelectorAll(".qp-option")) {
+  for (const o of menuOptions(root)) {
     o.setAttribute("aria-selected", o === opt ? "true" : "false");
   }
   const valueEl = root.querySelector(".qp-select-value");
@@ -51,17 +132,16 @@ function onSelectTriggerClick(root: HTMLElement): void {
   closeAllSelects();
   if (!willOpen) return;
   root.classList.add("open");
-  // Flip upward when there is not enough room below (design: <180px).
   const menu = root.querySelector<HTMLElement>(".qp-select-menu");
   const trigger = root.querySelector<HTMLElement>(".qp-select-trigger");
   if (menu && trigger) {
-    const spaceBelow = window.innerHeight - trigger.getBoundingClientRect().bottom;
-    menu.dataset.drop = spaceBelow < 180 ? "up" : "down";
+    portalMenu(root, menu);
+    placeSelectMenu(trigger, menu);
   }
 }
 
 function onSelectKeydown(root: HTMLElement, e: KeyboardEvent): void {
-  const options = [...root.querySelectorAll<HTMLElement>(".qp-option")];
+  const options = menuOptions(root);
   if (options.length === 0) return;
   const open = root.classList.contains("open");
   const activeIdx = options.findIndex((o) => o.classList.contains("active"));
@@ -118,8 +198,14 @@ export function ttSelect(
       aria-selected=${value === current ? "true" : "false"}
       @click=${(e: Event) => {
         e.stopPropagation();
-        const root = (e.currentTarget as HTMLElement).closest<HTMLElement>(".qp-select");
-        if (root) pickOption(root, e.currentTarget as HTMLElement);
+        // The menu may be portaled to <body>: prefer the open-select
+        // back-reference over DOM ancestry.
+        const opt = e.currentTarget as HTMLElement;
+        const menu = opt.closest(".qp-select-menu");
+        const root =
+          (menu && openSelect?.menu === menu ? openSelect.root : null) ??
+          opt.closest<HTMLElement>(".qp-select");
+        if (root) pickOption(root, opt);
       }}
     >${text}</button>
   `;

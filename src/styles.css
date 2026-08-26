@@ -346,7 +346,12 @@ body {
   z-index: 110;
   width: var(--tt-qp-width);
   max-height: calc(100% - 48px);
-  overflow: auto;
+  /* Content may scroll when Serial + modem + forwards stack is tall.
+     Select menus are position:fixed (see .qp-select-menu) so opening a
+     dropdown NEVER grows scrollHeight / never forces a classic bar. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: auto;
   color: var(--tt-text);
   font: 13px / 1.4 var(--tt-ui);
   background: var(--tt-sidebar);
@@ -355,6 +360,15 @@ body {
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
   padding: 8px;
   display: none;
+}
+
+/* Overlay preference (Chromium): paint over content, do not reserve a
+   gutter that shifts the 148px control column. The @supports upgrade from
+   overflow-y:auto to overlay is a deliberate progressive enhancement. */
+@supports (overflow-y: overlay) {
+  .quick-panel {
+    overflow-y: overlay;
+  }
 }
 
 .quick-panel.open {
@@ -416,21 +430,6 @@ body.qp-glass .qp-sharing {
   body.qp-glass .quick-panel {
     background: #1c1c1e;
   }
-}
-
-.quick-panel::-webkit-scrollbar {
-  width: 8px;
-}
-
-.quick-panel::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.quick-panel::-webkit-scrollbar-thumb {
-  background: var(--tt-scroll-thumb);
-  border-radius: 8px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
 }
 
 /* -- header: title | status pills (separate slots, fixed widths) -- */
@@ -668,12 +667,15 @@ body.qp-glass .qp-sharing {
   white-space: nowrap;
 }
 
+/* Floating listbox: fixed to the viewport AND portaled to <body> (a
+   backdrop-filtered glass panel would otherwise trap it as its fixed
+   containing block) — so it never contributes to .quick-panel
+   scrollHeight. top/left/width/bottom are set in JS (placeSelectMenu);
+   data-drop only documents intent. z sits above every modal overlay
+   (sshauth z-1100) since settings editors use the same control. */
 .qp-select-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 20;
+  position: fixed;
+  z-index: 1200;
   max-height: 220px;
   overflow: auto;
   padding: 4px;
@@ -682,15 +684,11 @@ body.qp-glass .qp-sharing {
   border-radius: var(--tt-radius-sm);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
   display: none;
+  box-sizing: border-box;
 }
 
 .qp-select.open .qp-select-menu {
   display: block;
-}
-
-.qp-select-menu[data-drop="up"] {
-  top: auto;
-  bottom: calc(100% + 4px);
 }
 
 .qp-optgroup {
@@ -1649,27 +1647,65 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   scrollbar-width: none;
 }
 
-/* Global scrollbar theme for consistency */
+/* Unified overlay scrollbar (parity with docs/ui/scroll.css `.tt-scroll`):
+   floating thumb, transparent track, no Windows arrow buttons.
+   Chrome 121+: do NOT set scrollbar-width/color on Chromium — that forces
+   the native Windows bar (with arrows) and overrides ::-webkit-*. */
+.tt-scroll,
+.quick-panel,
+.settings-sidebar,
+.settings-panel-content,
+.font-picker-body,
+.fp-list,
+.tab-switcher-list {
+  scrollbar-gutter: auto;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  html,
+  .tt-scroll,
+  .quick-panel,
+  .settings-sidebar,
+  .settings-panel-content,
+  .font-picker-body,
+  .fp-list,
+  .tab-switcher-list {
+    scrollbar-width: thin;
+    scrollbar-color: var(--tt-scroll-thumb) transparent;
+  }
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
+  background: transparent;
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--tt-scroll-track);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
   background: var(--tt-scroll-thumb);
-  border-radius: 3px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--tt-scroll-thumb-hover);
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-corner {
-  background: var(--tt-scroll-track);
+  background: transparent;
 }
 
 /* -- tab context menu -- */
@@ -2033,8 +2069,8 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 /* -- sidebar -- */
 
 .settings-sidebar {
-  width: 200px;
-  min-width: 200px;
+  width: 188px;
+  min-width: 188px;
   background: var(--tt-sidebar);
   border-right: 1px solid var(--tt-line);
   padding: 12px 0;
@@ -2077,14 +2113,34 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   overflow: hidden;
 }
 
+/* Panel header (h2 + description, follows the active nav — design S8). */
+.settings-header {
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid var(--tt-line);
+  flex-shrink: 0;
+}
+
+.settings-header h2 {
+  font-size: 16px;
+  font-weight: var(--tt-title-weight);
+  letter-spacing: -0.02em;
+  color: var(--tt-text);
+}
+
+.settings-header p {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--tt-muted);
+}
+
 .settings-panel-content {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  padding: 20px 24px 28px;
 }
 
 .settings-section {
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .settings-section-title {
@@ -2133,11 +2189,18 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   align-items: flex-start;
 }
 
+/* Row wells (design: every settings row is a bordered well, not a bare
+   flex line). */
 .settings-item-row {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
+  padding: 10px 12px;
+  background: var(--tt-well);
+  border: 1px solid var(--tt-line);
+  border-radius: var(--tt-radius-sm);
+  margin-bottom: 8px;
 }
 
 .settings-item-info {
@@ -2569,7 +2632,10 @@ input[type="number"] {
   flex: 1;
 }
 
+/* Modal footer buttons share the 148px footprint (design L2: Theme /
+   Serial / Host editor Save·Cancel同宽). */
 .te-btn {
+  min-width: var(--tt-btn-width);
   padding: 6px 16px;
   border-radius: var(--tt-radius-ctrl);
   border: 1px solid var(--tt-line);
@@ -2675,7 +2741,17 @@ input[type="number"] {
 }
 
 #dirty-hint.on {
-  display: inline;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#dirty-hint.on::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .settings-reset-wrap {
@@ -2812,6 +2888,479 @@ input[type="number"] {
 .settings-link-btn-danger:hover {
   background: rgba(255, 255, 255, 0.06);
   color: var(--tt-bad);
+}
+
+/* Visibility lists (LOCKED L3): multi-item "show in new-tab menu" lists
+   use LEFT checkboxes, never toggles — docs/settings-preview.html
+   .check-row. Single on/off features keep the right-side .qp-switch. */
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--tt-well);
+  border: 1px solid var(--tt-line);
+  border-radius: var(--tt-radius-sm);
+  margin-bottom: 4px;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    opacity 120ms ease;
+}
+
+.check-row:hover {
+  background: color-mix(in srgb, var(--tt-well) 70%, #fff 4%);
+}
+
+.check-row.is-off {
+  opacity: 0.72;
+}
+
+.check-row.is-off .check-main {
+  opacity: 0.78;
+}
+
+.check-hit {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  cursor: pointer;
+}
+
+.check-box {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin: 3px 0 0;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--tt-muted) 42%, transparent);
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.check-box:hover {
+  border-color: color-mix(in srgb, var(--tt-muted) 70%, transparent);
+  background: color-mix(in srgb, var(--tt-hover) 80%, transparent);
+}
+
+.check-row.is-off .check-box {
+  border-color: color-mix(in srgb, var(--tt-faint) 55%, transparent);
+}
+
+.check-box:checked {
+  background: var(--tt-accent-fill);
+  border-color: var(--tt-accent-fill);
+  box-shadow: none;
+}
+
+.check-box:checked::after {
+  content: "";
+  position: absolute;
+  left: 3.5px;
+  top: 0.5px;
+  width: 3.5px;
+  height: 7px;
+  border: solid var(--tt-accent-text);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+body[data-skin="cursor"] .check-box:checked {
+  background: #f2f2f2;
+  border-color: #f2f2f2;
+}
+
+body[data-skin="cursor"] .check-box:checked::after {
+  border-color: #0a0a0a;
+}
+
+.check-main {
+  min-width: 0;
+  flex: 1;
+  transition: opacity 120ms ease;
+}
+
+.check-title {
+  font-size: 13px;
+  font-weight: var(--tt-title-weight);
+  color: var(--tt-text);
+}
+
+.check-meta {
+  font-size: 11.5px;
+  color: var(--tt-muted);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.check-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Toolbar above host/key lists (design: primary + ghost, both 148). */
+.host-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.host-toolbar .btn {
+  width: var(--tt-btn-width);
+  min-width: var(--tt-btn-width);
+  box-sizing: border-box;
+  justify-content: center;
+}
+
+.btn {
+  height: var(--tt-ctrl-h);
+  padding: 0 14px;
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius-ctrl);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: 12.5px / 1 var(--tt-ui);
+  font-weight: var(--tt-title-weight);
+  background: var(--tt-well);
+  color: var(--tt-text);
+}
+
+.btn:hover {
+  filter: brightness(1.08);
+}
+
+.btn-primary {
+  background: var(--tt-accent-fill);
+  border-color: transparent;
+  color: var(--tt-accent-text);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--tt-muted);
+}
+
+.btn-ghost:hover {
+  color: var(--tt-text);
+  background: var(--tt-hover);
+  filter: none;
+}
+
+/* Tiny icon buttons in check-row actions (✎ / ⋯ / ×). */
+.icon-tiny {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--tt-radius-ctrl);
+  background: transparent;
+  color: var(--tt-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.icon-tiny:hover {
+  background: var(--tt-hover);
+  color: var(--tt-text);
+}
+
+/* ⋯ overflow menu on host rows. */
+.host-more {
+  position: relative;
+}
+
+.host-more-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  min-width: 160px;
+  padding: 4px;
+  background: var(--tt-chrome);
+  border: 1px solid var(--tt-line);
+  border-radius: var(--tt-radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  display: none;
+  flex-direction: column;
+}
+
+.host-more-menu.open {
+  display: flex;
+}
+
+.host-more-menu button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--tt-radius-ctrl);
+  background: transparent;
+  color: var(--tt-chrome-text);
+  font: 12px / 1.3 var(--tt-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.host-more-menu button:hover {
+  background: var(--tt-tab-active);
+  color: var(--tt-text);
+}
+
+/* Shared overlay scrollbar (docs/ui/scroll.css): floating thin thumb, no
+   reserved gutter, no arrow buttons. */
+.tt-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--tt-scroll-thumb) transparent;
+  scrollbar-gutter: auto;
+}
+
+.tt-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: transparent;
+}
+
+.tt-scroll::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.tt-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tt-scroll::-webkit-scrollbar-thumb {
+  background: var(--tt-scroll-thumb);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.tt-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--tt-scroll-thumb-hover);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.tt-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Confirm dialog chrome (docs/confirm-preview.html .cf-*): 420px well
+   dialog; warn border + danger primary for destructive actions. */
+.cf-dialog {
+  width: 420px;
+  max-width: 100%;
+  background: var(--tt-well);
+  border: 1px solid var(--tt-line);
+  border-radius: var(--tt-radius-sm);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+.cf-dialog.warn {
+  border-color: color-mix(in srgb, var(--tt-warn) 55%, var(--tt-line));
+}
+
+.cf-header {
+  padding: 14px 20px;
+  font-size: 13px;
+  font-weight: var(--tt-title-weight);
+  border-bottom: 1px solid var(--tt-line);
+  user-select: none;
+}
+
+.cf-dialog.warn .cf-header {
+  color: var(--tt-warn);
+  border-bottom-color: color-mix(in srgb, var(--tt-warn) 40%, var(--tt-line));
+}
+
+.cf-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cf-text {
+  font-size: 13px;
+  color: var(--tt-text);
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.cf-meta {
+  font-size: 12px;
+  color: var(--tt-muted);
+  line-height: 1.45;
+}
+
+.cf-preview {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 120px;
+  overflow: auto;
+  background: var(--tt-inset);
+  border: 1px solid var(--tt-line);
+  border-radius: var(--tt-radius-ctrl);
+  font: 12px / 1.45 var(--tt-mono);
+  color: var(--tt-muted);
+  white-space: pre;
+}
+
+.cf-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--tt-line);
+}
+
+.cf-btn {
+  min-width: 88px;
+  height: var(--tt-ctrl-h);
+  padding: 0 16px;
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius-ctrl);
+  background: var(--tt-well);
+  color: var(--tt-text);
+  font: 12px / 1 var(--tt-ui);
+  font-weight: var(--tt-ui-weight);
+  cursor: pointer;
+}
+
+.cf-btn:hover {
+  background: var(--tt-hover);
+}
+
+.cf-btn:focus-visible {
+  outline: 2px solid var(--tt-focus);
+  outline-offset: 2px;
+}
+
+.cf-btn-ok {
+  background: var(--tt-accent-fill);
+  border-color: var(--tt-accent);
+  color: var(--tt-accent-text);
+}
+
+.cf-btn-ok:hover {
+  filter: brightness(1.06);
+}
+
+body[data-skin="vscode"] .cf-btn-ok:hover {
+  filter: none;
+  background: var(--tt-accent);
+}
+
+.cf-btn-danger {
+  background: var(--tt-bad);
+  border-color: var(--tt-bad);
+  color: #fff;
+}
+
+.cf-btn-danger:hover {
+  filter: brightness(1.08);
+}
+
+/* "New …" tile (design .theme-new): New Theme / New Profile live in the
+   gallery grid as a tile, not a text link. */
+.theme-new {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 88px;
+  padding: 14px 12px;
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius-sm);
+  background: var(--tt-well);
+  color: var(--tt-text);
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+  box-sizing: border-box;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.theme-new:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: color-mix(in srgb, var(--tt-well) 70%, #fff 4%);
+}
+
+.theme-new-plus {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--tt-inset);
+  border: 1px solid var(--tt-line-strong);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--tt-text);
+  font-weight: 400;
+}
+
+.theme-new-label {
+  font-size: 12.5px;
+  font-weight: var(--tt-title-weight);
+  color: var(--tt-text);
+}
+
+.theme-new-hint {
+  font-size: 11px;
+  color: var(--tt-muted);
+  font-weight: 400;
+}
+
+/* Solid secondary CTA (design .link-btn.solid): the shared 148×28 row-end
+   button — Homepage / Configure / Check for Updates / Copy / Reload… */
+.settings-link-btn.solid {
+  width: var(--tt-btn-width);
+  height: var(--tt-ctrl-h);
+  padding: 0 12px;
+  background: #3a3a3a;
+  color: var(--tt-text);
+  font-weight: var(--tt-title-weight);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.settings-link-btn.solid:hover {
+  background: #3a3a3a;
+  color: var(--tt-text);
+  filter: brightness(1.1);
 }
 
 /* ===== Settings — SSH host list ===== */
@@ -3757,6 +4306,7 @@ input[type="number"] {
 }
 
 .sp-btn {
+  min-width: var(--tt-btn-width);
   padding: 6px 16px;
   border-radius: var(--tt-radius-ctrl);
   border: 1px solid var(--tt-line);
@@ -3831,23 +4381,6 @@ input[type="number"] {
   max-height: 50vh;
   overflow-y: auto;
   padding: 4px 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--tt-scroll-thumb) transparent;
-}
-
-.tab-switcher-list::-webkit-scrollbar {
-  width: 8px;
-}
-
-.tab-switcher-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.tab-switcher-list::-webkit-scrollbar-thumb {
-  background: var(--tt-scroll-thumb);
-  border-radius: 8px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
 }
 
 .tab-switcher-row {

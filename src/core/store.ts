@@ -34,6 +34,8 @@ export interface ConfigState {
   terminalBell: boolean;
   pasteWarning: boolean;
   pasteTrim: boolean;
+  // Ask before closing the window while any tab is open (confirm-preview).
+  confirmCloseWindow: boolean;
   serialBaud: number;
   // Default serial profile name (built-in or custom). The rest of the
   // serial defaults live in profiles (serial-profiles.json), not here.
@@ -94,6 +96,7 @@ const SCHEMA = {
   terminalBell: { default: false, validate: isBoolean },
   pasteWarning: { default: true, validate: isBoolean },
   pasteTrim: { default: true, validate: isBoolean },
+  confirmCloseWindow: { default: true, validate: isBoolean },
   serialBaud: { default: 115200, validate: isNumber(300, 921600) },
   serialProfile: { default: "Normal", validate: isString },
   defaultLocalProfile: { default: null as string | null, validate: isOrNull(isString) },

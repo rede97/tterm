@@ -66,38 +66,31 @@ function renderProfilePanel(panel: HTMLElement): void {
         "Imported from Windows Terminal",
         html`
           <div class="settings-item-desc" style="margin-bottom:10px">
-            Toggle visibility of profiles imported from Windows Terminal. Uncheck to hide.
+            Checkbox on the left — shown in the new-tab menu when checked (same
+            pattern as SSH hosts). Pending until Apply.
           </div>
           ${repeat(
             localProfiles,
             (p) => p.name,
-            (p) => html`<label
-              class="settings-item settings-item-row"
-              style="cursor:pointer;margin-bottom:4px;background:#2a2a2a;border-radius:4px;padding:6px 10px;"
-            >
-              <div class="settings-item-info">
-                <div class="settings-item-title" style="margin-bottom:0;">${p.name}</div>
-                <div class="settings-item-desc" style="margin-bottom:0;">${p.command}</div>
-              </div>
-              <div class="settings-item-control">
-                <button
-                  type="button"
-                  class="qp-switch wt-profile-check ${hiddenProfiles.includes(p.name) ? "" : "on"}"
-                  role="switch"
+            (p) => html`<div class="check-row ${hiddenProfiles.includes(p.name) ? "is-off" : ""}">
+              <label class="check-hit">
+                <input
+                  type="checkbox"
+                  class="check-box wt-profile-check"
                   value=${p.name}
-                  aria-label=${`Show ${p.name}`}
-                  aria-checked=${hiddenProfiles.includes(p.name) ? "false" : "true"}
-                  @click=${(e: Event) => {
-                    e.stopPropagation();
-                    const btn = e.currentTarget as HTMLElement;
-                    const next = btn.getAttribute("aria-checked") !== "true";
-                    btn.classList.toggle("on", next);
-                    btn.setAttribute("aria-checked", next ? "true" : "false");
-                    btn.dispatchEvent(new CustomEvent("tterm-settings-changed", { bubbles: true }));
+                  title="Show in new-tab menu"
+                  .checked=${!hiddenProfiles.includes(p.name)}
+                  @change=${(e: Event) => {
+                    const box = e.currentTarget as HTMLInputElement;
+                    box.closest(".check-row")?.classList.toggle("is-off", !box.checked);
                   }}
-                ><span class="qp-knob"></span></button>
-              </div>
-            </label>`,
+                />
+                <div class="check-main">
+                  <div class="check-title">${p.name}</div>
+                  <div class="check-meta">${p.command}</div>
+                </div>
+              </label>
+            </div>`,
           )}
         `,
       )}
@@ -110,13 +103,13 @@ function renderProfilePanel(panel: HTMLElement): void {
 export function collectProfileSettings(root: HTMLElement): Partial<ConfigState> {
   const partial: Partial<ConfigState> = {};
   const profileEl = root.querySelector<HTMLElement>("#set-default-profile");
-  const checks = root.querySelectorAll<HTMLElement>(".wt-profile-check");
+  const checks = root.querySelectorAll<HTMLInputElement>(".wt-profile-check");
   if (profileEl?.dataset.current) {
     partial.defaultLocalProfile = profileEl.dataset.current;
   }
   const hidden: string[] = [];
   checks.forEach((c) => {
-    if (c.getAttribute("aria-checked") !== "true") hidden.push(c.getAttribute("value") ?? "");
+    if (!c.checked) hidden.push(c.getAttribute("value") ?? "");
   });
   partial.hiddenProfiles = hidden;
   return partial;

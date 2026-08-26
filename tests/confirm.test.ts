@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { confirmDialog } from "../src/ui/confirm";
 
 function dialog(): HTMLElement {
-  return document.querySelector(".confirm-overlay .sshauth-dialog")!;
+  return document.querySelector(".confirm-overlay .cf-dialog")!;
 }
 
 beforeEach(() => {
@@ -19,20 +19,20 @@ describe("confirmDialog", () => {
       cancelLabel: "Later",
     });
     const d = dialog();
-    expect(d.querySelector(".sshauth-header")!.textContent).toBe("Update Available");
+    expect(d.querySelector(".cf-header")!.textContent).toBe("Update Available");
     expect(d.querySelector(".confirm-text")!.textContent).toBe("line one\n\nline two");
-    const btns = [...d.querySelectorAll<HTMLButtonElement>(".sshauth-btn")];
+    const btns = [...d.querySelectorAll<HTMLButtonElement>(".cf-btn")];
     expect(btns.map((b) => b.textContent)).toEqual(["Later", "Update"]);
   });
 
   it("resolves true on OK, false on Cancel", async () => {
     const p1 = confirmDialog({ title: "t", message: "m" });
-    dialog().querySelector<HTMLButtonElement>(".sshauth-btn-ok")!.click();
+    dialog().querySelector<HTMLButtonElement>(".cf-btn-ok")!.click();
     await expect(p1).resolves.toBe(true);
     expect(document.querySelector(".confirm-overlay")).toBeNull();
 
     const p2 = confirmDialog({ title: "t", message: "m" });
-    dialog().querySelector<HTMLButtonElement>(".sshauth-btn-cancel")!.click();
+    dialog().querySelector<HTMLButtonElement>(".cf-cancel")!.click();
     await expect(p2).resolves.toBe(false);
     expect(document.querySelector(".confirm-overlay")).toBeNull();
   });
@@ -48,10 +48,18 @@ describe("confirmDialog", () => {
     await expect(p2).resolves.toBe(false);
   });
 
-  it("danger style marks header and OK button", () => {
+  it("danger style marks the dialog warn border and OK button", () => {
     confirmDialog({ title: "t", message: "m", danger: true });
     const d = dialog();
-    expect(d.classList.contains("sshauth-dialog-danger")).toBe(true);
-    expect(d.querySelector(".sshauth-btn-danger")).not.toBeNull();
+    expect(d.classList.contains("warn")).toBe(true);
+    expect(d.querySelector(".cf-btn-danger")).not.toBeNull();
+  });
+
+  it("renders optional meta and mono preview blocks", () => {
+    confirmDialog({ title: "t", message: "m", meta: "why not", preview: "a\nb" });
+    const d = dialog();
+    expect(d.querySelector(".cf-meta")!.textContent).toBe("why not");
+    expect(d.querySelector(".cf-preview")!.textContent).toBe("a\nb");
+    expect(d.querySelector(".cf-preview")!.classList.contains("tt-scroll")).toBe(true);
   });
 });

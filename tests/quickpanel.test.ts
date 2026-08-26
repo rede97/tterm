@@ -188,7 +188,10 @@ describe("quick panel — serial tab", () => {
     const root = selectOf(row);
     root.querySelector<HTMLElement>(".qp-select-trigger")!.click();
     expect(root.classList.contains("open")).toBe(true);
-    const opt = root.querySelector<HTMLElement>(`.qp-option[data-value="${value}"]`);
+    // Open menus are portaled to <body> (Q8).
+    const opt = document.querySelector<HTMLElement>(
+      `body > .qp-select-menu .qp-option[data-value="${value}"]`,
+    );
     expect(opt, `option ${value}`).toBeTruthy();
     opt!.click();
     expect(root.classList.contains("open")).toBe(false);
