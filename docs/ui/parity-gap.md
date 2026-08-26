@@ -3,40 +3,49 @@
 对照标准：**100% 与设计稿同显示、同交互**。
 
 - Drafts: `docs/*-preview.html`、`docs/index.html` UX log、`docs/ui/tokens.css`
-- App: `feat/ui-redesign-migration`（含 `edca2f7` 迁移）
-- 审计日期：2026-08-26
+- App: `feat/ui-redesign-migration`（`edca2f7` 迁移 → `ed6a827` QP 1:1 → `5110486` parity 收口）
+- 审计 / 复核：2026-08-26
 
-**结论一句话：** Quick panel 的 CSS 骨架已进 `styles.css`，但 bolt / Esc / Copy / Forward 分组等交互与状态反馈仍和稿不一致；其它面最大漏项是菜单 hover、终端 New Tab、Palette 命令与 Port Forward 对话框、Settings 原生 select + skin swatch + 按钮字重宽。
+**结论一句话：** **CLOSED** — `5110486` 收口全部 blocker；T4 chip 显示回归与 `.tab` 注释 nit 已于复核当日修掉（`colorPreview` 初始 `display:none` 移除 + 宽注释 108–180）。仅余 OK\* 有意增强（Q5 即时生效、Q7 键盘导航）。
 
 ---
 
-## A. Quick panel — 仍未对齐（优先）
+## Status legend
 
-| # | 漏项 | 设计稿 | 当前实现 |
-|---|------|--------|----------|
-| **Q1** | **闪电按钮默认色** | 默认 **白**；Sharing 时才变蓝 bolt；**只有断开显示红点** | 默认就一直 `--tt-bolt` 蓝；shared 状态同色，看不出「分享变色」 |
-| **Q2** | **Esc** | Esc **只关下拉**，面板保持开着 | Esc **直接关整个 panel** |
-| **Q3** | **Copy 反馈** | 按钮文案 → `Copied`（约 900ms）再回 `Copy` | Toast「Share link copied」，按钮文案不变 |
-| **Q4** | **Port Forward 分组色** | Local 固定 `#4da6ff`；标题 sentence case、无 uppercase tracking | Local 用 `--tt-accent`（Cursor 皮肤下变白）；标题 **UPPERCASE + letter-spacing** |
-| **Q5** | **皮肤/毛玻璃预览方式** | 侧栏即时切 skin / glass，骨架不跳 | 走 Settings Apply（`chromeSkin` / `quickPanelGlass`）；面板内不能像稿一样当场对比 |
-| **Q6** | **下拉选中底** | `--qp-accent-fill`（Cursor 为白洗选中） | 已映射 `--tt-selected`，大体接近；需肉眼确认 Cursor/VS Code 两套是否与稿同帧 |
-| **Q7** | **Select 键盘高亮** | 稿主要是点击 | App 有 Arrow/Enter + `.active`（能力更强）；若与稿「纯点击」严格一致，属于**有意增强**，不算漏显示，但交互不完全相同 |
+| 标记 | 含义 |
+|------|------|
+| **DONE** | 已与设计稿对齐 |
+| **BUG** | 代码意图对齐，但有回归/漏线 |
+| **OK\*** | 有意偏离（增强或产品模型），可接受 |
 
-**已对齐（勿再当漏项）：**  
-wells / pills / custom select DOM+CSS / share reveal / glass blur / CONNECTED绿≠Share teal / LED / switch 尺寸与动画 / 控件列宽 148×28 / 字重 500 等——主体 CSS 已在。
+---
+
+## A. Quick panel
+
+| # | 项 | 状态 | 备注 |
+|---|----|------|------|
+| **Q1** | 闪电默认中性色；Sharing → 蓝 bolt；仅断开红点 | **DONE** | `#quick-status` → `--tt-chrome-text`；`[data-state=shared]` → `--tt-bolt` |
+| **Q2** | Esc 只关下拉，面板保持开 | **DONE** | `closeAllSelects()`；关面板靠空白 / bolt |
+| **Q3** | Copy → `Copied` ~900ms | **DONE** | 就地改按钮文案 |
+| **Q4** | Forward Local `#4da6ff`；sentence-case 标题 | **DONE** | 固定三色；无 uppercase tracking |
+| **Q5** | Skin / glass 即时生效 | **OK\*** | 走 `configStore.set` 即时（UX-05），不经 Apply — 比稿的「侧栏 demo」更符合产品 |
+| **Q6** | 下拉选中底 | **DONE** | `--tt-selected`（= 稿 `--qp-accent-fill`） |
+| **Q7** | Select 键盘 | **OK\*** | Arrow/Enter + `.active` 保留为增强 |
+
+主体 wells / pills / custom select / share reveal / glass / CONNECTED≠Share / LED / switch / 148×28 / weight 500 —— 已在。
 
 ---
 
 ## B. Tab bar / 菜单
 
-| # | 漏项 | 设计稿 | 当前实现 |
-|---|------|--------|----------|
-| **T1** | **菜单 / Profiles hover** | `--tab-active`（中性 tab 灰，**非主题蓝**） | `--tt-selected`（VS Code 皮肤 hover 变蓝） |
-| **T2** | **终端右键末项** | **只有 Duplicate Tab**（不要 New） | 仍有 **New Tab + Duplicate Tab** |
-| **T3** | **Profiles 字体** | 整菜单 `var(--mono)` | UI 无衬线，非 mono |
-| **T4** | **颜色预览芯片** | 12×12 圆；无色时空心斜线 hatch | 短条；无色时 **隐藏**（无 empty 态） |
-| **T5** | Profiles 圆角/阴影/列宽 | 半径 6、阴影更重、列 min≈200 | 半径 4、阴影更轻、min 170 |
-| **T6** | Tab 宽约束 | max 180 / min 108 | max 200 / min 120 |
+| # | 项 | 状态 | 备注 |
+|---|----|------|------|
+| **T1** | 菜单 / Profiles hover = tab 灰（非主题蓝） | **DONE** | `--tt-tab-active` |
+| **T2** | 终端右键末项仅 Duplicate（无 New Tab） | **DONE** | |
+| **T3** | Profiles mono | **DONE** | `font-family: var(--tt-mono)` |
+| **T4** | 颜色预览 12×12 圆 + 无色 hatch | **BUG** | CSS + `.empty` 已写；`colorPreview.style.display = "none"` 初始化后打开菜单未清，chip 永不显示。修：`display = ""` |
+| **T5** | Profiles 半径 6 / 阴影 / 列 min 200 | **DONE** | |
+| **T6** | Tab 宽 108–180 | **DONE** | CSS 已改；`.tab` 注释仍可能写旧 200/120 |
 
 关 tab 确认条、Duplicate 首项、无 Port Forward、overflow `+N` —— 已对齐。
 
@@ -44,40 +53,39 @@ wells / pills / custom select DOM+CSS / share reveal / glass blur / CONNECTED绿
 
 ## C. Command palette
 
-| # | 漏项 | 设计稿 | 当前实现 |
-|---|------|--------|----------|
-| **P1** | **命令清单** | Share start/stop 分项；Add Local / Remote / Dynamic；Remove all；SSH auto-reconnect；Duplicate Tab；Close Window… | 单条 Share toggle；一条 **Port Forwarding…**；缺 Duplicate / Close Window / auto-reconnect 等 |
-| **P2** | **Port Forward 交互** | **同 overlay 二级流程**（笔记：不另开窗） | `showPortForwardingDialog` **独立对话框** |
-| **P3** | **滚动条/分组视觉** | 自定义细滚动条 + Window/Tab/View… 分组标题 | 复用 tab-switcher 壳；无稿同款 `pal-sb`；分组靠命令 title 前缀而非稿的 group 标签 |
+| # | 项 | 状态 | 备注 |
+|---|----|------|------|
+| **P1** | 命令清单扩展 | **DONE** | Share Start/Stop、Duplicate、Close Window、SSH auto-reconnect、Add L/R/D Forward、Remove All |
+| **P2** | Port Forward 同 overlay | **DONE** | 独立 dialog / `forwardeditor` 已删；palette 内 list + 三步添加 |
+| **P3** | 滚动条 / 分组 | **DONE** | 细滚动条 + `pal-cat` 分组（共用 tab-switcher 壳，非独立 `pal-sb` 类名） |
 
-New Tab → Local/SSH/Serial、临时 SSH host→password、Serial 二级、Ctrl+P 打 `>` 翻转 —— **已有**。
+New Tab → Local/SSH/Serial、临时 SSH、Serial 二级、`>` 翻转 —— 已有。
 
 ---
 
 ## D. Settings
 
-| # | 漏项 | 设计稿 | 当前实现 |
-|---|------|--------|----------|
-| **S1** | **下拉控件** | 「与 quickpanel **同族**自定义 select，不用系统菜单」 | General / Profile / Serial 仍是 **原生 `<select class="settings-select">`** |
-| **S2** | **Skin 卡片** | 对角 `skin-swatch` 色块预览 | 仅 title + desc，**无 swatch** |
-| **S3** | **按钮宽 / 标题字重** | `--set-btn-width: 148px`、`--set-title-weight` 贯穿标题与实心按钮 | token 有 `--tt-btn-width` / `--tt-title-weight`，多数 `.settings-btn` / 标题 **未吃到**（仍散落 600） |
+| # | 项 | 状态 | 备注 |
+|---|----|------|------|
+| **S1** | 自定义 select（与 QP 同族） | **DONE** | `ui/select.ts` → general / profile / serial |
+| **S2** | Skin 对角 swatch | **DONE** | `.skin-swatch` |
+| **S3** | 按钮 148px + title weight | **DONE** | `--tt-btn-width` / `--tt-title-weight`；subsection 标题偶有硬编码 600 |
 
-Serial 画廊、Theme editor、Keyboard 含 Ctrl+P / Ctrl+Shift+P、Apply 一次写 SSH —— 功能侧基本已有。
+Serial 画廊、Theme editor、Keyboard Ctrl+P / Ctrl+Shift+P、Apply 写 SSH —— 已有。
 
 ---
 
-## E. 汇总
+## E. 汇总（复核后）
 
-| 面 | Blocker（必须改才算一样） | 次要视觉 |
-|----|---------------------------|----------|
-| Quick panel | **Q1–Q5** | Q6–Q7 |
-| Tab / 菜单 | **T1–T2** | T3–T6 |
-| Palette | **P1–P2** | P3 |
-| Settings | **S1–S3** | — |
+| 面 | 开放项 |
+|----|--------|
+| Quick panel | 无 blocker（Q5/Q7 为 OK\*） |
+| Tab / 菜单 | **T4 BUG**；T6 注释 nit |
+| Palette | 无 |
+| Settings | 无 blocker |
 
-### 建议收口顺序
+### 下一步
 
-1. Quick：Q1–Q4  
-2. Tab：T1–T2  
-3. Settings：S1–S3  
-4. Palette：P1–P2（命令清单 + Port Forward 改为同 overlay）
+无 — 本文档已于 2026-08-26 复核关闭。T4 实际修法：删除创建期的
+`colorPreview.style.display = "none"`（`.empty` hatch 类即无色态表达，
+无需隐藏）；`tests/contextmenu.test.ts` 新增 chip 可见性回归断言。

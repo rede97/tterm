@@ -169,7 +169,6 @@ colorItem.appendChild(arrow);
 // Live preview of the tab's current color; hidden while the tab is uncolored.
 const colorPreview = document.createElement("span");
 colorPreview.className = "menu-color-preview";
-colorPreview.style.display = "none";
 colorItem.appendChild(colorPreview);
 colorItemWrap.appendChild(colorItem);
 tabMenuGroup.appendChild(colorItemWrap);

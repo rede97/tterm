@@ -1133,7 +1133,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   align-items: center;
   position: relative;
   /* Equal sizing (Chrome/Windows Terminal style): all tabs share the bar
-     equally, capped at 200px, shrinking together down to 120px under
+     equally, capped at 180px, shrinking together down to 108px under
      pressure, then #tabs scrolls. Truncated names are available via the
      hover tooltip. */
   flex: 1 1 0;

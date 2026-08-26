@@ -103,6 +103,24 @@ describe("context menu — semantics and keyboard model", () => {
     expect(buttons.length).toBeGreaterThan(0);
     for (const b of buttons) expect(b.tagName).toBe("BUTTON");
   });
+  it("color row shows the hatch chip when uncolored, the color when set", () => {
+    vi.mocked(handlers.getTabColor).mockReturnValue(undefined);
+    showTabContextMenu("tab-1", 100, 100);
+    const chip = () => menu().querySelector<HTMLElement>(".menu-color-preview")!;
+    // Always visible — never a hidden slot (T4 regression).
+    expect(chip().style.display).not.toBe("none");
+    expect(chip().classList.contains("empty")).toBe(true);
+    expect(chip().style.background).toBe("");
+
+    vi.mocked(handlers.getTabColor).mockReturnValue("#e06c75");
+    showTabContextMenu("tab-1", 100, 100);
+    expect(chip().classList.contains("empty")).toBe(false);
+    expect(chip().style.background).toBe("#e06c75"); // jsdom keeps the raw value
+    // The matching swatch carries the current marker.
+    expect(menu().querySelector(".color-swatch.current")?.getAttribute("data-color")).toBe(
+      "#e06c75",
+    );
+  });
 
   it("open focuses the first entry; arrows skip hidden entries", () => {
     showTabContextMenu("tab-1", 100, 100);
