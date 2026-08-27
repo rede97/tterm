@@ -107,7 +107,7 @@
 
 | 差异 | 稿 | 实现 | 级别 |
 |------|----|------|------|
-| 面板标题区 | `.settings-header` | **有** | DONE |
+| 面板标题区 | `.settings-header` 随内容滚走 | **有** | DONE |
 | 行容器 | `.row` well `10×12` | `.row` well · `align center` | DONE |
 | 侧栏 | `188` · pad `14px 0` · nav muted/550 | **对齐** | DONE |
 | 内容 / section | `20 24 28` / mb 28 | **对齐** | DONE |

@@ -8,6 +8,12 @@
  * Tab bar follows chrome skin (same surface as Settings sidebar), never
  * terminal color schemes.
  *
+ * Surface languages — do not mix:
+ *   Tab chrome: --tt-tab-bar / idle / active / seam; hover --tt-chrome-hover
+ *   Settings / QP / palette: --tt-page / sidebar / well / hover / selected
+ *   Status: --tt-ok / share / bad. In-chrome destroy: --tt-close-confirm
+ * Window-caption close hover stays OS chrome (--tt-bad in app).
+ *
  * NOTE: the preview alias layer (--set-*, --qp-*, --pal-*) is intentionally
  * NOT inlined here — production CSS uses --tt-* directly. Also NOT ported: the
  * `--term-bg: var(--tt-term-bg)` alias. In the app, --term-bg is written by

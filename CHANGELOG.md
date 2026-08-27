@@ -49,9 +49,18 @@ Changes
   terminal menu gains icons and a Duplicate Tab row
 - **Quick panel status colors split** — CONNECTED is green (#22c55e),
   sharing is teal (#4ec9b0), shown as separate badges
+- **Settings page header is content** — the panel title and description
+  scroll away with the body instead of staying pinned above it
+- **Tab and + right-click menus open under the control** — aligned to the
+  tab / + button, not the pointer. Terminal right-click still opens at
+  the cursor
 
 Fixes
 
+- **SSH host ⋯ menu uses Settings well/hover** — it was painted with tab
+  chrome tokens (`--tt-chrome` / `--tt-tab-active`)
+- **Tab menu Change Tab Color row matches the draft** — no › chevron (the
+  color chip is the cue); item pad 14, min-width 200, 4×2 color grid
 - **Settings chrome metrics vs design** — sidebar padding 14, muted nav
   weight 550, row desc 11.5 / center align, inputs·stepper·footer·modals
   on shared 28h / 12.5px / radius tokens (see parity-gap)

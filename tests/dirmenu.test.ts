@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { invokeMock } = vi.hoisted(() => ({
   invokeMock: vi.fn(() => Promise.resolve(null)),
@@ -6,7 +6,12 @@ const { invokeMock } = vi.hoisted(() => ({
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 
 import { configStore } from "../src/core/store";
-import { launchDirectoryTab, setDirMenuHandlers } from "../src/terminal/dirmenu";
+import {
+  closeDirectoryMenu,
+  launchDirectoryTab,
+  setDirMenuHandlers,
+  showDirectoryMenu,
+} from "../src/terminal/dirmenu";
 import { tabManager } from "../src/terminal/tabmanager";
 
 const PS = { name: "PowerShell", command: "powershell.exe" };
@@ -94,5 +99,32 @@ describe("launchDirectoryTab", () => {
       "tterm",
       "D:\\projects\\tterm\\",
     );
+  });
+});
+
+describe("directory menu — placement", () => {
+  afterEach(() => {
+    closeDirectoryMenu();
+  });
+
+  it("opens under the + button, not at the pointer", () => {
+    const btn = document.createElement("button");
+    document.body.appendChild(btn);
+    vi.spyOn(btn, "getBoundingClientRect").mockReturnValue({
+      x: 80,
+      y: 4,
+      left: 80,
+      top: 4,
+      right: 108,
+      bottom: 32,
+      width: 28,
+      height: 28,
+      toJSON: () => {},
+    });
+    showDirectoryMenu(btn);
+    const menu = document.querySelector<HTMLElement>(".dir-menu");
+    expect(menu).toBeTruthy();
+    expect(menu?.style.left).toBe("80px");
+    expect(menu?.style.top).toBe("32px");
   });
 });

@@ -219,7 +219,7 @@ export class TabManager {
     el.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      import("./contextmenu").then((m) => m.showTabContextMenu(tab.id, e.clientX, e.clientY));
+      import("./contextmenu").then((m) => m.showTabContextMenu(tab.id, el));
     });
 
     tab.tabElement = el;

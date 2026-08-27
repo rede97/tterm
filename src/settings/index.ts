@@ -25,8 +25,8 @@ import {
   saveSshConfigToDisk,
 } from "./ssh";
 
-// Panel header copy (design: docs/settings-preview.html META) — the header
-// above the scroll area follows the active nav item.
+// Panel header copy (design: docs/settings-preview.html META) — in-flow
+// content at the top of the scrollport, follows the active nav item.
 const PANEL_META: Record<string, [string, string]> = {
   general: ["General", "App version, updates, renderer, paste behavior."],
   appearance: ["Appearance", "Chrome skin, fonts, and terminal color schemes."],
@@ -67,7 +67,10 @@ export function createSettingsContent(): HTMLElement {
   const body = document.createElement("div");
   body.className = "settings-main";
 
-  // Panel header (h2 + description, follows the active nav).
+  // One scrollport: header is in-flow content (scrolls away), not pinned.
+  const scroll = document.createElement("div");
+  scroll.className = "settings-scroll";
+
   const header = document.createElement("div");
   header.className = "settings-header";
   const headerTitle = document.createElement("h2");
@@ -80,26 +83,28 @@ export function createSettingsContent(): HTMLElement {
     headerDesc.textContent = desc;
   };
   syncHeader("general");
-  body.appendChild(header);
+  scroll.appendChild(header);
 
   // Create panels
   const panelGeneral = createGeneralPanel();
-  body.appendChild(panelGeneral);
+  scroll.appendChild(panelGeneral);
 
   const panelAppearance = createAppearancePanel();
-  body.appendChild(panelAppearance);
+  scroll.appendChild(panelAppearance);
 
   const panelProfile = createProfilePanel();
-  body.appendChild(panelProfile);
+  scroll.appendChild(panelProfile);
 
   const panelSsh = createSshPanel();
-  body.appendChild(panelSsh);
+  scroll.appendChild(panelSsh);
 
   const panelSerial = createSerialPanel();
-  body.appendChild(panelSerial);
+  scroll.appendChild(panelSerial);
 
   const panelShortcuts = createShortcutsPanel();
-  body.appendChild(panelShortcuts);
+  scroll.appendChild(panelShortcuts);
+
+  body.appendChild(scroll);
 
   // -- Footer --
   // Design (docs/settings-preview.html): the footer carries ONLY the dirty
@@ -191,11 +196,9 @@ export function createSettingsContent(): HTMLElement {
     });
   }
 
-  // Floating overlay scrollbars on every scrollable panel (Q8b): a classic
-  // bar would squeeze the 148px control column when content overflows.
-  for (const panel of body.querySelectorAll<HTMLElement>(".settings-panel-content")) {
-    attachOverlayScrollbar(panel);
-  }
+  // Overlay scrollbar on the shared scrollport (Q8b): a classic bar would
+  // squeeze the 148px control column when content overflows.
+  attachOverlayScrollbar(scroll);
 
   // Sidebar navigation — always set display:block/none (clearing to "" left
   // flex height ambiguous in WebView2 and could clip Profile to empty).
@@ -204,6 +207,8 @@ export function createSettingsContent(): HTMLElement {
     root.querySelectorAll(".settings-panel-content").forEach((p) => {
       (p as HTMLElement).style.display = p.getAttribute("data-panel") === name ? "block" : "none";
     });
+    scroll.scrollTop = 0;
+    scroll.dispatchEvent(new Event("scroll"));
   };
   // General is the landing panel; pin it explicitly so every sibling starts hidden.
   showPanel("general");

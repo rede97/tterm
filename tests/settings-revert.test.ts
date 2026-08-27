@@ -64,6 +64,17 @@ describe("settings — panel visibility", () => {
       );
     }
   });
+
+  it("puts the panel header inside the scrollport (not pinned above it)", () => {
+    const root = createSettingsContent();
+    document.body.appendChild(root);
+    const scroll = root.querySelector(".settings-scroll");
+    const header = root.querySelector(".settings-header");
+    const footer = root.querySelector(".settings-footer");
+    expect(scroll, "scrollport").toBeTruthy();
+    expect(scroll?.contains(header)).toBe(true);
+    expect(scroll?.contains(footer)).toBe(false);
+  });
 });
 
 describe("settings — Revert", () => {

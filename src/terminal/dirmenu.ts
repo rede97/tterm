@@ -7,6 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { createElement, Folder, FolderOpen, Trash2 } from "lucide";
 import { logCatch } from "../core/errorlog";
 import { configStore } from "../core/store";
+import { placeMenuBelow } from "../ui/place-menu";
 
 // ---- Injected handlers (bound by wiring.ts — no tabmanager import here) ----
 
@@ -133,20 +134,7 @@ export function showDirectoryMenu(anchor: HTMLElement): void {
 
   document.body.appendChild(menu);
   menuEl = menu;
-
-  // Anchor under the + button; flip inside the window if needed.
-  const rect = anchor.getBoundingClientRect();
-  menu.style.left = `${rect.left}px`;
-  menu.style.top = `${rect.bottom}px`;
-  requestAnimationFrame(() => {
-    if (menuEl !== menu) return;
-    const mw = menu.offsetWidth;
-    const mh = menu.offsetHeight;
-    if (rect.left + mw > window.innerWidth - 4)
-      menu.style.left = `${Math.max(4, window.innerWidth - mw - 4)}px`;
-    if (rect.bottom + mh > window.innerHeight - 4)
-      menu.style.top = `${Math.max(4, rect.top - mh)}px`;
-  });
+  placeMenuBelow(menu, anchor);
 
   const onDocClick = (e: MouseEvent) => {
     if (!menu.contains(e.target as Node)) closeDirectoryMenu();

@@ -26,6 +26,7 @@ import {
 } from "lucide";
 import { logCatch } from "../core/errorlog";
 import { handleMenuKeydown, menuItems, restoreFocus } from "../ui/menukeys";
+import { placeMenuBelow } from "../ui/place-menu";
 import { openFind } from "./search";
 
 // ---- Injected handlers ----
@@ -88,13 +89,16 @@ function closeContextMenu(restore = true) {
   menuTrigger = null;
 }
 
-function showAt(x: number, y: number) {
-  contextMenu.style.left = `${x}px`;
-  contextMenu.style.top = `${y}px`;
+function openMenu(): void {
   contextMenu.classList.add("open");
   // Keyboard entry point: focus lands on the first usable entry.
   menuItems(contextMenu)[0]?.focus();
+}
 
+function showAtCursor(x: number, y: number): void {
+  contextMenu.style.left = `${x}px`;
+  contextMenu.style.top = `${y}px`;
+  openMenu();
   requestAnimationFrame(() => {
     const rect = contextMenu.getBoundingClientRect();
     const pad = 4;
@@ -105,6 +109,11 @@ function showAt(x: number, y: number) {
     contextMenu.style.left = `${Math.max(pad, left)}px`;
     contextMenu.style.top = `${Math.max(pad, top)}px`;
   });
+}
+
+function showBelow(anchor: HTMLElement): void {
+  openMenu();
+  placeMenuBelow(contextMenu, anchor);
 }
 
 function mkItem(
@@ -161,13 +170,10 @@ colorItem.appendChild(colorIcon);
 const colorLabel = document.createElement("span");
 colorLabel.textContent = "Change Tab Color";
 colorItem.appendChild(colorLabel);
-const arrow = document.createElement("span");
-arrow.className = "menu-arrow";
-arrow.textContent = "\u203a";
-colorItem.appendChild(arrow);
-// Live preview of the tab's current color; hidden while the tab is uncolored.
 const colorPreview = document.createElement("span");
 colorPreview.className = "menu-color-preview";
+colorPreview.title = "Current tab color";
+colorPreview.setAttribute("aria-hidden", "true");
 colorItem.appendChild(colorPreview);
 colorItemWrap.appendChild(colorItem);
 tabMenuGroup.appendChild(colorItemWrap);
@@ -397,7 +403,7 @@ function dispatch(action: string) {
 }
 
 // -- Public API --
-export function showTabContextMenu(tabId: string, x: number, y: number) {
+export function showTabContextMenu(tabId: string, anchor: HTMLElement) {
   currentTabId = tabId;
   menuTrigger = document.activeElement;
   const shared = _handlers?.isTabShared(tabId) ?? false;
@@ -414,7 +420,7 @@ export function showTabContextMenu(tabId: string, x: number, y: number) {
   }
   tabMenuGroup.style.display = "";
   termMenuGroup.style.display = "none";
-  showAt(x, y);
+  showBelow(anchor);
 }
 
 export function showTerminalContextMenu(tabId: string, x: number, y: number) {
@@ -422,7 +428,7 @@ export function showTerminalContextMenu(tabId: string, x: number, y: number) {
   menuTrigger = document.activeElement;
   tabMenuGroup.style.display = "none";
   termMenuGroup.style.display = "";
-  showAt(x, y);
+  showAtCursor(x, y);
 }
 
 export function initContextMenu() {

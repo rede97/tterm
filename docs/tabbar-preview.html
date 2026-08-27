@@ -417,6 +417,12 @@
     white-space: nowrap;
   }
   .profile-item:hover .item-detail { color: var(--tt-chrome-text); }
+  .profile-separator {
+    height: 1px;
+    background: var(--tt-line);
+    margin: 4px 0;
+  }
+  .profile-menu.dir-menu { min-width: 180px; }
 
   /* ---- Tab right-click menu — mirrors contextmenu.ts tab group ---- */
   .tab-context-menu {
@@ -461,14 +467,7 @@
   }
   .tab-context-menu .menu-item:hover .menu-icon { color: var(--tt-chrome-text); }
   .tab-context-menu .menu-icon svg { display: block; }
-  .tab-context-menu .menu-arrow {
-    margin-left: 4px;
-    font-size: var(--tt-fs-md);
-    color: var(--tt-chrome-muted);
-    flex-shrink: 0;
-  }
-  .tab-context-menu .menu-item:hover .menu-arrow { color: var(--tt-chrome-text); }
-  /* Current tab color chip — sits before › on “Change Tab Color” */
+  /* Current tab color chip — right end of “Change Tab Color” */
   .menu-color-preview {
     width: 12px;
     height: 12px;
@@ -817,6 +816,30 @@
       </div>
     </div>
 
+    <!-- + right-click: recent folders (mirrors dirmenu.ts) -->
+    <div class="profile-menu dir-menu" id="dir-menu" role="menu" aria-label="Open folder">
+      <div class="profile-col">
+        <button type="button" class="profile-item" role="menuitem" data-dir="browse">
+          <span class="item-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg></span>
+          <span class="item-label">Browse…</span>
+        </button>
+        <div class="profile-separator"></div>
+        <button type="button" class="profile-item" role="menuitem" data-dir="Desktop">
+          <span class="item-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
+          <span class="item-label">Desktop</span>
+        </button>
+        <button type="button" class="profile-item" role="menuitem" data-dir="tterm">
+          <span class="item-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
+          <span class="item-label">tterm</span>
+        </button>
+        <div class="profile-separator"></div>
+        <button type="button" class="profile-item" role="menuitem" data-dir="clear">
+          <span class="item-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg></span>
+          <span class="item-label">Clear history</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Tab right-click menu -->
     <div class="tab-context-menu" id="tab-context-menu" role="menu" aria-label="Tab actions">
       <button type="button" class="menu-item" role="menuitem" data-ctx="duplicate">
@@ -833,7 +856,6 @@
           <span class="menu-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="17.5" r="2.5"/><path d="M9 11.5 12 8"/><path d="m15.5 15-3-2.5"/></svg></span>
           Change Tab Color
           <span class="menu-color-preview empty" id="menu-color-preview" title="Current tab color" aria-hidden="true"></span>
-          <span class="menu-arrow">›</span>
         </button>
         <div class="color-submenu">
           <div class="color-grid">
@@ -1081,6 +1103,7 @@
           hideProfileMenu();
           hideCtxMenu();
           hideTermMenu();
+          hideDirMenu();
           if (e.shiftKey) {
             closeTabAt(i);
             return;
@@ -1093,6 +1116,7 @@
         hideProfileMenu();
         hideCtxMenu();
         hideTermMenu();
+        hideDirMenu();
         renderTabs();
         const el = tabsEl.querySelector(".tab.active");
         el?.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
@@ -1105,7 +1129,7 @@
         e.preventDefault();
         hideClosePop();
         hideProfileMenu();
-        showCtxMenu(i, e.clientX, e.clientY);
+        showCtxMenu(i);
       });
       tabsEl.insertBefore(t, newGroup);
     }
@@ -1125,6 +1149,7 @@
     hideClosePop();
     hideCtxMenu();
     hideTermMenu();
+    hideDirMenu();
     profileMenu.classList.add("open");
     menuBtn.setAttribute("aria-expanded", "true");
     const appRect = appEl.getBoundingClientRect();
@@ -1159,6 +1184,8 @@
   // ---- Tab context menu ----
   const ctxMenu = document.getElementById("tab-context-menu");
   const termMenu = document.getElementById("term-context-menu");
+  const dirMenu = document.getElementById("dir-menu");
+  const newTabBtn = document.getElementById("new-tab");
   let ctxTabIndex = -1;
 
   function hideCtxMenu() {
@@ -1170,7 +1197,11 @@
     termMenu.classList.remove("open");
   }
 
-  function placeMenu(menu, clientX, clientY) {
+  function hideDirMenu() {
+    dirMenu.classList.remove("open");
+  }
+
+  function placeAtCursor(menu, clientX, clientY) {
     menu.classList.add("open");
     const appRect = appEl.getBoundingClientRect();
     const mw = menu.offsetWidth;
@@ -1183,26 +1214,87 @@
     menu.style.top = `${top}px`;
   }
 
-  function showCtxMenu(index, clientX, clientY) {
+  function placeAtAnchor(menu, anchor) {
+    menu.classList.add("open");
+    const appRect = appEl.getBoundingClientRect();
+    const rect = anchor.getBoundingClientRect();
+    const mw = menu.offsetWidth;
+    const mh = menu.offsetHeight;
+    let left = rect.left - appRect.left;
+    let top = rect.bottom - appRect.top;
+    left = Math.min(Math.max(4, left), appRect.width - mw - 4);
+    if (top + mh > appRect.height - 4) top = Math.max(4, rect.top - appRect.top - mh);
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+  }
+
+  function showCtxMenu(index) {
     ctxTabIndex = index;
     active = index;
     renderTabs();
     syncColorPreview(tabColors[index] || "");
     hideTermMenu();
-    placeMenu(ctxMenu, clientX, clientY);
+    hideDirMenu();
+    const tabEl = tabsEl.querySelectorAll(".tab")[index];
+    if (tabEl) placeAtAnchor(ctxMenu, tabEl);
   }
 
   function showTermMenu(clientX, clientY) {
     hideClosePop();
     hideProfileMenu();
     hideCtxMenu();
-    placeMenu(termMenu, clientX, clientY);
+    hideDirMenu();
+    placeAtCursor(termMenu, clientX, clientY);
   }
 
   term.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     e.stopPropagation();
     showTermMenu(e.clientX, e.clientY);
+  });
+
+  newTabBtn.addEventListener("click", () => {
+    hideClosePop();
+    hideProfileMenu();
+    hideCtxMenu();
+    hideTermMenu();
+    hideDirMenu();
+    tabNames.push("tab");
+    tabColors.push("");
+    nTabs = tabNames.length;
+    active = nTabs - 1;
+    renderTabs();
+    term.textContent = `rede@tterm:~$  # new tab`;
+  });
+  newTabBtn.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dirMenu.classList.contains("open")) {
+      hideDirMenu();
+      return;
+    }
+    hideClosePop();
+    hideProfileMenu();
+    hideCtxMenu();
+    hideTermMenu();
+    placeAtAnchor(dirMenu, newTabBtn);
+  });
+  dirMenu.addEventListener("click", (e) => {
+    const item = e.target.closest("[data-dir]");
+    if (!item) return;
+    const id = item.dataset.dir;
+    hideDirMenu();
+    if (id === "clear") {
+      term.textContent = `rede@tterm:~$  # cleared recent folders (demo)`;
+      return;
+    }
+    const label = id === "browse" ? "folder" : id;
+    tabNames.push(label);
+    tabColors.push("");
+    nTabs = tabNames.length;
+    active = nTabs - 1;
+    renderTabs();
+    term.textContent = `rede@tterm:~$  # opened “${label}”`;
   });
 
   termMenu.addEventListener("click", (e) => {
@@ -1285,6 +1377,7 @@
     hideProfileMenu();
     hideCtxMenu();
     hideTermMenu();
+    hideDirMenu();
   });
   document.addEventListener("mousedown", (e) => {
     if (confirmingTab && !e.target.closest(".tab.confirming")) {
@@ -1292,6 +1385,9 @@
     }
     if (profileMenu.classList.contains("open") && !e.target.closest(".profile-menu") && !e.target.closest("#new-tab-menu-btn")) {
       hideProfileMenu();
+    }
+    if (dirMenu.classList.contains("open") && !e.target.closest("#dir-menu") && !e.target.closest("#new-tab")) {
+      hideDirMenu();
     }
     if (!e.target.closest(".tab-context-menu")) {
       hideCtxMenu();
@@ -1345,6 +1441,7 @@
     hideCtxMenu();
     hideTermMenu();
     hideProfileMenu();
+    hideDirMenu();
     renderTabs();
   });
 
