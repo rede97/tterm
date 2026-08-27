@@ -44,29 +44,36 @@
 | 主题与字体 | 从项目目录开始 |
 | <img src="docs/images/screenshot-themes.png" width="410" alt="TTerm 主题与字体设置" /> | <img src="docs/images/screenshot-browse.png" width="410" alt="选择项目目录或最近使用的目录" /> |
 
+
 ## 为什么是 TTerm
 
-### 轻，而且快
+### 不到10MB：轻，而且快
 
-冷启动不到 1 秒。安装包约 7 MB。空闲内存低于 30 MB。给开发工作用，而不是再做一个功能更多的传统终端。
+冷启动不到 1 秒。安装包仅约 7 MB。
 
-### 三种会话，一套工作流
+### 开箱即用，不仅是工具
 
-本地 Shell、SSH、串口都是一等标签：同一套新建、切换、重连和分享。笔记本休眠或短暂断线后静默恢复，滚动历史还在。
+内嵌主题、等宽字体，SSH无需任何配置，直接进入状态。为Vibe Coding和Agent工作流而生，而不是再做一个功能更多的传统终端工具。
+
+### 纯键盘操控，VS Code兼容
+
+操控兼容 VS Code 习惯（`Ctrl+Shift+P` / `Ctrl+P` / `Ctrl+Tab`），纯键盘日常不必碰鼠标。
+
+### Local、SSH、Serial 全套工作流
+
+本地 Shell、SSH、Serial串口都是一等标签，为每种场景优化的一流体验。
+
+* SSH适配了配置编辑、密钥上传、动态端口转发
+* Serial串口配置动态配置无缝切换，适配了不同的嵌入式场景：Linux/Console交互、AT命令、Log日志
 
 ### 让 AI 看见真实现场
 
-**Share with AI** 把正在运行的会话交给本地 Agent：字符级屏幕（滚动区、颜色、光标、TUI），不是截图或 OCR。授权后 Agent 可以回写按键。服务只听 `127.0.0.1`。协议见[会话分享](docs/ai-session-sharing.md)。
+**Share with AI** 把正在运行的会话交给本地 Agent：字符级屏幕（滚动区、颜色、光标、TUI），不是截图或 OCR。授权后 Agent 可以回写按键，辅助调试效率翻倍。不能安装AI Agent也能解决问题。
 
-Windows 上 Agent TUI 常会藏光标，输入法组合串和候选窗跟着跑偏。TTerm 在输入点附近重建组合显示，中文（以及日文、韩文）可以在隐藏光标的 TUI 里正常打字。
+### 中文输入（IME）优化
+TTerm 在输入点附近重建组合显示，中文（以及日文、韩文）可以在 TUI 里正常稳定打字。
+Windows 下的输入法组合串和TUI天然不适配，跟着抖动跑偏，是多年来中文Windows用户的痛点。
 
-### 开箱即用
-
-内嵌主题和等宽字体，SSH 客户端也在安装包里。读已有的 `~/.ssh/config` 就能连，不用再配一套工具链。
-
-### 纯键盘，命令式
-
-切标签、开会话、改串口和转发，都可以从命令面板打出来。默认快捷键兼容 VS Code 习惯（`Ctrl+Shift+P` / `Ctrl+P` / `Ctrl+Tab`），日常不必碰鼠标。
 
 ## 功能
 
@@ -80,10 +87,14 @@ Windows 上 Agent TUI 常会藏光标，输入法组合串和候选窗跟着跑�
 
 ## 适合谁
 
-并非只面向中文用户。快启动本身就是一块好用的 Windows 终端；把 **Share with AI** 接到正在跑的 SSH 或串口上，运维和嵌入式工程师也能用来辅助远程排障和现场调试。
+### Unix习惯用户
+这款终端不仅是中文用户。Windows一致依赖缺乏一款稳定可靠，深度适配Unix CLI/TUI、SSH工作流的终端，在AI Agent时代尤其明显，也是方向Windows和Unix系统拉开差距的地方。
 
-- 在 Windows 上把 Claude Code、Codex、Pi 等 CLI Agent 当主工具
-- 需要立刻切进本地、SSH、串口任意会话的开发与运维
+### 远程运维、嵌入式工程师
+把 **Share with AI** 接到正在跑的 SSH 或串口上，运维和嵌入式工程师也能用来辅助远程排障和现场调试。无需在远程主机环境上介入AI Agent。
+
+- 以`Claude Code`、`Codex`、`Pi`、`Kimi Code`、`Hermes`为日常主要工具的用户、开发者
+- 离不开SSH运维与远程开发开发工程师
 - 用 AI 看着同一段远程日志或串口输出做诊断的嵌入式工程师
 - 用中文（以及日文、韩文）和 Agent 交流，被 Windows IME / TUI 打断过
 - 习惯 VS Code 快捷键、希望终端也能纯键盘操作
@@ -93,20 +104,6 @@ Windows 上 Agent TUI 常会藏光标，输入法组合串和候选窗跟着跑�
 
 从 [Releases](https://github.com/rede97/tterm/releases/latest) 下载 Windows 安装包（NSIS / MSI）。
 
-## 快捷键
-
-| 操作 | 默认 |
-| --- | --- |
-| 命令面板 | `Ctrl+Shift+P` |
-| 跳转标签 | `Ctrl+P` |
-| 最近标签 | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
-| 新建本地标签 | `Ctrl+T` |
-| 关闭标签 | `Ctrl+W` |
-| 设置 | `Ctrl+,` |
-| 全屏 / Zen | `F11` / `Shift+F11` |
-| 新窗口 | `Ctrl+Shift+N` |
-
-可在设置 → 键盘改绑定。终端内查找：在终端里 **Shift+右键**。
 
 ## 从源码构建
 
