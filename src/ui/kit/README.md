@@ -67,6 +67,7 @@ App: [`index.html`](../../../index.html) loads tokens; [`styles.css`](../../styl
 ## Contract
 
 - **Select:** `.tt-select` / `.tt-select-trigger` / `.tt-select-menu` / `.tt-option` / `.tt-optgroup`
+  (`body.tt-glass` frosts the portaled menu via `--tt-glass-*`)
 - **Toggle:** `.tt-switch` / `.tt-knob`
 - **Buttons:** `.tt-btn` + `.tt-btn-primary|ghost|solid|danger|danger-fill|link`
 - **Settings layout:** `.section` / `.section-title` / `.row` / …

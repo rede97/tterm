@@ -90,12 +90,12 @@ tabManager.setSettingsFactory(async () => {
   return m.createSettingsContent();
 });
 
-/** Apply chrome skin + quick-panel glass to <body>. Skin drives Settings,
+/** Apply chrome skin + frosted overlays to <body>. Skin drives Settings,
  *  menus, quick panel, and the tab bar via --tt-* tokens; terminal schemes
  *  stay independent (see src/ui/tokens.css). */
 function applyChromeSkin(): void {
   document.body.dataset.skin = configStore.get("chromeSkin");
-  document.body.classList.toggle("qp-glass", configStore.get("quickPanelGlass"));
+  document.body.classList.toggle("tt-glass", configStore.get("overlayGlass"));
 }
 
 // Skin defaults to Cursor Mono before config resolves; load() re-applies.
@@ -109,7 +109,7 @@ settingsBtn.addEventListener("click", () => {
 
 // Subscribe to config changes — update all open terminals when relevant keys change
 configStore.subscribe((keys) => {
-  if (keys.includes("chromeSkin") || keys.includes("quickPanelGlass")) {
+  if (keys.includes("chromeSkin") || keys.includes("overlayGlass")) {
     applyChromeSkin();
   }
   if (keys.some((k) => ["fontFamily", "fontSize", "scrollback", "themeName"].includes(k))) {

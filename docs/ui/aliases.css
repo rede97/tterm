@@ -147,11 +147,11 @@ body[data-skin="vscode"] {
   --pal-badge-sel: rgba(255, 255, 255, 0.15);
 }
 
-body.qp-glass {
-  --qp-bg: var(--tt-sidebar);
-  --qp-well: var(--tt-well);
-  --qp-inset: var(--tt-inset);
-  --qp-hover: var(--tt-hover);
-  --qp-line: var(--tt-line);
-  --qp-line-strong: var(--tt-line-strong);
+body.tt-glass {
+  --qp-bg: var(--tt-glass-bg);
+  --qp-well: var(--tt-glass-well);
+  --qp-inset: var(--tt-glass-inset);
+  --qp-hover: var(--tt-glass-hover);
+  --qp-line: var(--tt-glass-line);
+  --qp-line-strong: var(--tt-glass-line-strong);
 }

@@ -3,25 +3,18 @@
  * Production source of truth: src/ui/tokens.css
  * Preview aliases: docs/ui/aliases.css
  *
- * Glass: drafts use --tt-sidebar / --tt-well (page chrome); app QP uses --tt-qp-*.
+ * Glass: drafts use `--tt-glass-*` (body.tt-glass); QP layout sizes stay `--tt-qp-width`.
  */
 
 @import url("/src/ui/tokens.css");
 
-/* Frosted glass for preview page chrome (Settings / QP drafts) */
-body.qp-glass[data-skin="cursor"] {
-  --tt-sidebar: rgba(28, 28, 30, 0.62);
-  --tt-well: rgba(44, 44, 46, 0.45);
-  --tt-inset: rgba(0, 0, 0, 0.35);
-  --tt-hover: rgba(255, 255, 255, 0.07);
-  --tt-line: rgba(255, 255, 255, 0.1);
-  --tt-line-strong: rgba(255, 255, 255, 0.18);
-}
-body.qp-glass[data-skin="vscode"] {
-  --tt-sidebar: rgba(37, 37, 38, 0.72);
-  --tt-well: rgba(45, 45, 48, 0.55);
-  --tt-inset: rgba(30, 30, 30, 0.55);
-  --tt-hover: rgba(255, 255, 255, 0.06);
-  --tt-line: rgba(62, 62, 66, 0.85);
-  --tt-line-strong: rgba(62, 62, 66, 0.95);
+/* Frosted glass for preview page chrome (Settings / QP drafts) —
+   same `--tt-glass-*` values as overlays; do not duplicate rgba. */
+body.tt-glass {
+  --tt-sidebar: var(--tt-glass-bg);
+  --tt-well: var(--tt-glass-well);
+  --tt-inset: var(--tt-glass-inset);
+  --tt-hover: var(--tt-glass-hover);
+  --tt-line: var(--tt-glass-line);
+  --tt-line-strong: var(--tt-glass-line-strong);
 }

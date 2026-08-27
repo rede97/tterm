@@ -5,6 +5,7 @@
  * `docs/ui/aliases.css`. Controls: `src/ui/kit/controls.css`.
  *
  * Skins: body[data-skin="cursor" | "vscode"] (set from config `chromeSkin`).
+ * Frosted overlays: body.tt-glass (config `overlayGlass`).
  * Tab bar follows chrome skin (same surface as Settings sidebar), never
  * terminal color schemes.
  *
@@ -180,20 +181,42 @@ body[data-skin="vscode"] {
   --tt-tab-seam: var(--tt-term-bg);
 }
 
-/* Frosted glass — translucency only; skin colors still apply */
-body.qp-glass[data-skin="cursor"] {
-  --tt-qp-sidebar: rgba(28, 28, 30, 0.62);
-  --tt-qp-well: rgba(44, 44, 46, 0.45);
-  --tt-qp-inset: rgba(0, 0, 0, 0.35);
-  --tt-qp-hover: rgba(255, 255, 255, 0.07);
-  --tt-qp-line: rgba(255, 255, 255, 0.1);
-  --tt-qp-line-strong: rgba(255, 255, 255, 0.18);
+/* Frosted overlays — one token set for menus, dropdowns, and the quick panel.
+   Translucency only; skin colors still apply. Window stays opaque. */
+body.tt-glass {
+  --tt-glass-filter: saturate(180%) blur(28px);
+  --tt-glass-border: rgba(255, 255, 255, 0.22);
+  --tt-glass-shine: 0 0 0 0.5px rgba(255, 255, 255, 0.08) inset;
+  --tt-glass-ctrl: rgba(0, 0, 0, 0.28);
+  --tt-glass-chip: rgba(255, 255, 255, 0.06);
+  --tt-glass-fallback: #1c1c1e;
 }
-body.qp-glass[data-skin="vscode"] {
-  --tt-qp-sidebar: rgba(37, 37, 38, 0.72);
-  --tt-qp-well: rgba(45, 45, 48, 0.55);
-  --tt-qp-inset: rgba(30, 30, 30, 0.55);
-  --tt-qp-hover: rgba(255, 255, 255, 0.06);
-  --tt-qp-line: rgba(62, 62, 66, 0.85);
-  --tt-qp-line-strong: rgba(62, 62, 66, 0.95);
+
+body.tt-glass,
+body.tt-glass[data-skin="cursor"] {
+  --tt-glass-bg: rgba(28, 28, 30, 0.62);
+  --tt-glass-well: rgba(44, 44, 46, 0.45);
+  --tt-glass-inset: rgba(0, 0, 0, 0.35);
+  --tt-glass-hover: rgba(255, 255, 255, 0.07);
+  --tt-glass-line: rgba(255, 255, 255, 0.1);
+  --tt-glass-line-strong: rgba(255, 255, 255, 0.18);
+}
+
+body.tt-glass[data-skin="vscode"] {
+  --tt-glass-bg: rgba(37, 37, 38, 0.72);
+  --tt-glass-well: rgba(45, 45, 48, 0.55);
+  --tt-glass-inset: rgba(30, 30, 30, 0.55);
+  --tt-glass-hover: rgba(255, 255, 255, 0.06);
+  --tt-glass-line: rgba(62, 62, 66, 0.85);
+  --tt-glass-line-strong: rgba(62, 62, 66, 0.95);
+}
+
+/* QP layout sizes stay --tt-qp-width; glass surfaces alias the unified tokens. */
+body.tt-glass {
+  --tt-qp-sidebar: var(--tt-glass-bg);
+  --tt-qp-well: var(--tt-glass-well);
+  --tt-qp-inset: var(--tt-glass-inset);
+  --tt-qp-hover: var(--tt-glass-hover);
+  --tt-qp-line: var(--tt-glass-line);
+  --tt-qp-line-strong: var(--tt-glass-line-strong);
 }

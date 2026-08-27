@@ -385,60 +385,67 @@ body {
   display: block;
 }
 
-/* Apple-like vibrancy (Settings → Appearance → Frosted glass): blur +
-   slight saturate over the terminal only — window stays opaque. */
-body.qp-glass .quick-panel {
-  -webkit-backdrop-filter: saturate(180%) blur(28px);
-  backdrop-filter: saturate(180%) blur(28px);
-  background: var(--tt-qp-sidebar);
-  border-color: rgba(255, 255, 255, 0.22);
-  box-shadow:
-    0 0 0 0.5px rgba(255, 255, 255, 0.08) inset,
-    var(--tt-shadow);
+/* Frosted overlays: tokens in src/ui/tokens.css (`--tt-glass-*`).
+   Menus / dropdowns / quick panel share `overlayGlass` → body.tt-glass. */
+body.tt-glass .quick-panel,
+body.tt-glass .tab-context-menu,
+body.tt-glass .profile-menu,
+body.tt-glass .color-submenu,
+body.tt-glass .host-more-menu {
+  -webkit-backdrop-filter: var(--tt-glass-filter);
+  backdrop-filter: var(--tt-glass-filter);
+  background: var(--tt-glass-bg);
+  border-color: var(--tt-glass-border);
+  box-shadow: var(--tt-glass-shine), var(--tt-shadow);
 }
 
-body.qp-glass .qp-section {
-  background: var(--tt-qp-well);
-  border-color: rgba(255, 255, 255, 0.1);
+body.tt-glass .qp-section {
+  background: var(--tt-glass-well);
+  border-color: var(--tt-glass-line);
 }
 
-body.qp-glass .tt-select-menu {
-  -webkit-backdrop-filter: saturate(160%) blur(20px);
-  backdrop-filter: saturate(160%) blur(20px);
-  background: rgba(22, 22, 24, 0.72);
+/* QP chrome only — Settings triggers/buttons stay opaque `--tt-inset`. */
+body.tt-glass .quick-panel .tt-select-trigger,
+body.tt-glass .quick-panel .tt-btn.tt-btn-solid:not(.qp-connect-btn[data-kind="reconnect"]),
+body.tt-glass .qp-share-url {
+  background: var(--tt-glass-ctrl);
 }
 
-body.qp-glass .tt-select-trigger,
-body.qp-glass .tt-btn.tt-btn-solid:not(.qp-connect-btn[data-kind="reconnect"]),
-body.qp-glass .qp-share-url {
-  background: rgba(0, 0, 0, 0.28);
-}
-
-body.qp-glass .qp-connect-btn[data-kind="reconnect"] {
+body.tt-glass .qp-connect-btn[data-kind="reconnect"] {
   background: var(--tt-accent);
   border-color: var(--tt-accent);
   color: var(--tt-accent-text);
 }
 
-body.qp-glass[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
+body.tt-glass[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   background: var(--tt-selected);
   border-color: var(--tt-accent);
   color: var(--tt-text);
 }
 
-body.qp-glass .qp-connect-btn[data-kind="reconnect"]:hover {
+body.tt-glass .qp-connect-btn[data-kind="reconnect"]:hover {
   filter: brightness(1.08);
 }
 
-body.qp-glass .qp-conn,
-body.qp-glass .qp-sharing {
-  background: rgba(255, 255, 255, 0.06);
+body.tt-glass .qp-conn,
+body.tt-glass .qp-sharing {
+  background: var(--tt-glass-chip);
 }
 
-/* Fallback when backdrop-filter unsupported — stay opaque. */
+body.tt-glass .tab-context-menu button.menu-item:hover,
+body.tt-glass .tab-context-menu button.menu-item:focus-visible,
+body.tt-glass .profile-menu button.profile-item:hover:not(:disabled),
+body.tt-glass .profile-menu button.profile-item:focus-visible {
+  background: var(--tt-glass-hover);
+}
+
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  body.qp-glass .quick-panel {
-    background: #1c1c1e;
+  body.tt-glass .quick-panel,
+  body.tt-glass .tab-context-menu,
+  body.tt-glass .profile-menu,
+  body.tt-glass .color-submenu,
+  body.tt-glass .host-more-menu {
+    background: var(--tt-glass-fallback);
   }
 }
 

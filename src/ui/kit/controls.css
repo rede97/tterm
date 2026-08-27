@@ -113,6 +113,21 @@
   display: block;
 }
 
+/* Same frosted surface as chrome overlays (`--tt-glass-*`, body.tt-glass). */
+body.tt-glass .tt-select-menu {
+  -webkit-backdrop-filter: var(--tt-glass-filter);
+  backdrop-filter: var(--tt-glass-filter);
+  background: var(--tt-glass-bg);
+  border-color: var(--tt-glass-border);
+  box-shadow: var(--tt-glass-shine), var(--tt-shadow);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  body.tt-glass .tt-select-menu {
+    background: var(--tt-glass-fallback);
+  }
+}
+
 .tt-optgroup {
   padding: 6px 8px 3px;
   font-size: var(--tt-fs-caption);
@@ -144,6 +159,12 @@
 .tt-option[aria-selected="true"]:hover {
   background: var(--tt-hover);
   color: var(--tt-text);
+}
+
+body.tt-glass .tt-option:hover,
+body.tt-glass .tt-option.active,
+body.tt-glass .tt-option[aria-selected="true"]:hover {
+  background: var(--tt-glass-hover);
 }
 
 .tt-option[aria-selected="true"] {

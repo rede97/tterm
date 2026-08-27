@@ -529,6 +529,20 @@
   }
   .menu-submenu-wrap:hover .color-submenu,
   .menu-submenu-wrap.open .color-submenu { display: block; }
+
+  body.tt-glass .tab-context-menu,
+  body.tt-glass .profile-menu,
+  body.tt-glass .color-submenu {
+    -webkit-backdrop-filter: var(--tt-glass-filter);
+    backdrop-filter: var(--tt-glass-filter);
+    background: var(--tt-glass-bg);
+    border-color: var(--tt-glass-border);
+    box-shadow: var(--tt-glass-shine), var(--tt-shadow);
+  }
+  body.tt-glass .tab-context-menu .menu-item:hover,
+  body.tt-glass .profile-menu .profile-item:hover {
+    background: var(--tt-glass-hover);
+  }
   .color-grid {
     display: grid;
     grid-template-columns: repeat(4, 20px);
@@ -958,6 +972,11 @@
       <button type="button" aria-pressed="false" data-skin="vscode">VS Code Dark</button>
     </div>
 
+    <div class="picker" id="glass-picker">
+      <button type="button" aria-pressed="false" data-glass="off">Opaque</button>
+      <button type="button" aria-pressed="true" data-glass="on">Frosted overlays</button>
+    </div>
+
     <div class="picker" id="scheme">
       <button type="button" aria-pressed="true" data-bg="#1e1e1e">TTerm Dark</button>
       <button type="button" aria-pressed="false" data-bg="#0c0c0c">Campbell</button>
@@ -972,7 +991,7 @@
     </div>
 
     <ol>
-      <li><strong>v0 Cursor</strong>：栏 / 未选 = Settings 侧栏 <code>--tt-sidebar</code>；选中为 inset 圆角 pill（<code>--tt-selected</code>，同 palette 选中行），不整格填满、无顶标。不跟 <code>--term-bg</code>。</li>
+      <li><strong>v0 Cursor</strong>：栏 / 未选 = Settings 侧栏 <code>--tt-sidebar</code>；选中为 inset 圆角 pill（<code>--tt-selected</code>，同 palette 选中行），不整格填满、无顶标。不跟 <code>--term-bg</code>。Frosted overlays 与 app 共用 <code>--tt-glass-*</code>。</li>
       <li><strong>v0 VS Code</strong>：栏 = 侧栏 <code>#252526</code>；未选 <code>#2d2d2d</code> 成块；选中更深 <code>#1e1e1e</code>（无顶标）；tab 间 1px 缝。</li>
       <li>用户色仍是<strong>左侧 3px 色带 + badge</strong>，两套皮肤相同；选中不盖掉 badge 色。</li>
       <li>终端主题（下排）只影响内容区；切 Solarized 时顶栏仍可读。</li>
@@ -1436,6 +1455,19 @@
     if (btn?.dataset.skin) setSkin(btn.dataset.skin);
   });
   setSkin("cursor");
+
+  const glassPicker = document.getElementById("glass-picker");
+  function setGlass(on) {
+    document.body.classList.toggle("tt-glass", on);
+    glassPicker.querySelectorAll("button").forEach((b) => {
+      b.setAttribute("aria-pressed", (b.dataset.glass === "on") === on ? "true" : "false");
+    });
+  }
+  glassPicker.addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (btn?.dataset.glass) setGlass(btn.dataset.glass === "on");
+  });
+  setGlass(true);
 
   document.getElementById("scheme").addEventListener("click", (e) => {
     const btn = e.target.closest("button");

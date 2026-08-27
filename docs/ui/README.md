@@ -66,7 +66,7 @@ Previews **must** link or import these. Never redefine the lists, CSS, shell mar
 
 - `body[data-skin="cursor"]` — near-black, white CTA, soft radius  
 - `body[data-skin="vscode"]` — blue accent, tighter radius  
-- `body.qp-glass` — frosted translucency for Quick panel only  
+- `body.tt-glass` — frosted translucency for menus, dropdowns, and the quick panel (`--tt-glass-*`) 
 
 ## Production status
 
@@ -74,8 +74,8 @@ Previews **must** link or import these. Never redefine the lists, CSS, shell mar
 aliases stay preview-only. Controls and palette live in `src/ui/kit/`. Select class is
 **`.tt-select`** / **`.tt-switch`** / **`.tt-btn*`** (not `.qp-select` / `.qp-switch` /
 `.set-select`). Skin comes from
-`chromeSkin` → `body[data-skin]`, glass from `quickPanelGlass` →
-`body.qp-glass`. One intentional divergence: `--term-bg` is NOT aliased to
+`chromeSkin` → `body[data-skin]`, glass from `overlayGlass` →
+`body.tt-glass`. One intentional divergence: `--term-bg` is NOT aliased to
 `--tt-term-bg` in production — the app's `applyTerminalBackground()` writes
 `--term-bg` from the terminal scheme (2px seam).
 

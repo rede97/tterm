@@ -213,6 +213,19 @@ describe("ConfigStore — load", () => {
     expect("keybindings" in stripped).toBe(false);
   });
 
+  it("load migrates quickPanelGlass into overlayGlass", async () => {
+    invokeMock.mockImplementation((cmd: string, args?: { name?: string }) => {
+      if (cmd === "read_config_file") {
+        return Promise.resolve(
+          args?.name === "keybindings" ? "{}" : JSON.stringify({ quickPanelGlass: true }),
+        );
+      }
+      return Promise.resolve(null);
+    });
+    await configStore.load();
+    expect(configStore.get("overlayGlass")).toBe(true);
+  });
+
   it("load cancels a pending debounced write (Revert race)", async () => {
     vi.useFakeTimers();
     try {

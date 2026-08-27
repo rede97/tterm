@@ -1697,7 +1697,7 @@
   }
 </style>
 </head>
-<body data-skin="cursor">
+<body data-skin="cursor" class="tt-glass">
 <nav class="draft-nav" aria-label="Design drafts">
   <a class="brand" href="/">Drafts</a>
   <a href="/">Overview</a>
@@ -1770,16 +1770,12 @@
                 <div class="skin-desc">Blue accent, tighter chrome</div>
               </button>
             </div>
-          </div>
-
-          <div class="section">
-            <div class="section-title">Quick panel</div>
             <div class="row">
               <div class="row-info">
-                <div class="row-title">Frosted glass</div>
-                <div class="row-desc">Blur terminal behind the panel only —window stays opaque</div>
+                <div class="row-title">Frosted overlays</div>
+                <div class="row-desc">Blur the terminal behind menus, dropdowns, and the quick panel — the window stays opaque.</div>
               </div>
-              <button type="button" class="tt-switch on" id="glass-toggle" role="switch" aria-checked="true" aria-label="Frosted glass"><span class="tt-knob"></span></button>
+              <button type="button" class="tt-switch on" id="glass-toggle" role="switch" aria-checked="true" aria-label="Frosted overlays"><span class="tt-knob"></span></button>
             </div>
           </div>
 
@@ -2838,6 +2834,7 @@
     const on = t.getAttribute("aria-checked") !== "true";
     t.setAttribute("aria-checked", on ? "true" : "false");
     t.classList.toggle("on", on);
+    document.body.classList.toggle("tt-glass", on);
     appDirty = true;
     syncDirty();
   });

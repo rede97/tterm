@@ -2,6 +2,9 @@
 
 Changes
 
+- **Frosted overlays** — one Settings switch (`overlayGlass`) frosts menus,
+  dropdowns, and the quick panel. Glass colors/blur live in `--tt-glass-*`
+  (legacy `quickPanelGlass` migrates on load)
 - **Cursor tab selection is a rounded pill** — active tab uses the same
   light `--tt-selected` inset highlight as palette rows, not a full-height
   `#2d2d2d` tile. VS Code skin still uses the darker filled tab

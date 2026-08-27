@@ -98,7 +98,7 @@ export function collectAppearanceSettings(root: HTMLElement): Partial<ConfigStat
   partial.themeName = panel
     ? pendingThemeName(panel)
     : root.dataset.themeName || configStore.get("themeName");
-  // chromeSkin / quickPanelGlass are NOT collected: both apply instantly
+  // chromeSkin / overlayGlass are NOT collected: both apply instantly
   // (UX-05), no Apply gate.
   return partial;
 }
@@ -152,18 +152,14 @@ function appearanceTemplate(panel: HTMLElement): TemplateResult {
           ${skinCard("cursor", "Cursor Mono", "Near-black, white CTA, soft radius")}
           ${skinCard("vscode", "VS Code Dark", "Blue accent, tighter chrome")}
         </div>
+        ${itemRow(
+          "Frosted overlays",
+          "Blur the terminal behind menus, dropdowns, and the quick panel — the window stays opaque.",
+          toggle(configStore.get("overlayGlass"), (on) => {
+            configStore.set({ overlayGlass: on });
+          }),
+        )}
       `,
-    )}
-    ${section(
-      "Quick Panel",
-      itemRow(
-        "Frosted glass",
-        "Blur the terminal behind the panel only — the window stays opaque.",
-        toggle(configStore.get("quickPanelGlass"), (on) => {
-          // Frosted glass is instant too — the panel can be compared live.
-          configStore.set({ quickPanelGlass: on });
-        }),
-      ),
     )}
     ${section(
       "Font",

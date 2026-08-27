@@ -28,8 +28,9 @@ export interface ConfigState {
   // Chrome skin for Settings / menus / quick panel / tab bar ("cursor" | "vscode").
   // Terminal color schemes stay independent.
   chromeSkin: string;
-  // Frosted translucency for the quick panel only (window stays opaque).
-  quickPanelGlass: boolean;
+  // Frosted translucency for floating chrome (menus, dropdowns, quick panel).
+  // Window itself stays opaque.
+  overlayGlass: boolean;
   renderer: string;
   terminalBell: boolean;
   pasteWarning: boolean;
@@ -95,7 +96,7 @@ const SCHEMA = {
     default: "cursor",
     validate: (v: unknown): v is string => v === "cursor" || v === "vscode",
   },
-  quickPanelGlass: { default: false, validate: isBoolean },
+  overlayGlass: { default: false, validate: isBoolean },
   renderer: { default: "webgl", validate: isString },
   terminalBell: { default: false, validate: isBoolean },
   pasteWarning: { default: true, validate: isBoolean },
@@ -226,6 +227,12 @@ export class ConfigStore {
       const configWithoutKb = { ...cfg };
       cfg.keybindings = migratedKb ?? kbValid;
 
+      // Frosted glass used to be quick-panel-only (`quickPanelGlass`).
+      if (cfg.overlayGlass === undefined && typeof cfg.quickPanelGlass === "boolean") {
+        cfg.overlayGlass = cfg.quickPanelGlass;
+      }
+      delete cfg.quickPanelGlass;
+
       // Keys ABSENT from the file (old config from before a key existed,
       // or a deleted config) must fall back to defaults, not to whatever
       // stale value memory currently holds. Runtime keys are untouched.
@@ -321,6 +328,7 @@ export class ConfigStore {
         // keybindings never lands in config.json, even if a stale copy
         // survived the migration (hand-edited file).
         delete existing.keybindings;
+        delete existing.quickPanelGlass;
         jobs.push(
           invoke("write_config_file", {
             name: "config",
