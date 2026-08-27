@@ -47,63 +47,59 @@
 
 ## 为什么是 TTerm
 
-### 不到10MB：轻，而且快
+### 不到 10 MB：轻，而且快
 
 冷启动不到 1 秒。安装包仅约 7 MB。
 
 ### 开箱即用，不仅是工具
 
-内嵌主题、等宽字体，SSH无需任何配置，直接进入状态。为Vibe Coding和Agent工作流而生，而不是再做一个功能更多的传统终端工具。
+内嵌主题、等宽字体。内建 SSH 客户端，已有 `~/.ssh/config` 装完就能连，不必再配一套工具链。为 Vibe Coding 和 Agent 工作流而生，而不是再做一个功能更多的传统终端。
 
-### 纯键盘操控，VS Code兼容
+### 纯键盘操控，VS Code 兼容
 
 操控兼容 VS Code 习惯（`Ctrl+Shift+P` / `Ctrl+P` / `Ctrl+Tab`），纯键盘日常不必碰鼠标。
 
 ### Local、SSH、Serial 全套工作流
 
-本地 Shell、SSH、Serial串口都是一等标签，为每种场景优化的一流体验。
+本地 Shell、SSH、Serial 串口都是一等标签，为每种场景做了专门优化。
 
-* SSH适配了配置编辑、密钥上传、动态端口转发
-* Serial串口配置动态配置无缝切换，适配了不同的嵌入式场景：Linux/Console交互、AT命令、Log日志
+* SSH：配置编辑、密钥上传、本地 / 远程 / 动态端口转发
+* Serial：运行中改波特率；Profile 按场景切换输入和换行（Linux/Console、AT 命令、Log）
 
 ### 让 AI 看见真实现场
 
-**Share with AI** 把正在运行的会话交给本地 Agent：字符级屏幕（滚动区、颜色、光标、TUI），不是截图或 OCR。授权后 Agent 可以回写按键，辅助调试效率翻倍。不能安装AI Agent也能解决问题。
+**Share with AI** 把正在运行的会话交给本机 Agent：字符级屏幕（滚动区、颜色、光标、TUI），不是截图或 OCR。授权后 Agent 可以回写按键。Agent 跑在本机，远程主机和设备不用装任何东西。服务只听 `127.0.0.1`。协议见[会话分享](docs/ai-session-sharing.md)。
 
 ### 中文输入（IME）优化
-TTerm 在输入点附近重建组合显示，中文（以及日文、韩文）可以在 TUI 里正常稳定打字。
-Windows 下的输入法组合串和TUI天然不适配，跟着抖动跑偏，是多年来中文Windows用户的痛点。
 
+TTerm 在输入点附近重建组合显示，中文（以及日文、韩文）可以在隐藏光标的 TUI 里稳定打字。Windows 下输入法组合串和 TUI 天然不适配，跟着抖动跑偏，是多年来中文 Windows 用户的痛点。
 
 ## 功能
 
 - **本地** — 读取 Windows Terminal Profile；从指定目录开 Shell；资源管理器 **Open in TTerm**
-- **SSH** — 内建客户端；读取 `~/.ssh/config`；密码和口令在标签里输入；主机指纹对话框；本地 / 远程 / SOCKS5 转发
-- **串口** — 自动发现设备（USB VID/PID）；运行中改波特率；直发 / 回显 / 整行；流控与 RTS/CTS/DTR/DSR；Profile 保存输入与换行
-- **主题与字体** — 内嵌配色和等宽字体，装完就能用
-- **命令面板** — `Ctrl+Shift+P`；`Ctrl+P` 跳转标签；操作可全键盘完成
+- **SSH** — 密码和口令在标签里输入；主机指纹对话框
+- **串口** — 自动发现设备（USB VID/PID）；直发 / 回显 / 整行；流控与 RTS/CTS/DTR/DSR
 - **会话恢复** — 休眠或短暂传输中断后重连，保留历史
 - **低占用** — Tauri + xterm.js；终端字节走本机 WebSocket，不经过 IPC
 
 ## 适合谁
 
-### Unix习惯用户
-这款终端不仅是中文用户。Windows一致依赖缺乏一款稳定可靠，深度适配Unix CLI/TUI、SSH工作流的终端，在AI Agent时代尤其明显，也是方向Windows和Unix系统拉开差距的地方。
+### Unix 习惯用户
+
+不仅面向中文用户。Windows 一直缺少一款稳定可靠、深度适配 Unix CLI/TUI 和 SSH 工作流的终端；在 AI Agent 时代尤其明显，也是 Windows 相对 macOS、Linux 等 Unix 系统拉开差距的地方。
 
 ### 远程运维、嵌入式工程师
-把 **Share with AI** 接到正在跑的 SSH 或串口上，运维和嵌入式工程师也能用来辅助远程排障和现场调试。无需在远程主机环境上介入AI Agent。
 
-- 以`Claude Code`、`Codex`、`Pi`、`Kimi Code`、`Hermes`为日常主要工具的用户、开发者
-- 离不开SSH运维与远程开发开发工程师
-- 用 AI 看着同一段远程日志或串口输出做诊断的嵌入式工程师
-- 用中文（以及日文、韩文）和 Agent 交流，被 Windows IME / TUI 打断过
+把 **Share with AI** 接到正在跑的 SSH 或串口上，辅助远程排障和现场调试。无需在远程主机上安装 AI Agent。
+
+- 以 `Claude Code`、`Codex`、`Pi`、`Kimi Code`、`Hermes` 为日常主工具的开发者
 - 习惯 VS Code 快捷键、希望终端也能纯键盘操作
+- 用中文（以及日文、韩文）和 Agent 交流，被 Windows IME / TUI 打断过
 - 在意启动速度、内存和数据不出本机
 
 ## 下载
 
 从 [Releases](https://github.com/rede97/tterm/releases/latest) 下载 Windows 安装包（NSIS / MSI）。
-
 
 ## 从源码构建
 

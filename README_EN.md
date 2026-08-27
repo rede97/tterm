@@ -46,67 +46,59 @@
 
 ## Why TTerm
 
-### Light, and fast
+### Under 10 MB: light, and fast
 
-Cold start under 1 second. Installer around 7 MB. Idle memory under 30 MB. Built for development work on Windows—not another traditional terminal with a longer feature list.
+Cold start under 1 second. Installer only about 7 MB.
 
-### Three session kinds, one workflow
+### Ready out of the box, not merely a tool
 
-Local shells, SSH, and serial are first-class tabs: same create, switch, reconnect, and share paths. Sleep or a short drop reconnects silently and keeps scrollback.
+Bundled themes and monospace fonts. Built-in SSH client: existing `~/.ssh/config` hosts connect after install, with no extra toolchain. Built for vibe coding and agent workflows—not another traditional terminal with a longer feature list.
+
+### Keyboard-first, VS Code-compatible
+
+Defaults follow VS Code habits (`Ctrl+Shift+P` / `Ctrl+P` / `Ctrl+Tab`). Daily work does not need the mouse.
+
+### Local, SSH, and serial as one workflow
+
+Local shells, SSH, and serial are first-class tabs, each tuned for its scene.
+
+* SSH: config editing, public-key upload, local / remote / dynamic port forwarding
+* Serial: live baud changes; profiles switch input and newlines per scene (Linux/Console, AT commands, Log)
 
 ### Let AI see the live session
 
-**Share with AI** hands a running session to a local agent as character-level screen state (scroll regions, color, cursor, TUIs)—not a screenshot or OCR. With permission, the agent can type back. The share server listens only on `127.0.0.1`. Protocol: [session sharing](docs/ai-session-sharing.md).
+**Share with AI** hands a running session to a local agent as character-level screen state (scroll regions, color, cursor, TUIs)—not a screenshot or OCR. With permission, the agent can type back. The agent runs on your machine; the remote host and device need nothing installed. The share server listens only on `127.0.0.1`. Protocol: [session sharing](docs/ai-session-sharing.md).
 
-Agent TUIs often hide the cursor; Windows IMEs then lose the composition string and candidate window. TTerm rebuilds composition next to the input cell so Chinese (and Japanese / Korean) typing stays usable inside hidden-cursor TUIs.
+### Chinese input (IME)
 
-### Ready out of the box
-
-Bundled themes and monospace fonts, plus a built-in SSH client. Existing `~/.ssh/config` hosts connect immediately—no extra toolchain to install.
-
-### Keyboard-first, command-style
-
-Switch tabs, open sessions, and change serial or forwarding settings from the command palette. Defaults follow VS Code habits (`Ctrl+Shift+P` / `Ctrl+P` / `Ctrl+Tab`). You can work without the mouse.
+TTerm rebuilds composition next to the input cell so Chinese (and Japanese / Korean) typing stays stable inside hidden-cursor TUIs. Windows IMEs and TUIs do not fit together natively; composition text jumping around has been a long-standing pain for Chinese Windows users.
 
 ## Features
 
 - **Local** — Windows Terminal profiles; shells from a chosen directory; Explorer **Open in TTerm**
-- **SSH** — built-in client; reads `~/.ssh/config`; passwords and passphrases typed in the tab; host-key dialog; local / remote / SOCKS5 forwarding
-- **Serial** — auto-discovery (USB VID/PID); live baud changes; direct / echo / line input; flow control and RTS/CTS/DTR/DSR; profiles for input and newlines
-- **Themes and fonts** — bundled palettes and monospace fonts, ready after install
-- **Command palette** — `Ctrl+Shift+P`; `Ctrl+P` jumps to a tab; the rest is keyboard-operable
+- **SSH** — passwords and passphrases typed in the tab; host-key dialog
+- **Serial** — auto-discovery (USB VID/PID); direct / echo / line input; flow control and RTS/CTS/DTR/DSR
 - **Session recovery** — silent reattach after sleep or a short transport drop
 - **Low overhead** — Tauri + xterm.js; terminal bytes stay on a local WebSocket, not IPC
 
 ## Who it is for
 
-Not only for Chinese users. Fast launch is already a better daily Windows terminal; **Share with AI** on a live SSH or serial session is a tool for ops and embedded engineers doing remote and device debug.
+### People with Unix habits
 
-- CLI agents (Claude Code, Codex, Pi, …) as the main tool on Windows
-- Developers and operators who need to jump into any local, SSH, or serial session
-- Embedded engineers who want AI watching the same serial stream or remote logs
-- Anyone who talks to agents in Chinese (or Japanese / Korean) and has hit Windows IME / TUI bugs
+Not only for Chinese users. Windows has long lacked a solid terminal that is deeply adapted to Unix CLI/TUI and SSH workflows. That gap is sharper in the AI agent era, and it is one place Windows still trails macOS, Linux, and other Unix systems.
+
+### Ops and embedded engineers
+
+**Share with AI** on a live SSH or serial session helps remote debug and on-device diagnosis. No AI agent needs to be installed on the remote host.
+
+- Developers who live in `Claude Code`, `Codex`, `Pi`, `Kimi Code`, or `Hermes`
 - VS Code keyboard habits, and a terminal that does not need the mouse
+- Anyone who talks to agents in Chinese (or Japanese / Korean) and has hit Windows IME / TUI bugs
 - Anyone who cares about startup time, memory, and keeping data on-box
 
 ## Download
 
 Get the Windows installer (NSIS / MSI) from [Releases](https://github.com/rede97/tterm/releases/latest).
-
-## Shortcuts
-
-| Action | Default |
-| --- | --- |
-| Command palette | `Ctrl+Shift+P` |
-| Go to tab | `Ctrl+P` |
-| Recent tabs | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
-| New local tab | `Ctrl+T` |
-| Close tab | `Ctrl+W` |
-| Settings | `Ctrl+,` |
-| Full screen / Zen | `F11` / `Shift+F11` |
-| New window | `Ctrl+Shift+N` |
-
-Rebind in Settings → Keyboard. Terminal find: **Shift+right-click** in the terminal.
 
 ## Build from source
 
