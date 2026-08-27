@@ -5,7 +5,8 @@
  * `docs/ui/aliases.css`. Controls: `src/ui/kit/controls.css`.
  *
  * Skins: body[data-skin="cursor" | "vscode"] (set from config `chromeSkin`).
- * Fixed chrome (tab bar) never follows terminal theme colors.
+ * Tab bar follows chrome skin (same surface as Settings sidebar), never
+ * terminal color schemes.
  *
  * NOTE: the preview alias layer (--set-*, --qp-*, --pal-*) is intentionally
  * NOT inlined here — production CSS uses --tt-* directly. Also NOT ported: the
@@ -43,6 +44,7 @@ body[data-skin="cursor"] {
   --tt-ok: #22c55e;
   --tt-share: #4ec9b0;
   --tt-bad: #ef4444;
+  --tt-close-confirm: #c45454;
   --tt-warn: #e8a33d;
   --tt-bolt: #3794ff;
   /* Port-forward direction chips (Settings / QP) */
@@ -97,13 +99,17 @@ body[data-skin="cursor"] {
   --tt-scroll-thumb: rgba(255, 255, 255, 0.14);
   --tt-scroll-thumb-hover: rgba(255, 255, 255, 0.28);
 
-  /* ---- Fixed window chrome (never themes with terminal) ---- */
+  /* ---- Window chrome (tab bar follows Settings sidebar; not terminal) ---- */
   --tt-term-bg: #1e1e1e;
   --tt-chrome: #252526;
-  --tt-chrome-hover: #2a2a2a;
-  --tt-tab-active: #2d2d2d;
+  --tt-chrome-hover: #1c1c1c;
   --tt-chrome-text: #cccccc;
   --tt-chrome-muted: #888888;
+  --tt-tab-bar: var(--tt-sidebar);
+  --tt-tab-idle: var(--tt-sidebar);
+  --tt-tab-active: #2d2d2d;
+  --tt-tab-active-mark: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --tt-tab-seam: transparent;
 
   /* ---- Feature sizes (quick panel) ---- */
   --tt-qp-width: 328px;
@@ -156,11 +162,15 @@ body[data-skin="vscode"] {
   --tt-scroll-thumb: #424242;
   --tt-scroll-thumb-hover: #555555;
 
-  /* chrome stays fixed dark even on vscode skin */
+  /* Tab bar follows Settings sidebar; selected is darker (no top mark). */
   --tt-term-bg: #1e1e1e;
   --tt-chrome: #252526;
-  --tt-chrome-hover: #2a2a2a;
-  --tt-tab-active: #2d2d2d;
+  --tt-chrome-hover: #323232;
+  --tt-tab-bar: var(--tt-sidebar);
+  --tt-tab-idle: #2d2d2d;
+  --tt-tab-active: #1e1e1e;
+  --tt-tab-active-mark: none;
+  --tt-tab-seam: var(--tt-term-bg);
 }
 
 /* Frosted glass — translucency only; skin colors still apply */

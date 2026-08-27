@@ -367,6 +367,9 @@
   filter: none;
 }
 
+/* Filled destructive CTA (Close window, Delete confirm). Fill matches the
+   tab-close X (`--tt-close-confirm`); hover is brightness only. Outline
+   danger (`.tt-btn-danger`) stays `--tt-bad` for status-red. */
 .tt-btn-danger-fill {
   width: var(--tt-btn-width);
   min-width: var(--tt-btn-width);
@@ -379,7 +382,7 @@
   justify-content: center;
   border: none;
   border-radius: var(--tt-radius-ctrl);
-  background: var(--tt-bad);
+  background: var(--tt-close-confirm);
   color: #fff;
   font-family: var(--tt-ui);
   font-size: var(--tt-fs-ctrl);

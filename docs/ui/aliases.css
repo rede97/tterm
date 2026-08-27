@@ -13,11 +13,13 @@ body {
   --mono: var(--tt-mono);
   --term-bg: var(--tt-term-bg);
   --chrome: var(--tt-chrome);
-  --tab-bar-bg: var(--tt-chrome);
+  --tab-bar-bg: var(--tt-tab-bar);
   --tab-active: var(--tt-tab-active);
-  --tab-idle: var(--tt-chrome);
+  --tab-idle: var(--tt-tab-idle);
   --tab-hover: var(--tt-chrome-hover);
-  --tab-border: var(--tt-term-bg);
+  --tab-active-mark: var(--tt-tab-active-mark);
+  --tab-seam: var(--tt-tab-seam);
+  --tab-border: var(--tt-line);
   --chrome-text: var(--tt-chrome-text);
   --chrome-muted: var(--tt-chrome-muted);
   --ok: var(--tt-ok);

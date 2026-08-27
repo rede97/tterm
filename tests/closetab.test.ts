@@ -23,29 +23,29 @@ function makeTab(label = "pi"): { parent: HTMLElement; tab: HTMLElement } {
   return { parent: strip, tab };
 }
 
-const inline = () => document.querySelector<HTMLElement>(".tab-close-confirm-inline");
+const confirmBtn = () => document.querySelector<HTMLButtonElement>(".tab-close-confirm-btn");
 
 beforeEach(() => {
   document.body.innerHTML = "";
   dismissTabCloseConfirm();
 });
 
-describe("tab close confirmation (in-place)", () => {
-  it("shows Confirm: + Close on the tab and the button fires onConfirm", () => {
+describe("tab close confirmation (expanding X)", () => {
+  it("shows an X over the × and the button fires onConfirm", () => {
     const { tab } = makeTab();
     const onConfirm = vi.fn();
     showTabCloseConfirm(tab, "pi", onConfirm);
 
     expect(tab.classList.contains("confirming")).toBe(true);
-    const el = inline();
-    expect(el).toBeTruthy();
-    expect(el!.textContent).toContain("Confirm:");
-    expect(el!.querySelectorAll("button")).toHaveLength(1);
-    expect(el!.querySelector("button")!.textContent).toBe("Close");
+    const btn = confirmBtn();
+    expect(btn).toBeTruthy();
+    expect(btn!.textContent).toBe("");
+    expect(btn!.querySelector("svg")).toBeTruthy();
+    expect(btn!.getAttribute("aria-label")).toBe("Close pi?");
 
-    el!.querySelector("button")!.click();
+    btn!.click();
     expect(onConfirm).toHaveBeenCalledTimes(1);
-    expect(inline()).toBeNull();
+    expect(confirmBtn()).toBeNull();
     expect(tab.classList.contains("confirming")).toBe(false);
   });
 
@@ -55,7 +55,7 @@ describe("tab close confirmation (in-place)", () => {
     showTabCloseConfirm(tab, "pi", onConfirm);
 
     document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
-    expect(inline()).toBeNull();
+    expect(confirmBtn()).toBeNull();
     expect(tab.classList.contains("confirming")).toBe(false);
     expect(onConfirm).not.toHaveBeenCalled();
   });
@@ -66,7 +66,7 @@ describe("tab close confirmation (in-place)", () => {
     const e = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
     document.dispatchEvent(e);
     expect(e.defaultPrevented).toBe(true);
-    expect(inline()).toBeNull();
+    expect(confirmBtn()).toBeNull();
   });
 
   it("disappears when its tab is removed by another close path", () => {
@@ -74,7 +74,7 @@ describe("tab close confirmation (in-place)", () => {
     showTabCloseConfirm(tab, "pi", vi.fn());
     tab.remove();
     dismissTabCloseConfirm();
-    expect(inline()).toBeNull();
+    expect(confirmBtn()).toBeNull();
   });
 
   it("opening for a second tab replaces the first confirm", () => {
@@ -88,7 +88,7 @@ describe("tab close confirmation (in-place)", () => {
     parent.appendChild(other);
     showTabCloseConfirm(tab, "pi", vi.fn());
     showTabCloseConfirm(other, "nginx", vi.fn());
-    expect(document.querySelectorAll(".tab-close-confirm-inline")).toHaveLength(1);
+    expect(document.querySelectorAll(".tab-close-confirm-btn")).toHaveLength(1);
     expect(tab.classList.contains("confirming")).toBe(false);
     expect(other.classList.contains("confirming")).toBe(true);
   });

@@ -204,8 +204,8 @@ export class TabManager {
     closeBtn.title = "Close tab (Shift-click skips confirmation)";
     closeBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      // Design: × replaces the tab chrome with Confirm: + Close; Shift+×
-      // closes at once. Off via Settings → confirmCloseTab. Other paths
+      // Design: × expands into a confirm X; Shift+× closes at once.
+      // Off via Settings → confirmCloseTab. Other paths
       // (Ctrl+W, context menu, session exit) never confirm.
       if (e.shiftKey || !configStore.get("confirmCloseTab")) {
         void this.closeTab(tab.id);

@@ -1,12 +1,14 @@
-// Tab close confirmation — floating "Close" button over the × (does not
-// replace tab chrome or change tab width). Confirm-only (no Cancel);
-// dismissed by clicking anywhere else or Escape. Shift+× and Settings →
+// Tab close confirmation — the × expands into a red X (no "Close" label,
+// tab chrome and width stay). Confirm-only (no Cancel); dismissed by
+// clicking anywhere else or Escape. Shift+× and Settings →
 // confirmCloseTab=off skip this for session tabs (handled at the call site).
 // Settings with unsaved changes also uses this when clicking its ×.
 //
 // Deliberately NOT ui/confirm.ts: that is a centered modal with Cancel and
 // backdrop. Only the × button routes here — Ctrl+W, context-menu Close,
 // and session-exited auto-close go straight to TabManager.closeTab.
+
+import { createElement, X } from "lucide";
 
 // Only one tab can be confirming at a time; opening for another replaces it.
 let active: { dismiss: () => void } | null = null;
@@ -28,7 +30,7 @@ export function showTabCloseConfirm(
   const float = document.createElement("button");
   float.type = "button";
   float.className = "tab-close-confirm-btn";
-  float.textContent = "Close";
+  float.appendChild(createElement(X, { stroke: "currentColor", width: 14, height: 14 }));
   float.setAttribute("role", "alertdialog");
   float.setAttribute("aria-label", `Close ${label}?`);
 

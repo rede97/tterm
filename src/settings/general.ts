@@ -209,7 +209,7 @@ function generalTemplate(panel: HTMLElement, st: GeneralPanelState) {
       html`
         ${itemRow(
           "Confirm before closing tab",
-          "When clicking × on a tab, show a Close button over the ×. Off = close immediately. Shift+× always skips.",
+          "When clicking × on a tab, expand a confirm X over it. Off = close immediately. Shift+× always skips.",
           toggle(st.confirmCloseTab, (v) => (st.confirmCloseTab = v), {
             id: "set-confirm-close-tab",
           }),

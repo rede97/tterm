@@ -37,7 +37,7 @@ body {
 #tab-bar {
   display: flex;
   align-items: center;
-  background: var(--tt-chrome);
+  background: var(--tt-tab-bar);
   height: 32px;
   overflow: hidden;
   flex-shrink: 0;
@@ -74,8 +74,8 @@ body {
 #tabs.overflowing #new-tab-group {
   position: sticky;
   right: 0;
-  background: var(--tt-chrome);
-  border-left: 1px solid var(--tt-term-bg);
+  background: var(--tt-tab-bar);
+  border-left: 1px solid var(--tt-tab-seam);
 }
 
 #new-tab {
@@ -146,7 +146,7 @@ body {
 .profile-menu {
   position: fixed;
   z-index: 100;
-  background: var(--tt-chrome);
+  background: var(--tt-tab-bar);
   border: 1px solid var(--tt-line);
   border-radius: 6px;
   box-shadow: var(--tt-shadow);
@@ -190,10 +190,10 @@ body {
   cursor: pointer;
 }
 
-/* Menu hovers use the neutral tab gray, never the theme accent (design:
-   menus belong to the fixed tab chrome, not the skin). */
-.profile-item:hover {
-  background: var(--tt-tab-active);
+/* Hover follows chrome skin (same slot as idle-tab hover), never the theme accent.
+   Must beat `.profile-menu button.profile-item { background: transparent }`. */
+.profile-menu button.profile-item:hover:not(:disabled) {
+  background: var(--tt-chrome-hover);
   color: var(--tt-text);
 }
 
@@ -245,7 +245,7 @@ body {
   opacity: 0.5;
 }
 
-.profile-item:disabled:hover {
+.profile-menu button.profile-item:disabled:hover {
   background: transparent;
   color: var(--tt-chrome-text);
 }
@@ -908,7 +908,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 }
 
 #tabs::-webkit-scrollbar-track {
-  background: var(--tt-chrome);
+  background: var(--tt-tab-bar);
 }
 
 #tabs::-webkit-scrollbar-thumb {
@@ -933,8 +933,8 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   max-width: 180px;
   height: 100%;
   padding: 0 0 0 12px;
-  background: var(--tt-chrome);
-  border-right: 1px solid var(--tt-term-bg);
+  background: var(--tt-tab-idle);
+  border-right: 1px solid var(--tt-tab-seam);
   cursor: pointer;
   user-select: none;
   font-family: var(--tt-mono);
@@ -960,11 +960,11 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   background: var(--tt-warn);
 }
 
-/* Active = one step LIGHTER than the bar plus a faint top highlight
-   (design: no side shadow, no --term-bg bleed). */
+/* Active: Cursor = one step lighter + faint top mark; VS Code = darker,
+   no top mark (docs/tabbar-preview.html). Never --term-bg bleed. */
 .tab.active {
   background: var(--tt-tab-active);
-  box-shadow: inset 0 1px 0 var(--tt-line-strong);
+  box-shadow: var(--tt-tab-active-mark);
 }
 
 .tab:hover:not(.active) {
@@ -987,7 +987,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   z-index: 20;
   pointer-events: none;
   opacity: 0;
-  background: linear-gradient(to right, var(--tt-chrome), transparent);
+  background: linear-gradient(to right, var(--tt-tab-bar), transparent);
 }
 
 #new-tab-group::before {
@@ -999,7 +999,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   width: 16px;
   pointer-events: none;
   opacity: 0;
-  background: linear-gradient(to left, var(--tt-chrome), transparent);
+  background: linear-gradient(to left, var(--tt-tab-bar), transparent);
 }
 
 /* "+N" overflow count: tabs fully beyond the right edge, left of the
@@ -1238,8 +1238,8 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   color: var(--tt-text);
 }
 
-/* Close-tab confirmation: floating Close over the × — title stays, width
-   unchanged (overlay layer only). */
+/* Close-tab confirmation: × blooms into a desaturated red X. Title stays;
+   tab width unchanged (overlay layer only). */
 .tab.confirming > .tab-close {
   opacity: 0;
   pointer-events: none;
@@ -1247,26 +1247,63 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 
 .tab-close-confirm-btn {
   position: absolute;
-  right: 2px;
-  top: 50%;
-  transform: translateY(-50%);
+  right: 0;
+  top: 0;
   z-index: 5;
-  height: 22px;
-  padding: 0 10px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 100%;
+  padding: 0;
   border: none;
-  border-radius: var(--tt-radius-ctrl);
-  background: var(--tt-bad);
+  background: transparent;
   color: #fff;
-  font-family: var(--tt-ui);
-  font-size: var(--tt-fs-label);
-  font-weight: var(--tt-title-weight);
-  line-height: 1;
   cursor: pointer;
-  box-shadow: var(--tt-shadow);
 }
 
-.tab-close-confirm-btn:hover {
+.tab-close-confirm-btn::before {
+  content: "";
+  position: absolute;
+  inset: 5px 3px;
+  border-radius: 5px;
+  background: var(--tt-close-confirm);
+  transform: scale(1);
+  opacity: 1;
+  animation: tab-close-confirm-expand 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tab-close-confirm-btn svg {
+  position: relative;
+  z-index: 1;
+}
+
+.tab-close-confirm-btn:hover::before {
   filter: brightness(1.1);
+}
+
+.tab-close-confirm-btn:focus-visible {
+  outline: none;
+}
+
+.tab-close-confirm-btn:focus-visible::before {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+@keyframes tab-close-confirm-expand {
+  from {
+    transform: scale(0.38);
+    opacity: 0.4;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-close-confirm-btn::before {
+    animation: none;
+  }
 }
 
 #terminal-container {
@@ -1551,7 +1588,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 .tab-context-menu {
   position: fixed;
   z-index: 200;
-  background: var(--tt-chrome);
+  background: var(--tt-tab-bar);
   border: 1px solid var(--tt-line);
   border-radius: 6px;
   box-shadow: var(--tt-shadow);
@@ -1585,8 +1622,8 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 .profile-menu button.profile-item:focus-visible,
 .tab-context-menu button.menu-item:focus-visible,
 .tab-context-menu button.color-clear:focus-visible {
-  /* Same neutral slot as hover — menus belong to the fixed tab chrome. */
-  background: var(--tt-tab-active);
+  /* Same chrome-hover slot as pointer hover. */
+  background: var(--tt-chrome-hover);
   color: var(--tt-text);
   outline: none;
 }
@@ -1637,8 +1674,8 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   color: var(--tt-text);
 }
 
-.tab-context-menu .menu-item:hover {
-  background: var(--tt-tab-active);
+.tab-context-menu button.menu-item:hover {
+  background: var(--tt-chrome-hover);
   color: var(--tt-text);
 }
 
@@ -1670,7 +1707,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   position: absolute;
   left: 100%;
   top: 0;
-  background: var(--tt-chrome);
+  background: var(--tt-tab-bar);
   border: 1px solid var(--tt-line);
   border-radius: 6px;
   box-shadow: var(--tt-shadow);
@@ -1688,7 +1725,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   position: absolute;
   left: 100%;
   top: 0;
-  background: var(--tt-chrome);
+  background: var(--tt-tab-bar);
   border: 1px solid var(--tt-line);
   border-radius: 6px;
   box-shadow: var(--tt-shadow);
@@ -1706,6 +1743,11 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   font-size: var(--tt-fs-label);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+
+.baud-submenu .baud-option:hover {
+  background: var(--tt-chrome-hover);
+  color: var(--tt-text);
 }
 
 .color-grid {
@@ -1732,7 +1774,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 .color-swatch.current {
   border-color: var(--tt-text);
   box-shadow:
-    0 0 0 2px var(--tt-chrome),
+    0 0 0 2px var(--tt-tab-bar),
     0 0 0 3px var(--tt-text);
 }
 
@@ -1766,8 +1808,8 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   text-align: center;
 }
 
-.color-clear:hover {
-  background: var(--tt-tab-active);
+.tab-context-menu button.color-clear:hover {
+  background: var(--tt-chrome-hover);
   color: var(--tt-text);
 }
 

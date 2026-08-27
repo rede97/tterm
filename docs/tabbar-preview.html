@@ -191,10 +191,14 @@
     transform: translateY(0.5px);
   }
   .icon-btn:hover {
-    background: #333333;
+    background: var(--tab-hover);
     color: var(--tt-text);
   }
   .overflow-chip + .icon-btn { width: 28px; }
+
+  /* ---- Tab chrome skins (app tokens in src/ui/tokens.css) ----
+     Bar / idle follow Settings sidebar. Cursor: selected lighter + top mark.
+     VS Code: idle tiles, selected darker, no top mark. Hover = --tt-chrome-hover. */
 
   .tab {
     display: flex;
@@ -207,19 +211,18 @@
     height: 100%;
     padding: 0 0 0 10px;
     background: var(--tab-idle);
-    border-right: none;
+    border-right: 1px solid var(--tab-seam);
     color: var(--chrome-text);
     cursor: pointer;
   }
   .tab:hover:not(.active) {
     background: var(--tab-hover);
   }
-  /* Selected = one step lighter; no side shadows (they read as a dark “ring”). */
   .tab.active {
     z-index: 3;
     background: var(--tab-active);
     color: var(--tt-text);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    box-shadow: var(--tab-active-mark);
   }
 
   .tab-badge {
@@ -238,7 +241,6 @@
     background: rgba(255,255,255,0.07);
     border-radius: 3px;
   }
-  .tab.active .tab-badge { color: var(--tt-muted); }
 
   .tab-label {
     flex: 1;
@@ -282,52 +284,48 @@
   .tab.active .tab-close { opacity: 0.7; }
   .tab-close:hover { opacity: 1; color: var(--tt-text); }
 
-  /* Close confirm — in-tab Confirm: + Close (no floating pop) */
-  .tab.confirming > .tab-badge,
-  .tab.confirming > .tab-label,
+  /* Close confirm — × expands into a desaturated red X (title stays). */
   .tab.confirming > .tab-close {
-    display: none;
-  }
-  .tab.confirming.shared::after { display: none; }
-  .tab-close-confirm-inline {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex: 1;
-    min-width: 0;
-    height: 100%;
-    padding-right: 6px;
-    font: var(--tt-fs-label) / 1 var(--tt-ui);
-    font-weight: var(--tt-ui-weight);
-    color: var(--chrome-text);
-  }
-  .tab-close-confirm-text {
-    flex-shrink: 0;
-    color: var(--chrome-muted);
+    opacity: 0;
+    pointer-events: none;
   }
   .tab-close-confirm-btn {
-    flex-shrink: 0;
-    margin-left: auto;
-    height: 22px;
-    padding: 0 10px;
+    position: absolute;
+    right: 0;
+    top: 0;
+    z-index: 5;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 100%;
+    padding: 0;
     border: 0;
-    border-radius: 5px;
-    background: #e81123;
+    background: transparent;
     color: #fff;
-    font: inherit;
-    font-size: var(--tt-fs-label);
-    font-weight: var(--tt-title-weight);
     cursor: pointer;
   }
-  .tab-close-confirm-btn:hover { filter: brightness(1.08); }
+  .tab-close-confirm-btn::before {
+    content: "";
+    position: absolute;
+    inset: 5px 3px;
+    border-radius: 5px;
+    background: var(--tt-close-confirm);
+    animation: tab-close-confirm-expand 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .tab-close-confirm-btn svg { position: relative; z-index: 1; }
+  .tab-close-confirm-btn:hover::before { filter: brightness(1.1); }
+  @keyframes tab-close-confirm-expand {
+    from { transform: scale(0.38); opacity: 0.4; }
+    to { transform: scale(1); opacity: 1; }
+  }
 
   /* ---- Profile dropdown (new-tab ▾) — mirrors profilemenu.ts ---- */
   .profile-menu {
     position: absolute;
     z-index: 210;
     display: none;
-    background: #252526;
-    border: 1px solid #3e3e42;
+    background: var(--tt-tab-bar);
+    border: 1px solid var(--tt-line);
     border-radius: 6px;
     box-shadow: var(--tt-shadow);
     max-height: min(360px, calc(100% - 40px));
@@ -345,7 +343,7 @@
     overflow-x: hidden;
     padding: 4px 0;
   }
-  .profile-col + .profile-col { border-left: 1px solid #3e3e42; }
+  .profile-col + .profile-col { border-left: 1px solid var(--tt-line); }
   .profile-section-title {
     padding: 6px 12px 4px;
     font: inherit;
@@ -368,7 +366,7 @@
     cursor: pointer;
   }
   .profile-item:hover {
-    background: var(--tab-active);
+    background: var(--tab-hover);
     color: var(--tt-text);
   }
   .profile-item .item-icon {
@@ -427,8 +425,8 @@
     display: none;
     min-width: 200px;
     padding: 4px 0;
-    background: #252526;
-    border: 1px solid #3e3e42;
+    background: var(--tt-tab-bar);
+    border: 1px solid var(--tt-line);
     border-radius: 6px;
     box-shadow: var(--tt-shadow);
   }
@@ -449,7 +447,7 @@
     white-space: nowrap;
   }
   .tab-context-menu .menu-item:hover {
-    background: var(--tab-active);
+    background: var(--tab-hover);
     color: var(--tt-text);
   }
   .tab-context-menu .menu-icon {
@@ -498,7 +496,7 @@
   }
   .tab-context-menu .menu-separator {
     height: 1px;
-    background: #3e3e42;
+    background: var(--tt-line);
     margin: 4px 0;
   }
   .menu-submenu-wrap { position: relative; }
@@ -509,8 +507,8 @@
     top: -4px;
     margin-left: 2px;
     padding: 8px;
-    background: #252526;
-    border: 1px solid #3e3e42;
+    background: var(--tt-tab-bar);
+    border: 1px solid var(--tt-line);
     border-radius: 6px;
     box-shadow: var(--tt-shadow);
   }
@@ -544,7 +542,7 @@
     text-align: left;
     cursor: pointer;
   }
-  .color-clear:hover { background: var(--tab-active); color: var(--tt-text); }
+  .color-clear:hover { background: var(--tab-hover); color: var(--tt-text); }
 
   /* Safe drag zone — plain belt; min 70px for window dragging. */
   #drag-spacer {
@@ -574,7 +572,7 @@
     width: 1px;
     height: 14px;
     align-self: center;
-    background: #3e3e42;
+    background: var(--tt-line);
     margin: 0 4px;
     flex-shrink: 0;
   }
@@ -595,7 +593,7 @@
   }
   #quick-status { color: var(--tt-bolt); }
   #quick-status:hover {
-    background: #333333;
+    background: var(--tab-hover);
     color: var(--tt-bolt);
   }
   #btn-park-tray:hover {
@@ -683,8 +681,9 @@
   }
   .picker button[aria-pressed="true"] {
     color: var(--tt-accent-text);
-    background: #f2f2f2;
-    border-color: #f2f2f2;
+    background: var(--tt-accent-fill);
+    border-color: var(--tt-accent-fill);
+    font-weight: var(--tt-title-weight);
   }
   .hint {
     margin-top: 8px;
@@ -697,7 +696,7 @@
   }
 </style>
 </head>
-<body>
+<body data-skin="cursor">
 <nav class="draft-nav" aria-label="Design drafts">
   <a class="brand" href="/">Drafts</a>
   <a href="/">Overview</a>
@@ -758,7 +757,7 @@
     <div class="term" id="term">rede@tterm:~$  # active tab content
 # Scroll the tab strip with the mouse wheel over the tabs.
 # Edge fades + +N show that more tabs exist off-screen.
-# Click × → Confirm: + Close in the tab; Shift+× closes immediately.</div>
+# Click × → the × expands into a red X; Shift+× closes immediately.</div>
 
     <!-- Profiles dropdown (▾) -->
     <div class="profile-menu" id="profile-menu" role="menu" aria-label="New tab profiles">
@@ -913,8 +912,13 @@
   </div>
 
   <aside class="notes">
-    <h1>Tab bar — scroll draft</h1>
-    <p>保留 quickpanel 稿不动。这里只画顶栏：均分压缩 → 滚动。滚轮在标签条上可横滚；点标签会滚入视野。</p>
+    <h1>Tab bar — 两套皮肤 · v0</h1>
+    <p>骨架不动（均分压缩、滚动、+N、色带、关 tab）。皮肤只换栏 / 未选 / 选中 / 顶标。终端配色仍只刷内容区。</p>
+
+    <div class="picker" id="skin-picker">
+      <button type="button" aria-pressed="true" data-skin="cursor">Cursor Mono</button>
+      <button type="button" aria-pressed="false" data-skin="vscode">VS Code Dark</button>
+    </div>
 
     <div class="picker" id="scheme">
       <button type="button" aria-pressed="true" data-bg="#1e1e1e">TTerm Dark</button>
@@ -930,20 +934,18 @@
     </div>
 
     <ol>
-      <li><strong>Settings</strong> 保留最左。</li>
-      <li><strong>固定深色 chrome</strong>：栏 / 未选都是 <code>#252526</code>，不跟终端白/蓝走。</li>
-      <li><strong>选中更浅</strong>：<code>#2d2d2d</code> + 顶边微高光，不用侧影 / <code>--term-bg</code>。</li>
-      <li>终端主题只影响内容区；切 Solarized/浅色终端时顶栏仍稳定可读。</li>
-      <li>滚动：渐隐 + <code>+N</code>（右侧还剩几）；无滚动条 / scrubber。</li>
-      <li>Settings 无竖线；闪电与后台托盘之间有分割线；中间 <code>drag</code> 区 ≥70px 可拖窗。</li>
-      <li><strong>关 tab</strong>：点 × → 正下方矮确认条；点空白取消；<code>Shift+×</code> 直接关。</li>
-      <li><strong>▾ Profiles</strong>：三列 Local / SSH / Serial 下拉（对齐 <code>profilemenu.ts</code>）。</li>
-      <li><strong>右键 tab</strong>：首项 Duplicate（New 走右侧 + / ▾）；颜色行带当前色预览。</li>
-      <li><strong>右键终端</strong>：与 tab 菜单同字体/图标行；末项 Duplicate Tab（非 New）。</li>
+      <li><strong>v0 Cursor</strong>：栏 / 未选 = Settings 侧栏 <code>--tt-sidebar</code>（<code>#141414</code>）；选中更浅 <code>#2d2d2d</code> + 1px 白顶标。不跟 <code>--term-bg</code>。</li>
+      <li><strong>v0 VS Code</strong>：栏 = 侧栏 <code>#252526</code>；未选 <code>#2d2d2d</code> 成块；选中更深 <code>#1e1e1e</code>（无顶标）；tab 间 1px 缝。</li>
+      <li>用户色仍是<strong>左侧 3px 色带 + badge</strong>，两套皮肤相同；选中不盖掉 badge 色。</li>
+      <li>终端主题（下排）只影响内容区；切 Solarized 时顶栏仍可读。</li>
+      <li><strong>Settings</strong> 保留最左。滚动：渐隐 + <code>+N</code>；无滚动条。</li>
+      <li>闪电与托盘之间有分割线；中间 <code>drag</code> ≥70px。</li>
+      <li><strong>关 tab</strong>：× 展开为低饱和红 X（无 Close 字）；点空白 / Esc 取消；<code>Shift+×</code> 直接关。</li>
+      <li><strong>▾ / 右键</strong>：三列 Profiles；Duplicate 为首；色带预览。</li>
     </ol>
 
     <div class="hint">
-      <code>+N</code> = 仍在可视区右侧之外的 tab 数。拖拽区与栏同色连成一条皮带，只在功能键之间用浅分割线。关标签默认两步确认，避免误关会话。
+      颜色来自 <code>src/ui/tokens.css</code>（<code>--tt-tab-*</code>）。切皮肤即换栏 / 菜单；终端配色仍只刷内容区。
     </div>
   </aside>
 </div>
@@ -974,7 +976,7 @@
   function hideClosePop() {
     if (confirmingTab) {
       confirmingTab.classList.remove("confirming");
-      confirmingTab.querySelector(".tab-close-confirm-inline")?.remove();
+      confirmingTab.querySelector(".tab-close-confirm-btn")?.remove();
       confirmingTab = null;
     }
     pendingClose = -1;
@@ -985,17 +987,18 @@
     pendingClose = index;
     confirmingTab = tabEl;
     tabEl.classList.add("confirming");
-    const inline = document.createElement("div");
-    inline.className = "tab-close-confirm-inline";
-    inline.innerHTML =
-      `<span class="tab-close-confirm-text">Confirm:</span>` +
-      `<button type="button" class="tab-close-confirm-btn" data-confirm>Close</button>`;
-    inline.addEventListener("click", (e) => e.stopPropagation());
-    inline.querySelector("[data-confirm]").addEventListener("click", (e) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "tab-close-confirm-btn";
+    btn.setAttribute("aria-label", "Close tab?");
+    btn.dataset.confirm = "";
+    btn.innerHTML =
+      `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
+    btn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (pendingClose >= 0) closeTabAt(pendingClose);
     });
-    tabEl.appendChild(inline);
+    tabEl.appendChild(btn);
   }
 
   function syncColorPreview(color) {
@@ -1308,6 +1311,19 @@
   }, { passive: false });
 
   window.addEventListener("resize", syncOverflow);
+
+  const skinPicker = document.getElementById("skin-picker");
+  function setSkin(name) {
+    document.body.dataset.skin = name;
+    skinPicker.querySelectorAll("button").forEach((b) => {
+      b.setAttribute("aria-pressed", b.dataset.skin === name ? "true" : "false");
+    });
+  }
+  skinPicker.addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (btn?.dataset.skin) setSkin(btn.dataset.skin);
+  });
+  setSkin("cursor");
 
   document.getElementById("scheme").addEventListener("click", (e) => {
     const btn = e.target.closest("button");

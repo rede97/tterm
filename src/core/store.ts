@@ -25,8 +25,8 @@ export interface ConfigState {
   fontSize: number;
   scrollback: number;
   themeName: string;
-  // Chrome skin for Settings / menus / quick panel ("cursor" | "vscode").
-  // Tab bar stays fixed dark regardless; terminal schemes are independent.
+  // Chrome skin for Settings / menus / quick panel / tab bar ("cursor" | "vscode").
+  // Terminal color schemes stay independent.
   chromeSkin: string;
   // Frosted translucency for the quick panel only (window stays opaque).
   quickPanelGlass: boolean;
@@ -36,7 +36,7 @@ export interface ConfigState {
   pasteTrim: boolean;
   // Ask before closing the window while any tab is open (confirm-preview).
   confirmCloseWindow: boolean;
-  // Ask (in-tab Confirm: + Close) before closing a tab via ×.
+  // Ask (expanding X over the ×) before closing a tab via ×.
   confirmCloseTab: boolean;
   serialBaud: number;
   // Default serial profile name (built-in or custom). The rest of the

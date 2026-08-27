@@ -26,7 +26,7 @@
     grid-template-columns: minmax(520px, 1fr) 300px;
   }
 
-  /* ---- mock window (fixed dark tab bar) ---- */
+  /* ---- mock window (tab bar follows chrome skin) ---- */
   .app {
     position: relative;
     margin: 20px 20px 28px 32px;
@@ -1845,7 +1845,7 @@
         <div class="settings-panel tt-scroll active" data-panel="appearance" id="panel-appearance">
           <div class="section">
             <div class="section-title">Chrome skin</div>
-            <p class="section-note">Drives Settings / menus / quickpanel. Tab bar stays fixed dark. Terminal schemes stay independent.</p>
+            <p class="section-note">Drives Settings, menus, quick panel, and the tab bar. Terminal schemes stay independent.</p>
             <div class="skin-grid" id="skin-cards">
               <button type="button" class="skin-card" data-pick="cursor" aria-pressed="true">
                 <div class="skin-swatch" aria-hidden="true"></div>
@@ -2218,7 +2218,7 @@
             <div class="row">
               <div class="row-info">
                 <div class="row-title">Confirm before closing tab</div>
-                <div class="row-desc">When clicking × on a tab, show a Close button over the ×. Off = close immediately. Shift+× always skips.</div>
+                <div class="row-desc">When clicking × on a tab, expand a confirm X over it. Off = close immediately. Shift+× always skips.</div>
               </div>
               <button type="button" class="tt-switch on" role="switch" aria-checked="true" data-dirty aria-label="Confirm before closing tab"><span class="tt-knob"></span></button>
             </div>
@@ -2657,7 +2657,7 @@
 
   <aside class="notes">
     <h1>Settings — design draft</h1>
-    <p>Same tier as quickpanel / tabbar drafts. Chrome tokens only; tab bar stays fixed dark; terminal schemes independent.</p>
+    <p>Same tier as quickpanel / tabbar drafts. Chrome tokens drive Settings, menus, quick panel, and the tab bar; terminal schemes stay independent.</p>
 
     <div class="picker" id="skin-picker">
       <button type="button" aria-pressed="true" data-skin="cursor">Cursor Mono</button>

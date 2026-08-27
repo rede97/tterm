@@ -43,7 +43,7 @@
     display: flex;
     align-items: center;
     height: 32px;
-    background: var(--tt-chrome);
+    background: var(--tt-tab-bar);
     border-bottom: 1px solid #1a1a1a;
     user-select: none;
     flex-shrink: 0;
@@ -272,7 +272,7 @@ rede@tterm:~$ █</div>
     </div>
 
     <ol>
-      <li><strong>共用壳</strong>：420 宽、well 底、token 圆角；Cursor 白 CTA / VS Code 蓝 CTA；危险主按钮用 <code>--tt-bad</code>。</li>
+      <li><strong>共用壳</strong>：420 宽、well 底、token 圆角；Cursor 白 CTA / VS Code 蓝 CTA；关窗等危险主按钮用 <code>--tt-close-confirm</code>（与关 tab X 同色）。</li>
       <li><strong>多行粘贴</strong>：标题旁 <code>N lines</code>；正文为可编辑等宽 <code>textarea</code>（更高可视区）；无 Security 脚注。受 <code>pasteWarning</code> 控制。</li>
       <li><strong>关窗</strong>：仅当存在活动 tab 时弹出；主按钮「Close window」为危险色。受新开关 <code>confirmCloseWindow</code>（默认 on）控制。</li>
       <li><strong>焦点</strong>：打开时焦点进主按钮；Esc / 点遮罩 / Cancel = 否；不关窗、不粘贴。</li>

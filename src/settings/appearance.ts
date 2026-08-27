@@ -145,8 +145,8 @@ function appearanceTemplate(panel: HTMLElement): TemplateResult {
       "Chrome Skin",
       html`
         <div class="row-desc" style="margin-bottom:6px">
-          Drives Settings / menus / quick panel. The tab bar stays fixed dark;
-          terminal color schemes stay independent.
+          Drives Settings, menus, quick panel, and the tab bar.
+          Terminal color schemes stay independent.
         </div>
         <div class="skin-grid" role="radiogroup" aria-label="Chrome skin">
           ${skinCard("cursor", "Cursor Mono", "Near-black, white CTA, soft radius")}

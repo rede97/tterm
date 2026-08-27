@@ -19,10 +19,11 @@ Changes
   (renamed from `.qp-select`); docs previews link the same tokens/controls.
   Modal close clears portaled select menus
 - **UI redesign: chrome tokens and skins** — Settings, menus, the quick
-  panel, and the command palette are now driven by one token sheet
+  panel, the tab bar, and tab menus are driven by one token sheet
   (`--tt-*`). New Appearance → Chrome Skin picker (Cursor Mono default /
-  VS Code Dark) and a Frosted-glass quick panel option. The tab bar stays
-  fixed dark; terminal color schemes are unaffected
+  VS Code Dark) and a Frosted-glass quick panel option. Tab bar follows
+  the Settings sidebar per skin (Cursor: lighter selected; VS Code:
+  darker selected). Terminal color schemes are unaffected
 - **Command palette (Ctrl+Shift+P)** — draft-aligned copy/order/groups
   (Window → Tab → View → Share → SSH → Serial → Terminal); New Tab…
   (Ctrl+T, Local / SSH / Serial → target; Temporary Connect… last under
@@ -30,9 +31,11 @@ Changes
   Auto-reconnect; Go to Tab… (Ctrl+P) flips into commands with `>`; Esc
   steps back. Show Palette / MRU / default-profile New Tab stay in
   Keyboard settings only. Metrics match `docs/command-palette-preview.html`
-- **Closing a tab via × asks first** — a small strip under the tab
-  (outside click / Esc cancels; Shift+× closes immediately). Ctrl+W and
-  the context menus still close directly
+- **Closing a tab via × asks first** — the × expands into a desaturated
+  red X (no "Close" label; Esc / click away cancels; Shift+× closes
+  immediately). Ctrl+W and the context menus still close directly.
+  Close-window confirm uses the same `--tt-close-confirm` fill; the
+  window-caption close hover stays Windows red
 - **Tab strip overflow shows a fade and a +N count** of hidden tabs
   instead of shadows; the active tab is now lighter than the bar with a
   top highlight (was darker)

@@ -42,7 +42,7 @@ Previews **must** link or import these. Never redefine the lists, CSS, shell mar
 2. **Never redefine** `.tt-select` / `.tt-btn*` / `.tt-switch` / `.stepper` / `.pal-*` in preview `<style>` — link the kit.
 3. Settings layout in drafts uses the same `.section` / `.row` vocabulary as the app.
 4. New preview CSS should use `--tt-*` directly when practical; legacy `--set-*` / `--qp-*` / `--pal-*` remain as aliases.
-5. Tab bar chrome (`--tt-chrome`) is **fixed dark** — it does not follow terminal schemes.
+5. Tab bar chrome (`--tt-tab-bar`) follows the chrome skin (same surface as Settings sidebar) — it does not follow terminal schemes.
 6. **CONNECTED** = `--tt-ok` (`#22c55e`); **Share** = `--tt-share` (`#4ec9b0`). Do not merge these.
 7. Load order in every preview `<head>`:
 
