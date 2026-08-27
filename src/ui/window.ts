@@ -4,6 +4,8 @@ import { Copy, createElement, Drama, Minus, Square, X } from "lucide";
 import { DOM_ID } from "../core/dom-ids";
 import { logCatch, swallow } from "../core/errorlog";
 import { mustGetById } from "./dom";
+import { restoreTerminalFocus } from "./termfocus";
+import { attachWindowDrag } from "./windowdrag";
 
 const appWindow = getCurrentWindow();
 
@@ -26,27 +28,11 @@ async function updateMaximizeIcon() {
 // -- drag ----
 
 function initDrag() {
-  const tabBar = mustGetById(DOM_ID.tabBar);
-  tabBar.addEventListener("mousedown", (e) => {
-    const target = e.target as HTMLElement;
-    if (target.tagName === "BUTTON" || target.closest("button")) return;
-    // Tabs are handled by SortableJS (drag reorder), not window drag
-    if (target.closest(".tab")) return;
-
-    const startX = e.clientX;
-    const startY = e.clientY;
-
-    const cleanup = () => {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", cleanup);
-    };
-    const onMove = (e: MouseEvent) => {
-      if (Math.abs(e.clientX - startX) < 5 && Math.abs(e.clientY - startY) < 5) return;
-      cleanup();
-      invoke("window_start_drag");
-    };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", cleanup);
+  attachWindowDrag(mustGetById(DOM_ID.tabBar), {
+    startDrag: () => {
+      invoke("window_start_drag").catch(swallow);
+    },
+    keepFocus: restoreTerminalFocus,
   });
 }
 
@@ -181,9 +167,10 @@ export async function toggleFullscreenMode(): Promise<void> {
 
 // -- init ----
 
-// onResized's unlisten is retained so re-initialization (dev HMR) doesn't
-// stack duplicate listeners.
+// onResized / onFocusChanged unlistens are retained so re-initialization
+// (dev HMR) doesn't stack duplicate listeners.
 let unlistenResized: (() => void) | null = null;
+let unlistenFocusChanged: (() => void) | null = null;
 
 export function initWindowControls() {
   initDrag();
@@ -192,6 +179,17 @@ export function initWindowControls() {
   updateMaximizeIcon();
 
   unlistenResized?.();
+  unlistenFocusChanged?.();
+  // Window re-selected (Alt-Tab back, click the title bar): if a terminal
+  // tab is showing, typing must go to xterm without an extra click.
+  appWindow
+    .onFocusChanged(({ payload: focused }) => {
+      if (focused) restoreTerminalFocus();
+    })
+    .then((fn) => {
+      unlistenFocusChanged = fn;
+    })
+    .catch(swallow);
   appWindow
     .onResized(() => {
       updateMaximizeIcon();

@@ -11,6 +11,9 @@ import { confirmPaste } from "../ui/confirm";
 
 interface PasteTarget {
   paste(text: string): void;
+  // xterm Terminal.focus — after the confirm overlay, typing must land
+  // back in the session without a click (multi-line paste warning).
+  focus?(): void;
 }
 
 export function pasteIntoTerminal(target: PasteTarget, raw: string): void {
@@ -31,5 +34,7 @@ export function pasteIntoTerminal(target: PasteTarget, raw: string): void {
   const lines = body.split("\n").length;
   confirmPaste({ lines, text }).then((edited) => {
     if (edited !== null) target.paste(edited);
+    // Confirm or cancel: the overlay stole focus from xterm's textarea.
+    target.focus?.();
   });
 }

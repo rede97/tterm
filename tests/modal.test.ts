@@ -1,13 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "../src/ui/lit";
-import { createModal } from "../src/ui/modal";
+import { createModal, resetModalsForTests } from "../src/ui/modal";
 import { ttSelect } from "../src/ui/select";
+import { resetTerminalFocusForTests, setTerminalFocusRestore } from "../src/ui/termfocus";
 
 function escapeKey() {
   document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
 }
 
+function nextFrame(): Promise<void> {
+  return new Promise((r) => requestAnimationFrame(() => r()));
+}
+
 beforeEach(() => {
+  resetTerminalFocusForTests();
+  resetModalsForTests();
   document.body.innerHTML = "";
 });
 
@@ -78,5 +85,22 @@ describe("createModal", () => {
     expect(m.overlay.isConnected).toBe(false);
     expect(document.querySelector("body > .tt-select-menu.open")).toBeNull();
     expect(document.querySelector("body > .tt-select-menu")).toBeNull();
+  });
+
+  it("restores terminal focus only after the last modal closes", async () => {
+    const restore = vi.fn();
+    setTerminalFocusRestore(restore);
+
+    const first = createModal({ className: "m-one" });
+    const second = createModal({ className: "m-two", singleton: false });
+    document.body.append(first.overlay, second.overlay);
+
+    second.close();
+    await nextFrame();
+    expect(restore).not.toHaveBeenCalled();
+
+    first.close();
+    await nextFrame();
+    expect(restore).toHaveBeenCalledTimes(1);
   });
 });

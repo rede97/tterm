@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { confirmDialog } from "../src/ui/confirm";
+import { resetModalsForTests } from "../src/ui/modal";
 
 function dialog(): HTMLElement {
   return document.querySelector(".cf-overlay .cf-dialog")!;
 }
 
 beforeEach(() => {
+  resetModalsForTests();
   document.body.innerHTML = "";
 });
 

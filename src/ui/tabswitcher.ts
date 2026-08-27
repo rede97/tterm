@@ -14,6 +14,7 @@ import { parseCombo, resolveKeybindings } from "../core/keymap";
 import { configStore } from "../core/store";
 import { el } from "./dom";
 import { createPaletteShell } from "./kit/shell";
+import { restoreTerminalFocus } from "./termfocus";
 
 export interface SwitcherItem {
   id: string;
@@ -184,6 +185,7 @@ function close(): void {
   window.removeEventListener("keyup", onMruKeyup, true);
   window.removeEventListener("keydown", onMruKeydown, true);
   window.removeEventListener("blur", onWindowBlur);
+  restoreTerminalFocus();
 }
 
 function commit(id: string): void {

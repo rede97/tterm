@@ -11,6 +11,7 @@
 // on <body> while open, so removing the overlay alone would orphan them.
 
 import { closeAllSelects } from "./select";
+import { restoreTerminalFocus } from "./termfocus";
 
 export interface ModalHandle {
   overlay: HTMLElement;
@@ -56,6 +57,10 @@ export function createModal(options: ModalOptions): ModalHandle {
       onClose?.();
       document.removeEventListener("keydown", onKeydown, true);
       overlay.remove();
+      // Last modal gone: typing belongs on the active terminal again
+      // (paste confirm, close-window cancel, host-key, …). Nested
+      // Settings editors leave another modal on the stack and skip this.
+      if (modalStack.length === 0) restoreTerminalFocus();
     },
   };
 
@@ -66,4 +71,13 @@ export function createModal(options: ModalOptions): ModalHandle {
     if (e.target === overlay) handle.close();
   });
   return handle;
+}
+
+export function hasOpenModal(): boolean {
+  return modalStack.length > 0;
+}
+
+/** Tests: drop leftover overlays/listeners so files don't leak stack state. */
+export function resetModalsForTests(): void {
+  for (const h of [...modalStack]) h.close();
 }

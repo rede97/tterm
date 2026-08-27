@@ -4,12 +4,17 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(() => Promise.resolve(nul
 
 import { configStore } from "../src/core/store";
 import { pasteIntoTerminal } from "../src/terminal/paste";
+import { resetModalsForTests } from "../src/ui/modal";
 
 function target() {
   return {
     pasted: [] as string[],
+    focused: 0,
     paste(text: string) {
       this.pasted.push(text);
+    },
+    focus() {
+      this.focused++;
     },
   };
 }
@@ -22,6 +27,7 @@ async function flushMicrotasks(): Promise<void> {
 
 describe("pasteIntoTerminal (pasteTrim / pasteWarning)", () => {
   beforeEach(() => {
+    resetModalsForTests();
     document.body.innerHTML = "";
     configStore.set({ pasteWarning: true, pasteTrim: true });
   });
@@ -44,7 +50,9 @@ describe("pasteIntoTerminal (pasteTrim / pasteWarning)", () => {
     overlay!.querySelector<HTMLButtonElement>(".cf-footer .tt-btn:last-child")!.click();
     await flushMicrotasks();
     expect(t.pasted).toEqual(["echo a\necho b"]);
+    expect(t.focused).toBe(1);
   });
+
   it("the preview is an editable textarea; edits are what gets pasted", async () => {
     const t = target();
     pasteIntoTerminal(t, "echo a\necho b\n");
@@ -57,6 +65,7 @@ describe("pasteIntoTerminal (pasteTrim / pasteWarning)", () => {
     document.querySelector<HTMLButtonElement>(".cf-overlay .cf-footer .tt-btn:last-child")!.click();
     await flushMicrotasks();
     expect(t.pasted).toEqual(["echo edited\nrm -rf /tmp/x"]);
+    expect(t.focused).toBe(1);
   });
 
   it("multi-line paste warns; cancelling pastes nothing", async () => {
@@ -65,6 +74,7 @@ describe("pasteIntoTerminal (pasteTrim / pasteWarning)", () => {
     document.querySelector<HTMLButtonElement>(".cf-cancel")!.click();
     await flushMicrotasks();
     expect(t.pasted).toEqual([]);
+    expect(t.focused).toBe(1);
   });
 
   it("pasteWarning off: multi-line pastes without a dialog", () => {

@@ -33,6 +33,7 @@ import {
   removeForward,
 } from "./forwarding";
 import { createPaletteShell } from "./kit/shell";
+import { restoreTerminalFocus } from "./termfocus";
 import { showToast } from "./toast";
 
 export interface PaletteHandlers {
@@ -820,4 +821,5 @@ function close(): void {
   listEl = null;
   inputEl = null;
   prefixEl = null;
+  restoreTerminalFocus();
 }

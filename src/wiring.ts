@@ -20,8 +20,15 @@ import type { TerminalTab } from "./terminal/tab";
 import { tabManager } from "./terminal/tabmanager";
 import { confirmDialog } from "./ui/confirm";
 import { listForwards, removeForward } from "./ui/forwarding";
-import { openCommandPalette, openPaletteFlow, setPaletteHandlers } from "./ui/palette";
-import { openQuickOpen, setTabSwitcherHandlers, stepMruSwitcher } from "./ui/tabswitcher";
+import { hasOpenModal } from "./ui/modal";
+import { openCommandPalette, openPaletteFlow, paletteOpen, setPaletteHandlers } from "./ui/palette";
+import {
+  openQuickOpen,
+  setTabSwitcherHandlers,
+  stepMruSwitcher,
+  tabSwitcherOpen,
+} from "./ui/tabswitcher";
+import { setTerminalFocusRestore } from "./ui/termfocus";
 import { showToast } from "./ui/toast";
 import { toggleFullscreenMode, toggleZenMode } from "./ui/window";
 
@@ -226,6 +233,22 @@ export function initContextMenuWiring(): void {
 
 export function initSearchWiring(): void {
   setSearchHandlers({ getTab: (id) => tabManager.get(id) });
+}
+
+/** When the window is focused and a terminal tab is showing, keystrokes
+ *  go to xterm — not leftover on a dismissed modal/palette/body. */
+export function initTerminalFocusRestore(): void {
+  setTerminalFocusRestore(() => {
+    if (tabManager.settingsOpen) return;
+    if (hasOpenModal() || paletteOpen() || tabSwitcherOpen()) return;
+    const search = document.getElementById("search-bar");
+    if (search && search.style.display !== "none") return;
+    if (document.querySelector(".tab-rename-input")) return;
+    if (document.querySelector(".tab-close-confirm-btn")) return;
+    const ae = document.activeElement;
+    if (ae instanceof HTMLElement && ae.classList.contains("xterm-helper-textarea")) return;
+    tabManager.activeTab?.terminal.focus();
+  });
 }
 
 // Close-window confirmation (docs/confirm-preview.html): the backend

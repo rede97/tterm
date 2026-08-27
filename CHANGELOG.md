@@ -2,6 +2,11 @@
 
 Changes
 
+- **Terminal typing focus** — after a confirm (multi-line paste, close-window),
+  the command palette, the tab switcher, or Alt-Tab back to the window, keystrokes
+  return to xterm without a click. Clicking or dragging the title-bar drag
+  region keeps xterm focused. Settings, Find, tab rename, and the close-tab
+  strip keep their own input
 - **UI kit shells** — `src/ui/kit/shell.ts` builds palette / confirm
   fixed chrome for both the app and design drafts (no duplicated overlay HTML)
 - **Quick panel one-render path** — `src/ui/kit/qp/view.ts` is the shared lit
