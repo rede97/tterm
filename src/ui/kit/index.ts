@@ -30,6 +30,7 @@ export type {
   ConfirmMessageShell,
   ConfirmPasteShell,
   ConfirmShell,
+  PaletteFooterHint,
   PaletteShell,
   PaletteShellKind,
 } from "./shell";
@@ -38,4 +39,6 @@ export {
   createConfirmOverlay,
   createConfirmPasteDialog,
   createPaletteShell,
+  PAL_FOOT,
+  setPaletteFooter,
 } from "./shell";

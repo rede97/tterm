@@ -241,27 +241,36 @@ Type &gt; inside Ctrl+P to flip into commands (VS Code).</span></div>
     <div class="demo-actions">
       <button type="button" id="demo-quick">Go to Tab… <span class="combo">Ctrl+P</span></button>
       <button type="button" id="demo-cmd">Command Palette… <span class="combo">Ctrl+Shift+P</span></button>
+      <button type="button" id="demo-fwd">SSH Port Forwards</button>
       <button type="button" id="demo-mru">MRU switcher hint <span class="combo">Ctrl+Tab</span></button>
     </div>
 
     <ol>
-      <li><strong>Ctrl+P</strong>: filter by number or title; guidance lives in the input placeholder only (no separate hint bar).</li>
-      <li><strong>Ctrl+Shift+P</strong>: fixed <code>&gt;</code> prefix; commands grouped by section. New Local / SSH / Serial Tab each open a target list (profile / host / COM).</li>
+      <li><strong>Ctrl+P</strong>: filter by number or title; guidance lives in the input placeholder only.</li>
+      <li><strong>Context filter</strong>: SSH / Serial / Share commands that do not match the active tab are omitted from the list (system <code>ssh</code> hides Port Forwarding; Share with AI / Stop Sharing follow share state).</li>
+      <li><strong>Secondary footer</strong>: Cursor-style key row under the list (<code>↑↓</code> Select · <code>↵</code> Open/Connect/Add · <code>⇥</code> Complete · <code>Del</code> Remove). Command root has no footer. Del removes an existing forward only when the input is empty.</li>
       <li><strong>Interruptible flows</strong>: Baud / Profile / Flow and New SSH Temporary Tab (host → open tab; password in terminal) stay in one panel; Esc pops one level.</li>
       <li><strong>New Local / SSH / Serial Tab</strong>: secondary menus match Profiles ▾ (shell / host / COM only).</li>
-      <li><strong>Coverage</strong>: New Window / New Local·SSH·Serial·SSH Temporary Tab, Quick Panel, Share, Temporary SSH as a root Tab command (<code>ssh-history.json</code>, not <code>~/.ssh/config</code>), SSH Port Forwards, Serial Profile · baud · flow.</li>
+      <li><strong>Coverage</strong>: New Window / New Local·SSH·Serial·SSH Temporary Tab, Quick Panel, Share, Temporary SSH as a root Tab command (<code>ssh-history.json</code>, not <code>~/.ssh/config</code>), <strong>SSH: Port Forwarding…</strong> (one-line spec), Serial Profile · baud · flow.</li>
+      <li><strong>SSH Port Forwards</strong>: palette lists one hub command. Type <code>L 8080:localhost:3000</code> / <code>R 2222:127.0.0.1:22</code> / <code>D 1080</code> in the same input as Temporary SSH. Enter adds and stays open; Tab fills an existing spec back; Del removes (empty input). Esc returns to commands. <strong>Embedded client only</strong> — system <code>ssh</code> / local / serial get the same toast as the app. Grammar lives in <code>src/ui/forwardspec.ts</code> (app + this draft).</li>
       <li><strong>App landing</strong>: shared <code>tabswitcher.ts</code> chrome; command registry SSOT is <code>src/core/commands.ts</code>; unbound commands are palette-only.</li>
     </ol>
 
     <div class="hint">
-      Preview only — command list / <code>.pal-*</code> / fixed chrome from <code>src/ui/kit/shell.ts</code> + <code>commands.ts</code>; do not duplicate here. Temporary SSH writes local connection history (<code>ssh-history.json</code>, not <code>~/.ssh/config</code>); password is typed in the terminal like any other SSH session — no palette password step.
+      Port-forward one-line spec is shared with the app (<code>src/ui/forwardspec.ts</code>). Temporary SSH writes local connection history (<code>ssh-history.json</code>, not <code>~/.ssh/config</code>); password is typed in the terminal like any other SSH session — no palette password step.
     </div>
   </aside>
 </div>
 
 <script type="module">
-import { KEY_COMMANDS, formatCombo } from "/src/core/commands.ts";
-import { createPaletteShell } from "/src/ui/kit/shell.ts";
+import { KEY_COMMANDS, commandListed, formatCombo } from "/src/core/commands.ts";
+import {
+  FORWARD_KIND_LABELS,
+  formatForwardSpec,
+  forwardRoute,
+  parseForwardSpec,
+} from "/src/ui/forwardspec.ts";
+import { createPaletteShell, PAL_FOOT, setPaletteFooter } from "/src/ui/kit/shell.ts";
 
 /** Preview-only demo hooks — titles/order/groups/defaults come from KEY_COMMANDS. */
 const ACTION_BY_ID = {
@@ -270,6 +279,7 @@ const ACTION_BY_ID = {
   "tterm.newSerialTab": { action: "newSerial" },
   "workbench.action.quickOpen": { action: "openQuick" },
   "tterm.tempSsh": { action: "adhocSsh" },
+  "tterm.portForwards": { action: "forwards" },
   "tterm.serialProfile": { picker: "profile" },
   "tterm.serialBaud": { picker: "baud" },
   "tterm.serialFlow": { picker: "flow" },
@@ -282,6 +292,7 @@ const COMMANDS = KEY_COMMANDS.filter((c) => c.group).map((c) => {
     id: c.id,
     title: c.title,
     group: c.group,
+    when: c.when,
     key: c.default ? formatCombo(c.default) : undefined,
     ...hook,
   };
@@ -289,10 +300,26 @@ const COMMANDS = KEY_COMMANDS.filter((c) => c.group).map((c) => {
 
 const TABS = [
   { id: "t1", index: 1, label: "PowerShell", kind: "local", active: false, disconnected: false },
-  { id: "t2", index: 2, label: "pi@example.raspi.lan", kind: "ssh", active: true, disconnected: false },
+  {
+    id: "t2",
+    index: 2,
+    label: "pi@example.raspi.lan",
+    kind: "ssh",
+    sshEmbedded: true,
+    active: true,
+    disconnected: false,
+  },
   { id: "t3", index: 3, label: "COM3 · 115200", kind: "serial", active: false, disconnected: false },
   { id: "t4", index: 4, label: "ubuntu (WSL)", kind: "local", active: false, disconnected: false },
-  { id: "t5", index: 5, label: "lab-jtag", kind: "ssh", active: false, disconnected: true },
+  {
+    id: "t5",
+    index: 5,
+    label: "lab-jtag",
+    kind: "ssh",
+    sshEmbedded: false,
+    active: false,
+    disconnected: false,
+  },
 ];
 
 const SERIAL_BAUDS = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
@@ -328,6 +355,27 @@ const SSH_HISTORY = [
   { user: "root", host: "lab.example.com", port: 2222, label: "root@lab.example.com:2222" },
 ];
 
+/** Preview fake of ssh_forward_list — grammar from src/ui/forwardspec.ts. */
+let nextFwdId = 3;
+const FORWARDS = [
+  {
+    id: 1,
+    kind: "local",
+    listenHost: "127.0.0.1",
+    listenPort: 8080,
+    targetHost: "db.internal",
+    targetPort: 5432,
+  },
+  {
+    id: 2,
+    kind: "dynamic",
+    listenHost: "127.0.0.1",
+    listenPort: 1080,
+    targetHost: "",
+    targetPort: 0,
+  },
+];
+
 const appEl = document.getElementById("app");
 const shell = createPaletteShell({
   kind: "commands",
@@ -339,15 +387,16 @@ const overlay = shell.overlay;
 const input = shell.input;
 const prefix = shell.prefix;
 const listEl = shell.list;
+const footer = shell.footer;
 const tabBar = document.getElementById("tab-bar");
 const term = document.getElementById("term");
 const toastStack = document.getElementById("toast-stack");
 
-if (!input || !prefix || !listEl || !appEl) {
+if (!input || !prefix || !listEl || !footer || !appEl) {
   throw new Error("command-palette-preview: shell mount failed");
 }
 
-/** @type {"tabs" | "commands" | "picker" | "adhocSsh" | "newTabPick" | null} */
+/** @type {"tabs" | "commands" | "picker" | "adhocSsh" | "newTabPick" | "forwards" | null} */
 let mode = null;
 /** @type {string | null} */
 let pickerKind = null;
@@ -378,6 +427,16 @@ function historyComplete(h) {
 
 function activeTab() {
   return TABS.find((t) => t.active) || TABS[0];
+}
+
+/** Same gate as src/ui/palette.ts activeEmbeddedSshTab — system ssh is not enough. */
+function isEmbeddedSsh(t) {
+  return t?.kind === "ssh" && t.sshEmbedded === true;
+}
+
+function tabKindLabel(t) {
+  if (t.kind === "ssh") return t.sshEmbedded === true ? "ssh" : "ssh (system)";
+  return t.kind;
 }
 
 function showToast(message, kind = "info") {
@@ -413,7 +472,13 @@ function renderTabBar() {
 
 function paintTerm() {
   const t = activeTab();
-  term.innerHTML = `<span class="dim"># ${escapeHtml(t.label)} · ${t.kind}</span>
+  const extra =
+    t.kind === "ssh" && t.sshEmbedded !== true
+      ? " · system ssh (forwards refused)"
+      : t.kind === "ssh"
+        ? " · embedded"
+        : "";
+  term.innerHTML = `<span class="dim"># ${escapeHtml(t.label)} · ${t.kind}${extra}</span>
 rede@tterm:~$ █
 
 <span class="dim">Ctrl+P — Go to Tab
@@ -437,9 +502,12 @@ function filterTabs(q) {
 }
 
 function filterCommands(q) {
+  const t = activeTab();
+  const ctx = { type: t.kind, sshEmbedded: t.sshEmbedded, shared: t.shared };
+  const listed = COMMANDS.filter((c) => commandListed(c, ctx));
   const query = q.trim().toLowerCase();
-  if (!query) return [...COMMANDS];
-  return COMMANDS.filter(
+  if (!query) return listed;
+  return listed.filter(
     (c) =>
       c.title.toLowerCase().includes(query) ||
       c.group.toLowerCase().includes(query) ||
@@ -493,8 +561,8 @@ function syncChrome() {
   input.type = "text";
   input.autocomplete = "off";
   input.spellcheck = true;
-  // Guidance lives in the input placeholder only (same as src/ui/palette.ts /
-  // tabswitcher.ts) — no separate hint bar; secondary menus share one pattern.
+  // Guidance: command root / Ctrl+P use the placeholder only; secondary
+  // pages add the Cursor-style .pal-footer (↑↓ ↵ ⇥ Del).
   if (mode === "tabs") {
     input.placeholder = "Go to tab — number or name; > for commands";
   } else if (mode === "commands") {
@@ -512,6 +580,17 @@ function syncChrome() {
     input.placeholder = `${titles[newTabKind] || "Target"} — type to filter`;
   } else if (mode === "adhocSsh") {
     input.placeholder = "user@host[:port] — kept in connection history";
+  } else if (mode === "forwards") {
+    input.placeholder = "L|R|D listen[:host:port] — e.g. L 8080:localhost:3000";
+  }
+  if (mode === "adhocSsh") {
+    setPaletteFooter(footer, [PAL_FOOT.select, PAL_FOOT.connect, PAL_FOOT.complete]);
+  } else if (mode === "forwards") {
+    setPaletteFooter(footer, [PAL_FOOT.select, PAL_FOOT.add, PAL_FOOT.complete, PAL_FOOT.remove]);
+  } else if (mode === "picker" || mode === "newTabPick" || mode === "newTabKind") {
+    setPaletteFooter(footer, [PAL_FOOT.select, PAL_FOOT.open]);
+  } else {
+    setPaletteFooter(footer, null);
   }
 }
 
@@ -546,13 +625,9 @@ function renderList() {
       type: "adhocRecent",
       title: h.label,
       meta: "",
-      group: "Recent",
+        group: "Recent",
       parsed: h,
       complete: historyComplete(h),
-      selectHints: [
-        { key: "Enter", action: "connect" },
-        { key: "Tab", action: "complete" },
-      ],
     }));
     // Fixed first row: live Connect → (content-synced) or Examples hint.
     visible = [];
@@ -571,6 +646,47 @@ function renderList() {
       });
     }
     visible.push(...recent);
+  } else if (mode === "forwards") {
+    const q = input.value;
+    const parsed = parseForwardSpec(q);
+    const lq = q.trim().toLowerCase();
+    visible = [];
+    if (parsed) {
+      visible.push({
+        type: "fwdAdd",
+        title: `Add → ${forwardRoute(parsed)}`,
+        meta: FORWARD_KIND_LABELS[parsed.kind],
+        parsed,
+      });
+    } else {
+      visible.push({
+        type: "fwdHint",
+        title: "Examples: L 8080:localhost:3000 · R 2222:127.0.0.1:22 · D 1080",
+        meta: "",
+      });
+    }
+    const existing = FORWARDS.filter((f) => {
+      if (!lq) return true;
+      const hay = `${forwardRoute(f)} ${FORWARD_KIND_LABELS[f.kind]} ${formatForwardSpec(f)}`.toLowerCase();
+      return hay.includes(lq);
+    });
+    for (const f of existing) {
+      visible.push({
+        type: "fwdExisting",
+        title: forwardRoute(f),
+        meta: FORWARD_KIND_LABELS[f.kind],
+        group: "Existing",
+        forward: f,
+        complete: formatForwardSpec(f),
+      });
+    }
+    if (!lq && FORWARDS.length > 0) {
+      visible.push({
+        type: "fwdRemoveAll",
+        title: `Remove all forwards (${FORWARDS.length})`,
+        meta: "",
+      });
+    }
   } else if (mode === "newTabKind") {
     const lq = q.toLowerCase();
     visible = NEW_TAB_KINDS.filter(
@@ -621,6 +737,8 @@ function renderList() {
               ? "No matching targets"
               : mode === "adhocSsh"
                 ? "Enter user@host[:port]"
+                : mode === "forwards"
+                  ? "L|R|D listen[:host:port]"
                   : "No matching commands";
     listEl.appendChild(empty);
     return;
@@ -638,6 +756,13 @@ function renderList() {
       listEl.appendChild(g);
     }
     if (it.type === "adhocRecent" && it.group && it.group !== lastGroup) {
+      lastGroup = it.group;
+      const g = document.createElement("div");
+      g.className = "pal-group";
+      g.textContent = it.group;
+      listEl.appendChild(g);
+    }
+    if (it.type === "fwdExisting" && it.group && it.group !== lastGroup) {
       lastGroup = it.group;
       const g = document.createElement("div");
       g.className = "pal-group";
@@ -667,31 +792,11 @@ function renderList() {
         <span class="pal-badge">${it.index}</span>
         <span class="pal-label${it.disconnected ? " disconnected" : ""}">${escapeHtml(it.label)}</span>
         ${it.active ? '<span class="pal-meta">current</span>' : ""}
-        <span class="pal-meta">${it.kind}</span>`;
+        <span class="pal-meta">${escapeHtml(tabKindLabel(it))}</span>`;
     } else if (it.type === "cmd") {
       row.innerHTML = `
         <span class="pal-label">${escapeHtml(it.title)}</span>
         ${it.key ? `<span class="pal-kbd">${escapeHtml(it.key)}</span>` : ""}`;
-    } else if (
-      it.type === "adhoc" ||
-      it.type === "adhocHint" ||
-      it.type === "adhocRecent" ||
-      it.type === "newTabKind" ||
-      it.type === "newTabTarget"
-    ) {
-      const hints =
-        it.type === "adhocRecent" && it.selectHints
-          ? `<span class="pal-row-hints">${it.selectHints
-              .map(
-                (h) =>
-                  `<span class="pal-hint" title="${escapeHtml(h.key)} — ${escapeHtml(h.action)}"><span class="pal-kbd">${escapeHtml(h.key)}</span><span class="pal-hint-action">${escapeHtml(h.action)}</span></span>`,
-              )
-              .join("")}</span>`
-          : "";
-      row.innerHTML = `
-        <span class="pal-label">${escapeHtml(it.title)}</span>
-        ${it.meta ? `<span class="pal-meta">${escapeHtml(it.meta)}</span>` : ""}
-        ${hints}`;
     } else {
       row.innerHTML = `
         <span class="pal-label">${escapeHtml(it.title)}</span>
@@ -774,6 +879,7 @@ function addDemoTab(label, kind) {
     index: nextIndex,
     label,
     kind,
+    sshEmbedded: kind === "ssh" ? true : undefined,
     active: true,
     disconnected: false,
   });
@@ -790,6 +896,82 @@ function openAdhocSsh() {
   ensureMounted();
   renderList();
   input.focus();
+}
+
+function openForwards() {
+  if (!isEmbeddedSsh(activeTab())) {
+    showToast("Active tab is not an embedded-SSH session", "error");
+    return false;
+  }
+  mode = "forwards";
+  pickerKind = null;
+  newTabKind = null;
+  selected = 0;
+  input.value = "";
+  syncChrome();
+  ensureMounted();
+  renderList();
+  input.focus();
+  return true;
+}
+
+function addForward(parsed) {
+  const dup = FORWARDS.some(
+    (f) =>
+      f.kind === parsed.kind &&
+      f.listenHost === parsed.listenHost &&
+      f.listenPort === parsed.listenPort,
+  );
+  if (dup) {
+    showToast(`Already listening on ${parsed.listenHost}:${parsed.listenPort}`, "error");
+    return;
+  }
+  FORWARDS.unshift({ id: nextFwdId++, ...parsed });
+  input.value = "";
+  selected = 0;
+  renderList();
+  showToast(`Added ${FORWARD_KIND_LABELS[parsed.kind]} · ${forwardRoute(parsed)}`, "ok");
+}
+
+function removeForward(id) {
+  const i = FORWARDS.findIndex((f) => f.id === id);
+  if (i < 0) return;
+  const [f] = FORWARDS.splice(i, 1);
+  selected = 0;
+  renderList();
+  showToast(`Removed ${forwardRoute(f)}`, "ok");
+}
+
+function removeAllForwards() {
+  const n = FORWARDS.length;
+  if (!n) return;
+  FORWARDS.length = 0;
+  selected = 0;
+  renderList();
+  showToast(`Removed ${n} forward${n === 1 ? "" : "s"}`, "ok");
+}
+
+function commitForward(it) {
+  if (it.type === "fwdHint") {
+    const parsed = parseForwardSpec(input.value);
+    if (!parsed) {
+      showToast("Use L|R|D listen[:host:port]", "info");
+      return;
+    }
+    addForward(parsed);
+    return;
+  }
+  if (it.type === "fwdAdd") {
+    addForward(it.parsed);
+    return;
+  }
+  if (it.type === "fwdExisting") {
+    removeForward(it.forward.id);
+    return;
+  }
+  if (it.type === "fwdRemoveAll") {
+    removeAllForwards();
+  }
 }
 
 function rememberHistory(parsed) {
@@ -814,6 +996,7 @@ function finishAdhocConnect(parsed) {
     index: nextIndex,
     label: parsed.label,
     kind: "ssh",
+    sshEmbedded: true,
     active: true,
     disconnected: false,
   });
@@ -874,6 +1057,11 @@ function commit(index) {
 
   if (it.type === "adhocHint") return;
 
+  if (it.type === "fwdHint" || it.type === "fwdAdd" || it.type === "fwdExisting" || it.type === "fwdRemoveAll") {
+    commitForward(it);
+    return;
+  }
+
   if (it.type === "adhoc" || it.type === "adhocRecent") {
     finishAdhocConnect(it.parsed);
     return;
@@ -898,6 +1086,10 @@ function commit(index) {
   if (it.action === "adhocSsh") {
     newTabKind = null;
     openAdhocSsh();
+    return;
+  }
+  if (it.action === "forwards") {
+    openForwards();
     return;
   }
   if (it.picker) {
@@ -945,7 +1137,7 @@ input.addEventListener("keydown", (e) => {
       renderList();
       return;
     }
-    if (mode === "picker" || mode === "adhocSsh" || mode === "newTabKind") {
+    if (mode === "picker" || mode === "adhocSsh" || mode === "newTabKind" || mode === "forwards") {
       mode = "commands";
       pickerKind = null;
       newTabKind = null;
@@ -974,16 +1166,38 @@ input.addEventListener("keydown", (e) => {
       finishAdhocConnect(parsed);
       return;
     }
+    if (mode === "forwards") {
+      const it = visible[selected];
+      if (it) {
+        commitForward(it);
+        return;
+      }
+      const parsed = parseForwardSpec(input.value);
+      if (!parsed) {
+        showToast("Use L|R|D listen[:host:port]", "info");
+        return;
+      }
+      addForward(parsed);
+      return;
+    }
     commit(selected);
     return;
   }
-  if (e.key === "Tab" && mode === "adhocSsh") {
+  if (e.key === "Tab") {
+    e.preventDefault();
     const it = visible[selected];
-    if (it?.type === "adhocRecent" && it.complete) {
-      e.preventDefault();
+    if ((it?.type === "adhocRecent" || it?.type === "fwdExisting") && it.complete) {
       input.value = it.complete;
       selected = 0;
       renderList();
+    }
+    return;
+  }
+  if (e.key === "Delete" && mode === "forwards" && input.value === "") {
+    const it = visible[selected];
+    if (it?.type === "fwdExisting") {
+      e.preventDefault();
+      removeForward(it.forward.id);
       return;
     }
   }
@@ -1021,6 +1235,20 @@ document.addEventListener("keydown", (e) => {
 
 document.getElementById("demo-quick").addEventListener("click", () => openPalette("tabs"));
 document.getElementById("demo-cmd").addEventListener("click", () => openPalette("commands"));
+document.getElementById("demo-fwd").addEventListener("click", () => {
+  const ssh =
+    TABS.find((t) => isEmbeddedSsh(t) && !t.disconnected) || TABS.find((t) => isEmbeddedSsh(t));
+  if (ssh) {
+    TABS.forEach((t) => {
+      t.active = t.id === ssh.id;
+    });
+    renderTabBar();
+    paintTerm();
+  }
+  ensureMounted();
+  overlay.setAttribute("aria-hidden", "false");
+  openForwards();
+});
 document.getElementById("demo-mru").addEventListener("click", () => {
   showToast("Ctrl+Tab MRU stays in tabswitcher.ts — release Ctrl to commit (not redrawn here)", "info");
 });

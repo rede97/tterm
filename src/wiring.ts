@@ -74,7 +74,7 @@ export function initShortcutsWiring(): void {
     openSerialTab: (port) => void tabManager.createSerialTab(port),
     getActiveTab: () => {
       const t = tabManager.settingsOpen ? null : tabManager.activeTab;
-      return t ? { id: t.id, type: t.type, sshEmbedded: t.sshEmbedded } : null;
+      return t ? { id: t.id, type: t.type, sshEmbedded: t.sshEmbedded, shared: t.shared } : null;
     },
     setSerialBaud: (id, baud) => tabManager.setSerialBaud(id, baud),
     setSerialProfile: (id, name) => tabManager.setSerialProfile(id, name),
@@ -125,11 +125,23 @@ export function initShortcutsWiring(): void {
     },
     "tterm.shareStart": () => {
       const t = tabManager.activeTab;
-      if (t && !t.shared) tabManager.shareTab(t.id);
+      if (!t) {
+        showToast("No active tab", "error");
+        return;
+      }
+      if (t.shared) {
+        showToast("Session is already shared", "error");
+        return;
+      }
+      tabManager.shareTab(t.id);
     },
     "tterm.shareStop": () => {
       const t = tabManager.activeTab;
-      if (t?.shared) tabManager.shareTab(t.id);
+      if (!t?.shared) {
+        showToast("Session is not shared", "error");
+        return;
+      }
+      tabManager.shareTab(t.id);
     },
     "tterm.duplicateTab": () => {
       if (tabManager.activeTabId) tabManager.duplicateTab(tabManager.activeTabId);
@@ -137,7 +149,10 @@ export function initShortcutsWiring(): void {
     "tterm.closeWindow": () => invoke("window_request_close").catch(logCatch("window.close")),
     "tterm.sshAutoReconnect": () => {
       const t = tabManager.activeTab;
-      if (t?.type !== "ssh") return;
+      if (t?.type !== "ssh") {
+        showToast("Active tab is not an SSH session", "error");
+        return;
+      }
       void invoke<boolean>("session_get_auto_reconnect", { id: t.id })
         .then((v) => invoke("session_set_auto_reconnect", { id: t.id, enabled: !v }))
         .catch(logCatch("ssh.autoReconnect"));
@@ -147,7 +162,10 @@ export function initShortcutsWiring(): void {
     "tterm.forwardAddDynamic": () => openPaletteFlow("forwardDynamic"),
     "tterm.forwardRemoveAll": () => {
       const t = tabManager.activeTab;
-      if (t?.type !== "ssh" || !t.sshEmbedded) return;
+      if (t?.type !== "ssh" || !t.sshEmbedded) {
+        showToast("Active tab is not an embedded-SSH session", "error");
+        return;
+      }
       void listForwards(t.id).then(async (forwards) => {
         if (!forwards) return;
         for (const f of forwards) await removeForward(t.id, f.forwardId);
@@ -166,17 +184,34 @@ export function initShortcutsWiring(): void {
     "tterm.serialInputMode": () => openPaletteFlow("serialInputMode"),
     "tterm.serialDisconnect": () => {
       const t = tabManager.activeTab;
-      if (t?.type !== "serial" || t.disconnected) return;
+      if (t?.type !== "serial") {
+        showToast("Active tab is not a serial session", "error");
+        return;
+      }
+      if (t.disconnected) {
+        showToast("Serial session is already disconnected", "error");
+        return;
+      }
       invoke("serial_disconnect", { id: t.id }).catch(logCatch("serial.disconnect"));
     },
     "tterm.serialReconnect": () => {
       const t = tabManager.activeTab;
-      if (t?.type !== "serial" || !t.disconnected) return;
+      if (t?.type !== "serial") {
+        showToast("Active tab is not a serial session", "error");
+        return;
+      }
+      if (!t.disconnected) {
+        showToast("Serial session is already connected", "error");
+        return;
+      }
       invoke("serial_reconnect", { id: t.id }).catch(logCatch("serial.reconnect"));
     },
     "tterm.serialAutoReconnect": () => {
       const t = tabManager.activeTab;
-      if (t?.type !== "serial") return;
+      if (t?.type !== "serial") {
+        showToast("Active tab is not a serial session", "error");
+        return;
+      }
       void invoke<boolean>("session_get_auto_reconnect", { id: t.id })
         .then((v) => invoke("session_set_auto_reconnect", { id: t.id, enabled: !v }))
         .catch(logCatch("serial.autoReconnect"));

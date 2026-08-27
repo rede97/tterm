@@ -5,7 +5,9 @@
 // an input that holds only the filter/query (never the ">"), and a page STACK
 // for two-level flows (New Local/SSH/Serial Tab → target; Temporary Connect…
 // → open tab; password is typed in the terminal like any other SSH session).
-// Escape pops one level; at the root it closes. Backspace on an
+// Escape pops one level; at the root it closes. Secondary pages show a
+// Cursor-style .pal-footer (↑↓ Select · ↵ Open/Connect/Add · ⇥ Complete ·
+// Del Remove); the command root does not. Backspace on an
 // empty command-root input flips back to quick open (tabs); typing ">" there
 // flips in — the two share one continuous input, VS Code style.
 //
@@ -21,18 +23,32 @@ import { allSerialProfiles } from "../config/serial-profiles";
 import { entryLabel, entryToHost, listSshHistory, rememberSshHistory } from "../config/ssh-history";
 import { hostProp, SERIAL_BAUD_RATES } from "../core/common";
 import { logCatch } from "../core/errorlog";
-import { formatCombo, KEY_COMMANDS, resolveKeybindings, runCommand } from "../core/keymap";
+import {
+  commandListed,
+  formatCombo,
+  KEY_COMMANDS,
+  resolveKeybindings,
+  runCommand,
+} from "../core/keymap";
 import { configStore } from "../core/store";
 import type { SerialFlowControl, SerialInputMode, SerialPort, SshHost } from "../core/types";
 import { el } from "./dom";
+import { addForward, type ForwardInfo, listForwards, removeForward } from "./forwarding";
 import {
-  addForward,
-  type ForwardInfo,
-  listForwards,
-  type NewForward,
-  removeForward,
-} from "./forwarding";
-import { createPaletteShell } from "./kit/shell";
+  FORWARD_KIND_LABELS,
+  FORWARD_SPEC_HINT,
+  type ForwardSpec,
+  formatForwardSpec,
+  forwardRoute,
+  parseForwardSpec,
+  sameListen,
+} from "./forwardspec";
+import {
+  createPaletteShell,
+  PAL_FOOT,
+  type PaletteFooterHint,
+  setPaletteFooter,
+} from "./kit/shell";
 import { restoreTerminalFocus } from "./termfocus";
 import { showToast } from "./toast";
 
@@ -45,7 +61,12 @@ export interface PaletteHandlers {
   openSshTab: (host: SshHost, password?: string) => void;
   openSerialTab: (port: SerialPort) => void;
   // Active-tab context for session commands (serial setters, forwards).
-  getActiveTab: () => { id: string; type: string; sshEmbedded?: boolean } | null;
+  getActiveTab: () => {
+    id: string;
+    type: string;
+    sshEmbedded?: boolean;
+    shared?: boolean;
+  } | null;
   setSerialBaud: (id: string, baud: number) => void;
   setSerialProfile: (id: string, name: string) => void;
   setSerialFrame: (id: string, frame: string) => void | Promise<void>;
@@ -75,8 +96,8 @@ interface PaletteRow {
    * Recent → edit port / user before connecting).
    */
   complete?: string;
-  /** Glyph chips shown only while selected (Recent: keycap + action word). */
-  selectHints?: { key: string; action: string }[];
+  /** Delete removes this row when the filter input is empty (port forwards). */
+  deletable?: boolean;
   action: () => void;
 }
 
@@ -87,6 +108,7 @@ type PalettePage =
       title: string;
       placeholder?: string;
       rows: () => PaletteRow[] | Promise<PaletteRow[]>;
+      footer?: readonly PaletteFooterHint[];
     }
   | {
       kind: "text";
@@ -99,7 +121,19 @@ type PalettePage =
       rows?: (value: string) => PaletteRow[];
       /** Enter always submits; row clicks run their own action. */
       submit: (value: string) => void;
+      /** Override the Cursor-style footer (default: Select · Connect · Complete). */
+      footer?: readonly PaletteFooterHint[];
     };
+
+function pageFooter(page: PalettePage): PaletteFooterHint[] | null {
+  if (page.kind === "commands") return null;
+  if (page.footer) return [...page.footer];
+  if (page.kind === "text" && page.rows) {
+    return [PAL_FOOT.select, PAL_FOOT.connect, PAL_FOOT.complete];
+  }
+  if (page.kind === "text") return [PAL_FOOT.open];
+  return [PAL_FOOT.select, PAL_FOOT.open];
+}
 
 let overlay: HTMLElement | null = null;
 let stack: PalettePage[] = [];
@@ -108,6 +142,7 @@ let selected = 0;
 let listEl: HTMLElement | null = null;
 let inputEl: HTMLInputElement | null = null;
 let prefixEl: HTMLElement | null = null;
+let footerEl: HTMLElement | null = null;
 // Generation guard: an async list resolve from a stale page must not render.
 let pageGen = 0;
 
@@ -151,14 +186,15 @@ function inputQuery(): string {
 function commandRows(query: string): PaletteRow[] {
   const bindings = resolveKeybindings(configStore.get("keybindings"));
   const q = query.trim().toLowerCase();
-  // Only commands with a draft `group` appear in the palette (order = registry).
+  const tab = _handlers?.getActiveTab() ?? null;
+  // Only commands with a draft `group` appear; `when` hides mismatching sessions.
   return KEY_COMMANDS.filter(
     (c) =>
-      c.group &&
+      commandListed(c, tab) &&
       (!q ||
         c.title.toLowerCase().includes(q) ||
         c.id.toLowerCase().includes(q) ||
-        c.group.toLowerCase().includes(q)),
+        (c.group ?? "").toLowerCase().includes(q)),
   ).map((c) => ({
     label: c.title,
     group: c.group,
@@ -250,10 +286,6 @@ function tempSshHostPage(): PalettePage {
           label: entryLabel(e),
           group: "Recent",
           complete: historyComplete(e),
-          selectHints: [
-            { key: "Enter", action: "connect" },
-            { key: "Tab", action: "complete" },
-          ],
           action: () => connectTempSsh(entryToHost(e)),
         }));
 
@@ -330,133 +362,158 @@ function activeEmbeddedSshTab(): string | null {
   return tab.id;
 }
 
-// -- Port forwards (in-overlay, design: 不另开窗) --
+// -- Port forwards (one-line spec, same input as Temporary SSH) --
 
-function parsePortField(value: string): number | null {
-  const n = parseInt(value.trim(), 10);
-  return Number.isInteger(n) && n >= 1 && n <= 65535 ? n : null;
-}
+const FWD_FOOTER: readonly PaletteFooterHint[] = [
+  PAL_FOOT.select,
+  PAL_FOOT.add,
+  PAL_FOOT.complete,
+  PAL_FOOT.remove,
+];
 
-function forwardTextPage(
-  title: string,
-  placeholder: string,
-  validate: (value: string) => string | null,
-  next: (value: string) => void,
-): PalettePage {
+let fwdTabId: string | null = null;
+let fwdCache: ForwardInfo[] = [];
+
+function asSpec(f: ForwardInfo): ForwardSpec {
   return {
-    kind: "text",
-    title,
-    placeholder,
-    submit: (value) => {
-      const err = validate(value);
-      if (err) {
-        showToast(err, "error");
-        return;
-      }
-      next(value.trim());
-    },
+    kind: f.kind === "remote" ? "remote" : f.kind === "dynamic" ? "dynamic" : "local",
+    listenHost: f.listenHost,
+    listenPort: f.listenPort,
+    targetHost: f.targetHost,
+    targetPort: f.targetPort,
   };
 }
 
-/** Two/three-step add flow: local and remote collect listen-port →
- *  target-host → target-port; dynamic just the listen port. */
-function pushForwardForm(kind: "local" | "remote" | "dynamic"): void {
-  const tabId = activeEmbeddedSshTab();
+function onForwardsPage(): boolean {
+  const p = stack[stack.length - 1];
+  return p?.kind === "text" && p.title === "SSH · Port Forwards";
+}
+
+async function refreshFwdCache(): Promise<boolean> {
+  if (!fwdTabId) return false;
+  const list = await listForwards(fwdTabId);
+  if (!list) return false;
+  fwdCache = list;
+  if (onForwardsPage()) await renderPage();
+  return true;
+}
+
+function commitForward(spec: ForwardSpec): void {
+  const tabId = fwdTabId;
+  if (!tabId) return;
+  if (fwdCache.some((f) => sameListen(asSpec(f), spec))) {
+    showToast(`Already listening on ${spec.listenHost}:${spec.listenPort}`, "error");
+    return;
+  }
+  void addForward(tabId, spec).then((id) => {
+    if (id === null) return;
+    if (inputEl) inputEl.value = "";
+    selected = 0;
+    showToast(`Added ${FORWARD_KIND_LABELS[spec.kind]} · ${forwardRoute(spec)}`, "info");
+    void refreshFwdCache();
+  });
+}
+
+function dropForward(forwardId: number): void {
+  const tabId = fwdTabId;
+  if (!tabId) return;
+  void removeForward(tabId, forwardId).then((ok) => {
+    if (ok) void refreshFwdCache();
+  });
+}
+
+async function openForwardsHub(seed = ""): Promise<void> {
+  const tab = _handlers?.getActiveTab();
+  const tabId = tab?.type === "ssh" && tab.sshEmbedded === true ? tab.id : null;
   if (!tabId) {
     close();
     return;
   }
-  const finish = (f: NewForward): void => {
-    close();
-    void addForward(tabId, f);
-  };
-  const portValidator = (v: string) => (parsePortField(v) === null ? `Invalid port: ${v}` : null);
-  const hostValidator = (v: string) => (v.trim() ? null : "Target host required");
-  push(
-    forwardTextPage(
-      `Forward · listen port${kind === "remote" ? " (remote)" : ""}`,
-      kind === "dynamic" ? "1080" : "8080",
-      portValidator,
-      (listenText) => {
-        // Validated by portValidator upstream — always a number here.
-        const listenPort = parsePortField(listenText) ?? 0;
-        if (kind === "dynamic") {
-          finish({
-            kind,
-            listenHost: "127.0.0.1",
-            listenPort,
-            targetHost: "",
-            targetPort: 0,
-          });
-          return;
-        }
-        push(
-          forwardTextPage("Forward · target host", "127.0.0.1", hostValidator, (targetHost) => {
-            push(
-              forwardTextPage("Forward · target port", "3000", portValidator, (targetText) => {
-                finish({
-                  kind,
-                  listenHost: "127.0.0.1",
-                  listenPort,
-                  targetHost,
-                  targetPort: parsePortField(targetText) ?? 0,
-                });
-              }),
-            );
-          }),
-        );
-      },
-    ),
-  );
+  const list = await listForwards(tabId);
+  if (!list || !paletteOpen()) {
+    if (paletteOpen()) close();
+    return;
+  }
+  fwdTabId = tabId;
+  fwdCache = list;
+  push(forwardsPage());
+  if (seed && inputEl) {
+    inputEl.value = seed;
+    inputEl.setSelectionRange(seed.length, seed.length);
+    void renderPage();
+  }
 }
 
-const FORWARD_KIND_LABELS: Record<string, string> = {
-  local: "Local (-L)",
-  remote: "Remote (-R)",
-  dynamic: "Dynamic (-D)",
-};
-
-function forwardRoute(f: ForwardInfo): string {
-  const listen = `${f.listenHost}:${f.listenPort}`;
-  return f.kind === "dynamic"
-    ? `${listen} → any destination (SOCKS5)`
-    : `${listen} → ${f.targetHost}:${f.targetPort}`;
+function startForwardsHub(seed = ""): void {
+  if (!activeEmbeddedSshTab()) {
+    close();
+    return;
+  }
+  void openForwardsHub(seed);
 }
 
 function forwardsPage(): PalettePage {
   return {
-    kind: "list",
+    kind: "text",
     title: "SSH · Port Forwards",
-    rows: async (): Promise<PaletteRow[]> => {
-      const tabId = activeEmbeddedSshTab();
-      if (!tabId) return [];
-      const forwards = (await listForwards(tabId)) ?? [];
-      const actions: PaletteRow[] = [
-        { label: "Add Local Forward…", action: () => pushForwardForm("local") },
-        { label: "Add Remote Forward…", action: () => pushForwardForm("remote") },
-        { label: "Add Dynamic Forward…", action: () => pushForwardForm("dynamic") },
-      ];
-      if (forwards.length > 0) {
-        actions.push({
-          label: `Remove all forwards (${forwards.length})`,
+    placeholder: "L|R|D listen[:host:port] — e.g. L 8080:localhost:3000",
+    footer: FWD_FOOTER,
+    rows: (value) => {
+      const parsed = parseForwardSpec(value);
+      const lq = value.trim().toLowerCase();
+      const out: PaletteRow[] = [];
+      if (parsed) {
+        out.push({
+          label: `Add → ${forwardRoute(parsed)}`,
+          detail: FORWARD_KIND_LABELS[parsed.kind],
+          action: () => commitForward(parsed),
+        });
+      } else {
+        out.push({
+          label: "Examples: L 8080:localhost:3000 · R 2222:127.0.0.1:22 · D 1080",
+          action: () => {},
+        });
+      }
+      const existing = fwdCache.filter((f) => {
+        if (!lq) return true;
+        const spec = asSpec(f);
+        const hay =
+          `${forwardRoute(spec)} ${FORWARD_KIND_LABELS[spec.kind]} ${formatForwardSpec(spec)}`.toLowerCase();
+        return hay.includes(lq);
+      });
+      for (const f of existing) {
+        const spec = asSpec(f);
+        out.push({
+          label: forwardRoute(spec),
+          detail: FORWARD_KIND_LABELS[spec.kind],
+          group: "Existing",
+          complete: formatForwardSpec(spec),
+          deletable: true,
+          action: () => dropForward(f.forwardId),
+        });
+      }
+      if (!lq && fwdCache.length > 0) {
+        out.push({
+          label: `Remove all forwards (${fwdCache.length})`,
           action: () => {
+            const tabId = fwdTabId;
+            if (!tabId) return;
             void (async () => {
-              for (const f of forwards) await removeForward(tabId, f.forwardId);
-              await renderPage();
+              for (const f of fwdCache) await removeForward(tabId, f.forwardId);
+              await refreshFwdCache();
             })();
           },
         });
       }
-      return [
-        ...actions,
-        ...forwards.map((f) => ({
-          label: forwardRoute(f),
-          detail: FORWARD_KIND_LABELS[f.kind] ?? f.kind,
-          action: () => {
-            void removeForward(tabId, f.forwardId).then(() => renderPage());
-          },
-        })),
-      ];
+      return out;
+    },
+    submit: (value) => {
+      const parsed = parseForwardSpec(value);
+      if (!parsed) {
+        showToast(FORWARD_SPEC_HINT, "error");
+        return;
+      }
+      commitForward(parsed);
     },
   };
 }
@@ -556,6 +613,7 @@ async function renderPage(): Promise<void> {
   const page = top();
   const gen = ++pageGen;
   syncPrefix();
+  if (footerEl) setPaletteFooter(footerEl, pageFooter(page));
 
   inputEl.placeholder =
     page.kind === "commands"
@@ -631,17 +689,6 @@ async function renderPage(): Promise<void> {
     row.appendChild(el("span", "pal-label", r.label));
     if (r.kbd) row.appendChild(el("span", "pal-kbd", r.kbd));
     else if (r.detail) row.appendChild(el("span", "pal-meta", r.detail));
-    if (r.selectHints?.length) {
-      const hints = el("span", "pal-row-hints");
-      for (const h of r.selectHints) {
-        const item = el("span", "pal-hint");
-        item.appendChild(el("span", "pal-kbd", h.key));
-        item.appendChild(el("span", "pal-hint-action", h.action));
-        item.title = `${h.key} — ${h.action}`;
-        hints.appendChild(item);
-      }
-      row.appendChild(hints);
-    }
     row.addEventListener("click", () => r.action());
     row.addEventListener("mousemove", () => {
       if (selected !== i) {
@@ -701,14 +748,25 @@ function onKeydown(e: KeyboardEvent): void {
     rows[selected]?.action();
     return;
   }
-  // Temporary Connect Recent: Tab completes into the input (edit port) — no connect.
-  if (e.key === "Tab" && page.kind === "text" && page.rows) {
+  // Tab stays in the overlay (Cursor). Recent / existing-forward rows
+  // complete into the input; otherwise the key is swallowed.
+  if (e.key === "Tab") {
+    e.preventDefault();
     const row = rows[selected];
     if (row?.complete != null && inputEl) {
-      e.preventDefault();
       inputEl.value = row.complete;
       selected = 0;
       void renderPage();
+    }
+    return;
+  }
+  // Port forwards: Del removes the selected existing row when the input is empty
+  // (so typing a spec still uses Delete as a character key).
+  if (e.key === "Delete" && (inputEl?.value ?? "") === "") {
+    const row = rows[selected];
+    if (row?.deletable) {
+      e.preventDefault();
+      row.action();
       return;
     }
   }
@@ -758,17 +816,16 @@ export function openPaletteFlow(
       push(newTabSerialPage());
       break;
     case "forwards":
-      if (activeEmbeddedSshTab()) push(forwardsPage());
-      else close();
+      startForwardsHub();
       break;
     case "forwardLocal":
-      pushForwardForm("local");
+      startForwardsHub("L ");
       break;
     case "forwardRemote":
-      pushForwardForm("remote");
+      startForwardsHub("R ");
       break;
     case "forwardDynamic":
-      pushForwardForm("dynamic");
+      startForwardsHub("D ");
       break;
     case "tempSsh":
       // Same page the Tab command New SSH Temporary Tab opens.
@@ -800,6 +857,7 @@ export function openCommandPalette(query = ""): void {
   prefixEl = shell.prefix;
   inputEl = shell.input;
   listEl = shell.list;
+  footerEl = shell.footer;
   if (!inputEl || !listEl) return;
   inputEl.value = query;
   inputEl.setSelectionRange(query.length, query.length);
@@ -821,5 +879,8 @@ function close(): void {
   listEl = null;
   inputEl = null;
   prefixEl = null;
+  footerEl = null;
+  fwdTabId = null;
+  fwdCache = [];
   restoreTerminalFocus();
 }

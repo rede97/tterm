@@ -222,7 +222,7 @@
         <ul>
           <li><strong>Ctrl+P</strong>：编号 / 标题过滤跳 Tab</li>
           <li><strong>Ctrl+Shift+P</strong>：<code>&gt;</code> 前缀命令；<strong>New Tab…</strong> → Local / SSH / Serial → 目标</li>
-          <li><strong>Serial / SSH</strong>：波特率 · Profile · 流控 · Port Forward；临时 SSH（host → password，不写配置）</li>
+          <li><strong>Serial / SSH</strong>：波特率 · Profile · 流控；<strong>Port Forward</strong> 一行 spec（<code>L 8080:host:port</code>）</li>
         </ul>
         <span class="go">Open →</span>
       </a>
@@ -257,6 +257,10 @@
         <dt><a href="/docs/settings-preview.html">Settings · Keyboard</a></dt>
         <dd>
           快捷键表加入 <strong>Show Command Palette…</strong>（默认 <code>Ctrl+Shift+P</code>），与 Go to Tab（<code>Ctrl+P</code>）并列可改绑。
+        </dd>
+        <dt><a href="/docs/command-palette-preview.html">Command palette · Port Forward</a></dt>
+        <dd>
+          palette 只列 <strong>SSH: Port Forwarding…</strong>。输入复用同一栏：<code>L|R|D listen[:host:port]</code>；底栏 Cursor 式 <code>↑↓ ↵ ⇥ Del</code>。非内建 SSH 一律 toast 拦截。语法与 app 共用 <code>forwardspec.ts</code>。
         </dd>
         <dt><a href="/docs/command-palette-preview.html">Command palette · New Tab</a></dt>
         <dd>

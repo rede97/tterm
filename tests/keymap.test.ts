@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   comboFromEvent,
   comboMatches,
+  commandListed,
   defaultKeybindings,
   findConflict,
   formatCombo,
@@ -265,5 +266,33 @@ describe("command registry", () => {
     const defaults = defaultKeybindings();
     expect(defaults["workbench.action.toggleFullScreen"]).toBe("f11");
     expect(defaults["workbench.action.toggleZenMode"]).toBe("shift+f11");
+  });
+
+  it("SSH Port Forwarding is the palette hub; add/remove stay Keyboard-only", () => {
+    const byId = Object.fromEntries(KEY_COMMANDS.map((c) => [c.id, c]));
+    expect(byId["tterm.portForwards"]?.group).toBe("SSH");
+    expect(byId["tterm.forwardAddLocal"]?.group).toBeUndefined();
+    expect(byId["tterm.forwardAddRemote"]?.group).toBeUndefined();
+    expect(byId["tterm.forwardAddDynamic"]?.group).toBeUndefined();
+    expect(byId["tterm.forwardRemoveAll"]?.group).toBeUndefined();
+  });
+
+  it("hides session commands that do not match the active tab", () => {
+    const byId = Object.fromEntries(KEY_COMMANDS.map((c) => [c.id, c]));
+    const local = { type: "local" };
+    const sshBin = { type: "ssh", sshEmbedded: false };
+    const sshEmb = { type: "ssh", sshEmbedded: true };
+    const serial = { type: "serial" };
+    expect(commandListed(byId["tterm.portForwards"]!, local)).toBe(false);
+    expect(commandListed(byId["tterm.portForwards"]!, sshBin)).toBe(false);
+    expect(commandListed(byId["tterm.portForwards"]!, sshEmb)).toBe(true);
+    expect(commandListed(byId["tterm.sshAutoReconnect"]!, sshBin)).toBe(true);
+    expect(commandListed(byId["tterm.serialBaud"]!, local)).toBe(false);
+    expect(commandListed(byId["tterm.serialBaud"]!, serial)).toBe(true);
+    expect(commandListed(byId["tterm.shareStart"]!, local)).toBe(true);
+    expect(commandListed(byId["tterm.shareStart"]!, { ...local, shared: true })).toBe(false);
+    expect(commandListed(byId["tterm.shareStop"]!, local)).toBe(false);
+    expect(commandListed(byId["tterm.shareStop"]!, { ...local, shared: true })).toBe(true);
+    expect(commandListed(byId["tterm.clearSshTempHistory"]!, local)).toBe(true);
   });
 });

@@ -73,7 +73,7 @@ App: [`index.html`](../../../index.html) loads tokens; [`styles.css`](../../styl
 - **Confirm:** `createConfirmPasteDialog` / `createConfirmMessageDialog`
 - **Forward table:** `createForwardTable` + `.ft-*` — Settings host editor and
   quick panel share one compact layout (listen port \| target \| +)
-- **Palette:** `createPaletteShell({ kind })`
+- **Palette:** `createPaletteShell({ kind })` + `setPaletteFooter` (Cursor key row)
 - **Quick panel:** `qpPanelView(model, actions)` — hardware flow greys RTS only (no hint prose)
 - **Type:** only `--tt-fs-*`, `--tt-*-weight`, `--tt-ui` / `--tt-mono`
 

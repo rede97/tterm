@@ -26,6 +26,40 @@ export interface PaletteShell {
   /** Present for kind "commands" | "quick". */
   input: HTMLInputElement | null;
   list: HTMLElement;
+  /** Cursor-style key footer; hidden until `setPaletteFooter` fills it. */
+  footer: HTMLElement;
+}
+
+/** One footer chip: glyph (`↑↓` / `↵` / `⇥` / `Del`) + action word. */
+export interface PaletteFooterHint {
+  key: string;
+  label: string;
+}
+
+export const PAL_FOOT = {
+  select: { key: "↑↓", label: "Select" },
+  open: { key: "↵", label: "Open" },
+  connect: { key: "↵", label: "Connect" },
+  add: { key: "↵", label: "Add" },
+  complete: { key: "⇥", label: "Complete" },
+  remove: { key: "Del", label: "Remove" },
+} as const;
+
+/** Fill or hide the palette footer. Empty / null hides it (command root, Ctrl+P). */
+export function setPaletteFooter(footer: HTMLElement, hints: PaletteFooterHint[] | null): void {
+  footer.replaceChildren();
+  if (!hints?.length) {
+    footer.classList.remove("on");
+    footer.hidden = true;
+    return;
+  }
+  footer.hidden = false;
+  footer.classList.add("on");
+  for (const h of hints) {
+    const item = el("span", "pal-foot-item");
+    item.append(el("span", "pal-foot-key", h.key), el("span", "pal-foot-label", h.label));
+    footer.appendChild(item);
+  }
 }
 
 export interface PaletteShellOptions {
@@ -79,9 +113,12 @@ export function createPaletteShell(opts: PaletteShellOptions): PaletteShell {
   const list = el("div", "pal-list");
   if (opts.ids?.list) list.id = opts.ids.list;
 
-  panel.append(wrap, list);
+  const footer = el("div", "pal-footer");
+  footer.hidden = true;
+
+  panel.append(wrap, list, footer);
   overlay.append(panel);
-  return { overlay, panel, wrap, prefix, input, list };
+  return { overlay, panel, wrap, prefix, input, list, footer };
 }
 
 // ---- Confirm dialogs ----

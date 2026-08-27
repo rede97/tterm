@@ -2,6 +2,19 @@
 
 Changes
 
+- **Palette hides mismatching session commands** — SSH / Serial / Share
+  rows that do not apply to the active tab are omitted (embedded-only
+  Port Forwarding; Share with AI vs Stop Sharing follow share state).
+  Settings → Keyboard still lists them for binding
+- **Palette secondary footer** — Cursor-style key row (`↑↓` Select · `↵`
+  Open/Connect/Add · `⇥` Complete · `Del` Remove) under the list; command
+  root and Ctrl+P stay placeholder-only. Del removes an existing forward
+  when the input is empty
+- **Palette SSH hub** — `SSH: Port Forwarding…` is the listed command
+  (one-line spec `L 8080:host:port` in the same input as Temporary SSH).
+  Add Local/Remote/Dynamic seed `L `/`R `/`D ` on that page; Remove All
+  stays Keyboard only. Wrong-tab session commands toast instead of a
+  silent return
 - **Settings theme cards pass the wheel through** — a global
   `::-webkit-scrollbar { width }` had turned `overflow: hidden` cards into
   scrollports; scoped to real scrollers, cards use `overflow: clip`

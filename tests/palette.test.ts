@@ -36,7 +36,12 @@ initKeymap(new Proxy({}, { get: (_, id) => () => fired.push(String(id)) }) as ne
 const sshTabs: { host: SshHost; password?: string }[] = [];
 const serialCalls: string[] = [];
 let flippedTo: string | null = null;
-let activeTab: { id: string; type: string; sshEmbedded?: boolean } | null = {
+let activeTab: {
+  id: string;
+  type: string;
+  sshEmbedded?: boolean;
+  shared?: boolean;
+} | null = {
   id: "tab-1",
   type: "local",
 };
@@ -107,6 +112,7 @@ describe("command palette — root", () => {
     expect(input().value).toBe("");
     expect(document.querySelector(".pal-prefix.on")?.textContent).toBe(">");
     expect(document.querySelector(".pal-group")?.textContent).toBe("Tab");
+    expect(document.querySelector(".pal-footer.on")).toBeNull();
     // New SSH Temporary Tab is a root Tab command.
     expect(rowTexts().some((t) => t.includes("New SSH Temporary Tab"))).toBe(true);
   });
@@ -119,18 +125,52 @@ describe("command palette — root", () => {
     );
     expect(rowTexts()).toContain("New SSH Tab");
     expect(rowTexts()).toContain("New Serial Tab");
+    expect(rowTexts()).toContain("Share with AI");
+    expect(rowTexts()).not.toContain("SSH: Port Forwarding…");
+    expect(rowTexts().some((t) => t.startsWith("Serial:"))).toBe(false);
+    expect(rowTexts().some((t) => t === "Stop Sharing")).toBe(false);
     expect(rowTexts().some((t) => t === "New Tab…")).toBe(false);
+    expect(rowTexts().some((t) => t.includes("Add Local"))).toBe(false);
+    expect(rowTexts().some((t) => t.includes("Remove All"))).toBe(false);
   });
 
   it("filters by title and runs the selected command with Enter", async () => {
     openCommandPalette();
     await vi.waitFor(() => expect(rowTexts().length).toBeGreaterThan(0));
-    type("baud");
-    await vi.waitFor(() => expect(rowTexts()).toEqual(["Serial: Set Baud Rate…"]));
+    type("terminal: clear");
+    await vi.waitFor(() => expect(rowTexts()).toEqual(["Terminal: Clear"]));
     key("Enter");
-    // The command dispatches through the keymap handler table and closes.
-    expect(fired).toEqual(["tterm.serialBaud"]);
+    expect(fired).toEqual(["workbench.action.terminal.clear"]);
     expect(paletteOpen()).toBe(false);
+  });
+
+  it("lists SSH Port Forwarding only on an embedded-SSH tab", async () => {
+    activeTab = { id: "tab-ssh", type: "ssh", sshEmbedded: true };
+    openCommandPalette();
+    await vi.waitFor(() => expect(rowTexts()).toContain("SSH: Port Forwarding…"));
+    expect(rowTexts()).toContain("SSH: Toggle Auto-reconnect");
+    expect(rowTexts().some((t) => t.startsWith("Serial:"))).toBe(false);
+  });
+
+  it("lists serial commands only on a serial tab", async () => {
+    activeTab = { id: "tab-ser", type: "serial" };
+    openCommandPalette();
+    await vi.waitFor(() => expect(rowTexts()).toContain("Serial: Set Baud Rate…"));
+    expect(rowTexts()).not.toContain("SSH: Port Forwarding…");
+  });
+
+  it("hides Port Forwarding on system ssh", async () => {
+    activeTab = { id: "tab-bin", type: "ssh", sshEmbedded: false };
+    openCommandPalette();
+    await vi.waitFor(() => expect(rowTexts()).toContain("SSH: Toggle Auto-reconnect"));
+    expect(rowTexts()).not.toContain("SSH: Port Forwarding…");
+  });
+
+  it("lists Stop Sharing only while the tab is shared", async () => {
+    activeTab = { id: "tab-1", type: "local", shared: true };
+    openCommandPalette();
+    await vi.waitFor(() => expect(rowTexts()).toContain("Stop Sharing"));
+    expect(rowTexts()).not.toContain("Share with AI");
   });
 
   it("serial setter refuses a non-serial active tab with an explanation", async () => {
@@ -219,16 +259,16 @@ describe("command palette — two-level flows", () => {
     setSshHistory([{ hostname: "lab", user: "root", port: "2222", lastUsed: 1 }]);
     openPaletteFlow("tempSsh");
     await vi.waitFor(() => expect(rowTexts()).toContain("root@lab:2222"));
+    expect(
+      [...document.querySelectorAll(".pal-footer.on .pal-foot-item")].map((n) => n.textContent),
+    ).toEqual(["↑↓Select", "↵Connect", "⇥Complete"]);
+    expect(
+      [...document.querySelectorAll(".pal-footer .pal-foot-key")].map((n) => n.textContent),
+    ).toEqual(["↑↓", "↵", "⇥"]);
+    expect(
+      [...document.querySelectorAll(".pal-footer .pal-foot-label")].map((n) => n.textContent),
+    ).toEqual(["Select", "Connect", "Complete"]);
     key("ArrowDown"); // Examples → first Recent
-    expect(
-      [...document.querySelectorAll(".pal-row.selected .pal-hint")].map((n) => n.textContent),
-    ).toEqual(["Enterconnect", "Tabcomplete"]);
-    expect(
-      [...document.querySelectorAll(".pal-row.selected .pal-hint .pal-kbd")].map((n) => n.textContent),
-    ).toEqual(["Enter", "Tab"]);
-    expect(
-      [...document.querySelectorAll(".pal-row.selected .pal-hint-action")].map((n) => n.textContent),
-    ).toEqual(["connect", "complete"]);
     key("Tab");
     expect(paletteOpen()).toBe(true);
     expect(sshTabs).toHaveLength(0);
@@ -278,27 +318,48 @@ describe("command palette — port forwards", () => {
     },
   ];
 
+  let live = SAMPLE.map((f) => ({ ...f }));
+
   beforeEach(() => {
     activeTab = { id: "tab-3", type: "ssh", sshEmbedded: true };
+    live = SAMPLE.map((f) => ({ ...f }));
     invokeMock.mockClear();
-    invokeMock.mockImplementation((cmd: string) => {
-      if (cmd === "ssh_forward_list") return Promise.resolve(SAMPLE);
-      if (cmd === "ssh_forward_add") return Promise.resolve(12);
+    invokeMock.mockImplementation((cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === "ssh_forward_list") return Promise.resolve(live);
+      if (cmd === "ssh_forward_add") {
+        live = [
+          {
+            forwardId: 12,
+            kind: String(args?.kind ?? "local"),
+            listenHost: String(args?.listenHost ?? ""),
+            listenPort: Number(args?.listenPort ?? 0),
+            targetHost: String(args?.targetHost ?? ""),
+            targetPort: Number(args?.targetPort ?? 0),
+          },
+          ...live,
+        ];
+        return Promise.resolve(12);
+      }
+      if (cmd === "ssh_forward_remove") {
+        live = live.filter((f) => f.forwardId !== args?.forwardId);
+        return Promise.resolve(null);
+      }
       return Promise.resolve(null);
     });
   });
 
-  it("lists forwards in-overlay with add/remove actions", async () => {
+  it("lists existing forwards with the one-line spec footer", async () => {
     openPaletteFlow("forwards");
     await vi.waitFor(() => expect(rowTexts().some((t) => t.includes("8080"))).toBe(true));
-    expect(rowTexts()).toContain("Add Local Forward…");
-    expect(rowTexts()).toContain("Add Remote Forward…");
-    expect(rowTexts()).toContain("Add Dynamic Forward…");
+    expect(input().placeholder).toContain("L|R|D");
+    expect(rowTexts()[0]).toContain("Examples:");
     expect(rowTexts()).toContain("Remove all forwards (2)");
-    // Dynamic renders as SOCKS, not host:port.
-    expect(rowFullTexts().some((t) => t.includes("any destination (SOCKS5)"))).toBe(true);
+    expect(rowTexts().some((t) => t.includes("Add Local"))).toBe(false);
+    expect(
+      [...document.querySelectorAll(".pal-footer.on .pal-foot-label")].map((n) => n.textContent),
+    ).toEqual(["Select", "Add", "Complete", "Remove"]);
+    expect(rowFullTexts().some((t) => t.includes("SOCKS5"))).toBe(true);
 
-    // Clicking a forward row removes it by backend id.
     const row = [...document.querySelectorAll<HTMLElement>(".pal-row")].find((r) =>
       r.textContent?.includes("db.internal"),
     )!;
@@ -311,62 +372,84 @@ describe("command palette — port forwards", () => {
     );
   });
 
-  it("add local forward is a three-step in-overlay flow", async () => {
-    openPaletteFlow("forwardLocal");
-    await vi.waitFor(() => expect(input().placeholder).toBe("8080"));
-    type("8080");
-    key("Enter");
-    await vi.waitFor(() => expect(input().placeholder).toBe("127.0.0.1"));
-    type("db.internal");
-    key("Enter");
-    await vi.waitFor(() => expect(input().placeholder).toBe("3000"));
-    type("5432");
-    key("Enter");
+  it("Delete removes the selected existing forward when the input is empty", async () => {
+    openPaletteFlow("forwards");
+    await vi.waitFor(() => expect(rowTexts().some((t) => t.includes("db.internal"))).toBe(true));
+    const idx = rowTexts().findIndex((t) => t.includes("db.internal"));
+    for (let i = 0; i < idx; i++) key("ArrowDown");
+    key("Delete");
+    await vi.waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("ssh_forward_remove", {
+        id: "tab-3",
+        forwardId: 7,
+      }),
+    );
+  });
 
+  it("adds a local forward from the one-line spec and stays open", async () => {
+    openPaletteFlow("forwards");
+    await vi.waitFor(() => expect(rowTexts()[0]).toContain("Examples:"));
+    type("L 9000:localhost:3000");
+    await vi.waitFor(() => expect(rowTexts()[0]).toContain("Add →"));
+    key("Enter");
     await vi.waitFor(() =>
       expect(invokeMock).toHaveBeenCalledWith("ssh_forward_add", {
         id: "tab-3",
         kind: "local",
         listenHost: "127.0.0.1",
-        listenPort: 8080,
-        targetHost: "db.internal",
-        targetPort: 5432,
+        listenPort: 9000,
+        targetHost: "localhost",
+        targetPort: 3000,
       }),
     );
-    expect(paletteOpen()).toBe(false);
+    expect(paletteOpen()).toBe(true);
+    await vi.waitFor(() => expect(input().value).toBe(""));
   });
 
-  it("dynamic forward collects only the listen port", async () => {
+  it("keyboard Add Dynamic seeds D and submits the listen port", async () => {
     openPaletteFlow("forwardDynamic");
-    await vi.waitFor(() => expect(input().placeholder).toBe("1080"));
-    type("1080");
+    await vi.waitFor(() => expect(input().value).toBe("D "));
+    type("D 1081");
+    await vi.waitFor(() => expect(rowTexts()[0]).toContain("Add →"));
     key("Enter");
     await vi.waitFor(() =>
       expect(invokeMock).toHaveBeenCalledWith("ssh_forward_add", {
         id: "tab-3",
         kind: "dynamic",
         listenHost: "127.0.0.1",
-        listenPort: 1080,
+        listenPort: 1081,
         targetHost: "",
         targetPort: 0,
       }),
     );
+    expect(paletteOpen()).toBe(true);
   });
 
-  it("refuses a non-embedded tab with an explanation", async () => {
+  it("refuses a non-embedded tab with an explanation", () => {
     activeTab = { id: "tab-1", type: "local" };
     openPaletteFlow("forwards");
     expect(paletteOpen()).toBe(false);
     expect(document.querySelector("#toast-container")?.textContent).toContain("embedded-SSH");
   });
 
-  it("rejects an invalid port without leaving the page", async () => {
-    openPaletteFlow("forwardLocal");
-    await vi.waitFor(() => expect(input().placeholder).toBe("8080"));
+  it("rejects an incomplete spec without leaving the page", async () => {
+    openPaletteFlow("forwards");
+    await vi.waitFor(() => expect(rowTexts()[0]).toContain("Examples:"));
     type("99999");
     key("Enter");
     expect(invokeMock).not.toHaveBeenCalledWith("ssh_forward_add", expect.anything());
     expect(paletteOpen()).toBe(true);
-    expect(document.querySelector("#toast-container")?.textContent).toContain("Invalid port");
+    expect(document.querySelector("#toast-container")?.textContent).toContain("L|R|D");
+  });
+
+  it("Tab completes an existing forward into the input", async () => {
+    openPaletteFlow("forwards");
+    await vi.waitFor(() => expect(rowTexts().some((t) => t.includes("db.internal"))).toBe(true));
+    const idx = rowTexts().findIndex((t) => t.includes("db.internal"));
+    for (let i = 0; i < idx; i++) key("ArrowDown");
+    key("Tab");
+    expect(paletteOpen()).toBe(true);
+    expect(input().value).toBe("L 8080:db.internal:5432");
+    await vi.waitFor(() => expect(rowTexts()[0]).toContain("Add →"));
   });
 });

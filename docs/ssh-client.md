@@ -158,9 +158,9 @@ host is optional everywhere and defaults to 127.0.0.1.
 - Settings → SSH: host editor modal (`sshhosteditor.ts`), key section
   (`sshkeys.ts`: generate/list/copy/install modals), per-host "Upload SSH
   Key".
-- Tab context menu → "Port Forwarding…" + quick-panel forwards block; both
-  go through `src/terminal/forwarding.ts` (single home of invoke calls +
-  error toasts).
+- Tab context menu dropped Port Forwarding (lives in quick panel + palette
+  one-line spec via `src/ui/forwardspec.ts`). Both palette and quick-panel
+  go through `src/ui/forwarding.ts` (single home of invoke calls + error toasts).
 
 ## Tests
 

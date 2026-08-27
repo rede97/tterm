@@ -178,35 +178,6 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* Selection-only hints on the row (SSH Recent: Enter connect · Tab complete). */
-.pal-row-hints {
-  display: none;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 10px;
-  margin-left: auto;
-}
-
-.pal-row.selected .pal-row-hints {
-  display: inline-flex;
-}
-
-.pal-hint {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.pal-hint-action {
-  font-size: var(--tt-fs-caption);
-  color: var(--tt-muted);
-  font-weight: var(--tt-ui-weight);
-}
-
-.pal-row.selected .pal-hint-action {
-  color: rgba(255, 255, 255, 0.45);
-}
-
 .pal-meta {
   flex-shrink: 0;
   font-size: var(--tt-fs-caption);
@@ -223,4 +194,41 @@
   font-size: var(--tt-fs-label);
   color: var(--tt-muted);
   text-align: center;
+}
+
+/* Cursor-style key footer — secondary pages only (not command root / Ctrl+P).
+   Glyphs, not boxed .pal-kbd chips. */
+.pal-footer {
+  display: none;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 6px 12px 7px;
+  border-top: 1px solid var(--tt-line);
+  color: var(--tt-muted);
+  font: var(--tt-fs-caption) / 1.2 var(--tt-ui);
+  font-weight: var(--tt-ui-weight);
+  user-select: none;
+}
+
+.pal-footer.on {
+  display: flex;
+}
+
+.pal-foot-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pal-foot-key {
+  font-size: var(--tt-fs-label);
+  line-height: 1;
+  color: var(--tt-muted);
+  font-family: var(--tt-ui);
+}
+
+.pal-foot-label {
+  font-size: var(--tt-fs-caption);
+  color: var(--tt-muted);
 }

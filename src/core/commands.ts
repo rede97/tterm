@@ -4,9 +4,12 @@
 // Design (VS Code model, shrunk to fit):
 //  - KEY_COMMANDS is the declarative registry: id, display title, default
 //    binding ("" = unbound, e.g. Clear Terminal ships without a shortcut).
+//  - `when` hides a grouped command from the palette when the active tab
+//    is the wrong session (SSH / serial / share state). Settings → Keyboard
+//    still lists it so it can be bound.
 //  - `group` matches docs/command-palette-preview.html section headers; omit
 //    to keep a command in Settings → Keyboard but out of the palette list
-//    (MRU / Show Palette / default-profile New Tab).
+//    (MRU / Show Palette / default-profile New Tab / Add·Remove forwards).
 //  - User overrides live in configStore "keybindings": { [commandId]: combo }.
 //    An explicit "" override UNBINDS a command that has a default — merge is
 //    plain {...defaults, ...stored}, never delete-on-empty.
@@ -28,6 +31,37 @@ export interface KeyCommand {
   default: string;
   /** Palette section header; omit → Settings only, not listed in palette. */
   group?: string;
+  /**
+   * Palette visibility vs the active tab. Keyboard bindings stay in Settings
+   * regardless. Omit → listed whenever `group` is set.
+   */
+  when?: "ssh" | "ssh-embedded" | "serial" | "shared" | "unshared";
+}
+
+/** Active-tab facts the palette uses to hide mismatching session commands. */
+export interface PaletteTabContext {
+  type: string;
+  sshEmbedded?: boolean;
+  shared?: boolean;
+}
+
+/** Whether a grouped command appears in the current palette list. */
+export function commandListed(cmd: KeyCommand, tab: PaletteTabContext | null): boolean {
+  if (!cmd.group) return false;
+  switch (cmd.when) {
+    case "ssh":
+      return tab?.type === "ssh";
+    case "ssh-embedded":
+      return tab?.type === "ssh" && tab.sshEmbedded === true;
+    case "serial":
+      return tab?.type === "serial";
+    case "shared":
+      return tab != null && tab.shared === true;
+    case "unshared":
+      return tab != null && tab.shared !== true;
+    default:
+      return true;
+  }
 }
 
 /** Registry order = palette order (Tab → … → Terminal → Window last). */
@@ -118,6 +152,7 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
     desc: "Share the active session with the AI hub.",
     default: "",
     group: "Share",
+    when: "unshared",
   },
   {
     id: "tterm.shareStop",
@@ -125,35 +160,16 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
     desc: "Stop sharing the active session with the AI hub.",
     default: "",
     group: "Share",
+    when: "shared",
   },
   // ---- SSH ----
   {
-    id: "tterm.forwardAddLocal",
-    title: "SSH: Add Local Port Forward…",
-    desc: "Add a local (-L) port forward: listen here, dial from the remote.",
+    id: "tterm.portForwards",
+    title: "SSH: Port Forwarding…",
+    desc: "Manage port forwards for the active embedded-SSH session.",
     default: "",
     group: "SSH",
-  },
-  {
-    id: "tterm.forwardAddRemote",
-    title: "SSH: Add Remote Port Forward…",
-    desc: "Add a remote (-R) port forward: listen on the remote, dial from here.",
-    default: "",
-    group: "SSH",
-  },
-  {
-    id: "tterm.forwardAddDynamic",
-    title: "SSH: Add Dynamic (SOCKS) Forward…",
-    desc: "Add a dynamic (-D) SOCKS5 proxy forward listening here.",
-    default: "",
-    group: "SSH",
-  },
-  {
-    id: "tterm.forwardRemoveAll",
-    title: "SSH: Remove All Port Forwards",
-    desc: "Remove every port forward of the active embedded-SSH session.",
-    default: "",
-    group: "SSH",
+    when: "ssh-embedded",
   },
   {
     id: "tterm.sshAutoReconnect",
@@ -161,6 +177,7 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
     desc: "Toggle timed auto-reconnect for the active SSH session.",
     default: "",
     group: "SSH",
+    when: "ssh",
   },
   {
     id: "tterm.clearSshTempHistory",
@@ -169,6 +186,32 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
     default: "",
     group: "SSH",
   },
+  // Bindable add/remove — Keyboard only. Palette uses Port Forwarding…
+  // (one-line spec in src/ui/forwardspec.ts).
+  {
+    id: "tterm.forwardAddLocal",
+    title: "SSH: Add Local Port Forward…",
+    desc: "Add a local (-L) port forward: listen here, dial from the remote.",
+    default: "",
+  },
+  {
+    id: "tterm.forwardAddRemote",
+    title: "SSH: Add Remote Port Forward…",
+    desc: "Add a remote (-R) port forward: listen on the remote, dial from here.",
+    default: "",
+  },
+  {
+    id: "tterm.forwardAddDynamic",
+    title: "SSH: Add Dynamic (SOCKS) Forward…",
+    desc: "Add a dynamic (-D) SOCKS5 proxy forward listening here.",
+    default: "",
+  },
+  {
+    id: "tterm.forwardRemoveAll",
+    title: "SSH: Remove All Port Forwards",
+    desc: "Remove every port forward of the active embedded-SSH session.",
+    default: "",
+  },
   // ---- Serial ----
   {
     id: "tterm.serialProfile",
@@ -176,6 +219,7 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
     desc: "Switch the active serial session's profile (input mode, newlines, flow).",
     default: "",
     group: "Serial",
+    when: "serial",
   },
   {
     id: "tterm.serialBaud",
@@ -183,6 +227,7 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
     desc: "Change the active serial session's baud rate.",
     default: "",
     group: "Serial",
+    when: "serial",
   },
   {
     id: "tterm.serialFlow",
@@ -190,6 +235,7 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
     desc: "Change the active serial session's flow control.",
     default: "",
     group: "Serial",
+    when: "serial",
   },
   {
     id: "tterm.serialInputMode",
@@ -197,6 +243,7 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
     desc: "Change the active serial session's input mode (normal / line).",
     default: "",
     group: "Serial",
+    when: "serial",
   },
   {
     id: "tterm.serialDisconnect",
@@ -204,6 +251,7 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
     desc: "Disconnect the active serial session (keeps the tab).",
     default: "",
     group: "Serial",
+    when: "serial",
   },
   {
     id: "tterm.serialReconnect",
@@ -211,6 +259,7 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
     desc: "Reconnect the active serial session.",
     default: "",
     group: "Serial",
+    when: "serial",
   },
   {
     id: "tterm.serialAutoReconnect",
@@ -218,6 +267,7 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
     desc: "Toggle timed auto-reconnect for the active serial session.",
     default: "",
     group: "Serial",
+    when: "serial",
   },
   // ---- Terminal ----
   {
@@ -265,12 +315,6 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
     id: "workbench.action.newTab",
     title: "New Tab (default profile)",
     desc: "Open a new local tab with the default profile (no picker).",
-    default: "",
-  },
-  {
-    id: "tterm.portForwards",
-    title: "SSH: Port Forwarding…",
-    desc: "Manage port forwards for the active embedded-SSH session.",
     default: "",
   },
 ];
