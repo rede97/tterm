@@ -408,12 +408,21 @@ fn ssh_hooks(app: tauri::AppHandle, id: String, auto_retry: Arc<AtomicBool>) -> 
 
 // ── Commands ─────────────────────────────────────────────────────────
 
+fn clamp_pty_size(cols: Option<u32>, rows: Option<u32>) -> (u32, u32) {
+    (
+        cols.filter(|&c| c >= 2).unwrap_or(80),
+        rows.filter(|&r| r >= 2).unwrap_or(24),
+    )
+}
+
 #[tauri::command]
 pub async fn ssh_spawn_embedded(
     state: tauri::State<'_, AppState>,
     app: tauri::AppHandle,
     spec: EmbeddedSshSpec,
     prompt_tab_id: Option<String>,
+    cols: Option<u32>,
+    rows: Option<u32>,
 ) -> Result<WsConnectResult, String> {
     let id = {
         let mut next = state.next_id.lock().map_err(|e| e.to_string())?;
@@ -422,11 +431,12 @@ pub async fn ssh_spawn_embedded(
         id
     };
 
+    let size = clamp_pty_size(cols, rows);
     let session = SshSession {
         cancel: Arc::new(AtomicBool::new(false)),
         close_notify: Arc::new(tokio::sync::Notify::new()),
         live: Arc::new(tokio::sync::Mutex::new(None)),
-        size: Arc::new(Mutex::new((80, 24))),
+        size: Arc::new(Mutex::new(size)),
         // A pre-seeded password (palette Temporary Connect) authenticates
         // without prompting; agent/identity files are still tried first.
         cached_password: Arc::new(Mutex::new(spec.password.clone())),
@@ -494,4 +504,16 @@ pub(crate) fn kill_ssh_session(session: &SshSession) {
     tauri::async_runtime::spawn(async move {
         *live.lock().await = None;
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::clamp_pty_size;
+
+    #[test]
+    fn clamp_pty_size_defaults_when_missing_or_tiny() {
+        assert_eq!(clamp_pty_size(None, None), (80, 24));
+        assert_eq!(clamp_pty_size(Some(0), Some(1)), (80, 24));
+        assert_eq!(clamp_pty_size(Some(120), Some(40)), (120, 40));
+    }
 }

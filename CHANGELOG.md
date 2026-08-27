@@ -7,6 +7,9 @@ Changes
   scrollports; scoped to real scrollers, cards use `overflow: clip`
 - **No rubber-band on real scrollports** — Settings / QP / palette stop at
   the edge; not applied to every box (that trapped the wheel on cards)
+- **SSH sessions match the window grid on connect** — a new window's
+  embedded SSH tab no longer stays at 80×24 until you resize (htop and
+  other TUIs were drawing against the default grid)
 - **Terminal typing focus** — after a confirm (multi-line paste, close-window),
   the command palette, the tab switcher, or Alt-Tab back to the window, keystrokes
   return to xterm without a click. Clicking or dragging the title-bar drag

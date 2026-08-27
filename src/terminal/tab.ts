@@ -132,9 +132,7 @@ export class TerminalTab {
     // (fit, font-metric re-measure refits, window resize) fires onResize.
     // fitDeferred's explicit invoke alone misses font-race refits, which left
     // size-dependent sessions (Anime TTY) rendering for a stale grid.
-    this.terminal.onResize(({ cols, rows }) => {
-      invoke("pty_resize", { id: this.id, cols, rows }).catch(swallow);
-    });
+    this.terminal.onResize(() => this.syncBackendSize());
 
     this.terminal.onTitleChange((title: string) => {
       if (this._title.onOscTitle(title)) this._syncTitleDom();
@@ -411,6 +409,20 @@ export class TerminalTab {
       this.sizeHint.show(cols, rows);
     }
     return { cols, rows };
+  }
+
+  /**
+   * Push the current xterm grid to the backend even when cols/rows did not
+   * change. Needed after pending-SSH rebind: `fit()` already sized the
+   * xterm against `pending-ssh-N`, so `onResize` would never fire for the
+   * real session id.
+   */
+  syncBackendSize(): void {
+    invoke("pty_resize", {
+      id: this.id,
+      cols: this.terminal.cols,
+      rows: this.terminal.rows,
+    }).catch(swallow);
   }
 
   fitDeferred(): void {

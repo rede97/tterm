@@ -338,6 +338,8 @@ export class TabManager {
           password: password || null,
         },
         promptTabId: tab.id,
+        cols: tab.terminal.cols,
+        rows: tab.terminal.rows,
       });
     } catch (e) {
       cancelSshSecretPromptFor(tab.id);
@@ -395,6 +397,12 @@ export class TabManager {
     }
     tab.onSocketClosed = () => this._onSessionClosed(tab.id);
     tab.attachSocket(result.port, result.token);
+    // Pending-tab fit already sized xterm, so fitDeferred is often a no-op
+    // and onResize never fires for tab-N. Push the live grid to the session
+    // that just registered (spawn used this size for request_pty; a resize
+    // during the password prompt still needs this window_change).
+    tab.fit();
+    tab.syncBackendSize();
     tab.fitDeferred();
     this.refreshBadges();
     notifyTrayTabs();
