@@ -25,7 +25,7 @@ import {
   saveSshConfigToDisk,
 } from "./ssh";
 
-// Panel header copy (design: docs/settings-preview.html META) — in-flow
+// Panel header copy (design: drafts/settings-preview.html META) — in-flow
 // content at the top of the scrollport, follows the active nav item.
 const PANEL_META: Record<string, [string, string]> = {
   general: ["General", "App version, updates, renderer, paste behavior."],
@@ -107,7 +107,7 @@ export function createSettingsContent(): HTMLElement {
   body.appendChild(scroll);
 
   // -- Footer --
-  // Design (docs/settings-preview.html): the footer carries ONLY the dirty
+  // Design (drafts/settings-preview.html): the footer carries ONLY the dirty
   // hint + Revert + Apply; success/failure feedback goes to the bottom-left
   // toast. SSH edits join the same Apply — one click writes app config and
   // ~/.ssh/config together.

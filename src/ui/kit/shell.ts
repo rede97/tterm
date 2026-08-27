@@ -1,4 +1,4 @@
-// Fixed chrome builders shared by the app and docs/*-preview.html.
+// Fixed chrome builders shared by the app and drafts/*-preview.html.
 // Structure + class names only — callers wire events and fill dynamic rows.
 // CSS: palette.css / confirm.css. Do not duplicate this markup in drafts.
 

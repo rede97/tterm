@@ -276,6 +276,35 @@ describe("command palette — two-level flows", () => {
     await vi.waitFor(() => expect(rowTexts()[0]).toContain("Connect → root@lab:2222"));
   });
 
+  it("keeps the profile name when the commandline is long", async () => {
+    const prev = handlers.listLocalProfiles;
+    handlers.listLocalProfiles = () => [
+      {
+        name: "Developer Command Prompt for VS 2022",
+        command:
+          'cmd.exe /k "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\Tools\\VsDevCmd.bat"',
+      },
+    ];
+    try {
+      openPaletteFlow("newLocal");
+      await vi.waitFor(() =>
+        expect(rowTexts()).toContain("Developer Command Prompt for VS 2022"),
+      );
+      const row = [...document.querySelectorAll<HTMLElement>(".pal-row")].find((r) =>
+        r.querySelector(".pal-label")?.textContent?.includes("VS 2022"),
+      );
+      expect(row).toBeTruthy();
+      const label = row?.querySelector<HTMLElement>(".pal-label");
+      const meta = row?.querySelector<HTMLElement>(".pal-meta");
+      expect(label?.textContent).toBe("Developer Command Prompt for VS 2022");
+      expect(label?.title).toBe(label?.textContent);
+      expect(meta?.textContent).toContain("VsDevCmd.bat");
+      expect(meta?.title).toBe(meta?.textContent);
+    } finally {
+      handlers.listLocalProfiles = prev;
+    }
+  });
+
   it("Escape pops one level instead of closing", async () => {
     openPaletteFlow("newLocal");
     await vi.waitFor(() => expect(rowTexts()).toContain("PowerShell"));

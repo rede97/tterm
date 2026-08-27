@@ -82,7 +82,6 @@ describe("q8b overlay scrollbar", () => {
     });
     await browser.pause(200);
     expect(await flowRight()).toBe(before);
-    await browser.saveScreenshot("shots7/q8b-overflow.png");
 
     await browser.setWindowSize(size.width, size.height);
   });

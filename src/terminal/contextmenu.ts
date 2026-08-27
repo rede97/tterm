@@ -149,7 +149,7 @@ function mkSeparator(): HTMLElement {
 }
 
 // -- Tab context menu group --
-// Design (docs/tabbar-preview.html): Duplicate first; "New Tab" lives on
+// Design (drafts/tabbar-preview.html): Duplicate first; "New Tab" lives on
 // the + / ▾ buttons, Port Forwarding lives in the quick panel — neither
 // repeats here. The color row carries a live preview of the tab's color.
 const tabMenuGroup = document.createElement("div");

@@ -1,5 +1,5 @@
 // Command palette (Ctrl+Shift+P) — the ">" face of the quick-open shell
-// (docs/command-palette-preview.html).
+// (drafts/command-palette-preview.html).
 //
 // Model: one overlay, a fixed chrome ">" (.pal-prefix) on the command root,
 // an input that holds only the filter/query (never the ">"), and a page STACK
@@ -49,7 +49,7 @@ import {
   type PaletteFooterHint,
   setPaletteFooter,
 } from "./kit/shell";
-import { dismissChromePopups } from "./popups";
+import { dismissChromePopups, registerChromePopup } from "./popups";
 import { restoreTerminalFocus } from "./termfocus";
 import { showToast } from "./toast";
 
@@ -687,9 +687,15 @@ async function renderPage(): Promise<void> {
       listEl?.appendChild(el("div", "pal-group", page.group));
     }
     const row = el("div", `pal-row${i === selected ? " selected" : ""}`);
-    row.appendChild(el("span", "pal-label", r.label));
+    const labelEl = el("span", "pal-label", r.label);
+    labelEl.title = r.label;
+    row.appendChild(labelEl);
     if (r.kbd) row.appendChild(el("span", "pal-kbd", r.kbd));
-    else if (r.detail) row.appendChild(el("span", "pal-meta", r.detail));
+    else if (r.detail) {
+      const meta = el("span", "pal-meta", r.detail);
+      meta.title = r.detail;
+      row.appendChild(meta);
+    }
     row.addEventListener("click", () => r.action());
     row.addEventListener("mousemove", () => {
       if (selected !== i) {
@@ -850,7 +856,7 @@ export function openPaletteFlow(
 export function openCommandPalette(query = ""): void {
   if (!_handlers) return;
   close();
-  dismissChromePopups();
+  dismissChromePopups("palette");
   stack = [{ kind: "commands" }];
   selected = 0;
 
@@ -874,7 +880,8 @@ export function openCommandPalette(query = ""): void {
 }
 
 function close(): void {
-  overlay?.remove();
+  if (!overlay) return;
+  overlay.remove();
   overlay = null;
   stack = [];
   rows = [];
@@ -886,3 +893,5 @@ function close(): void {
   fwdCache = [];
   restoreTerminalFocus();
 }
+
+registerChromePopup("palette", close);

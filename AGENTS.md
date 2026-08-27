@@ -4,7 +4,7 @@
 
 TTerm is a Windows desktop terminal for CLI agents (Codex, Claude Code): local shells (ConPTY), SSH (system `ssh` or embedded russh client), and serial devices, with CJK/IME support and AI session sharing. Stack: Tauri 2 (Rust backend, undecorated WebView2 window) + TypeScript/lit-html frontend (Vite, xterm.js). Package/runtime: **Bun-first** (`bun run <script>`); Rust via cargo.
 
-Current branch: `feat/ui-redesign-migration` — full chrome redesign (design tokens `--tt-*`, skins, command palette, quick-panel 1:1, Settings 1:1, close-window confirm) ahead of `main`. Design fact sources: `docs/*-preview.html` + `docs/ui/tokens.css`; parity tracked in `docs/ui/parity-gap.md` (CLOSED). `AGENT.md` (existing) holds deeper domain notes (IME, PTY, SSH, tray).
+Current branch: `feat/ui-redesign-migration` — full chrome redesign (design tokens `--tt-*`, skins, command palette, quick-panel 1:1, Settings 1:1, close-window confirm) ahead of `main`. Design drafts: `drafts/*-preview.html` + `drafts/ui/` (token re-export). Kit contract: `src/ui/kit/README.md`. `AGENT.md` holds deeper domain notes (IME, PTY, SSH, tray).
 
 ## Architecture & Data Flow
 
@@ -35,7 +35,7 @@ Current branch: `feat/ui-redesign-migration` — full chrome redesign (design to
 - `src/util/` — imebox/imeanchor/imefreeze/imefilter, sizehint, hysteresis, themes, fontconfig, serialinput, osc, disconnect, xterm-internals (ONLY place private xterm APIs are touched)
 - `src/config/` — wt-profiles, ssh-config, custom-themes, serial-profiles (frontend owns all parsing)
 - `src-tauri/src/` — lib, relay, pty, serial(+_win), sshclient/, ssh, share, deadmode, state, window, tray, config, wt, newline, cmdparse, fonts, demo
-- `tests/` (vitest), `e2e/` (wdio + tauri-driver), `docs/` (design system), `plugins/` (biome grit rules)
+- `tests/` (vitest), `e2e/` (wdio + tauri-driver), `docs/` (markdown), `drafts/` (HTML UI previews), `plugins/` (biome grit rules)
 
 ## Development Commands
 
@@ -60,7 +60,7 @@ Constraints: vite pinned `127.0.0.1:1420` strictPort (HMR 1421; never `localhost
 - **Errors**: `.catch(logCatch("domain.action"))`, `swallow()` only for provably-ignorable, `showToast(msg, "error")` for user-facing. Bare `catch{}` banned (grit). Native `alert/confirm/prompt` banned (grit) — use `ui/confirm.ts`/`modal.ts`/`toast.ts` (every dismissal resolves false).
 - **Async guards**: monotonic tokens (`socketGen`), re-entry sets (`_closing`), in-handler busy flags over disabled attributes.
 - **Shared controls**: `ui/kit/` (`controls.css` + `select.ts` `.tt-select`, `lit.ts` `.tt-switch` / `.section`/`.row` / `.tt-btn*`, `stepper.ts`, `modal.ts`); menu portals to `<body>`; `ui/overlay-scroll.ts` (true overlay scrollbar — Chromium has none; webkit width = classic gutter).
-- **Design tokens**: `--tt-*` in `src/ui/tokens.css` (skins `body[data-skin]`, frosted overlays `body.tt-glass` / `overlayGlass`). `--term-bg` is JS-written per terminal scheme (2px seam) — NOT a `--tt-*` token. Tab chrome follows chrome skin (same surface as Settings sidebar), never terminal schemes. Settings is strictly 1:1 with `docs/settings-preview.html` (148px `--tt-btn-width`, row wells `.row`, visibility = LEFT checkbox `.check-row`, toggles only for single on/off).
+- **Design tokens**: `--tt-*` in `src/ui/tokens.css` (skins `body[data-skin]`, frosted overlays `body.tt-glass` / `overlayGlass`). `--term-bg` is JS-written per terminal scheme (2px seam) — NOT a `--tt-*` token. Tab chrome follows chrome skin (same surface as Settings sidebar), never terminal schemes. Settings is strictly 1:1 with `drafts/settings-preview.html` (148px `--tt-btn-width`, row wells `.row`, visibility = LEFT checkbox `.check-row`, toggles only for single on/off).
 - **Style**: Biome 2-space, lineWidth 100, organized imports, no `any`/non-null assertions (errors), no import cycles. `cargo fmt` after Rust edits.
 
 **Non-obvious invariants** (breaking these breaks things):
@@ -78,7 +78,7 @@ Constraints: vite pinned `127.0.0.1:1420` strictPort (HMR 1421; never `localhost
 - Entry: `src/main.ts`, `src/wiring.ts`, `index.html`, `src-tauri/src/lib.rs`
 - Config: `src/core/store.ts`, `src/core/keymap.ts`, `src/core/dom-ids.ts`, `vite.config.ts`, `tsconfig.json`, `biome.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`
 - Key modules: `src/terminal/tabmanager.ts`, `src/terminal/tab.ts`, `src/settings/index.ts`, `src/ui/lit.ts`, `src/ui/select.ts`, `src/styles.css` (all layout invariants, commented), `src-tauri/src/relay.rs`, `src-tauri/src/share.rs`
-- Docs: `AGENT.md` (domain deep-dives), `docs/ui/parity-gap.md`, `docs/backlog.md` (open items: real-IME acceptance), `CHANGELOG.md`
+- Docs: `AGENT.md` (domain deep-dives), `docs/backlog.md` (open items: real-IME acceptance), `docs/ux-entry-tree.md`, `CHANGELOG.md`
 
 ## Runtime/Tooling Preferences
 

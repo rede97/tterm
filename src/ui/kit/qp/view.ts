@@ -1,5 +1,5 @@
 // Pure quick-panel lit views — shared by app (terminal/quickpanel.ts) and
-// docs/quickpanel-preview.html. Input is a plain view-model + action
+// drafts/quickpanel-preview.html. Input is a plain view-model + action
 // callbacks; no TerminalTab, invoke, or TabManager.
 
 import {

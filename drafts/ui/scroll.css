@@ -7,7 +7,7 @@
  *
  * NOT a true overlay: setting ::-webkit-scrollbar { width } forces a
  * classic gutter on Chromium (content width shrinks when the bar appears).
- * See parity-gap Q8b. Do not claim "no layout impact" for this sheet alone.
+ * App QP/Settings use ui/overlay-scroll.ts for a true overlay thumb. Do not claim "no layout impact" for this sheet alone.
  *
  * Chrome 121+: setting scrollbar-width / scrollbar-color forces the native
  * Windows bar (with arrows) and overrides ::-webkit-*. Reserve scrollbar-*

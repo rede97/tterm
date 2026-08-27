@@ -1,7 +1,7 @@
 /**
  * Docs token entry — re-exports production tokens from src/ui/tokens.css.
  * Production source of truth: src/ui/tokens.css
- * Preview aliases: docs/ui/aliases.css
+ * Preview aliases: drafts/ui/aliases.css
  *
  * Glass: drafts use `--tt-glass-*` (body.tt-glass); QP layout sizes stay `--tt-qp-width`.
  */

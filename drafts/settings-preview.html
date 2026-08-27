@@ -4,14 +4,14 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>TTerm Settings — preview</title>
-<link rel="stylesheet" href="/docs/ui/tokens.css" />
-<link rel="stylesheet" href="/docs/ui/aliases.css" />
+<link rel="stylesheet" href="/drafts/ui/tokens.css" />
+<link rel="stylesheet" href="/drafts/ui/aliases.css" />
 <link rel="stylesheet" href="/src/ui/kit/controls.css" />
 <link rel="stylesheet" href="/src/ui/kit/forwardtable.css" />
-<link rel="stylesheet" href="/docs/ui/scroll.css" />
-<link rel="stylesheet" href="/docs/ui/preview-chrome.css" />
+<link rel="stylesheet" href="/drafts/ui/scroll.css" />
+<link rel="stylesheet" href="/drafts/ui/preview-chrome.css" />
 <style>
-  /* Page layout only —skins come from docs/ui/tokens.css */
+  /* Page layout only —skins come from drafts/ui/tokens.css */
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     height: 100%;
@@ -1701,11 +1701,11 @@
 <nav class="draft-nav" aria-label="Design drafts">
   <a class="brand" href="/">Drafts</a>
   <a href="/">Overview</a>
-  <a href="/docs/settings-preview.html" aria-current="page">Settings</a>
-  <a href="/docs/tabbar-preview.html">Tab bar</a>
-  <a href="/docs/quickpanel-preview.html">Quick panel</a>
-  <a href="/docs/command-palette-preview.html">Palette</a>
-  <a href="/docs/confirm-preview.html">Confirm</a>
+  <a href="/drafts/settings-preview.html" aria-current="page">Settings</a>
+  <a href="/drafts/tabbar-preview.html">Tab bar</a>
+  <a href="/drafts/quickpanel-preview.html">Quick panel</a>
+  <a href="/drafts/command-palette-preview.html">Palette</a>
+  <a href="/drafts/confirm-preview.html">Confirm</a>
 </nav>
 <div class="stage">
   <div class="app">
@@ -2532,8 +2532,8 @@
     </div>
 
     <ol>
-      <li><strong>SSH</strong> — toolbar: Add Host + Reload + Open File (148); Keys: Generate above list; Generate modal Name/Algo/Passphrase; Upload OS Auto|Windows|Linux|macOS; host row checkbox + edit/more/delete. See <code>docs/ui/parity-gap.md</code> D4.</li>
-      <li><strong>Landing rule</strong>: layout and buttons are strict 1:1 (parity-gap L1–L3). Visibility columns = left checkbox; toggles only for single on/off.</li>
+      <li><strong>SSH</strong> — toolbar: Add Host + Reload + Open File (148); Keys: Generate above list; Generate modal Name/Algo/Passphrase; Upload OS Auto|Windows|Linux|macOS; host row checkbox + edit/more/delete. See <code>src/ui/kit/README.md</code>.</li>
+      <li><strong>Landing rule</strong>: layout and buttons are strict 1:1 (kit 1:1). Visibility columns = left checkbox; toggles only for single on/off.</li>
       <li><strong>Footer</strong> shows dirty / Apply / Revert only; success feedback goes to bottom-left toast.</li>
       <li><strong>About</strong> left copy / right Homepage (GitHub) as solid 148.</li>
       <li><strong>Font</strong> keeps the Configure dialog; row-end Configure is solid 148.</li>
@@ -2544,7 +2544,7 @@
     </ol>
 
     <div class="hint">
-      When landing: <code>data-skin</code> → global chrome CSS variables; toast bottom-left; SSH writes via Apply; font dialog stays on <code>fontpicker.ts</code>. Diff tracker: <code>docs/ui/parity-gap.md</code>.
+      When landing: <code>data-skin</code> → global chrome CSS variables; toast bottom-left; SSH writes via Apply; font dialog stays on <code>fontpicker.ts</code>. Kit contract: <code>src/ui/kit/README.md</code>.
     </div>
 </aside>
 </div>

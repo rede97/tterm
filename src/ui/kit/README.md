@@ -1,6 +1,10 @@
 # TTerm UI kit
 
-Shared design-system controls for the **app** and **`docs/*-preview.html`**.
+Shared design-system controls for the **app** and **`drafts/*-preview.html`**.
+
+HTML drafts live in [`drafts/`](../../../drafts/) (not mixed with markdown in `docs/`). Hub: [`drafts/index.html`](../../../drafts/index.html). Preview CSS (token re-export, aliases, chrome, thin scroll) is [`drafts/ui/`](../../../drafts/ui/). Production tokens stay [`../tokens.css`](../tokens.css).
+
+Settings preview markup is still static HTML (not a shared lit view). Layout/button 1:1 still applies: 148px `--tt-btn-width`, `.row` wells, visibility = left checkbox `.check-row`, toggles only for a single on/off.
 
 ## Single source of truth
 
@@ -35,32 +39,26 @@ Stateful product chrome uses **one lit view** (or shell builder) for both app an
 
 App maps live tab/store → the same model. New DOM invariant → add/update a function in `tests/ui-contracts/` in the **same PR**.
 
-## Files
-
-| Path | Role |
-|------|------|
-| [`../tokens.css`](../tokens.css) | `--tt-*` tokens (production source of truth) |
-| [`controls.css`](./controls.css) | Select, toggle, buttons, stepper |
-| [`palette.css`](./palette.css) | Command palette / tab quick-open / MRU chrome |
-| [`confirm.css`](./confirm.css) | Confirm dialog chrome |
-| [`forwardtable.css`](./forwardtable.css) | Port-forward table (Settings + QP) |
-| [`shell.ts`](./shell.ts) | Fixed DOM structure for palette + confirm |
-| [`qp/view.ts`](./qp/view.ts) | Quick panel lit view (header + sections) |
-| [`../select.ts`](../select.ts) | `ttSelect` behavior (portal + fixed menu) |
-| [`../modal.ts`](../modal.ts) | Modals; `close()` always clears open selects |
-| [`../stepper.ts`](../stepper.ts) | Number stepper |
-| [`../lit.ts`](../lit.ts) | lit-html + Settings vocabulary (`.section` / `.row`) |
-
-Drafts link:
+## Draft load order
 
 ```html
-<link rel="stylesheet" href="/docs/ui/tokens.css" />
-<link rel="stylesheet" href="/docs/ui/aliases.css" />
+<link rel="stylesheet" href="/drafts/ui/tokens.css" />
+<link rel="stylesheet" href="/drafts/ui/aliases.css" />
 <link rel="stylesheet" href="/src/ui/kit/controls.css" />
 <link rel="stylesheet" href="/src/ui/kit/palette.css" />
 <link rel="stylesheet" href="/src/ui/kit/confirm.css" />
 <link rel="stylesheet" href="/src/ui/kit/forwardtable.css" />
+<link rel="stylesheet" href="/drafts/ui/scroll.css" />
+<link rel="stylesheet" href="/drafts/ui/preview-chrome.css" />
+<style>/* page-local layout only */</style>
 ```
+
+1. Never hard-code skin hex in a preview for colors that exist as `--tt-*`.
+2. Never redefine `.tt-select` / `.tt-btn*` / `.tt-switch` / `.stepper` / `.pal-*` in preview `<style>`.
+3. Tab bar chrome (`--tt-tab-bar`) follows the chrome skin — not terminal schemes.
+4. **CONNECTED** = `--tt-ok`; **Share** = `--tt-share`. Do not merge these.
+5. Scrollable surfaces use class **`tt-scroll`**. Setting `::-webkit-scrollbar` **width** forces a classic gutter; app QP/Settings use `ui/overlay-scroll.ts` for a true overlay thumb.
+6. Palette rows come from `KEY_COMMANDS`; palette/confirm chrome from `shell.ts`; QP DOM from `qpPanelView`.
 
 App: [`index.html`](../../../index.html) loads tokens; [`styles.css`](../../styles.css) `@import`s this kit.
 
@@ -79,3 +77,11 @@ App: [`index.html`](../../../index.html) loads tokens; [`styles.css`](../../styl
 - **Type:** only `--tt-fs-*`, `--tt-*-weight`, `--tt-ui` / `--tt-mono`
 
 Do **not** redefine these rules or paste parallel product HTML inside preview markup.
+
+## Skins
+
+- `body[data-skin="cursor"]` — near-black, white CTA, soft radius
+- `body[data-skin="vscode"]` — blue accent, tighter radius
+- `body.tt-glass` — frosted translucency for menus, dropdowns, and the quick panel (`--tt-glass-*`)
+
+`--term-bg` is NOT a `--tt-*` token — `applyTerminalBackground()` writes it from the terminal scheme (2px seam).

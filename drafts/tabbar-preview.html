@@ -4,13 +4,13 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>TTerm Tab Bar — preview</title>
-<link rel="stylesheet" href="/docs/ui/tokens.css" />
-<link rel="stylesheet" href="/docs/ui/aliases.css" />
+<link rel="stylesheet" href="/drafts/ui/tokens.css" />
+<link rel="stylesheet" href="/drafts/ui/aliases.css" />
 <link rel="stylesheet" href="/src/ui/kit/controls.css" />
-<link rel="stylesheet" href="/docs/ui/scroll.css" />
-<link rel="stylesheet" href="/docs/ui/preview-chrome.css" />
+<link rel="stylesheet" href="/drafts/ui/scroll.css" />
+<link rel="stylesheet" href="/drafts/ui/preview-chrome.css" />
 <style>
-  /* Page layout — chrome colors from docs/ui/tokens.css */
+  /* Page layout — chrome colors from drafts/ui/tokens.css */
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   html, body {
@@ -398,6 +398,7 @@
   .profile-item .item-icon svg { display: block; }
   .profile-item .item-label {
     flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -426,8 +427,9 @@
     margin-left: 8px;
     font-size: var(--tt-fs-caption);
     color: var(--tt-chrome-muted);
-    flex-shrink: 1;
+    flex: 0 1 auto;
     min-width: 0;
+    max-width: 50%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -729,11 +731,11 @@
 <nav class="draft-nav" aria-label="Design drafts">
   <a class="brand" href="/">Drafts</a>
   <a href="/">Overview</a>
-  <a href="/docs/settings-preview.html">Settings</a>
-  <a href="/docs/tabbar-preview.html" aria-current="page">Tab bar</a>
-  <a href="/docs/quickpanel-preview.html">Quick panel</a>
-  <a href="/docs/command-palette-preview.html">Palette</a>
-  <a href="/docs/confirm-preview.html">Confirm</a>
+  <a href="/drafts/settings-preview.html">Settings</a>
+  <a href="/drafts/tabbar-preview.html" aria-current="page">Tab bar</a>
+  <a href="/drafts/quickpanel-preview.html">Quick panel</a>
+  <a href="/drafts/command-palette-preview.html">Palette</a>
+  <a href="/drafts/confirm-preview.html">Confirm</a>
 </nav>
 <div class="stage">
   <div class="app">

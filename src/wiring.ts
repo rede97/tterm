@@ -286,7 +286,7 @@ export function initTerminalFocusRestore(): void {
   });
 }
 
-// Close-window confirmation (docs/confirm-preview.html): the backend
+// Close-window confirmation (drafts/confirm-preview.html): the backend
 // prevents every close request (X button, Alt+F4, taskbar) and asks via
 // event. Confirm only when the setting is on AND tabs are open — anything
 // else re-issues window_close, whose confirmed flag lets the close pass.

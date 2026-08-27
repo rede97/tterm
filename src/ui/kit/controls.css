@@ -1,5 +1,5 @@
 /**
- * TTerm UI kit — shared controls for app + docs/*-preview.html.
+ * TTerm UI kit — shared controls for app + drafts/*-preview.html.
  *
  * Classes are the contract. Behavior lives in src/ui/select.ts (and friends).
  * Drafts must NOT redefine these rules locally — link this file.

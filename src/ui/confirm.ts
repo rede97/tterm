@@ -1,6 +1,6 @@
 // Generic in-app confirm dialog — the single way to ask yes/no, replacing
 // native OS dialogs (which clash with the app's own modal look). Built on
-// createModal + kit shell (docs/confirm-preview.html): 420px well dialog,
+// createModal + kit shell (drafts/confirm-preview.html): 420px well dialog,
 // header / body / footer, OK or danger primary, warn border for destructive
 // actions. Every dismissal path (Cancel, Escape, backdrop) resolves false:
 // a dismissal never confirms.
@@ -21,7 +21,7 @@ export interface ConfirmOptions {
   danger?: boolean;
 }
 
-/** Multi-line paste confirmation (docs/confirm-preview.html): title with
+/** Multi-line paste confirmation (drafts/confirm-preview.html): title with
  *  an "N lines" header meta, and the clipboard body as an EDITABLE mono
  *  textarea — the user reviews/edits before it runs. Resolves the edited
  *  text, or null on any dismissal (Cancel / Escape / backdrop). */

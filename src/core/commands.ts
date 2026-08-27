@@ -7,7 +7,7 @@
 //  - `when` hides a grouped command from the palette when the active tab
 //    is the wrong session (SSH / serial / share state). Settings → Keyboard
 //    still lists it so it can be bound.
-//  - `group` matches docs/command-palette-preview.html section headers; omit
+//  - `group` matches drafts/command-palette-preview.html section headers; omit
 //    to keep a command in Settings → Keyboard but out of the palette list
 //    (MRU / Show Palette / default-profile New Tab / Add·Remove forwards).
 //  - User overrides live in configStore "keybindings": { [commandId]: combo }.

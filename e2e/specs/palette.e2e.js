@@ -66,4 +66,45 @@ describe("TTerm command palette", () => {
     });
     expect(await $(".pal-panel .pal-input").isExisting()).toBe(true);
   });
+
+  it("hides SSH/Serial session commands on a local tab", async () => {
+    await browser.keys("Escape");
+    await browser.waitUntil(async () => !(await $(".pal-overlay").isExisting()), {
+      timeout: 3000,
+      timeoutMsg: "palette did not close before filter test",
+    });
+
+    const kind = await browser.execute(() => {
+      const mgr = window.__tterm.mgr;
+      return mgr.get(mgr.activeTabId)?.type ?? null;
+    });
+    expect(kind).toBe("local");
+
+    await browser.keys(["Control", "Shift", "p"]);
+    const input = await $(".pal-panel .pal-input");
+    await input.waitForExist({ timeout: 5000 });
+    const unfiltered = await $(".pal-panel").getText();
+    expect(unfiltered).toContain("New Local Tab");
+    expect(unfiltered).not.toContain("Port Forward");
+    expect(unfiltered).not.toContain("Baud");
+
+    await input.click();
+    await input.setValue("Port Forward");
+    await browser.pause(200);
+    const pf = await browser.execute(() =>
+      [...document.querySelectorAll(".pal-row")].map((r) => r.textContent),
+    );
+    expect(pf.join("\n")).not.toMatch(/Port Forward/i);
+    expect(await $(".pal-empty").isExisting()).toBe(true);
+
+    await input.setValue("Baud");
+    await browser.pause(200);
+    const baud = await browser.execute(() =>
+      [...document.querySelectorAll(".pal-row")].map((r) => r.textContent),
+    );
+    expect(baud.join("\n")).not.toMatch(/Baud/i);
+    expect(await $(".pal-empty").isExisting()).toBe(true);
+
+    await browser.keys("Escape");
+  });
 });

@@ -211,6 +211,7 @@ body {
 
 .profile-item .item-label {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -235,7 +236,12 @@ body {
   margin-left: 8px;
   font-size: var(--tt-fs-caption);
   color: var(--tt-chrome-muted);
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profile-item:hover .item-detail {
@@ -343,7 +349,7 @@ body {
 }
 
 /* ==================================================================
-   Quick panel — 1:1 port of docs/quickpanel-preview.html
+   Quick panel — 1:1 port of drafts/quickpanel-preview.html
    (aliases mapped: --qp-bg→--tt-sidebar, --qp-well→--tt-well,
    --qp-inset→--tt-inset, --qp-accent-fill→--tt-selected, --qp-ctrl→
    --tt-btn-width, --qp-ctrl-h→--tt-ctrl-h, --qp-weight→--tt-ui-weight)
@@ -919,7 +925,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 }
 
 /* AI session sharing: teal dot. Settings unsaved: yellow dot. Same chrome.
-   order keeps the × rightmost (matches docs/tabbar-preview.html). */
+   order keeps the × rightmost (matches drafts/tabbar-preview.html). */
 .tab.shared::after,
 .tab.dirty::after {
   content: "";
@@ -1482,7 +1488,7 @@ body[data-skin="cursor"] .tab-close:hover {
   scrollbar-width: none;
 }
 
-/* Unified thin scrollbar (parity with docs/ui/scroll.css `.tt-scroll`):
+/* Unified thin scrollbar (parity with drafts/ui/scroll.css `.tt-scroll`):
    no Windows arrow buttons. NOT true overlay on Chromium: setting
    ::-webkit-scrollbar width forces a classic gutter (parity-gap Q8b).
    Chrome 121+: do NOT set scrollbar-width/color here — that restores arrows. */
@@ -1521,7 +1527,7 @@ body[data-skin="cursor"] .tab-close:hover {
   }
 }
 
-/* Native thin bar — scoped like docs/ui/scroll.css `.tt-scroll`.
+/* Native thin bar — scoped like drafts/ui/scroll.css `.tt-scroll`.
    A bare `::-webkit-scrollbar { width }` is classic-scrollbar mode on
    EVERY box, so overflow:hidden tiles (theme cards) swallow the wheel
    and the page underneath cannot scroll. Overlay ports (.ov-scroll) hide
@@ -2283,7 +2289,7 @@ body[data-skin="cursor"] .tab-close:hover {
   max-width: var(--tt-btn-width);
 }
 
-/* Draft Settings text fields (docs/settings-preview.html .input) */
+/* Draft Settings text fields (drafts/settings-preview.html .input) */
 .input {
   height: var(--tt-ctrl-h);
   padding: 0 10px;
@@ -2859,7 +2865,7 @@ input[type="number"] {
 }
 
 /* Visibility lists (LOCKED L3): multi-item "show in new-tab menu" lists
-   use LEFT checkboxes, never toggles — docs/settings-preview.html
+   use LEFT checkboxes, never toggles — drafts/settings-preview.html
    .check-row. Single on/off features keep the right-side .tt-switch. */
 .check-row {
   display: flex;

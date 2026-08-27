@@ -1,5 +1,5 @@
 /* Port-forward table — shared by Settings host editor, quick panel, and
-   docs/*-preview.html. Compact layout is the only design: listen port |
+   drafts/*-preview.html. Compact layout is the only design: listen port |
    target host:port | actions. Tokens: --tt-* only. */
 
 .ft {

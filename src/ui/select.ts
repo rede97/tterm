@@ -1,6 +1,6 @@
 // Shared custom select (design: no OS menu; one control family across the
-// quick panel and Settings — docs/quickpanel-preview.html .tt-select,
-// docs/settings-preview.html .tt-select is the same control).
+// quick panel and Settings — drafts/quickpanel-preview.html .tt-select,
+// drafts/settings-preview.html .tt-select is the same control).
 //
 // Structure: [data-select] root > trigger(.tt-select-value) + menu
 // (role=listbox, .tt-option[role=option][data-value][aria-selected],
@@ -54,7 +54,7 @@ window.addEventListener(
 /** Pin the listbox to the trigger in VIEWPORT space: position:fixed means
  *  the menu never contributes to the panel's scrollHeight — opening a
  *  select must not spawn a panel scrollbar or shift the control column
- *  (design Q8, docs/quickpanel-preview.html placeSelectMenu).
+ *  (design Q8, drafts/quickpanel-preview.html placeSelectMenu).
  *
  *  The menu is PORTALED to <body> while open: a backdrop-filtered panel
  *  (glass mode) becomes the containing block for fixed descendants, which

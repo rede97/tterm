@@ -1,4 +1,4 @@
-/* Confirm dialog chrome — shared by app confirm.ts and docs/confirm-preview.html.
+/* Confirm dialog chrome — shared by app confirm.ts and drafts/confirm-preview.html.
    Overlay positioning: app uses fixed (below); drafts may override to absolute
    inside `.app` and toggle `.open` for demo visibility. */
 

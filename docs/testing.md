@@ -97,6 +97,13 @@ bun run test:e2e
 - E2E 前先 `bun install && cd src-tauri && cargo build`
 - 无人值守无需显示服务器，WebView2 在 CI 会话中可正常创建窗口
 
+UI/UX 操作入口树、**重跑决策 / 待补自动化 / 必须人手**：[`docs/ux-entry-tree.md`](ux-entry-tree.md) §9–12。
+设计稿 HTML：[`drafts/index.html`](../drafts/index.html)（与 markdown 分目录）。
+
+- 只改 `--tt-ui` / `--tt-mono` 回退：重跑 `bun run test tests/fontconfig.test.ts`，**不要**为计算 `fontFamily` 加 e2e。
+- 未动 tab 宽 / QP 行 / palette 列表 / 互斥打开：L3 UI 五件套不必重跑。
+- 字形、毛玻璃观感、Cursor pill、真人 IME：人手，见该文档 §11 与 [`docs/backlog.md`](backlog.md)。
+
 ## 测试已发现的真实缺陷（回归保护）
 
 1. `parseSshConfig` 的 `Host *` 通配符在非末尾位置时泄漏为普通主机（已修复）

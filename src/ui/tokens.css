@@ -1,8 +1,8 @@
 /**
  * TTerm UI design tokens — production source of truth (`--tt-*`).
  *
- * Docs entry: `docs/ui/tokens.css` re-exports this file; preview aliases live in
- * `docs/ui/aliases.css`. Controls: `src/ui/kit/controls.css`.
+ * Docs entry: `drafts/ui/tokens.css` re-exports this file; preview aliases live in
+ * `drafts/ui/aliases.css`. Controls: `src/ui/kit/controls.css`.
  *
  * Skins: body[data-skin="cursor" | "vscode"] (set from config `chromeSkin`).
  * Frosted overlays: body.tt-glass (config `overlayGlass`).
@@ -97,8 +97,15 @@ body[data-skin="cursor"] {
   --tt-theme-card-h: 101px;
   --tt-theme-card-min-w: 212px; /* 16×10px swatches + gaps + pad — no clip */
 
-  --tt-ui: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
-  --tt-mono: "JetBrains Mono", Consolas, ui-monospace, monospace;
+  /* UI chrome (Settings / QP / kit selects): Inter for Latin, Segoe UI
+     font-links to YaHei for CJK. Terminal-adjacent chrome (tabs, new-tab
+     profile ▾, palette rows) uses --tt-mono: JetBrains for Latin, then the
+     same CJK fallbacks as the default terminal stack — never generic
+     `monospace` first (that is SimSun on zh-CN). */
+  --tt-ui: Inter, "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  --tt-mono: "JetBrains Mono", Consolas, "Noto Sans SC", "Noto Sans JP",
+    "Noto Sans KR", "Microsoft YaHei UI", "Microsoft YaHei", ui-monospace,
+    monospace;
 
   /* ---- Scroll ---- */
   /* ---- Scroll (colors only — chrome via .tt-scroll / styles.css unified block) ---- */

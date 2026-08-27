@@ -1,4 +1,4 @@
-// True overlay scrollbar (parity-gap Q8b). On Chromium there is NO CSS
+// True overlay scrollbar. On Chromium there is NO CSS
 // overlay scrollbar: `overflow: overlay` is dead, and giving
 // ::-webkit-scrollbar a width forces a CLASSIC bar whose gutter squeezes
 // the 148px control column when content overflows.

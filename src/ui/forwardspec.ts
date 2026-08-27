@@ -1,5 +1,5 @@
 // SSH port-forward one-liner — palette input grammar shared by the app
-// (`palette.ts`) and `docs/command-palette-preview.html`.
+// (`palette.ts`) and `drafts/command-palette-preview.html`.
 //
 //   [L|R|D] listen[:host:port]
 //   L 8080:localhost:3000     local  (-L), bind 127.0.0.1

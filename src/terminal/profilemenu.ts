@@ -61,16 +61,19 @@ function createMenuItem(
     const labelEl = document.createElement("span");
     labelEl.className = "item-label";
     labelEl.textContent = label;
+    labelEl.title = label;
     textWrap.appendChild(labelEl);
     const subEl = document.createElement("span");
     subEl.className = "item-subline";
     subEl.textContent = subline;
+    subEl.title = subline;
     textWrap.appendChild(subEl);
     item.appendChild(textWrap);
   } else {
     const labelEl = document.createElement("span");
     labelEl.className = "item-label";
     labelEl.textContent = label;
+    labelEl.title = label;
     item.appendChild(labelEl);
   }
 
@@ -78,6 +81,7 @@ function createMenuItem(
     const detailEl = document.createElement("span");
     detailEl.className = "item-detail";
     detailEl.textContent = detail;
+    detailEl.title = detail;
     item.appendChild(detailEl);
   }
 

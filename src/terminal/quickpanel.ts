@@ -9,7 +9,7 @@
 //               drive, CTS/DSR status)
 //
 // Product DOM is rendered by the shared pure view in ui/kit/qp/view.ts
-// (same module as docs/quickpanel-preview.html). This file maps tab +
+// (same module as drafts/quickpanel-preview.html). This file maps tab +
 // panel state → view-model and wires IPC / handlers.
 //
 // Like contextmenu, this module never imports TabManager: actions go

@@ -2,6 +2,15 @@
 
 Changes
 
+- **Palette / menu row titles stay visible** — long trailing commands
+  (VS 2022 Developer Prompt) ellipsize; the profile name is not squeezed
+  off the row
+- **Chrome CJK fallbacks** — tab / new-tab profile ▾ use `--tt-mono`; the
+  stack now includes Noto Sans CJK and YaHei after JetBrains/Consolas so
+  names like 命令提示符 do not fall through to SimSun
+- **Palette and Go to Tab do not stack** — Ctrl+P then Ctrl+Shift+P (or the
+  reverse) replaces the other overlay; both join the exclusive chrome
+  popup set with menus and the quick panel
 - **Frosted overlays** — one Settings switch (`overlayGlass`) frosts menus,
   dropdowns, and the quick panel. Glass colors/blur live in `--tt-glass-*`
   (legacy `quickPanelGlass` migrates on load)

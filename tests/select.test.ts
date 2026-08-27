@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "../src/ui/lit";
 import { closeAllSelects, ttSelect } from "../src/ui/select";
 
-// Q8 (docs/ui/parity-gap.md): the listbox floats position:fixed, pinned to
+// Q8 (src/ui/kit/README.md): the listbox floats position:fixed, pinned to
 // the trigger's viewport rect — it must never grow the panel's scrollHeight
 // or spawn a panel scrollbar. Scrolling any container (except the menu
 // itself) closes it.
@@ -34,6 +34,7 @@ const openSelect = (root: HTMLElement) =>
 
 beforeEach(() => {
   document.body.innerHTML = "";
+  document.body.classList.remove("tt-glass");
 });
 
 describe("custom select — floating menu (Q8)", () => {
@@ -105,6 +106,15 @@ describe("custom select — floating menu (Q8)", () => {
     outside.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
     expect(root.classList.contains("open")).toBe(false);
     expect(document.querySelector("body > .tt-select-menu.open")).toBeNull();
+  });
+
+  it("portals the menu to body under body.tt-glass (backdrop-filter containing block)", () => {
+    document.body.classList.add("tt-glass");
+    const { root } = mountSelect();
+    openSelect(root);
+    const menu = menuOf(root);
+    expect(menu.parentElement).toBe(document.body);
+    expect(menu.classList.contains("open")).toBe(true);
   });
 
   it("pointerdown on the open menu does not close it", () => {

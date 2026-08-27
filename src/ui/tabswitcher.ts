@@ -1,5 +1,5 @@
 // Tab switcher overlay — two faces of the palette shell (VS Code style),
-// 1:1 with docs/command-palette-preview.html `.pal-*` chrome:
+// 1:1 with drafts/command-palette-preview.html `.pal-*` chrome:
 //
 //  - Quick Open (Ctrl+P): input + numbered list of every tab; type a tab
 //    number or a label substring to filter, Enter/click jumps. Typing ">"
@@ -14,7 +14,7 @@ import { parseCombo, resolveKeybindings } from "../core/keymap";
 import { configStore } from "../core/store";
 import { el } from "./dom";
 import { createPaletteShell } from "./kit/shell";
-import { dismissChromePopups } from "./popups";
+import { dismissChromePopups, registerChromePopup } from "./popups";
 import { restoreTerminalFocus } from "./termfocus";
 
 export interface SwitcherItem {
@@ -113,6 +113,7 @@ function renderList(): void {
     row.appendChild(el("span", "pal-badge", String(it.index)));
     const label = el("span", "pal-label", it.label);
     if (it.disconnected) label.classList.add("disconnected");
+    label.title = it.label;
     row.appendChild(label);
     if (it.active) row.appendChild(el("span", "pal-meta", "current"));
     row.appendChild(el("span", "pal-meta", it.kind));
@@ -131,7 +132,7 @@ function renderList(): void {
 function open(nextMode: "quick" | "mru", startSelected: number): void {
   close();
   if (!_handlers) return;
-  dismissChromePopups();
+  dismissChromePopups("switcher");
   mode = nextMode;
   items = _handlers.listTabs(nextMode);
   selected = startSelected;
@@ -189,6 +190,8 @@ function close(): void {
   window.removeEventListener("blur", onWindowBlur);
   restoreTerminalFocus();
 }
+
+registerChromePopup("switcher", close);
 
 function commit(id: string): void {
   const h = _handlers;

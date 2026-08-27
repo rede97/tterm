@@ -167,19 +167,19 @@
   <nav class="topnav" aria-label="Design drafts">
     <a class="brand" href="/">TTerm drafts</a>
     <a href="/" aria-current="page">Overview</a>
-    <a href="/docs/settings-preview.html">Settings</a>
-    <a href="/docs/tabbar-preview.html">Tab bar</a>
-    <a href="/docs/quickpanel-preview.html">Quick panel</a>
-    <a href="/docs/command-palette-preview.html">Palette</a>
-    <a href="/docs/confirm-preview.html">Confirm</a>
+    <a href="/drafts/settings-preview.html">Settings</a>
+    <a href="/drafts/tabbar-preview.html">Tab bar</a>
+    <a href="/drafts/quickpanel-preview.html">Quick panel</a>
+    <a href="/drafts/command-palette-preview.html">Palette</a>
+    <a href="/drafts/confirm-preview.html">Confirm</a>
   </nav>
 
   <main class="main">
     <h1>Design drafts</h1>
-    <p class="lead">预览稿总览。皮肤 / 字重 / 色板以 <a href="/docs/ui/README.md" style="color:#ccc">docs/ui/tokens.css</a> 为唯一事实源；点卡片进入对应稿。</p>
+    <p class="lead">预览稿总览。皮肤 / 字重 / 色板以 <a href="/src/ui/kit/README.md" style="color:#ccc">drafts/ui/tokens.css</a> 为唯一事实源；点卡片进入对应稿。</p>
 
     <div class="cards">
-      <a class="card" href="/docs/settings-preview.html">
+      <a class="card" href="/drafts/settings-preview.html">
         <div class="kicker">Chrome · Apply</div>
         <h2>Settings</h2>
         <p>双皮肤、footer dirty/Apply、SSH 统一写盘、左下 toast。</p>
@@ -192,7 +192,7 @@
         </ul>
         <span class="go">Open →</span>
       </a>
-      <a class="card" href="/docs/tabbar-preview.html">
+      <a class="card" href="/drafts/tabbar-preview.html">
         <div class="kicker">Chrome · two skins · v0</div>
         <h2>Tab bar</h2>
         <p>Cursor / VS Code 顶栏初代；均分压缩 → 滚动、+N、拖拽安全区。</p>
@@ -205,7 +205,7 @@
         </ul>
         <span class="go">Open →</span>
       </a>
-      <a class="card" href="/docs/quickpanel-preview.html">
+      <a class="card" href="/drafts/quickpanel-preview.html">
         <div class="kicker">Session panel</div>
         <h2>Quick panel</h2>
         <p>Cursor / VS Code skin、glass、SSH / Serial 控件。</p>
@@ -215,7 +215,7 @@
         </ul>
         <span class="go">Open →</span>
       </a>
-      <a class="card" href="/docs/command-palette-preview.html">
+      <a class="card" href="/drafts/command-palette-preview.html">
         <div class="kicker">Ctrl+P · Ctrl+Shift+P</div>
         <h2>Command palette</h2>
         <p>Go to Tab + <code>&gt;</code> 命令面；New Tab / SSH / Serial 二级选择。</p>
@@ -226,7 +226,7 @@
         </ul>
         <span class="go">Open →</span>
       </a>
-      <a class="card" href="/docs/confirm-preview.html">
+      <a class="card" href="/drafts/confirm-preview.html">
         <div class="kicker">UX-01 · Security</div>
         <h2>Confirm dialogs</h2>
         <p>多行粘贴（安全）与关窗提示（有 tab 时）；Settings 可关关窗提示。</p>
@@ -242,58 +242,58 @@
     <section class="ux-log" aria-labelledby="ux-log-title">
       <h2 id="ux-log-title">Menus &amp; UX — 本轮标注</h2>
       <dl>
-        <dt><a href="/docs/ui/scroll.css">Scroll · 统一浮空条</a></dt>
+        <dt><a href="/drafts/ui/scroll.css">Scroll · 统一浮空条</a></dt>
         <dd>
-          共用 <code>docs/ui/scroll.css</code>（<code>.tt-scroll</code>）：无箭头；Chromium 上设了 width 仍是 classic gutter（会挤布局，见 parity <strong>Q8b</strong>）。Firefox 用标准属性。
+          共用 <code>drafts/ui/scroll.css</code>（<code>.tt-scroll</code>）：无箭头；Chromium 上设了 width 仍是 classic gutter（会挤布局，见 parity <strong>Q8b</strong>）。Firefox 用标准属性。
         </dd>
-        <dt><a href="/docs/quickpanel-preview.html">Quick panel · Hardware flow</a></dt>
+        <dt><a href="/drafts/quickpanel-preview.html">Quick panel · Hardware flow</a></dt>
         <dd>
           Flow = Hardware (RTS/CTS) 时 <strong>禁用 RTS</strong>（置灰、驱动接管），DTR 仍可拨；不隐藏、无额外说明文案。
         </dd>
-        <dt><a href="/docs/confirm-preview.html">Confirm · 粘贴 / 关窗</a></dt>
+        <dt><a href="/drafts/confirm-preview.html">Confirm · 粘贴 / 关窗</a></dt>
         <dd>
           多行粘贴：标题旁 <code>N lines</code> + 预览（无 Security 脚注）；关窗有 tab 时确认，Settings → General <code>confirmCloseWindow</code>（默认 on）可关。
         </dd>
-        <dt><a href="/docs/settings-preview.html">Settings · Keyboard</a></dt>
+        <dt><a href="/drafts/settings-preview.html">Settings · Keyboard</a></dt>
         <dd>
           快捷键表加入 <strong>Show Command Palette…</strong>（默认 <code>Ctrl+Shift+P</code>），与 Go to Tab（<code>Ctrl+P</code>）并列可改绑。
         </dd>
-        <dt><a href="/docs/command-palette-preview.html">Command palette · Port Forward</a></dt>
+        <dt><a href="/drafts/command-palette-preview.html">Command palette · Port Forward</a></dt>
         <dd>
           palette 只列 <strong>SSH: Port Forwarding…</strong>。输入复用同一栏：<code>L|R|D listen[:host:port]</code>；底栏 Cursor 式 <code>↑↓ ↵ ⇥ Del</code>。非内建 SSH 一律 toast 拦截。语法与 app 共用 <code>forwardspec.ts</code>。
         </dd>
-        <dt><a href="/docs/command-palette-preview.html">Command palette · New Tab</a></dt>
+        <dt><a href="/drafts/command-palette-preview.html">Command palette · New Tab</a></dt>
         <dd>
           命令面 <strong>New Local / SSH / Serial / SSH Temporary Tab</strong>；前三者各进次级选 shell · host · COM；Esc 逐级返回。
         </dd>
-        <dt><a href="/docs/tabbar-preview.html">Tab bar · 菜单</a></dt>
+        <dt><a href="/drafts/tabbar-preview.html">Tab bar · 菜单</a></dt>
         <dd>
           Profiles 下拉三列等宽；hover 用 tab 色非主题蓝。Tab 右键去掉 New / Port Forwarding，首项 Duplicate，Change Tab Color 带当前色预览与左侧色带。
           终端右键菜单 chrome 跟随 tab 栏，不跟 Settings；New Tab 改为 Duplicate Tab 并带图标行，与 tab 菜单字体对齐。
         </dd>
-        <dt><a href="/docs/tabbar-preview.html">Tab bar · 关标签 UX</a></dt>
+        <dt><a href="/drafts/tabbar-preview.html">Tab bar · 关标签 UX</a></dt>
         <dd>
           点 × 在正下方出矮确认条（无 Cancel，点空白 / Esc 取消）；<code>Shift+×</code> 直接关。确认条无投影。
         </dd>
-        <dt><a href="/docs/settings-preview.html">Settings · 控件体系统一</a></dt>
+        <dt><a href="/drafts/settings-preview.html">Settings · 控件体系统一</a></dt>
         <dd>
           标题与按钮字重、数字输入 / 下拉选项字重对齐；行尾实心按钮与 Homepage / Check for Updates / toolbar 共用 <code>--set-btn-width</code>。
         </dd>
-        <dt><a href="/docs/settings-preview.html">Settings · Serial profiles</a></dt>
+        <dt><a href="/drafts/settings-preview.html">Settings · Serial profiles</a></dt>
         <dd>
           Defaults 为波特率 + 默认 profile；Built-in / Custom 卡片画廊；New / Duplicate / Edit 打开 Profile 编辑器（input mode、Enter、output newlines、flow）；Save 进 Custom 并 dirty。
         </dd>
-        <dt><a href="/docs/settings-preview.html">Settings · Theme editor</a></dt>
+        <dt><a href="/drafts/settings-preview.html">Settings · Theme editor</a></dt>
         <dd>
           Color scheme：redesigned New Theme tile + Theme Editor dialog（name、live preview、Core+Palette、Save 插入自定义卡片）。
         </dd>
-        <dt><a href="/docs/quickpanel-preview.html">Quick panel · 状态色</a></dt>
+        <dt><a href="/drafts/quickpanel-preview.html">Quick panel · 状态色</a></dt>
         <dd>
           CONNECTED 固定 Cursor 绿，与 SHARING teal 区分；两套 skin 一致。
         </dd>
-        <dt><a href="/docs/ui/README.md">Design tokens · 事实源</a></dt>
+        <dt><a href="/src/ui/kit/README.md">Design tokens · 事实源</a></dt>
         <dd>
-          各 Preview 共用 <code>docs/ui/tokens.css</code>（<code>--tt-*</code>）与 <code>preview-chrome.css</code>；皮肤 / CONNECTED 绿 / Share teal / 字重 / 半径从此改，禁止在各稿内再抄一份 hex。
+          各 Preview 共用 <code>drafts/ui/tokens.css</code>（<code>--tt-*</code>）与 <code>preview-chrome.css</code>；皮肤 / CONNECTED 绿 / Share teal / 字重 / 半径从此改，禁止在各稿内再抄一份 hex。
         </dd>
       </dl>
     </section>

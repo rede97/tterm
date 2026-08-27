@@ -23,7 +23,7 @@ describe("settings — theme gallery", () => {
 
   it("renders one card per theme with terminal-font preview", () => {
     const root = createSettingsContent();
-    const cards = root.querySelectorAll(".theme-card");
+    const cards = root.querySelectorAll("#set-theme-gallery .theme-card");
     expect(cards.length).toBeGreaterThanOrEqual(BUILTIN_THEMES.length);
 
     const first = cards[0] as HTMLElement;
@@ -37,28 +37,28 @@ describe("settings — theme gallery", () => {
 
   it("marks the configured theme as selected", () => {
     const root = createSettingsContent();
-    const selected = root.querySelectorAll(".theme-card.selected");
+    const selected = root.querySelectorAll("#set-theme-gallery .theme-card.selected");
     expect(selected).toHaveLength(1);
     expect((selected[0] as HTMLElement).dataset.theme).toBe(configStore.get("themeName"));
   });
 
   it("clicking a card updates selection and pending themeName", () => {
     const root = createSettingsContent();
-    const target = [...root.querySelectorAll<HTMLElement>(".theme-card")].find(
+    const target = [...root.querySelectorAll<HTMLElement>("#set-theme-gallery .theme-card")].find(
       (c) => c.dataset.theme === "Dracula",
     )!;
     target.click();
     expect(root.dataset.themeName).toBe("Dracula");
-    expect(root.querySelectorAll(".theme-card.selected")).toHaveLength(1);
-    expect((root.querySelector(".theme-card.selected") as HTMLElement).dataset.theme).toBe(
-      "Dracula",
-    );
+    expect(root.querySelectorAll("#set-theme-gallery .theme-card.selected")).toHaveLength(1);
+    expect(
+      (root.querySelector("#set-theme-gallery .theme-card.selected") as HTMLElement).dataset.theme,
+    ).toBe("Dracula");
   });
 
   it("apply persists the clicked theme via themeName", async () => {
     const root = createSettingsContent();
     document.body.appendChild(root);
-    [...root.querySelectorAll<HTMLElement>(".theme-card")]
+    [...root.querySelectorAll<HTMLElement>("#set-theme-gallery .theme-card")]
       .find((c) => c.dataset.theme === "Nord")!
       .click();
     const applyBtn = [...root.querySelectorAll<HTMLButtonElement>(".tt-btn-primary")].find(

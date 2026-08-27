@@ -19,7 +19,7 @@
 //   pre-lit rebuild reset .disabled every render, so a click landing while
 //   the button looks ready must invoke, not no-op.
 //
-// Layout classes match docs/settings-preview.html (.section / .row).
+// Layout classes match drafts/settings-preview.html (.section / .row).
 // Controls use src/ui/kit (.tt-switch / .tt-btn*).
 
 export { html, noChange, nothing, render, type TemplateResult } from "lit-html";

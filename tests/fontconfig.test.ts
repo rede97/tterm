@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   allBuiltinFonts,
@@ -8,6 +10,13 @@ import {
   parseFontFamily,
   updateFontStack,
 } from "../src/util/fontconfig";
+
+function cssCustomProp(src: string, name: string): string {
+  const re = new RegExp(`^[ \\t]*${name.replace(/-/g, "\\-")}:\\s*([^;]+);`, "ms");
+  const m = src.match(re);
+  if (!m) throw new Error(`CSS custom property ${name} not found`);
+  return m[1].replace(/\s+/g, " ").trim();
+}
 
 describe("buildFontFamily", () => {
   it("quotes families containing spaces", () => {
@@ -50,6 +59,37 @@ describe("defaultFontStack / initial config consistency", () => {
     expect(stack).toContain("Noto Sans SC");
     expect(stack).toContain("Noto Sans JP");
     expect(stack).toContain("Noto Sans KR");
+  });
+});
+
+describe("chrome --tt-ui / --tt-mono CJK (tokens.css)", () => {
+  const tokens = readFileSync(join(__dirname, "../src/ui/tokens.css"), "utf8");
+  const styles = readFileSync(join(__dirname, "../src/styles.css"), "utf8");
+
+  it("--tt-mono lists JetBrains then the same CJK families as defaultFontStack, plus YaHei before generic monospace", () => {
+    const mono = cssCustomProp(tokens, "--tt-mono");
+    expect(mono.startsWith('"JetBrains Mono", Consolas')).toBe(true);
+    for (const family of ["Noto Sans SC", "Noto Sans JP", "Noto Sans KR"]) {
+      expect(mono).toContain(`"${family}"`);
+      expect(defaultFontStack()).toContain(family);
+    }
+    const yahei = mono.indexOf('"Microsoft YaHei UI"');
+    const generic = mono.indexOf("ui-monospace");
+    expect(yahei).toBeGreaterThan(-1);
+    expect(mono).toContain('"Microsoft YaHei"');
+    expect(generic).toBeGreaterThan(yahei);
+    expect(mono.endsWith("ui-monospace, monospace")).toBe(true);
+  });
+
+  it("--tt-ui lists YaHei after Segoe so Settings CJK stays sans (not SimSun)", () => {
+    const ui = cssCustomProp(tokens, "--tt-ui");
+    expect(ui.startsWith('Inter, "Segoe UI", "Microsoft YaHei UI"')).toBe(true);
+    expect(ui.endsWith("system-ui, sans-serif")).toBe(true);
+  });
+
+  it("tab chrome and the new-tab profile ▾ use --tt-mono, not --tt-ui", () => {
+    expect(styles).toMatch(/\.tab \{[\s\S]*?font-family:\s*var\(--tt-mono\)/);
+    expect(styles).toMatch(/\.profile-menu \{[\s\S]*?font-family:\s*var\(--tt-mono\)/);
   });
 });
 

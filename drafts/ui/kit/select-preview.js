@@ -1,9 +1,9 @@
 /**
  * Preview-only select portal helpers (mirrors src/ui/select.ts behavior).
- * App behavior remains authoritative; this is for docs/*-preview.html demos.
+ * App behavior remains authoritative; this is for drafts/*-preview.html demos.
  *
  * Usage:
- *   <script type="module" src="/docs/ui/kit/select-preview.js"></script>
+ *   <script type="module" src="/drafts/ui/kit/select-preview.js"></script>
  *   // auto-binds [data-select] roots; listen for "tt-pick" on the root if needed.
  */
 (function () {

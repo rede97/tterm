@@ -1,12 +1,11 @@
 // Exclusive chrome popups — tab/terminal context menu, profile ▾, recent-
-// folders menu, quick panel. Opening one dismisses the rest: chrome buttons
-// stopPropagation and contextmenu ≠ click, so outside-click listeners never
-// see the opener and the surfaces would otherwise stack.
+// folders menu, quick panel, command palette, tab switcher (Ctrl+P / Ctrl+Tab).
+// Opening one dismisses the rest: chrome buttons stopPropagation and
+// contextmenu ≠ click, so outside-click listeners never see the opener.
 //
-// Feature modules register their closer at load; they never import each
-// other. Palette / tab-switcher call dismissChromePopups() with no except.
+// Feature modules register their closer at load; they never import each other.
 
-export type ChromePopup = "context" | "profile" | "dir" | "quick";
+export type ChromePopup = "context" | "profile" | "dir" | "quick" | "palette" | "switcher";
 
 const closers: Partial<Record<ChromePopup, () => void>> = {};
 

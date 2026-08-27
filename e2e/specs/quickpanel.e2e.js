@@ -4,7 +4,7 @@
 // auto-reconnect IPC roundtrips.
 
 // Browser-side helper: pick an option in a design listbox (.tt-select) —
-// the panel no longer uses native <select> (docs/quickpanel-preview.html).
+// the panel no longer uses native <select> (drafts/quickpanel-preview.html).
 function qpPick(label, value) {
   const root = [...document.querySelectorAll(".quick-panel .tt-select")].find(
     (s) => s.getAttribute("aria-label") === label,
@@ -168,6 +168,7 @@ describe("Quick-status button and panel", () => {
     expect(info.selects).toEqual([
       "Profile",
       "Baud rate",
+      "Frame",
       "Input mode",
       "Enter sends",
       "Output newlines",
