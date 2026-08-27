@@ -14,6 +14,7 @@ import { parseCombo, resolveKeybindings } from "../core/keymap";
 import { configStore } from "../core/store";
 import { el } from "./dom";
 import { createPaletteShell } from "./kit/shell";
+import { dismissChromePopups } from "./popups";
 import { restoreTerminalFocus } from "./termfocus";
 
 export interface SwitcherItem {
@@ -130,6 +131,7 @@ function renderList(): void {
 function open(nextMode: "quick" | "mru", startSelected: number): void {
   close();
   if (!_handlers) return;
+  dismissChromePopups();
   mode = nextMode;
   items = _handlers.listTabs(nextMode);
   selected = startSelected;

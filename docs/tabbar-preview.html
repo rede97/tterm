@@ -197,8 +197,8 @@
   .overflow-chip + .icon-btn { width: 28px; }
 
   /* ---- Tab chrome skins (app tokens in src/ui/tokens.css) ----
-     Bar / idle follow Settings sidebar. Cursor: selected lighter + top mark.
-     VS Code: idle tiles, selected darker, no top mark. Hover = --tt-chrome-hover. */
+     Bar / idle follow Settings sidebar. Cursor: inset rounded --tt-selected
+     pill (no top mark). VS Code: idle tiles, selected darker, no top mark. */
 
   .tab {
     display: flex;
@@ -223,6 +223,22 @@
     background: var(--tab-active);
     color: var(--tt-text);
     box-shadow: var(--tab-active-mark);
+  }
+
+  body[data-skin="cursor"] .tab {
+    height: calc(100% - 6px);
+    align-self: center;
+    margin: 0 1px;
+    border-right: none;
+    border-radius: var(--tt-radius-ctrl);
+    background: transparent;
+  }
+  body[data-skin="cursor"] .tab.active {
+    background: var(--tt-selected);
+    box-shadow: none;
+  }
+  body[data-skin="cursor"] .tab:hover:not(.active) {
+    background: var(--tt-hover);
   }
 
   .tab-badge {
@@ -935,7 +951,7 @@
 
   <aside class="notes">
     <h1>Tab bar — 两套皮肤 · v0</h1>
-    <p>骨架不动（均分压缩、滚动、+N、色带、关 tab）。皮肤只换栏 / 未选 / 选中 / 顶标。终端配色仍只刷内容区。</p>
+    <p>骨架不动（均分压缩、滚动、+N、色带、关 tab）。皮肤只换栏 / 未选 / 选中形态。终端配色仍只刷内容区。</p>
 
     <div class="picker" id="skin-picker">
       <button type="button" aria-pressed="true" data-skin="cursor">Cursor Mono</button>
@@ -956,7 +972,7 @@
     </div>
 
     <ol>
-      <li><strong>v0 Cursor</strong>：栏 / 未选 = Settings 侧栏 <code>--tt-sidebar</code>（<code>#141414</code>）；选中更浅 <code>#2d2d2d</code> + 1px 白顶标。不跟 <code>--term-bg</code>。</li>
+      <li><strong>v0 Cursor</strong>：栏 / 未选 = Settings 侧栏 <code>--tt-sidebar</code>；选中为 inset 圆角 pill（<code>--tt-selected</code>，同 palette 选中行），不整格填满、无顶标。不跟 <code>--term-bg</code>。</li>
       <li><strong>v0 VS Code</strong>：栏 = 侧栏 <code>#252526</code>；未选 <code>#2d2d2d</code> 成块；选中更深 <code>#1e1e1e</code>（无顶标）；tab 间 1px 缝。</li>
       <li>用户色仍是<strong>左侧 3px 色带 + badge</strong>，两套皮肤相同；选中不盖掉 badge 色。</li>
       <li>终端主题（下排）只影响内容区；切 Solarized 时顶栏仍可读。</li>

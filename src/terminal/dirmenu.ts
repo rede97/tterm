@@ -8,6 +8,7 @@ import { createElement, Folder, FolderOpen, Trash2 } from "lucide";
 import { logCatch } from "../core/errorlog";
 import { configStore } from "../core/store";
 import { placeMenuBelow } from "../ui/place-menu";
+import { dismissChromePopups, registerChromePopup } from "../ui/popups";
 
 // ---- Injected handlers (bound by wiring.ts — no tabmanager import here) ----
 
@@ -69,6 +70,8 @@ export function closeDirectoryMenu(): void {
   }
 }
 
+registerChromePopup("dir", closeDirectoryMenu);
+
 function mkItem(
   iconFn: Parameters<typeof createElement>[0],
   label: string,
@@ -96,6 +99,8 @@ export function showDirectoryMenu(anchor: HTMLElement): void {
     closeDirectoryMenu();
     return;
   }
+
+  dismissChromePopups("dir");
 
   const menu = document.createElement("div");
   // Reuse the profile-menu look (fixed dropdown, items, separators).

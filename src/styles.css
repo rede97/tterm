@@ -930,8 +930,8 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   background: var(--tt-warn);
 }
 
-/* Active: Cursor = one step lighter + faint top mark; VS Code = darker,
-   no top mark (docs/tabbar-preview.html). Never --term-bg bleed. */
+/* Active: VS Code = darker full-height tile. Cursor = inset rounded pill
+   (body[data-skin="cursor"] below). Never --term-bg bleed. */
 .tab.active {
   background: var(--tt-tab-active);
   box-shadow: var(--tt-tab-active-mark);
@@ -939,6 +939,31 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 
 .tab:hover:not(.active) {
   background: var(--tt-chrome-hover);
+}
+
+/* Cursor: selected tab is an inset rounded pill (--tt-selected), like
+   palette .pal-row.selected / Cursor IDE — not a full-height tile. */
+body[data-skin="cursor"] .tab {
+  height: calc(100% - 6px);
+  align-self: center;
+  margin: 0 1px;
+  padding-left: 10px;
+  border-right: none;
+  border-radius: var(--tt-radius-ctrl);
+  background: transparent;
+}
+
+body[data-skin="cursor"] .tab.active {
+  background: var(--tt-selected);
+  box-shadow: none;
+}
+
+body[data-skin="cursor"] .tab:hover:not(.active) {
+  background: var(--tt-hover);
+}
+
+body[data-skin="cursor"] .tab-close:hover {
+  border-radius: var(--tt-radius-opt);
 }
 
 /* Scroll-edge shadows on the tab strip: the left shadow appears only

@@ -113,8 +113,9 @@ body[data-skin="cursor"] {
   --tt-chrome-muted: #888888;
   --tt-tab-bar: var(--tt-sidebar);
   --tt-tab-idle: var(--tt-sidebar);
-  --tt-tab-active: #2d2d2d;
-  --tt-tab-active-mark: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  /* Selected tab is a rounded --tt-selected pill (see styles.css); not a tile. */
+  --tt-tab-active: var(--tt-selected);
+  --tt-tab-active-mark: none;
   --tt-tab-seam: transparent;
 
   /* ---- Feature sizes (quick panel) ---- */

@@ -27,6 +27,7 @@ import {
 import { logCatch } from "../core/errorlog";
 import { handleMenuKeydown, menuItems, restoreFocus } from "../ui/menukeys";
 import { placeMenuBelow } from "../ui/place-menu";
+import { dismissChromePopups, registerChromePopup } from "../ui/popups";
 import { openFind } from "./search";
 
 // ---- Injected handlers ----
@@ -82,14 +83,18 @@ let currentTabId = "";
 // terminal's helper textarea for a right-click) — focus returns here.
 let menuTrigger: Element | null = null;
 
-function closeContextMenu(restore = true) {
+export function closeContextMenu(restore = true) {
   contextMenu.classList.remove("open");
   closeColorSub();
   if (restore) restoreFocus(menuTrigger);
   menuTrigger = null;
 }
 
+registerChromePopup("context", () => closeContextMenu(false));
+
 function openMenu(): void {
+  dismissChromePopups("context");
+  if (!contextMenu.isConnected) document.body.appendChild(contextMenu);
   contextMenu.classList.add("open");
   // Keyboard entry point: focus lands on the first usable entry.
   menuItems(contextMenu)[0]?.focus();

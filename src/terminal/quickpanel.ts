@@ -38,6 +38,7 @@ import { createForwardTable } from "../ui/forwardtable";
 import { type QpPanelActions, type QpPanelModel, qpPanelView } from "../ui/kit/qp/view";
 import { render } from "../ui/lit";
 import { attachOverlayScrollbar } from "../ui/overlay-scroll";
+import { dismissChromePopups, registerChromePopup } from "../ui/popups";
 import { closeAllSelects, syncSelectTexts, type TtSelectGroup } from "../ui/select";
 import { showToast } from "../ui/toast";
 import type { TerminalTab } from "./tab";
@@ -379,6 +380,8 @@ export function closeQuickPanel(): void {
   closeAllSelects();
 }
 
+registerChromePopup("quick", closeQuickPanel);
+
 /// Hide the panel if it is bound to the given (closing) tab — a panel
 /// must not outlive the tab whose session it drives.
 export function closeQuickPanelForTab(tabId: string): void {
@@ -393,6 +396,7 @@ function togglePanel(): void {
   const tab = _handlers?.getActiveTab();
   const btn = qsButton();
   if (!tab || !btn || !panel) return;
+  dismissChromePopups("quick");
   panelTabId = tab.id;
   panelState = null; // fresh per open: async reads re-fire, shadows reset
   renderPanel(tab);

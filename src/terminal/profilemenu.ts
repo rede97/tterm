@@ -6,6 +6,7 @@ import { DOM_ID } from "../core/dom-ids";
 import { configStore } from "../core/store";
 import { mustGetById } from "../ui/dom";
 import { handleMenuKeydown, menuItems, restoreFocus } from "../ui/menukeys";
+import { dismissChromePopups, registerChromePopup } from "../ui/popups";
 import { tabManager } from "./tabmanager";
 
 const menuBtn = mustGetById(DOM_ID.newTabMenuBtn);
@@ -173,17 +174,21 @@ function populateMenu() {
 
 // Focus returns to the trigger button on dismissal; an item activation
 // skips the restore because the action itself moves focus (new terminal).
-function closeMenu(restore = true) {
+export function closeProfileMenu(restore = true) {
   profileMenu.classList.remove("open");
   if (restore) restoreFocus(menuBtn);
 }
+
+registerChromePopup("profile", () => closeProfileMenu(false));
 
 export function initProfileMenu() {
   menuBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     if (profileMenu.classList.contains("open")) {
-      closeMenu(false);
+      closeProfileMenu(false);
     } else {
+      dismissChromePopups("profile");
+      if (!profileMenu.isConnected) document.body.appendChild(profileMenu);
       populateMenu();
       positionMenu();
       profileMenu.classList.add("open");
@@ -213,7 +218,7 @@ export function initProfileMenu() {
   profileMenu.addEventListener("keydown", (e) => {
     handleMenuKeydown(e, {
       items: () => menuItems(profileMenu),
-      close: () => closeMenu(),
+      close: () => closeProfileMenu(),
     });
   });
 
@@ -223,7 +228,7 @@ export function initProfileMenu() {
       !profileMenu.contains(e.target as Node) &&
       e.target !== menuBtn
     ) {
-      closeMenu(false);
+      closeProfileMenu(false);
     }
   });
 

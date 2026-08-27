@@ -2,6 +2,13 @@
 
 Changes
 
+- **Cursor tab selection is a rounded pill** — active tab uses the same
+  light `--tt-selected` inset highlight as palette rows, not a full-height
+  `#2d2d2d` tile. VS Code skin still uses the darker filled tab
+- **Chrome popups are exclusive** — tab / terminal context menus, the
+  profile ▾ and recent-folders dropdowns, and the quick panel dismiss
+  each other on open (they used to stack because chrome clicks
+  `stopPropagation` and `contextmenu` is not a `click`)
 - **Palette hides mismatching session commands** — SSH / Serial / Share
   rows that do not apply to the active tab are omitted (embedded-only
   Port Forwarding; Share with AI vs Stop Sharing follow share state).

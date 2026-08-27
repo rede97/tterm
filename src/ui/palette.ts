@@ -49,6 +49,7 @@ import {
   type PaletteFooterHint,
   setPaletteFooter,
 } from "./kit/shell";
+import { dismissChromePopups } from "./popups";
 import { restoreTerminalFocus } from "./termfocus";
 import { showToast } from "./toast";
 
@@ -849,6 +850,7 @@ export function openPaletteFlow(
 export function openCommandPalette(query = ""): void {
   if (!_handlers) return;
   close();
+  dismissChromePopups();
   stack = [{ kind: "commands" }];
   selected = 0;
 
