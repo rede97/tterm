@@ -180,6 +180,12 @@ gotchas that bite during changes:
   suppressed, and the forwarding dialog probes `ssh_forward_list` first and
   toasts instead of opening. This is by design (not a key scenario); config
   forwards still work there because OpenSSH reads `~/.ssh/config` itself.
+- **Gotcha — pending-tab PTY size**: embedded SSH opens a `pending-ssh-N`
+  tab, fits xterm, then `ssh_spawn_embedded` (`request_pty` uses that
+  grid). Rebind to `tab-N` must `syncBackendSize()` even when cols/rows
+  did not change — `onResize` uses `this.id` at fire time, and a no-op
+  `fit()` never fires it, which left remote TUIs (htop) at 80×24 until the
+  window was resized.
 - **Gotcha — exec EOF race**: sshd delivers a fast command's stdout EOF
   BEFORE it reaps the process and sends exit-status. `exec_capture` must
   keep reading until channel Close; breaking on Eof loses the exit status

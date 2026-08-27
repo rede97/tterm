@@ -161,8 +161,7 @@ pub fn window_set_fullscreen(window: tauri::Window, on: bool) {
 /// One-shot flag: set when the frontend's confirm flow approves a close.
 /// The close-requested hook checks and clears it, letting exactly that
 /// close through while every unconfirmed request is prevented.
-static CLOSE_CONFIRMED: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
+static CLOSE_CONFIRMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 pub fn take_close_confirmed() -> bool {
     CLOSE_CONFIRMED.swap(false, std::sync::atomic::Ordering::SeqCst)
