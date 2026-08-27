@@ -164,17 +164,15 @@ function sshSection(m: QpPanelModel, a: QpPanelActions): TemplateResult {
   return sectionTemplate(
     "Session",
     "ssh",
-    html`
-      ${qpToggle("Auto-reconnect", m.autoReconnect ?? false, (on) => a.onAutoReconnect?.(on))}
-      ${
-        m.sshEmbedded
-          ? html`<div class="qp-fwd">
-              <div class="qp-sub-title">Port forwards</div>
-              <div class="qp-fwd-slot"></div>
-            </div>`
-          : nothing
-      }
-    `,
+    html`${qpToggle("Auto-reconnect", m.autoReconnect ?? false, (on) => a.onAutoReconnect?.(on))}`,
+  );
+}
+
+function forwardsSection(): TemplateResult {
+  return sectionTemplate(
+    "Port forwards",
+    "forwards",
+    html`<div class="qp-fwd-slot"></div>`,
   );
 }
 
@@ -287,6 +285,7 @@ export function qpPanelView(m: QpPanelModel, a: QpPanelActions = {}): TemplateRe
     </div>
     ${shareSection(m, a)}
     ${m.kind === "ssh" ? sshSection(m, a) : nothing}
+    ${m.kind === "ssh" && m.sshEmbedded ? forwardsSection() : nothing}
     ${m.kind === "serial" ? serialSessionSection(m, a) : nothing}
     ${m.kind === "serial" ? serialIoSection(m, a) : nothing}
     ${m.kind === "serial" ? qpModemSection(m, a) : nothing}

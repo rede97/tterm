@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="/docs/ui/tokens.css" />
 <link rel="stylesheet" href="/docs/ui/aliases.css" />
 <link rel="stylesheet" href="/src/ui/kit/controls.css" />
+<link rel="stylesheet" href="/src/ui/kit/forwardtable.css" />
 <link rel="stylesheet" href="/docs/ui/scroll.css" />
 <link rel="stylesheet" href="/docs/ui/preview-chrome.css" />
 <style>
@@ -419,7 +420,7 @@
     flex-direction: column;
     border: 1px solid var(--set-line-strong);
     border-radius: var(--set-radius-sm);
-    overflow: hidden;
+    overflow: clip;
     cursor: pointer;
     background: var(--set-well);
     text-align: left;
@@ -451,7 +452,7 @@
     padding: 8px 10px;
     line-height: 1.6;
     white-space: nowrap;
-    overflow: hidden;
+    overflow: clip;
     font-family: var(--mono);
     min-height: 0;
   }
@@ -1060,112 +1061,7 @@
     margin-left: 6px;
   }
 
-  /* Port forwards —QuickPanel ft-compact: listen | target columns align */
-  .ft {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    font-size: var(--set-fs-label);
-  }
-  .ft-group {
-    border: 1px solid var(--set-line);
-    border-radius: var(--set-radius-sm);
-    overflow: hidden;
-    background: var(--set-inset);
-  }
-  .ft-group-head {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    padding: 6px 10px 5px;
-    background: color-mix(in srgb, var(--set-well) 80%, #fff 3%);
-  }
-  .ft-group-title {
-    font-size: var(--set-fs-caption);
-    font-weight: var(--set-title-weight);
-    letter-spacing: 0;
-    white-space: nowrap;
-  }
-  .ft-g-local { color: var(--tt-fwd-local); }
-  .ft-g-remote { color: var(--tt-fwd-remote); }
-  .ft-g-dynamic { color: var(--tt-share); }
-  .ft-row {
-    display: grid;
-    grid-template-columns: 64px minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 8px;
-    border-top: 1px solid var(--set-line);
-  }
-  .ft-listen,
-  .ft-target {
-    font-family: var(--mono);
-    font-size: var(--set-fs-desc);
-    color: var(--set-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    min-width: 0;
-  }
-  .ft-compact .ft-target {
-    border-left: 1px solid var(--set-line);
-    padding-left: 8px;
-  }
-  .ft-socks {
-    color: var(--set-faint);
-    font-style: italic;
-    font-family: var(--ui);
-  }
-  .ft-colon { color: var(--set-faint); flex-shrink: 0; }
-  .ft-cell input {
-    background: var(--set-well);
-    border: 1px solid var(--set-line-strong);
-    border-radius: var(--set-radius-ctrl);
-    color: var(--set-text);
-    font: 12px/1 var(--ui);
-    padding: 4px 6px;
-    outline: none;
-    min-width: 0;
-  }
-  .ft-cell input:focus { border-color: var(--set-focus); }
-  .ft-port {
-    width: 56px;
-    box-sizing: border-box;
-    flex-shrink: 0;
-    font-weight: var(--set-title-weight);
-    font-variant-numeric: tabular-nums;
-  }
-  .ft-host { flex: 1; width: 100%; }
-  .ft-actions { display: flex; gap: 4px; justify-content: flex-end; }
-  .ft-btn {
-    height: 22px;
-    min-width: 22px;
-    background: color-mix(in srgb, var(--set-hover) 100%, transparent);
-    border: 0;
-    border-radius: var(--set-radius-ctrl);
-    color: var(--set-text);
-    cursor: pointer;
-    padding: 0 7px;
-    display: grid;
-    place-items: center;
-  }
-  .ft-btn:hover { background: var(--set-hover); color: var(--set-text); }
-  .ft-del:hover {
-    background: color-mix(in srgb, var(--set-bad) 22%, transparent);
-    color: var(--set-bad);
-  }
-  .ft-add {
-    background: var(--set-accent-fill);
-    color: var(--set-accent-text);
-    padding: 0 8px;
-  }
-  .ft-add:hover { filter: brightness(1.08); }
-  .ft-add-row { background: color-mix(in srgb, #000 18%, transparent); }
-  .ft-compact .ft-row:not(.ft-add-row) .ft-listen { padding-left: 7px; }
-  .ft-compact .ft-row:not(.ft-add-row) .ft-target { padding-left: 15px; }
+  /* Port forwards table chrome → src/ui/kit/forwardtable.css */
 
   .she-footer {
     display: flex;
@@ -2451,55 +2347,7 @@
           </label>
         </div>
         <div class="she-fwd-title">Port Forwards <span class="she-fwd-hint">applied on connect</span></div>
-        <div class="ft ft-compact" id="she-fwd">
-          <div class="ft-group" data-kind="local">
-            <div class="ft-group-head"><span class="ft-group-title ft-g-local">Local (-L)</span></div>
-            <div class="ft-rows" data-kind="local"></div>
-            <div class="ft-row ft-add-row">
-              <span class="ft-cell ft-listen"><input class="ft-port" placeholder="Port" aria-label="Listen port" data-listen /></span>
-              <span class="ft-cell ft-target">
-                <input class="ft-host" placeholder="127.0.0.1 (Remote)" data-host />
-                <span class="ft-colon">:</span>
-                <input class="ft-port" placeholder="Port" data-port />
-              </span>
-              <span class="ft-cell ft-actions">
-                <button type="button" class="ft-btn ft-add" data-add-fwd="local" title="Add local forward">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-                </button>
-              </span>
-            </div>
-          </div>
-          <div class="ft-group" data-kind="remote">
-            <div class="ft-group-head"><span class="ft-group-title ft-g-remote">Remote (-R)</span></div>
-            <div class="ft-rows" data-kind="remote"></div>
-            <div class="ft-row ft-add-row">
-              <span class="ft-cell ft-listen"><input class="ft-port" placeholder="Port" aria-label="Listen port" data-listen /></span>
-              <span class="ft-cell ft-target">
-                <input class="ft-host" placeholder="127.0.0.1 (Local)" data-host />
-                <span class="ft-colon">:</span>
-                <input class="ft-port" placeholder="Port" data-port />
-              </span>
-              <span class="ft-cell ft-actions">
-                <button type="button" class="ft-btn ft-add" data-add-fwd="remote" title="Add remote forward">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-                </button>
-              </span>
-            </div>
-          </div>
-          <div class="ft-group" data-kind="dynamic">
-            <div class="ft-group-head"><span class="ft-group-title ft-g-dynamic">Dynamic (-D)</span></div>
-            <div class="ft-rows" data-kind="dynamic"></div>
-            <div class="ft-row ft-add-row">
-              <span class="ft-cell ft-listen"><input class="ft-port" placeholder="Port" aria-label="Listen port" data-listen /></span>
-              <span class="ft-cell ft-target ft-socks">any destination (SOCKS5)</span>
-              <span class="ft-cell ft-actions">
-                <button type="button" class="ft-btn ft-add" data-add-fwd="dynamic" title="Add dynamic forward">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-                </button>
-              </span>
-            </div>
-          </div>
-        </div>
+        <div id="she-fwd"></div>
         <div class="she-footer">
           <span class="she-spacer"></span>
           <button type="button" class="tt-btn tt-btn-ghost" id="she-cancel">Cancel</button>
@@ -2694,7 +2542,9 @@
 </aside>
 </div>
 
-<script>
+<script type="module">
+  import { createForwardTable } from "/src/ui/forwardtable.ts";
+
   const META = {
     general: ["General", "App version, updates, renderer, paste behavior."],
     appearance: ["Appearance", "Chrome skin, fonts, and terminal color schemes."],
@@ -3555,6 +3405,10 @@
   const sheFwd = document.getElementById("she-fwd");
   const sheSave = document.getElementById("she-save");
   let sheEditRow = null;
+  const FWD_SEED = [
+    { kind: "local", listenHost: "127.0.0.1", listenPort: 8080, targetHost: "127.0.0.1", targetPort: 3000 },
+    { kind: "dynamic", listenHost: "127.0.0.1", listenPort: 1080, targetHost: "", targetPort: 0 },
+  ];
 
   function sheEsc(s) {
     return String(s)
@@ -3563,68 +3417,9 @@
       .replace(/"/g, "&quot;");
   }
 
-  function clearFwdRows() {
-    sheFwd.querySelectorAll(".ft-rows").forEach((el) => {
-      el.innerHTML = "";
-    });
-    sheFwd.querySelectorAll(".ft-add-row input").forEach((inp) => {
-      inp.value = "";
-    });
+  function mountSheFwd(rows) {
+    sheFwd.replaceChildren(createForwardTable(rows).el);
   }
-
-  function appendFwdRow(kind, listen, target) {
-    const slot = sheFwd.querySelector(`.ft-rows[data-kind="${kind}"]`);
-    if (!slot) return;
-    const row = document.createElement("div");
-    row.className = "ft-row";
-    const targetHtml =
-      kind === "dynamic"
-        ? `<span class="ft-cell ft-target ft-socks">any destination (SOCKS5)</span>`
-        : `<span class="ft-cell ft-target" title="${sheEsc(target)}">${sheEsc(target)}</span>`;
-    row.innerHTML = `
-      <span class="ft-cell ft-listen" title="${sheEsc(listen)}">${sheEsc(listen)}</span>
-      ${targetHtml}
-      <span class="ft-cell ft-actions">
-        <button type="button" class="ft-btn ft-del" title="Delete forward" data-fwd-del>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-        </button>
-      </span>`;
-    row.querySelector("[data-fwd-del]").addEventListener("click", () => row.remove());
-    slot.appendChild(row);
-  }
-
-  function seedDemoForwards() {
-    appendFwdRow("local", "8080", "127.0.0.1:3000");
-    appendFwdRow("dynamic", "1080", "");
-  }
-
-  sheFwd.addEventListener("click", (e) => {
-    const add = e.target.closest("[data-add-fwd]");
-    if (!add) return;
-    const kind = add.dataset.addFwd;
-    const addRow = add.closest(".ft-add-row");
-    const listen = (addRow.querySelector("[data-listen]")?.value || "").trim();
-    if (!listen) {
-      showToast("Listen port is required", "bad");
-      addRow.querySelector("[data-listen]")?.focus();
-      return;
-    }
-    let target = "";
-    if (kind !== "dynamic") {
-      const host = (addRow.querySelector("[data-host]")?.value || "").trim() || "127.0.0.1";
-      const port = (addRow.querySelector("[data-port]")?.value || "").trim();
-      if (!port) {
-        showToast("Target port is required", "bad");
-        addRow.querySelector("[data-port]")?.focus();
-        return;
-      }
-      target = `${host}:${port}`;
-    }
-    appendFwdRow(kind, listen, target);
-    addRow.querySelectorAll("input").forEach((inp) => {
-      inp.value = "";
-    });
-  });
 
   function openShe(opts = {}) {
     sheEditRow = opts.row || null;
@@ -3636,12 +3431,7 @@
     shePort.value = opts.port || "";
     sheAgent.checked = !!opts.forwardAgent;
     sheX11.checked = !!opts.forwardX11;
-    clearFwdRows();
-    if (opts.forwards?.length) {
-      opts.forwards.forEach((f) => appendFwdRow(f.kind, f.listen, f.target || ""));
-    } else if (!sheEditRow) {
-      seedDemoForwards();
-    }
+    mountSheFwd(opts.forwards?.length ? opts.forwards : sheEditRow ? [] : FWD_SEED);
     sheOverlay.classList.add("open");
     sheOverlay.setAttribute("aria-hidden", "false");
     sheAlias.focus();

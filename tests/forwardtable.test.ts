@@ -156,19 +156,16 @@ describe("forward table — groups", () => {
     expect(t.rows()).toHaveLength(0);
   });
 
-  it("compact mode drops the pinned loopback and uses a bare + button", () => {
-    const t = createForwardTable(
-      [
-        {
-          kind: "local",
-          listenHost: "127.0.0.1",
-          listenPort: 8080,
-          targetHost: "db.internal",
-          targetPort: 5432,
-        },
-      ],
-      { compact: true },
-    );
+  it("listen cells show the port only and the add button is a + icon", () => {
+    const t = createForwardTable([
+      {
+        kind: "local",
+        listenHost: "127.0.0.1",
+        listenPort: 8080,
+        targetHost: "db.internal",
+        targetPort: 5432,
+      },
+    ]);
     document.body.appendChild(t.el);
 
     // Add-row: no "127.0.0.1 :" pin, icon-only add button.
@@ -176,6 +173,7 @@ describe("forward table — groups", () => {
     expect(a.listenPort.closest(".ft-listen")!.querySelector(".ft-pin")).toBeNull();
     expect(a.add.querySelector("svg")).not.toBeNull();
     expect(a.add.title).toBe("Add local forward");
+    expect(a.add.className).toBe("ft-btn ft-add");
 
     // Display row: listen cell is the bare port; full address on the title.
     const listen = displayRowsIn(group(t.el, "local"))[0].querySelector<HTMLElement>(".ft-listen")!;

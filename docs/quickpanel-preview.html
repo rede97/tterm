@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="/docs/ui/tokens.css" />
 <link rel="stylesheet" href="/docs/ui/aliases.css" />
 <link rel="stylesheet" href="/src/ui/kit/controls.css" />
+<link rel="stylesheet" href="/src/ui/kit/forwardtable.css" />
 <link rel="stylesheet" href="/docs/ui/scroll.css" />
 <link rel="stylesheet" href="/docs/ui/preview-chrome.css" />
 <style>
@@ -603,94 +604,9 @@
     border-color: var(--qp-ok);
   }
 
-  /* -- forwards -- */
+  /* -- forwards (table chrome → src/ui/kit/forwardtable.css) -- */
   .qp-fwd { padding: 0 0 4px; }
   .qp-fwd-slot { padding: 0 8px 8px; }
-
-  .ft { display: flex; flex-direction: column; gap: 8px; font-size: var(--tt-fs-label); }
-  .ft-group {
-    border: 1px solid var(--qp-line);
-    border-radius: 6px;
-    overflow: hidden;
-    background: rgba(0,0,0,0.2);
-  }
-  .ft-group-head {
-    display: flex; align-items: baseline; gap: 8px;
-    padding: 6px 10px 5px;
-    background: rgba(255,255,255,0.03);
-  }
-  .ft-group-title {
-    font-size: var(--tt-fs-caption); font-weight: var(--tt-title-weight);
-    letter-spacing: 0; white-space: nowrap;
-  }
-  .ft-g-local { color: var(--tt-fwd-local); }
-  .ft-g-remote { color: var(--tt-fwd-remote); }
-  .ft-g-dynamic { color: var(--tt-share); }
-  .ft-group-desc { font-size: var(--tt-fs-caption); color: var(--qp-faint); }
-  .ft-compact .ft-group-desc { display: none; }
-
-  .ft-row {
-    display: grid;
-    grid-template-columns: 56px minmax(0,1fr) auto;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 8px;
-    border-top: 1px solid var(--qp-line);
-  }
-  .ft-listen, .ft-target {
-    font-family: var(--qp-mono);
-    font-size: var(--tt-fs-desc);
-    color: var(--tt-muted);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    display: flex; align-items: center; gap: 4px;
-  }
-  .ft-compact .ft-target { border-left: 1px solid var(--qp-line); padding-left: 8px; }
-  .ft-socks { color: var(--qp-faint); font-style: italic; font-family: var(--qp-ui); }
-  .ft-cell input {
-    background: var(--qp-inset);
-    border: 1px solid var(--qp-line-strong);
-    border-radius: 5px;
-    color: var(--qp-text);
-    font-family: var(--tt-ui);
-  font-size: var(--tt-fs-label);
-  font-weight: var(--tt-ui-weight);
-  line-height: 1;
-    padding: 4px 6px;
-    outline: none;
-    min-width: 0;
-  }
-  .ft-cell input:focus { border-color: rgba(255,255,255,0.4); }
-  .ft-port { width: 56px; box-sizing: border-box; }
-  .ft-host { flex: 1; width: 100%; }
-  .ft-actions { display: flex; gap: 4px; justify-content: flex-end; }
-  .ft-btn {
-    height: 22px;
-    background: rgba(255,255,255,0.06);
-    border: 0;
-    border-radius: var(--qp-radius-opt);
-    color: var(--qp-text);
-    cursor: pointer;
-    font-size: var(--tt-fs-caption);
-    padding: 0 7px;
-    display: grid;
-    place-items: center;
-  }
-  .ft-btn:hover { background: var(--qp-hover); color: var(--tt-text); }
-  .ft-del:hover { background: color-mix(in srgb, var(--qp-bad) 22%, transparent); color: var(--tt-bad); }
-  /* Primary add — same accent language as Reconnect. */
-  .ft-add {
-    background: var(--qp-accent);
-    color: var(--tt-accent-text);
-    padding: 0 8px;
-  }
-  body[data-skin="vscode"] .ft-add {
-    background: var(--qp-accent-fill);
-    color: var(--tt-text);
-  }
-  .ft-add:hover { filter: brightness(1.08); }
-  .ft-add-row { background: rgba(0,0,0,0.12); }
-  .ft-compact .ft-row:not(.ft-add-row):not(.ft-editing) .ft-listen { padding-left: 7px; }
-  .ft-compact .ft-row:not(.ft-add-row):not(.ft-editing) .ft-target { padding-left: 15px; }
 
   .hidden { display: none !important; }
 </style>
@@ -771,29 +687,16 @@
 import { render } from "/src/ui/lit.ts";
 import { qpPanelView } from "/src/ui/kit/qp/view.ts";
 import { syncSelectTexts, closeAllSelects } from "/src/ui/select.ts";
+import { createForwardTable } from "/src/ui/forwardtable.ts";
 
 const panel = document.getElementById("panel");
 const SHARE_URL = "http://127.0.0.1:41789/share/3?token=8f2a1c90b4";
 
-const FWD_DEMO = `
-  <div class="ft ft-compact">
-    <div class="ft-group">
-      <div class="ft-group-head"><span class="ft-group-title ft-g-local">Local (-L)</span></div>
-      <div class="ft-row">
-        <span class="ft-cell ft-listen" title="127.0.0.1:8080">8080</span>
-        <span class="ft-cell ft-target">127.0.0.1:3000</span>
-        <span class="ft-cell ft-actions"><button type="button" class="ft-btn ft-del" title="Delete forward" tabindex="-1">×</button></span>
-      </div>
-    </div>
-    <div class="ft-group">
-      <div class="ft-group-head"><span class="ft-group-title ft-g-dynamic">Dynamic (-D)</span></div>
-      <div class="ft-row">
-        <span class="ft-cell ft-listen">1080</span>
-        <span class="ft-cell ft-target ft-socks">any destination (SOCKS5)</span>
-        <span class="ft-cell ft-actions"><button type="button" class="ft-btn ft-del" title="Delete forward" tabindex="-1">×</button></span>
-      </div>
-    </div>
-  </div>`;
+const FWD_DEMO_ROWS = [
+  { kind: "local", listenHost: "127.0.0.1", listenPort: 8080, targetHost: "127.0.0.1", targetPort: 3000 },
+  { kind: "remote", listenHost: "127.0.0.1", listenPort: 9090, targetHost: "127.0.0.1", targetPort: 80 },
+  { kind: "dynamic", listenHost: "127.0.0.1", listenPort: 1080, targetHost: "", targetPort: 0 },
+];
 
 /** Mutable demo state — re-rendered through the same view as the app. */
 const state = {
@@ -893,7 +796,9 @@ function paint() {
   );
   syncSelectTexts(panel);
   const slot = panel.querySelector(".qp-fwd-slot");
-  if (slot && state.sshEmbedded) slot.innerHTML = FWD_DEMO;
+  if (slot && state.sshEmbedded) {
+    slot.replaceChildren(createForwardTable(FWD_DEMO_ROWS, { editable: false }).el);
+  }
   syncQs();
 }
 

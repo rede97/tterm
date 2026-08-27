@@ -39,18 +39,22 @@ describe("overlay scrollbar (Q8b)", () => {
     expect(thumb.style.transform).toBe("translateY(4px)");
   });
 
-  it("thumb tracks scrollTop and the bar pins to the visible area", () => {
+  it("thumb tracks scrollTop; overscroll past the end stays clamped", () => {
     const el = scroller({ scrollHeight: 400, clientHeight: 100 });
     attachOverlayScrollbar(el);
     el.scrollTop = 300; // bottom
     el.dispatchEvent(new Event("scroll"));
     const bar = el.querySelector<HTMLElement>(".ov-sb")!;
     const thumb = el.querySelector<HTMLElement>(".ov-sb-thumb")!;
-    expect(bar.style.transform).toBe("translateY(300px)");
+    // Sticky height-0 bar — no translateY pin (that used to grow scrollHeight).
+    expect(bar.style.transform).toBe("");
     // thumb bottom-aligned: 4 + (92 - 24) = 72
     expect(thumb.style.transform).toBe("translateY(72px)");
-    // Native bar is hidden via the scoped class (CSS contract).
     expect(el.classList.contains("ov-scroll")).toBe(true);
+
+    el.scrollTop = 380; // past the end (rubber-band)
+    el.dispatchEvent(new Event("scroll"));
+    expect(thumb.style.transform).toBe("translateY(72px)");
   });
 
   it("re-attaches after a full content rebuild (Revert clears children)", () => {

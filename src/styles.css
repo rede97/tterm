@@ -1,6 +1,7 @@
 @import "./ui/kit/controls.css";
 @import "./ui/kit/palette.css";
 @import "./ui/kit/confirm.css";
+@import "./ui/kit/forwardtable.css";
 
 * {
   margin: 0;
@@ -22,6 +23,7 @@ body {
      script nor Chromium's implicit scroll-into-view (IME caret) can move
      the page horizontally — nothing in this fixed-layout app ever scrolls. */
   overflow: clip;
+  overscroll-behavior: none;
   background: var(--term-bg);
   color: var(--tt-text);
   font-family: var(--tt-ui);
@@ -821,38 +823,6 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   overflow-y: auto;
 }
 
-/* Compact rows are a single line: [Port] | [Host]:[Port] [+]. The listen
-   column is fixed to the port input's width so committed rows line up
-   with the input row below; a vertical divider separates listen from
-   target across all rows. */
-.ft-compact .ft-row {
-  grid-template-columns: 56px minmax(0, 1fr) auto;
-}
-
-.ft-compact .ft-target {
-  border-left: 1px solid var(--tt-line);
-  padding-left: 8px;
-}
-
-/* Committed rows: nudge text to where the input's text sits below
-   (input border 1px + padding 6px). */
-.ft-compact .ft-row:not(.ft-add-row):not(.ft-editing) .ft-listen {
-  padding-left: 7px;
-}
-
-.ft-compact .ft-row:not(.ft-add-row):not(.ft-editing) .ft-target {
-  padding-left: 15px;
-}
-
-.ft-compact .ft-port {
-  width: 56px;
-  box-sizing: border-box;
-}
-
-.ft-compact .ft-add {
-  padding: 4px 8px;
-}
-
 .win-btn {
   position: relative;
   display: flex;
@@ -1488,11 +1458,21 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 .quick-panel,
 .settings-sidebar,
 .settings-scroll,
-.settings-panel-content,
 .font-picker-body,
 .fp-list,
 .pal-list {
   scrollbar-gutter: auto;
+}
+
+.tt-scroll,
+.settings-sidebar,
+.pal-list,
+.tt-select-menu,
+.font-picker-body,
+.fp-list,
+.she-dialog,
+.te-dialog {
+  overscroll-behavior: none;
 }
 
 @supports not selector(::-webkit-scrollbar) {
@@ -1501,7 +1481,6 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   .quick-panel,
   .settings-sidebar,
   .settings-scroll,
-  .settings-panel-content,
   .font-picker-body,
   .fp-list,
   .pal-list {
@@ -1510,36 +1489,101 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   }
 }
 
-::-webkit-scrollbar {
+/* Native thin bar — scoped like docs/ui/scroll.css `.tt-scroll`.
+   A bare `::-webkit-scrollbar { width }` is classic-scrollbar mode on
+   EVERY box, so overflow:hidden tiles (theme cards) swallow the wheel
+   and the page underneath cannot scroll. Overlay ports (.ov-scroll) hide
+   the native bar separately. */
+:is(
+  .tt-scroll,
+  .settings-sidebar,
+  .pal-list,
+  .tt-select-menu,
+  .font-picker-body,
+  .fp-list,
+  .she-dialog,
+  .te-dialog,
+  .qp-fwd-slot
+)::-webkit-scrollbar {
   width: 8px;
   height: 8px;
   background: transparent;
 }
 
-::-webkit-scrollbar-button {
+:is(
+  .tt-scroll,
+  .settings-sidebar,
+  .pal-list,
+  .tt-select-menu,
+  .font-picker-body,
+  .fp-list,
+  .she-dialog,
+  .te-dialog,
+  .qp-fwd-slot
+)::-webkit-scrollbar-button {
   display: none;
   width: 0;
   height: 0;
 }
 
-::-webkit-scrollbar-track {
+:is(
+  .tt-scroll,
+  .settings-sidebar,
+  .pal-list,
+  .tt-select-menu,
+  .font-picker-body,
+  .fp-list,
+  .she-dialog,
+  .te-dialog,
+  .qp-fwd-slot
+)::-webkit-scrollbar-track {
   background: transparent;
 }
 
-::-webkit-scrollbar-thumb {
+:is(
+  .tt-scroll,
+  .settings-sidebar,
+  .pal-list,
+  .tt-select-menu,
+  .font-picker-body,
+  .fp-list,
+  .she-dialog,
+  .te-dialog,
+  .qp-fwd-slot
+)::-webkit-scrollbar-thumb {
   background: var(--tt-scroll-thumb);
   border-radius: 8px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
-::-webkit-scrollbar-thumb:hover {
+:is(
+  .tt-scroll,
+  .settings-sidebar,
+  .pal-list,
+  .tt-select-menu,
+  .font-picker-body,
+  .fp-list,
+  .she-dialog,
+  .te-dialog,
+  .qp-fwd-slot
+)::-webkit-scrollbar-thumb:hover {
   background: var(--tt-scroll-thumb-hover);
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
-::-webkit-scrollbar-corner {
+:is(
+  .tt-scroll,
+  .settings-sidebar,
+  .pal-list,
+  .tt-select-menu,
+  .font-picker-body,
+  .fp-list,
+  .she-dialog,
+  .te-dialog,
+  .qp-fwd-slot
+)::-webkit-scrollbar-corner {
   background: transparent;
 }
 
@@ -1549,6 +1593,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
    not shift when content overflows. */
 .ov-scroll {
   scrollbar-width: none;
+  overscroll-behavior: none;
 }
 
 .ov-scroll::-webkit-scrollbar {
@@ -1557,11 +1602,17 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   display: none;
 }
 
+/* Sticky + height:0: stays on the visible right edge without occupying
+   flow (float would steal 10px and reintroduce Q8b). Absolute+translateY
+   used to ride past the bottom on overscroll and grow scrollHeight. */
 .ov-sb {
-  position: absolute;
+  position: sticky;
   top: 0;
-  right: 0;
+  display: block;
   width: 10px;
+  height: 0;
+  margin-left: auto;
+  overflow: visible;
   z-index: 30;
   pointer-events: none;
 }
@@ -2275,7 +2326,9 @@ input[type="number"] {
   flex-direction: column;
   border: 1px solid var(--tt-line-strong);
   border-radius: var(--tt-radius-sm);
-  overflow: hidden;
+  /* clip (not hidden): hidden + a page-wide webkit scrollbar made these
+     cards a wheel trap so Settings could not scroll under the cursor. */
+  overflow: clip;
   cursor: pointer;
   background: var(--tt-well);
   width: 100%;
@@ -2304,7 +2357,7 @@ input[type="number"] {
   padding: 8px 10px;
   line-height: 1.6;
   white-space: nowrap;
-  overflow: hidden;
+  overflow: clip;
   min-height: 0;
 }
 
@@ -3721,157 +3774,7 @@ body[data-skin="cursor"] .check-box:checked::after {
   flex: 1;
 }
 
-/* Forward table (ui/forwardtable.ts) — three direction groups, each with
-   its own rows and add-row. Rows share one column track per group. */
-.ft {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  font-size: var(--tt-fs-label);
-}
-
-.ft-group {
-  border: 1px solid var(--tt-line);
-  border-radius: var(--tt-radius-sm);
-  overflow: hidden;
-}
-
-.ft-group-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 5px 10px;
-  background: var(--tt-well);
-  user-select: none;
-}
-
-.ft-group-title {
-  font-size: var(--tt-fs-caption);
-  font-weight: var(--tt-title-weight);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-/* Forward-direction colors are semantic, not skinned (design: fixed). */
-.ft-g-local {
-  color: var(--tt-fwd-local);
-}
-.ft-g-remote {
-  color: var(--tt-fwd-remote);
-}
-.ft-g-dynamic {
-  color: var(--tt-share);
-}
-
-.ft-group-desc {
-  font-size: var(--tt-fs-caption);
-  color: var(--tt-muted);
-}
-
-.ft-row {
-  display: grid;
-  grid-template-columns: 1fr 1.4fr auto;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 10px;
-  border-top: 1px solid var(--tt-line);
-}
-
-.ft-listen,
-.ft-target {
-  font-family: var(--tt-mono);
-  color: var(--tt-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.ft-socks {
-  color: var(--tt-faint);
-  font-style: italic;
-}
-
-.ft-pin {
-  color: var(--tt-faint);
-  font-family: var(--tt-mono);
-  user-select: none;
-}
-
-.ft-cell input {
-  background: var(--tt-inset);
-  border: 1px solid var(--tt-line-strong);
-  border-radius: var(--tt-radius-ctrl);
-  color: var(--tt-text);
-  font-size: var(--tt-fs-label);
-  padding: 4px 6px;
-  outline: none;
-  min-width: 0;
-}
-
-.ft-cell input:focus {
-  border-color: var(--tt-accent);
-}
-
-.ft-cell input.ft-invalid {
-  border-color: var(--tt-bad);
-}
-
-.ft-host {
-  width: 100%;
-  box-sizing: border-box;
-  flex: 1;
-}
-
-.ft-port {
-  width: 64px;
-  flex-shrink: 0;
-}
-
-.ft-actions {
-  display: flex;
-  gap: 4px;
-  justify-content: flex-end;
-}
-
-.ft-btn {
-  background: var(--tt-well);
-  border: none;
-  border-radius: 3px;
-  color: var(--tt-text);
-  cursor: pointer;
-  font-size: var(--tt-fs-caption);
-  padding: 3px 8px;
-}
-
-.ft-btn:hover {
-  background: var(--tt-hover);
-  color: var(--tt-text);
-}
-
-.ft-ok:hover {
-  background: var(--tt-accent-fill);
-}
-.ft-del:hover {
-  background: color-mix(in srgb, var(--tt-bad) 22%, transparent);
-  color: var(--tt-bad);
-}
-
-.ft-add {
-  background: var(--tt-accent-fill);
-  color: var(--tt-accent-text);
-  padding: 4px 14px;
-}
-
-.ft-add:hover {
-  background: var(--tt-accent);
-}
-
-.ft-add-row {
-  background: var(--tt-inset);
-}
+/* Forward table chrome → src/ui/kit/forwardtable.css */
 
 /* Serial profile cards (gallery reuses .theme-card/.theme-grid).
    Shorter than theme cards — no preview swatch strip; name/summary share

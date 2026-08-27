@@ -1,0 +1,203 @@
+/* Port-forward table — shared by Settings host editor, quick panel, and
+   docs/*-preview.html. Compact layout is the only design: listen port |
+   target host:port | actions. Tokens: --tt-* only. */
+
+.ft {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--tt-fs-label);
+}
+
+.ft-group {
+  border: 1px solid var(--tt-line);
+  border-radius: var(--tt-radius-sm);
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.ft-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px 5px;
+  background: rgba(255, 255, 255, 0.03);
+  user-select: none;
+}
+
+.ft-group-title {
+  font-family: var(--tt-mono);
+  font-size: var(--tt-fs-caption);
+  font-weight: var(--tt-title-weight);
+  letter-spacing: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+  width: 12ch;
+  text-align: left;
+}
+
+/* Forward-direction colors are semantic, not skinned (design: fixed). */
+.ft-g-local {
+  color: var(--tt-fwd-local);
+}
+.ft-g-remote {
+  color: var(--tt-fwd-remote);
+}
+.ft-g-dynamic {
+  color: var(--tt-share);
+}
+
+.ft-group-desc {
+  font-size: var(--tt-fs-caption);
+  color: var(--tt-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.ft-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-top: 1px solid var(--tt-line);
+}
+
+.ft-listen,
+.ft-target {
+  font-family: var(--tt-mono);
+  font-size: var(--tt-fs-desc);
+  color: var(--tt-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ft-target {
+  border-left: 1px solid var(--tt-line);
+  padding-left: 8px;
+}
+
+/* Committed rows: nudge text to where the input's text sits below
+   (input border 1px + padding 6px). */
+.ft-row:not(.ft-add-row):not(.ft-editing) .ft-listen {
+  padding-left: 7px;
+}
+
+.ft-row:not(.ft-add-row):not(.ft-editing) .ft-target {
+  padding-left: 15px;
+}
+
+.ft-socks {
+  color: var(--tt-faint);
+  font-style: italic;
+  font-family: var(--tt-ui);
+}
+
+.ft-pin {
+  color: var(--tt-faint);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.ft-cell input {
+  background: var(--tt-inset);
+  border: 1px solid var(--tt-line-strong);
+  border-radius: var(--tt-radius-opt);
+  color: var(--tt-text);
+  font-family: var(--tt-ui);
+  font-size: var(--tt-fs-label);
+  font-weight: var(--tt-ui-weight);
+  line-height: 1;
+  padding: 4px 6px;
+  outline: none;
+  min-width: 0;
+}
+
+.ft-cell input:focus {
+  border-color: var(--tt-focus);
+}
+
+.ft-cell input.ft-invalid {
+  border-color: var(--tt-bad);
+}
+
+.ft-port {
+  width: 56px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  font-weight: var(--tt-title-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+.ft-host {
+  flex: 1;
+  width: 100%;
+}
+
+.ft-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.ft-btn {
+  height: 22px;
+  min-width: 22px;
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  border-radius: var(--tt-radius-opt);
+  color: var(--tt-text);
+  cursor: pointer;
+  font-size: var(--tt-fs-caption);
+  padding: 0 7px;
+  display: grid;
+  place-items: center;
+}
+
+.ft-btn svg {
+  display: block;
+}
+
+.ft-btn:hover {
+  background: var(--tt-hover);
+  color: var(--tt-text);
+}
+
+.ft-del:hover {
+  background: color-mix(in srgb, var(--tt-bad) 22%, transparent);
+  color: var(--tt-bad);
+}
+
+/* Primary add — same accent language as Reconnect. */
+.ft-add {
+  background: var(--tt-accent);
+  color: var(--tt-accent-text);
+  padding: 0 8px;
+}
+
+body[data-skin="vscode"] .ft-add {
+  background: var(--tt-selected);
+  color: var(--tt-text);
+}
+
+.ft-btn.ft-add:hover {
+  background: var(--tt-accent);
+  color: var(--tt-accent-text);
+  filter: brightness(1.08);
+}
+
+body[data-skin="vscode"] .ft-btn.ft-add:hover {
+  background: var(--tt-selected);
+  color: var(--tt-text);
+}
+
+.ft-add-row {
+  background: rgba(0, 0, 0, 0.12);
+}

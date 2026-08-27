@@ -5,7 +5,7 @@
 1. **显示与交互 100% 对齐**设计稿（`docs/*-preview.html` + kit）。
 2. **Settings：布局与按钮严格 1:1**（row wells、间距、按钮宽 148px / 主次样式 / 落位、卡片与磁贴形态）。不得「语义接近即可」。
 3. **可见性列表用左侧 checkbox**（已定案，不用 toggle）。
-4. **控件同源：** [`src/ui/kit/`](../../src/ui/kit/)（`controls.css` + `select.ts` / `modal.ts` / …）；草稿链同一 CSS，禁止再内联一套 select/btn 皮。
+4. **控件同源：** [`src/ui/kit/`](../../src/ui/kit/)（`controls.css` + `forwardtable.css` + `select.ts` / `modal.ts` / …）；草稿链同一 CSS，禁止再内联一套 select/btn/ft 皮。
 5. **产品 DOM 同源：** 可交互产品树必须来自共享 view / shell（`qp/view.ts`、`shell.ts`），禁止在 preview 里再贴一份 `.qp-section` / dialog HTML。DOM 不变量进 [`tests/ui-contracts/`](../../tests/ui-contracts/)。
 
 - App：`feat/ui-redesign-migration`
@@ -22,6 +22,7 @@
 | Quick panel | [`src/ui/kit/qp/view.ts`](../../src/ui/kit/qp/view.ts) | mounts `qpPanelView` | [`tests/ui-contracts/qp-modem.ts`](../../tests/ui-contracts/qp-modem.ts) | **DONE** |
 | Palette shell | [`src/ui/kit/shell.ts`](../../src/ui/kit/shell.ts) `createPaletteShell` | mounts shell | (structure via kit) | **DONE** |
 | Confirm shell | `createConfirm*Dialog` | mounts shell | (structure via kit) | **DONE** |
+| Forward table | [`src/ui/forwardtable.ts`](../../src/ui/forwardtable.ts) + [`kit/forwardtable.css`](../../src/ui/kit/forwardtable.css) | mounts `createForwardTable` | [`tests/forwardtable.test.ts`](../../tests/forwardtable.test.ts) | **DONE** |
 | Settings panels | [`src/ui/lit.ts`](../../src/ui/lit.ts) vocabulary | still static HTML | — | **OPEN** (phase 2) |
 
 ---

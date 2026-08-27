@@ -42,10 +42,13 @@ xterm ──WS──► relay hub ──mpsc──► tokio task ──channel.d
 xterm ◄─WS── relay hub ◄─Read adapter◄─ ChannelMsg::Data ◄──────┘
 ```
 
-- `ssh_spawn_embedded(spec, promptTabId?)` — full lifecycle: TCP connect (15 s timeout)
+- `ssh_spawn_embedded(spec, promptTabId?, cols?, rows?)` — full lifecycle: TCP connect (15 s timeout)
   → handshake with host-key check → auth chain → `channel_open_session` →
-  `request_pty(xterm-256color)` → `request_shell` → bridge tasks → relay
-  registration with dead-mode hooks.
+  `request_pty(xterm-256color, cols×rows)` (pending tab's fitted grid, not
+  a hardcoded 80×24) → `request_shell` → bridge tasks → relay
+  registration with dead-mode hooks. After the pending tab rebinds to
+  `tab-N`, the frontend always `pty_resize`s — `fit()` is a no-op if xterm
+  already matches, so `onResize` would never ship the size to the real id.
 - **Resize** — `pty_resize` dispatches SSH sessions to
   `channel.window_change`. **Kill** — drop handle + cancel bridge tasks.
 - Channel EOF/Close ends the stream → relay dead mode → Enter respawns via
@@ -106,11 +109,11 @@ State per session: `forwards: {forwardId → kind, listen, target}`.
 
 ### Forward table UI (`src/ui/forwardtable.ts`)
 
-One table component, two modes: **full** (Settings host editor — pinned
-`127.0.0.1 :` listen prefix, inline edit) and **compact** (quick panel —
-single line `[Port] │ [Host]:[Port] [+]`, SVG icon buttons, vertical
-divider, listen column fixed to the port-input width so committed rows
-align with the input row). The directional two-column editor
+One compact table — Settings host editor and the quick panel share
+`src/ui/kit/forwardtable.css` and the same layout: single line
+`[Port] │ [Host]:[Port] [+]`, SVG icon buttons, vertical divider, listen
+column fixed to the port-input width so committed rows align with the
+input row. The directional two-column editor
 (`src/ui/forwardeditor.ts`) serves the tab context-menu dialog. Target
 host is optional everywhere and defaults to 127.0.0.1.
 

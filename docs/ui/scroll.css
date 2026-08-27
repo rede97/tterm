@@ -18,6 +18,7 @@
 
 .tt-scroll {
   scrollbar-gutter: auto;
+  overscroll-behavior: none;
 }
 
 /* Firefox — no ::-webkit-* */

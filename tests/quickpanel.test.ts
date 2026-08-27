@@ -389,13 +389,15 @@ describe("quick panel — ssh tab", () => {
     });
     activeTab = fakeTab({ id: "tab-3", type: "ssh", sshEmbedded: true });
     const p = openPanel();
-    const sec = p.querySelector('[data-section="ssh"]')!;
-    expect(sec.textContent).toContain("Auto-reconnect");
+    const session = p.querySelector('[data-section="ssh"]')!;
+    const forwards = p.querySelector('[data-section="forwards"]')!;
+    expect(session.textContent).toContain("Auto-reconnect");
+    expect(session.querySelector(".qp-fwd-slot")).toBeNull();
     // Grouped table: Local/Remote/Dynamic sections with add-rows.
     await vi.waitFor(() => {
-      expect(sec.querySelectorAll(".ft-group")).toHaveLength(3);
+      expect(forwards.querySelectorAll(".ft-group")).toHaveLength(3);
     });
-    const localAdd = sec
+    const localAdd = forwards
       .querySelectorAll<HTMLElement>(".ft-group")[0]
       .querySelector<HTMLElement>(".ft-add-row")!;
     localAdd.querySelector<HTMLInputElement>('input[aria-label="Listen port"]')!.value = "8080";
@@ -414,12 +416,12 @@ describe("quick panel — ssh tab", () => {
       });
     });
     // Runtime forwards are not inline-editable (delete + re-add instead).
-    expect(sec.querySelector(".ft-edit")).toBeNull();
+    expect(forwards.querySelector(".ft-edit")).toBeNull();
 
     // Regression: a runtime-added row must carry its backend forwardId —
     // deleting it addresses ssh_forward_remove with that id, not undefined.
     const row = await vi.waitFor(() => {
-      const r = sec.querySelector<HTMLElement>(".ft-group .ft-row:not(.ft-add-row)");
+      const r = forwards.querySelector<HTMLElement>(".ft-group .ft-row:not(.ft-add-row)");
       expect(r?.textContent).toContain("db.internal:5432");
       return r!;
     });
@@ -434,7 +436,8 @@ describe("quick panel — ssh tab", () => {
     const p = openPanel();
     const sec = p.querySelector('[data-section="ssh"]')!;
     expect(sec.textContent).toContain("Auto-reconnect");
-    expect(sec.querySelector(".qp-fwd")).toBeNull();
+    expect(p.querySelector('[data-section="forwards"]')).toBeNull();
+    expect(sec.querySelector(".qp-fwd-slot")).toBeNull();
   });
 });
 

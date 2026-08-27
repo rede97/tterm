@@ -161,9 +161,7 @@ function toModel(tab: TerminalTab, st: QuickPanelState): QpPanelModel {
   const lines = st.lines;
   // Serial: port name only in the header — baud/parity live in `.qp-meta`.
   const title =
-    kind === "serial"
-      ? tab.serialPortName || tab.label.split(" · ")[0] || tab.label
-      : tab.label;
+    kind === "serial" ? tab.serialPortName || tab.label.split(" · ")[0] || tab.label : tab.label;
   return {
     kind,
     title,
@@ -257,9 +255,7 @@ function actionsFor(tab: TerminalTab, st: QuickPanelState): QpPanelActions {
     },
     onFrame: (v) => {
       st.frame = v;
-      _handlers
-        ?.setSerialFrame(tab.id, v)
-        .catch(logCatch("serial.setFrame"));
+      _handlers?.setSerialFrame(tab.id, v).catch(logCatch("serial.setFrame"));
       renderPanel(tab);
     },
     onInputMode: (v) => {
@@ -320,7 +316,6 @@ function loadForwards(tab: TerminalTab): void {
       forwardId: f.forwardId,
     }));
     const table = createForwardTable(rows, {
-      compact: true,
       editable: false,
       onAdd: async (r) => {
         const forwardId = await addForward(tab.id, r);

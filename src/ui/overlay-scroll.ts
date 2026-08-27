@@ -4,9 +4,10 @@
 // the 148px control column when content overflows.
 //
 // Strategy: hide the native bar entirely (scoped `.ov-scroll` rules) and
-// paint a floating thumb that never takes layout width. The thumb's
-// track/position syncs on scroll + ResizeObserver; it is display-only
-// (pointer-events: none) — wheel/touch scrolling stay native.
+// paint a floating thumb that never takes layout width. The bar is sticky
+// with height 0 (not absolute+translateY) so it cannot extend scrollHeight
+// at the bottom. Thumb position syncs on scroll + ResizeObserver; it is
+// display-only (pointer-events: none) — wheel/touch scrolling stay native.
 
 /** Attach a floating scrollbar to a scroll container. Returns detach. */
 export function attachOverlayScrollbar(el: HTMLElement): () => void {
@@ -16,23 +17,23 @@ export function attachOverlayScrollbar(el: HTMLElement): () => void {
   const thumb = document.createElement("div");
   thumb.className = "ov-sb-thumb";
   bar.appendChild(thumb);
-  el.appendChild(bar);
+  el.prepend(bar);
 
   const sync = (): void => {
     // Settings panels fully rebuild on Revert (render(nothing) clears
     // children, this bar included) — re-attach on the next sync.
-    if (!bar.isConnected) el.appendChild(bar);
+    if (!bar.isConnected) el.prepend(bar);
     const { scrollHeight, clientHeight, scrollTop } = el;
     const scrollable = scrollHeight > clientHeight + 1;
     bar.classList.toggle("on", scrollable);
     if (!scrollable) return;
-    // The bar lives inside the scroller (absolute = padding box, which
-    // moves with scroll) — pin it back to the visible area.
-    bar.style.height = `${clientHeight}px`;
-    bar.style.transform = `translateY(${scrollTop}px)`;
+    // Clamp: WebView2 can report scrollTop past the range during rubber-band
+    // (and an unclamped thumb/bar used to extend scrollHeight → a jump).
+    const maxScroll = Math.max(1, scrollHeight - clientHeight);
+    const y = Math.min(Math.max(0, scrollTop), maxScroll);
     const trackH = clientHeight - 8;
     const thumbH = Math.max(24, Math.min(trackH, (clientHeight / scrollHeight) * trackH));
-    const top = 4 + (scrollTop / (scrollHeight - clientHeight)) * (trackH - thumbH);
+    const top = 4 + (y / maxScroll) * (trackH - thumbH);
     thumb.style.height = `${thumbH}px`;
     thumb.style.transform = `translateY(${top}px)`;
   };

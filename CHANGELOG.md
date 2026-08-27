@@ -2,6 +2,11 @@
 
 Changes
 
+- **Settings theme cards pass the wheel through** — a global
+  `::-webkit-scrollbar { width }` had turned `overflow: hidden` cards into
+  scrollports; scoped to real scrollers, cards use `overflow: clip`
+- **No rubber-band on real scrollports** — Settings / QP / palette stop at
+  the edge; not applied to every box (that trapped the wheel on cards)
 - **Terminal typing focus** — after a confirm (multi-line paste, close-window),
   the command palette, the tab switcher, or Alt-Tab back to the window, keystrokes
   return to xterm without a click. Clicking or dragging the title-bar drag
@@ -54,6 +59,15 @@ Changes
 - **Tab and + right-click menus open under the control** — aligned to the
   tab / + button, not the pointer. Terminal right-click still opens at
   the cursor
+- **Quick panel Port forwards is its own section** — no longer nested
+  under Session; Auto-reconnect stays in Session
+- **Forward group labels are mono 12ch** — Local / Remote / Dynamic
+  left-align so the one-line hints start on the same column
+- **Forward + button matches the draft** — 22px icon hit, accent fill,
+  brightness hover; dropped the old text-Add padding and `.ft-ok` hover
+- **Port-forward table is one kit surface** — Settings host editor and
+  Quick panel share `src/ui/kit/forwardtable.css` + compact layout
+  (`createForwardTable`); drafts link the same file instead of a local copy
 
 Fixes
 

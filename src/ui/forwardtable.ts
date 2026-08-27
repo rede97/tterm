@@ -3,6 +3,7 @@
 // Columns and validation rules are declared once as data; the engine
 // renders rows, enforces rules on commit, and manages add/edit/delete.
 // Used by the SSH host editor (Settings → SSH) and the quick panel.
+// One compact layout: listen port | target host:port | actions.
 //
 // Rows are ForwardEditorValue (ui/forwardeditor.ts). The listen host is
 // pinned to 127.0.0.1 by design: only its port is editable. Dynamic
@@ -19,8 +20,6 @@ import { html, render, repeat, type TemplateResult } from "./lit";
 import { showToast } from "./toast";
 
 export interface ForwardTableOptions {
-  // Narrow containers (quick panel): rows stack listen/target on two lines.
-  compact?: boolean;
   // Show the ✎ inline-edit button (host-config use). Runtime session
   // forwards can't be edited — delete and re-add — so they pass false.
   editable?: boolean;
@@ -76,7 +75,7 @@ const GROUPS: GroupDef[] = [
   {
     kind: "local",
     title: "Local (-L)",
-    desc: "Listen here, reach a target through the server",
+    desc: "Listen here, via server",
     hasTarget: true,
     accent: "ft-g-local",
     targetHostPh: "127.0.0.1 (Remote)",
@@ -84,7 +83,7 @@ const GROUPS: GroupDef[] = [
   {
     kind: "remote",
     title: "Remote (-R)",
-    desc: "Listen on the server, reach a target from here",
+    desc: "Listen on server, to here",
     hasTarget: true,
     accent: "ft-g-remote",
     targetHostPh: "127.0.0.1 (Local)",
@@ -92,7 +91,7 @@ const GROUPS: GroupDef[] = [
   {
     kind: "dynamic",
     title: "Dynamic (-D)",
-    desc: "SOCKS5 proxy listening here, any destination",
+    desc: "SOCKS5, any destination",
     hasTarget: false,
     accent: "ft-g-dynamic",
     targetHostPh: "",
@@ -184,7 +183,7 @@ export function createForwardTable(
   opts: ForwardTableOptions = {},
 ): ForwardTable {
   const data: ForwardEditorValue[] = initial.map((r) => ({ ...r }));
-  const root = el("div", opts.compact ? "ft ft-compact" : "ft");
+  const root = el("div", "ft");
 
   // Pending add-row input per group — this is the state the old rebuild
   // destroyed on every commit anywhere in the table.
@@ -232,8 +231,8 @@ export function createForwardTable(
     return fields;
   }
 
-  /** Edit-mode row inside a group: pinned listen host + port, target
-   *  fields when the group has one, then commit/cancel. `rowClass` is
+  /** Edit-mode row inside a group: listen port, target fields when the
+   *  group has one, then commit/cancel. `rowClass` is
    *  "ft-row ft-editing" for row edits and "ft-row ft-add-row" for the
    *  per-group add-row (CSS and tests key off both). */
   function editRowTemplate(
@@ -246,7 +245,6 @@ export function createForwardTable(
   ): TemplateResult {
     return html`<div class=${rowClass}>
       <span class="ft-cell ft-listen">
-        ${opts.compact ? "" : html`<span class="ft-pin">127.0.0.1 :</span>`}
         <input
           class="ft-port"
           type="text"
@@ -285,7 +283,7 @@ export function createForwardTable(
       <span class="ft-cell ft-actions">
         <button
           type="button"
-          class="ft-btn ft-ok${commitLabel === "Add" ? " ft-add" : ""}"
+          class="ft-btn ${commitLabel === "Add" ? "ft-add" : "ft-ok"}"
           title=${commitLabel === "Add" ? `Add ${group.kind} forward` : "Apply"}
           @click=${(e: MouseEvent) => {
             const rowEl = (e.currentTarget as HTMLElement).closest(".ft-row") as HTMLElement;
@@ -293,7 +291,7 @@ export function createForwardTable(
             if (fields) onCommit(fields);
           }}
         >
-          ${opts.compact && commitLabel === "Add" ? iconPlus : commitLabel}
+          ${commitLabel === "Add" ? iconPlus : commitLabel}
         </button>
         ${
           onCancel
@@ -326,7 +324,7 @@ export function createForwardTable(
   function displayRowTemplate(r: ForwardEditorValue): TemplateResult {
     return html`<div class="ft-row">
       <span class="ft-cell ft-listen" title="${r.listenHost}:${r.listenPort}"
-        >${opts.compact ? String(r.listenPort) : `${r.listenHost}:${r.listenPort}`}</span
+        >${String(r.listenPort)}</span
       >
       <span class="ft-cell ft-target${r.kind === "dynamic" ? " ft-socks" : ""}"
         >${r.kind === "dynamic" ? "any destination (SOCKS5)" : `${r.targetHost}:${r.targetPort}`}</span
