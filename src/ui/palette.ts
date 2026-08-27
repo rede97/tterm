@@ -47,6 +47,7 @@ export interface PaletteHandlers {
   getActiveTab: () => { id: string; type: string; sshEmbedded?: boolean } | null;
   setSerialBaud: (id: string, baud: number) => void;
   setSerialProfile: (id: string, name: string) => void;
+  setSerialFrame: (id: string, frame: string) => void | Promise<void>;
   setSerialFlow: (id: string, flow: SerialFlowControl) => void;
   setSerialInputMode: (id: string, mode: SerialInputMode) => void;
   // Deleting the chrome ">" (Backspace on empty command root) returns to

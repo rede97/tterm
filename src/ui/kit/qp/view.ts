@@ -205,12 +205,7 @@ function serialSessionSection(m: QpPanelModel, a: QpPanelActions): TemplateResul
         ${ttSelect("Profile", [], current, (value) => a.onProfile?.(value), { groups })}
       </div>
       ${qpSelectRow("Baud rate", QP_SERIAL_BAUD_OPTIONS, m.baud ?? "115200", (v) => a.onBaud?.(v))}
-      ${qpSelectRow(
-        "Data / parity / stop",
-        QP_SERIAL_FRAME_OPTIONS,
-        m.frame ?? "8N1",
-        (v) => a.onFrame?.(v),
-      )}
+      ${qpSelectRow("Frame", QP_SERIAL_FRAME_OPTIONS, m.frame ?? "8N1", (v) => a.onFrame?.(v))}
     `,
   );
 }

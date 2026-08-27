@@ -86,7 +86,6 @@ export function showKeygenModal(opts: { onSaved: (key: SshKeyInfo) => void }): v
         name: nameInput.value,
         passphrase: passInput.value || null,
       });
-      showToast(`Key generated: ${key.fingerprint}`, "info");
       opts.onSaved(key);
       modal.close();
     } catch (e) {
@@ -180,7 +179,7 @@ export function showInstallKeyModal(target: InstallTarget): void {
       installBtn.disabled = true;
       installBtn.textContent = "Installing…";
       try {
-        const res = await invoke<{ outcome: string; shell: string }>("ssh_install_pubkey", {
+        await invoke<{ outcome: string; shell: string }>("ssh_install_pubkey", {
           spec: {
             hostname: target.hostname,
             port: target.port,
@@ -190,12 +189,6 @@ export function showInstallKeyModal(target: InstallTarget): void {
           publicKey: key.publicKey,
           targetOs: os === "auto" ? null : os,
         });
-        showToast(
-          res.outcome === "already"
-            ? `${key.name} is already authorized on ${target.hostname} (${res.shell})`
-            : `${key.name} installed on ${target.hostname} (${res.shell})`,
-          "info",
-        );
         modal.close();
       } catch (e) {
         showToast(String(e), "error");

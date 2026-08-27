@@ -360,10 +360,7 @@ function keyList(st: SshPanelState) {
         ${linkBtn(
           "Copy",
           async () => {
-            await navigator.clipboard
-              .writeText(k.publicKey)
-              .then(() => showToast("Public key copied to clipboard", "info"))
-              .catch(logCatch("clipboard.write"));
+            await navigator.clipboard.writeText(k.publicKey).catch(logCatch("clipboard.write"));
           },
           { cls: "ssh-key-copy solid" },
         )}

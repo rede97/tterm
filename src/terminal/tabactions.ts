@@ -66,7 +66,6 @@ export async function shareTab(mgr: TabManager, id: string): Promise<void> {
     tab.shared = false;
     tab.shareUrl = undefined;
     tab.tabElement.classList.remove("shared");
-    showToast("AI sharing stopped", "info");
     updateQuickButton();
     return;
   }
@@ -81,7 +80,6 @@ export async function shareTab(mgr: TabManager, id: string): Promise<void> {
     tab.shared = true;
     tab.shareUrl = res.url;
     tab.tabElement.classList.add("shared");
-    showToast("Share link copied — paste it to your AI agent", "info", 6000);
     updateQuickButton();
   } catch (e) {
     showToast(`Failed to share session: ${e}`, "error");

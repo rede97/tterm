@@ -1979,12 +1979,29 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
 
 .settings-panel-content {
   flex: 1;
+  /* Flex scrollport: without min-height:0 the panel won't shrink below
+     content and settings-main's overflow:hidden clips it (Profile looks blank). */
+  min-height: 0;
+  /* Containing block for the floating .ov-sb thumb. */
+  position: relative;
   overflow-y: auto;
-  padding: 20px 24px 28px;
+  /* Top pad = section gap so the first title lines up with later ones. */
+  padding: 28px 24px 28px;
 }
 
 .section {
   margin-bottom: 28px;
+}
+
+.section:last-child {
+  margin-bottom: 0;
+}
+
+/* General → About: hairline under the intro so Updates doesn't float in empty air. */
+.settings-panel-content[data-panel="general"] > .section:first-child {
+  margin-bottom: 24px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--tt-line);
 }
 
 .section-title {
@@ -1993,7 +2010,7 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   text-transform: uppercase;
   color: var(--tt-muted);
   letter-spacing: 0.5px;
-  margin-bottom: 12px;
+  margin: 0 0 12px;
 }
 
 .settings-subsection {

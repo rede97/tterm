@@ -165,10 +165,10 @@ function serialTemplate(panel: HTMLElement, st: SerialPanelState) {
           ),
         )}
         ${itemRow(
-          "Data / parity / stop",
+          "Default Frame",
           "Frame for new serial sessions.",
           ttSelect(
-            "Data / parity / stop",
+            "Default Frame",
             SERIAL_FRAMES,
             st.frame,
             (v) => {

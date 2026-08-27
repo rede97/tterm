@@ -149,7 +149,6 @@ export function createSettingsContent(): HTMLElement {
     appDirty = false;
     applyBtn.classList.add("applied");
     syncDirty();
-    showToast("Reverted to saved settings", "info");
   });
   footer.appendChild(revertBtn);
 
@@ -161,11 +160,9 @@ export function createSettingsContent(): HTMLElement {
     await applySettings(root);
     // SSH host edits write ~/.ssh/config in the same Apply. On failure the
     // app settings stay applied; the SSH dirty flag is kept and reported.
-    let sshWrote = false;
     if (isSshConfigDirty()) {
       try {
         await saveSshConfigToDisk(root);
-        sshWrote = true;
       } catch (err) {
         showToast(`Failed to write SSH config: ${String(err)}`, "error");
       }
@@ -174,7 +171,6 @@ export function createSettingsContent(): HTMLElement {
     applyBtn.classList.add("applied");
     sshDirty = isSshConfigDirty();
     syncDirty();
-    showToast(sshWrote ? "Settings applied · SSH config written" : "Settings applied", "info");
   });
   footer.appendChild(applyBtn);
 
@@ -201,8 +197,16 @@ export function createSettingsContent(): HTMLElement {
     attachOverlayScrollbar(panel);
   }
 
-  // Sidebar navigation
+  // Sidebar navigation — always set display:block/none (clearing to "" left
+  // flex height ambiguous in WebView2 and could clip Profile to empty).
   const navItems = root.querySelectorAll(".settings-nav-item");
+  const showPanel = (name: string): void => {
+    root.querySelectorAll(".settings-panel-content").forEach((p) => {
+      (p as HTMLElement).style.display = p.getAttribute("data-panel") === name ? "block" : "none";
+    });
+  };
+  // General is the landing panel; pin it explicitly so every sibling starts hidden.
+  showPanel("general");
   navItems.forEach((t) => {
     t.addEventListener("click", () => {
       navItems.forEach((x) => {
@@ -212,11 +216,23 @@ export function createSettingsContent(): HTMLElement {
       const name = (t as HTMLElement).dataset.panel;
       if (!name) return;
       syncHeader(name);
-      root.querySelectorAll(".settings-panel-content").forEach((p) => {
-        (p as HTMLElement).style.display = p.getAttribute("data-panel") === name ? "" : "none";
-      });
+      showPanel(name);
     });
   });
+
+  // Settings can open before WT profiles land (or after a failed first load).
+  // Self-heal so Profile isn't an empty Default / Imported section forever.
+  if (configStore.get("localProfiles").length === 0) {
+    void loadAllWtData()
+      .then((wt) => {
+        setWtThemes(wt.themes);
+        configStore.set({ localProfiles: wt.profiles, vsInstalls: wt.vsInstalls });
+        refreshProfilePanel(root);
+      })
+      .catch((e) => {
+        showToast(`Failed to load local profiles: ${String(e)}`, "error");
+      });
+  }
 
   // Theme gallery (needs applyBtn reference)
   renderThemeGallery(root);

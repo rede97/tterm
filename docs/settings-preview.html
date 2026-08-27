@@ -172,19 +172,28 @@
   .settings-panel {
     display: none;
     flex: 1;
+    min-height: 0;
+    position: relative;
     overflow-y: auto;
-    padding: 20px 24px 28px;
+    padding: 28px 24px 28px;
   }
   .settings-panel.active { display: block; }
 
   .section { margin-bottom: 28px; }
+  .section:last-child { margin-bottom: 0; }
+  /* General → About: rule under intro balances the gap before Updates. */
+  .settings-panel[data-panel="general"] > .section:first-child {
+    margin-bottom: 24px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--set-line);
+  }
   .section-title {
     font-size: var(--set-fs-caption);
     font-weight: var(--set-title-weight);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--set-muted);
-    margin-bottom: 12px;
+    margin: 0 0 12px;
   }
   .section-note {
     font-size: var(--set-fs-label);
@@ -2186,6 +2195,9 @@
               </div>
               <button type="button" class="tt-switch" role="switch" aria-checked="false" data-dirty aria-label="Terminal bell"><span class="tt-knob"></span></button>
             </div>
+          </div>
+          <div class="section">
+            <div class="section-title">Paste</div>
             <div class="row">
               <div class="row-info">
                 <div class="row-title">Paste warning</div>
@@ -2199,6 +2211,16 @@
                 <div class="row-desc">Strip trailing whitespace and newlines from pasted text.</div>
               </div>
               <button type="button" class="tt-switch on" role="switch" aria-checked="true" data-dirty aria-label="Trim paste"><span class="tt-knob"></span></button>
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-title">Closing</div>
+            <div class="row">
+              <div class="row-info">
+                <div class="row-title">Confirm before closing tab</div>
+                <div class="row-desc">When clicking × on a tab, show a Close button over the ×. Off = close immediately. Shift+× always skips.</div>
+              </div>
+              <button type="button" class="tt-switch on" role="switch" aria-checked="true" data-dirty aria-label="Confirm before closing tab"><span class="tt-knob"></span></button>
             </div>
             <div class="row">
               <div class="row-info">
@@ -2317,7 +2339,7 @@
             </div>
             <div class="row">
               <div class="row-info">
-                <div class="row-title">Data / parity / stop</div>
+                <div class="row-title">Default Frame</div>
                 <div class="row-desc">Frame for new serial sessions.</div>
               </div>
               <div class="tt-select" data-dirty data-select id="serial-frame-select">

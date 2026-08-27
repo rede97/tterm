@@ -112,7 +112,7 @@ function generalTemplate(panel: HTMLElement, st: GeneralPanelState) {
         <div class="settings-about-row">
           <div>
             <div class="row-title" id="set-version">TTerm${st.version ? ` ${st.version}` : ""}</div>
-            <div class="row-desc" style="margin-bottom:20px">A fast, lightweight, efficient WebView Terminal.</div>
+            <div class="row-desc">A fast, lightweight, efficient WebView Terminal.</div>
           </div>
           <button
             id="set-homepage"
@@ -187,33 +187,40 @@ function generalTemplate(panel: HTMLElement, st: GeneralPanelState) {
           "Play a system sound when the terminal bell rings (BEL character).",
           toggle(st.bell, (v) => (st.bell = v), { id: "set-bell" }),
         )}
-        <div class="settings-subsection">
-          <div class="settings-subsection-title">Paste</div>
-          ${itemRow(
-            "Multi-line paste warning",
-            "Show a confirmation dialog when pasting text that spans multiple lines.",
-            toggle(st.pasteWarning, (v) => (st.pasteWarning = v), { id: "set-paste-warning" }),
-          )}
-          ${itemRow(
-            "Trim whitespace",
-            "Strip leading, trailing, and blank lines from pasted content.",
-            toggle(st.pasteTrim, (v) => (st.pasteTrim = v), { id: "set-paste-trim" }),
-          )}
-          ${itemRow(
-            "Confirm before closing tab",
-            "When clicking × on a tab, show Confirm: + Close in place. Off = close immediately. Shift+× always skips.",
-            toggle(st.confirmCloseTab, (v) => (st.confirmCloseTab = v), {
-              id: "set-confirm-close-tab",
-            }),
-          )}
-          ${itemRow(
-            "Confirm before closing window",
-            "When any tab is open, ask before closing the window. Off = quit immediately.",
-            toggle(st.confirmCloseWindow, (v) => (st.confirmCloseWindow = v), {
-              id: "set-confirm-close-window",
-            }),
-          )}
-        </div>
+      `,
+    )}
+    ${section(
+      "Paste",
+      html`
+        ${itemRow(
+          "Multi-line paste warning",
+          "Show a confirmation dialog when pasting text that spans multiple lines.",
+          toggle(st.pasteWarning, (v) => (st.pasteWarning = v), { id: "set-paste-warning" }),
+        )}
+        ${itemRow(
+          "Trim whitespace",
+          "Strip leading, trailing, and blank lines from pasted content.",
+          toggle(st.pasteTrim, (v) => (st.pasteTrim = v), { id: "set-paste-trim" }),
+        )}
+      `,
+    )}
+    ${section(
+      "Closing",
+      html`
+        ${itemRow(
+          "Confirm before closing tab",
+          "When clicking × on a tab, show a Close button over the ×. Off = close immediately. Shift+× always skips.",
+          toggle(st.confirmCloseTab, (v) => (st.confirmCloseTab = v), {
+            id: "set-confirm-close-tab",
+          }),
+        )}
+        ${itemRow(
+          "Confirm before closing window",
+          "When any tab is open, ask before closing the window. Off = quit immediately.",
+          toggle(st.confirmCloseWindow, (v) => (st.confirmCloseWindow = v), {
+            id: "set-confirm-close-window",
+          }),
+        )}
       `,
     )}
     ${section(

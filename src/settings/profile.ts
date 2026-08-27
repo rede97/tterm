@@ -66,29 +66,31 @@ function renderProfilePanel(panel: HTMLElement): void {
             Checkbox on the left — shown in the new-tab menu when checked (same
             pattern as SSH hosts). Pending until Apply.
           </div>
-          ${repeat(
-            localProfiles,
-            (p) => p.name,
-            (p) => html`<div class="check-row ${hiddenProfiles.includes(p.name) ? "is-off" : ""}">
-              <label class="check-hit">
-                <input
-                  type="checkbox"
-                  class="check-box wt-profile-check"
-                  value=${p.name}
-                  title="Show in new-tab menu"
-                  .checked=${!hiddenProfiles.includes(p.name)}
-                  @change=${(e: Event) => {
-                    const box = e.currentTarget as HTMLInputElement;
-                    box.closest(".check-row")?.classList.toggle("is-off", !box.checked);
-                  }}
-                />
-                <div class="check-main">
-                  <div class="check-title">${p.name}</div>
-                  <div class="check-meta">${p.command}</div>
-                </div>
-              </label>
-            </div>`,
-          )}
+          ${localProfiles.length === 0
+            ? html`<div class="row-desc">No Windows Terminal profiles found yet.</div>`
+            : repeat(
+                localProfiles,
+                (p) => p.name,
+                (p) => html`<div class="check-row ${hiddenProfiles.includes(p.name) ? "is-off" : ""}">
+                  <label class="check-hit">
+                    <input
+                      type="checkbox"
+                      class="check-box wt-profile-check"
+                      value=${p.name}
+                      title="Show in new-tab menu"
+                      .checked=${!hiddenProfiles.includes(p.name)}
+                      @change=${(e: Event) => {
+                        const box = e.currentTarget as HTMLInputElement;
+                        box.closest(".check-row")?.classList.toggle("is-off", !box.checked);
+                      }}
+                    />
+                    <div class="check-main">
+                      <div class="check-title">${p.name}</div>
+                      <div class="check-meta">${p.command}</div>
+                    </div>
+                  </label>
+                </div>`,
+              )}
         `,
       )}
     `,

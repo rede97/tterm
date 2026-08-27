@@ -212,7 +212,7 @@ describe("quick panel — serial tab", () => {
     expect(rowOf(sec, "Connection")).toBeDefined();
     expect(rowOf(sec, "Profile")).toBeDefined();
     expect(rowOf(sec, "Baud rate")).toBeDefined();
-    expect(rowOf(sec, "Data / parity / stop")).toBeDefined();
+    expect(rowOf(sec, "Frame")).toBeDefined();
     expect(rowOf(io(p), "Input mode")).toBeDefined();
     expect(rowOf(io(p), "Enter sends")).toBeDefined();
     expect(rowOf(io(p), "Output newlines")).toBeDefined();
@@ -251,7 +251,7 @@ describe("quick panel — serial tab", () => {
 
   it("frame select offers 8N1/8E1/8O1 and calls setSerialFrame", () => {
     const p = openPanel();
-    const frameRow = rowOf(session(p), "Data / parity / stop")!;
+    const frameRow = rowOf(session(p), "Frame")!;
     expect(selectText(frameRow)).toBe("8N1");
     expect(session(p).querySelector(".tt-select-hint")).toBeNull();
     pick(frameRow, "8E1");

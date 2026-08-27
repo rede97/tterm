@@ -50,7 +50,7 @@ describe("settings — panel visibility", () => {
     // renders stacked over the General page.
     for (const p of panels) {
       expect(p.style.display, `${p.dataset.panel} initial visibility`).toBe(
-        p.dataset.panel === "general" ? "" : "none",
+        p.dataset.panel === "general" ? "block" : "none",
       );
     }
 
@@ -60,7 +60,7 @@ describe("settings — panel visibility", () => {
     });
     for (const p of panels) {
       expect(p.style.display, `${p.dataset.panel} after switching`).toBe(
-        p.dataset.panel === "keyboard" ? "" : "none",
+        p.dataset.panel === "keyboard" ? "block" : "none",
       );
     }
   });
@@ -73,8 +73,8 @@ describe("settings — Revert", () => {
 
     revertButton(root).click();
     await vi.waitFor(() => {
-      expect(document.querySelector("#toast-container")?.textContent).toContain(
-        "Reverted to saved settings",
+      expect(root.querySelector(".settings-footer .tt-btn-primary")?.classList.contains("applied")).toBe(
+        true,
       );
     });
 
@@ -105,11 +105,11 @@ describe("settings — Revert", () => {
     document.body.appendChild(root);
 
     for (let i = 0; i < 2; i++) {
+      const apply = root.querySelector(".settings-footer .tt-btn-primary");
+      apply?.classList.remove("applied");
       revertButton(root).click();
       await vi.waitFor(() => {
-        expect(document.querySelector("#toast-container")?.textContent).toContain(
-          "Reverted to saved settings",
-        );
+        expect(apply?.classList.contains("applied")).toBe(true);
       });
     }
 

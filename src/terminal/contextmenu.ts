@@ -26,7 +26,6 @@ import {
 } from "lucide";
 import { logCatch } from "../core/errorlog";
 import { handleMenuKeydown, menuItems, restoreFocus } from "../ui/menukeys";
-import { showToast } from "../ui/toast";
 import { openFind } from "./search";
 
 // ---- Injected handlers ----
@@ -347,9 +346,7 @@ function dispatch(action: string) {
     case "copy-share": {
       const url = h.getShareUrl(tabId);
       if (url) {
-        clipboardWriteText(url)
-          .then(() => showToast("Share link copied", "info"))
-          .catch(logCatch("clipboard.write"));
+        clipboardWriteText(url).catch(logCatch("clipboard.write"));
       }
       break;
     }

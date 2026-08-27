@@ -49,7 +49,7 @@ describe("settings — profile panel", () => {
     const applyBtn = root.querySelector<HTMLButtonElement>(".settings-footer .tt-btn-primary")!;
     applyBtn.click();
     await vi.waitFor(() => {
-      expect(document.querySelector("#toast-container")?.textContent).toContain("Settings applied");
+      expect(applyBtn.classList.contains("applied")).toBe(true);
     });
     // Regression: an unrelated Apply used to rewrite defaultLocalProfile
     // to the first profile because the select was never initialized.
