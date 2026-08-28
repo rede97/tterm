@@ -166,8 +166,8 @@ function showAuthDialog(payload: SshAuthRequest): void {
         <input type="password" class="sshauth-input" autocomplete="off" />
       </div>
       <div class="sshauth-footer">
-        <button class="sshauth-btn sshauth-btn-cancel" type="button">Cancel</button>
-        <button class="sshauth-btn sshauth-btn-ok" type="button">OK</button>
+        <button class="tt-btn tt-btn-ghost sshauth-btn-cancel" type="button">Cancel</button>
+        <button class="tt-btn tt-btn-primary sshauth-btn-ok" type="button">OK</button>
       </div>
     </div>
   `;
@@ -250,13 +250,13 @@ function showHostkeyDialog(payload: SshHostkeyRequest): void {
   const footer = document.createElement("div");
   footer.className = "sshauth-footer";
   const rejectBtn = document.createElement("button");
-  rejectBtn.className = "sshauth-btn sshauth-btn-cancel";
+  rejectBtn.className = "tt-btn tt-btn-ghost sshauth-btn-cancel";
   rejectBtn.type = "button";
   rejectBtn.textContent = "Reject";
   const trustBtn = document.createElement("button");
   trustBtn.className = payload.mismatch
-    ? "sshauth-btn sshauth-btn-danger"
-    : "sshauth-btn sshauth-btn-ok";
+    ? "tt-btn tt-btn-danger-fill"
+    : "tt-btn tt-btn-primary";
   trustBtn.type = "button";
   trustBtn.textContent = "Trust & Connect";
   footer.appendChild(rejectBtn);

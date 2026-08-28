@@ -924,20 +924,24 @@ body[data-skin="vscode"] .qp-connect-btn[data-kind="reconnect"] {
   font-size: var(--tt-fs-label);
 }
 
-/* AI session sharing: teal dot. Settings unsaved: yellow dot. Same chrome.
-   order keeps the × rightmost (matches drafts/tabbar-preview.html). */
+/* AI session sharing: teal dot. Settings unsaved: yellow dot. Overlay so
+   toggling share/dirty cannot change tab width (flex ::after used to add
+   6px + margins in-flow — visible on Cursor pills). */
 .tab.shared::after,
 .tab.dirty::after {
   content: "";
+  position: absolute;
+  right: 28px;
+  top: 50%;
   width: 6px;
   height: 6px;
+  margin: 0;
   border-radius: 50%;
-  flex-shrink: 0;
-  margin: 0 6px;
-  order: 3;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 .tab.shared::after {
-  background: #4ec9b0;
+  background: var(--tt-share);
 }
 .tab.dirty::after {
   background: var(--tt-warn);
@@ -1199,6 +1203,7 @@ body[data-skin="cursor"] .tab-close:hover {
 
 .tab-label {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2915,6 +2920,9 @@ input[type="number"] {
   background: transparent;
   cursor: pointer;
   position: relative;
+  /* Fluent/iOS-style stroke check; padding is in the viewBox so mask+inset
+     keeps the glyph in the square (the old rotated-L sat on an edge). */
+  --tt-check-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath stroke='%23000' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round' d='M3.05 8.44 6.46 11.74 12.95 4.26'/%3E%3C/svg%3E");
   transition:
     border-color 120ms ease,
     background 120ms ease,
@@ -2939,13 +2947,11 @@ input[type="number"] {
 .check-box:checked::after {
   content: "";
   position: absolute;
-  left: 3.5px;
-  top: 0.5px;
-  width: 3.5px;
-  height: 7px;
-  border: solid var(--tt-accent-text);
-  border-width: 0 1.5px 1.5px 0;
-  transform: rotate(45deg);
+  /* Fluent/iOS: glyph inset in the square, never a rotated L hugging an edge. */
+  inset: 1.5px;
+  background-color: var(--tt-accent-text);
+  -webkit-mask: var(--tt-check-mark) center / contain no-repeat;
+  mask: var(--tt-check-mark) center / contain no-repeat;
 }
 
 body[data-skin="cursor"] .check-box:checked {
@@ -2954,7 +2960,7 @@ body[data-skin="cursor"] .check-box:checked {
 }
 
 body[data-skin="cursor"] .check-box:checked::after {
-  border-color: #0a0a0a;
+  background-color: #0a0a0a;
 }
 
 .check-main {
@@ -3682,36 +3688,10 @@ body[data-skin="cursor"] .check-box:checked::after {
   border-top: 1px solid var(--tt-line);
 }
 
-.sshauth-btn {
-  padding: 6px 16px;
-  border: 1px solid var(--tt-line-strong);
-  border-radius: var(--tt-radius-ctrl);
-  background: var(--tt-well);
-  color: var(--tt-text);
-  font-size: var(--tt-fs-label);
-  cursor: pointer;
-}
-
-.sshauth-btn:hover {
-  background: var(--tt-hover);
-}
-
-.sshauth-btn-ok {
-  background: var(--tt-accent-fill);
-  border-color: var(--tt-accent-fill);
-}
-
-.sshauth-btn-ok:hover {
-  background: var(--tt-accent);
-}
-
-.sshauth-btn-danger {
-  background: var(--tt-bad);
-  border-color: var(--tt-bad);
-}
-
-.sshauth-btn-danger:hover {
-  background: var(--tt-bad);
+.sshauth-footer .tt-btn {
+  min-width: 88px;
+  width: auto;
+  padding: 0 16px;
 }
 
 /* Disable ligatures in terminal */

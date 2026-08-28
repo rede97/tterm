@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { syncTabStripState } from "../src/terminal/tabmanager";
 
@@ -60,5 +62,14 @@ describe("syncTabStripState — scroll-edge shadows", () => {
     Object.defineProperty(el, "scrollLeft", { value: 0 });
     syncTabStripState(el);
     expect(classes(el)).toEqual({ overflowing: false, left: false, right: false });
+  });
+});
+
+describe("tab share/dirty dots", () => {
+  it("overlay the chrome so they cannot change tab width", () => {
+    const css = readFileSync(join(__dirname, "../src/styles.css"), "utf8");
+    const block = css.match(/\.tab\.shared::after,\s*\.tab\.dirty::after\s*\{[^}]+\}/);
+    expect(block?.[0]).toContain("position: absolute");
+    expect(block?.[0]).not.toContain("order:");
   });
 });

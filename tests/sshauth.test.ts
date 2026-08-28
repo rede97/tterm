@@ -92,6 +92,7 @@ describe("SSH auth dialogs", () => {
     const trustBtn = [...overlay.querySelectorAll<HTMLButtonElement>("button")].find(
       (b) => b.textContent === "Trust & Connect",
     )!;
+    expect(trustBtn.classList.contains("tt-btn-primary")).toBe(true);
     trustBtn.click();
 
     expect(invoke).toHaveBeenCalledWith("ssh_hostkey_response", { reqId: 11, accept: true });
@@ -115,6 +116,11 @@ describe("SSH auth dialogs", () => {
     );
     expect(overlay.textContent).toContain("man-in-the-middle");
     expect(overlay.textContent).toContain("SHA256:zzz999");
+
+    const trustBtn = [...overlay.querySelectorAll<HTMLButtonElement>("button")].find(
+      (b) => b.textContent === "Trust & Connect",
+    )!;
+    expect(trustBtn.classList.contains("tt-btn-danger-fill")).toBe(true);
 
     const rejectBtn = [...overlay.querySelectorAll<HTMLButtonElement>("button")].find(
       (b) => b.textContent === "Reject",
