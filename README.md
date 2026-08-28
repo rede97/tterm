@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/logo.svg" width="96" alt="TTerm" />
+  <img src="src/assets/tterm.svg" width="128" alt="TTerm" />
 </p>
 
 <h1 align="center">TTerm</h1>
@@ -23,16 +23,16 @@
 </p>
 
 <!-- 演示动画：把 GIF 放到对应路径后取消下面的注释。
-     docs/images/hero.gif      冷启动 + 命令面板 + 新开会话
-     docs/images/share.gif     Share with AI
-     docs/images/sessions.gif  本地 / SSH / 串口
+     docs/images/hero.gif   UI：主题/字体 + 键盘
+     docs/images/agent.gif  本地 Agent + 中文输入
+     docs/images/share.gif  玻璃 / 串口 AT / Share with AI
 <p align="center">
   <img src="docs/images/hero.gif" width="880" alt="TTerm" />
 </p>
 <p align="center">
-  <img src="docs/images/share.gif" width="430" alt="Share with AI" />
+  <img src="docs/images/agent.gif" width="430" alt="Local agent and Chinese input" />
   &nbsp;
-  <img src="docs/images/sessions.gif" width="430" alt="Local, SSH, and serial" />
+  <img src="docs/images/share.gif" width="430" alt="Share with AI on serial" />
 </p>
 -->
 
@@ -47,9 +47,9 @@
 
 ## 为什么是 TTerm
 
-### 不到 10 MB：轻，而且快
+### 约 5.8 MB：轻，而且快
 
-冷启动不到 1 秒。安装包仅约 7 MB。
+冷启动不到 1 秒。安装包仅约 5.8 MB。
 
 ### 开箱即用，不仅是工具
 

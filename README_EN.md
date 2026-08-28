@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/logo.svg" width="96" alt="TTerm" />
+  <img src="src/assets/tterm.svg" width="128" alt="TTerm" />
 </p>
 
 <h1 align="center">TTerm</h1>
@@ -23,16 +23,16 @@
 </p>
 
 <!-- Demo clips: drop GIFs at these paths, then uncomment.
-     docs/images/hero.gif      cold start + palette + new session
-     docs/images/share.gif     Share with AI
-     docs/images/sessions.gif  local / SSH / serial
+     docs/images/hero.gif   UI: themes/fonts + keyboard
+     docs/images/agent.gif  local agent + Chinese input
+     docs/images/share.gif  glass / serial AT / Share with AI
 <p align="center">
   <img src="docs/images/hero.gif" width="880" alt="TTerm" />
 </p>
 <p align="center">
-  <img src="docs/images/share.gif" width="430" alt="Share with AI" />
+  <img src="docs/images/agent.gif" width="430" alt="Local agent and Chinese input" />
   &nbsp;
-  <img src="docs/images/sessions.gif" width="430" alt="Local, SSH, and serial" />
+  <img src="docs/images/share.gif" width="430" alt="Share with AI on serial" />
 </p>
 -->
 
@@ -46,9 +46,9 @@
 
 ## Why TTerm
 
-### Under 10 MB: light, and fast
+### About 5.8 MB: light, and fast
 
-Cold start under 1 second. Installer only about 7 MB.
+Cold start under 1 second. Installer only about 5.8 MB.
 
 ### Ready out of the box, not merely a tool
 
