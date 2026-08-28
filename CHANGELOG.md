@@ -2,6 +2,18 @@
 
 Changes
 
+## v3.0.0
+
+Changes
+
+- **Settings checkmarks use a Fluent-style stroke ✓** — masked SVG inset
+  in the 14px box, not a rotated CSS L that sat on the top or bottom edge
+- **Share / dirty tab dots overlay the chrome** — they no longer sit in
+  the flex flow, so turning Share on cannot widen a Cursor pill tab
+- **SSH Trust & Connect uses the kit CTA colors** — first-contact is the
+  primary button (dark text on the white Cursor fill); a changed host key
+  stays the filled destroy red. The old style used chrome text on the
+  accent fill, so the label vanished on Cursor skin
 - **Palette / menu row titles stay visible** — long trailing commands
   (VS 2022 Developer Prompt) ellipsize; the profile name is not squeezed
   off the row
