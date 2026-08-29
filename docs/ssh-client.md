@@ -42,8 +42,10 @@ xterm ──WS──► relay hub ──mpsc──► tokio task ──channel.d
 xterm ◄─WS── relay hub ◄─Read adapter◄─ ChannelMsg::Data ◄──────┘
 ```
 
-- `ssh_spawn_embedded(spec, promptTabId?, cols?, rows?)` — full lifecycle: TCP connect (15 s timeout)
-  → handshake with host-key check → auth chain → `channel_open_session` →
+- `ssh_spawn_embedded(spec, promptTabId?, cols?, rows?)` — full lifecycle:
+  TCP connect (15 s timeout; DNS+TCP only) → handshake with host-key check
+  (not inside that 15 s; the Trust dialog has its own 300 s cap) → auth
+  chain → `channel_open_session` →
   `request_pty(xterm-256color, cols×rows)` (pending tab's fitted grid, not
   a hardcoded 80×24) → `request_shell` → bridge tasks → relay
   registration with dead-mode hooks. After the pending tab rebinds to

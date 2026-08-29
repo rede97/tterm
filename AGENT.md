@@ -71,7 +71,7 @@ src/
     hysteresis.ts       fit hysteresis (see below)
     disconnect.ts       re-attach backoff helpers
     fontconfig.ts       font stack model, system font enumeration glue
-    themes.ts           built-in theme gallery + WT theme import
+    themes.ts           built-in theme gallery + custom themes.json
     osc.ts              OSC 9;4 progress parsing
     serialinput.ts      serial input modes (normal/echo/line)
     sizehint.ts         cols×rows overlay during resize

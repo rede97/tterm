@@ -1,12 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import {
-  allThemes,
-  BUILTIN_THEMES,
-  DEFAULT_THEME_NAME,
-  findTheme,
-  parseWtSchemes,
-  setWtThemes,
-} from "../src/util/themes";
+import { describe, expect, it } from "vitest";
+import { allThemes, BUILTIN_THEMES, DEFAULT_THEME_NAME, findTheme } from "../src/util/themes";
 
 const ANSI_KEYS = [
   "black",
@@ -50,13 +43,20 @@ describe("built-in themes", () => {
   it("includes both dark and light schemes", () => {
     expect(BUILTIN_THEMES.some((t) => t.name.includes("Light"))).toBe(true);
   });
+
+  it("places Cursor Dark second, after TTerm Dark", () => {
+    expect(BUILTIN_THEMES[0].name).toBe("TTerm Dark");
+    expect(BUILTIN_THEMES[1].name).toBe("Cursor Dark");
+    expect(BUILTIN_THEMES[1].theme.background).toBe("#141414");
+    expect(BUILTIN_THEMES[1].theme.green).toBe("#3fa266");
+    expect(BUILTIN_THEMES[1].theme.cyan).toBe("#88c0d0");
+  });
 });
 
 describe("findTheme", () => {
-  beforeEach(() => setWtThemes([]));
-
   it("finds a built-in theme by name", () => {
     expect(findTheme("Dracula").name).toBe("Dracula");
+    expect(findTheme("Cursor Dark").name).toBe("Cursor Dark");
   });
 
   it("falls back to default for unknown or empty names", () => {
@@ -64,100 +64,9 @@ describe("findTheme", () => {
     expect(findTheme(null).name).toBe(DEFAULT_THEME_NAME);
     expect(findTheme(undefined).name).toBe(DEFAULT_THEME_NAME);
   });
-});
 
-describe("parseWtSchemes (Windows Terminal import)", () => {
-  beforeEach(() => setWtThemes([]));
-
-  const WT_SETTINGS = JSON.stringify({
-    schemes: [
-      {
-        name: "My Custom",
-        background: "#101010",
-        foreground: "#eeeeee",
-        cursorColor: "#00ff00",
-        selectionBackground: "#333333",
-        black: "#000000",
-        red: "#ff0000",
-        green: "#00ff00",
-        yellow: "#ffff00",
-        blue: "#0000ff",
-        purple: "#ff00ff",
-        cyan: "#00ffff",
-        white: "#ffffff",
-        brightBlack: "#111111",
-        brightRed: "#ff1111",
-        brightGreen: "#11ff11",
-        brightYellow: "#ffff11",
-        brightBlue: "#1111ff",
-        brightPurple: "#ff11ff",
-        brightCyan: "#11ffff",
-        brightWhite: "#ffffff",
-      },
-      // duplicates a built-in name -> skipped (built-in wins)
-      { name: "Dracula", background: "#000000", foreground: "#ffffff" },
-      // missing required fields -> skipped
-      { name: "Broken", background: "#000000" },
-    ],
-  });
-
-  it("parses valid schemes and maps WT field names", () => {
-    const themes = parseWtSchemes(WT_SETTINGS);
-    expect(themes).toHaveLength(1);
-    const t = themes[0];
-    expect(t.name).toBe("My Custom");
-    expect(t.source).toBe("wt");
-    expect(t.theme.cursor).toBe("#00ff00"); // cursorColor -> cursor
-    expect(t.theme.magenta).toBe("#ff00ff"); // purple -> magenta
-    expect(t.theme.brightMagenta).toBe("#ff11ff"); // brightPurple -> brightMagenta
-  });
-
-  it("skips duplicates of built-in names and malformed entries", () => {
-    const themes = parseWtSchemes(WT_SETTINGS);
-    expect(themes.some((t) => t.name === "Dracula")).toBe(false);
-    expect(themes.some((t) => t.name === "Broken")).toBe(false);
-  });
-
-  it("returns empty array for invalid JSON or missing schemes", () => {
-    expect(parseWtSchemes("not json")).toEqual([]);
-    expect(parseWtSchemes("{}")).toEqual([]);
-  });
-
-  it("imported schemes become resolvable via findTheme", () => {
-    setWtThemes(parseWtSchemes(WT_SETTINGS));
-    expect(findTheme("My Custom").name).toBe("My Custom");
-    expect(allThemes().length).toBe(BUILTIN_THEMES.length + 1);
-    setWtThemes([]);
-  });
-});
-
-describe("parseWtSchemes color validation", () => {
-  it("drops non-hex colors instead of passing them to markup", () => {
-    const schemes = parseWtSchemes(
-      JSON.stringify({
-        schemes: [
-          {
-            name: "Evil",
-            background: "#101010",
-            foreground: "#e0e0e0",
-            blue: 'red"><img src=x onerror=alert(1)>',
-            cursorColor: "not-a-color",
-          },
-        ],
-      }),
-    );
-    expect(schemes).toHaveLength(1);
-    expect(schemes[0].theme.blue).toBeUndefined();
-    expect(schemes[0].theme.cursor).toBeUndefined();
-    expect(schemes[0].theme.background).toBe("#101010");
-  });
-
-  it("skips schemes whose background/foreground are not hex colors", () => {
-    const schemes = parseWtSchemes(
-      JSON.stringify({
-        schemes: [{ name: "Bad", background: "url(x)", foreground: "#fff" }],
-      }),
-    );
-    expect(schemes).toHaveLength(0);
+  it("allThemes is built-in then custom — no Windows Terminal import", () => {
+    expect(allThemes().every((t) => t.source === "builtin" || t.source === "custom")).toBe(true);
+    expect(allThemes().some((t) => t.name === "Dark+")).toBe(false);
   });
 });

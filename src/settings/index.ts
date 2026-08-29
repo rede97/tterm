@@ -6,7 +6,6 @@ import { configStore } from "../core/store";
 import { attachOverlayScrollbar } from "../ui/overlay-scroll";
 import { showToast } from "../ui/toast";
 import { parseFontFamily, updateFontStack } from "../util/fontconfig";
-import { setWtThemes } from "../util/themes";
 import {
   collectAppearanceSettings,
   createAppearancePanel,
@@ -120,6 +119,10 @@ export function createSettingsContent(): HTMLElement {
   dirtyHint.id = "dirty-hint";
   footer.appendChild(dirtyHint);
 
+  const applyBtn = document.createElement("button");
+  applyBtn.className = "tt-btn tt-btn-primary";
+  applyBtn.textContent = "Apply";
+
   const syncDirty = (): void => {
     const dirty = appDirty || sshDirty;
     dirtyHint.classList.toggle("on", dirty);
@@ -132,8 +135,11 @@ export function createSettingsContent(): HTMLElement {
     document
       .querySelector<HTMLElement>('.tab[data-tab-id="#settings"]')
       ?.classList.toggle("dirty", dirty);
+    // Same flag as the hint/dot: dirty → Apply is the live CTA; clean →
+    // the muted `.applied` look. SSH Add/Edit/Delete/drag never fire
+    // input/change, so this must not live only on those native events.
+    applyBtn.classList.toggle("applied", !dirty);
   };
-  syncDirty();
 
   const spacer = document.createElement("div");
   spacer.style.flex = "1";
@@ -147,20 +153,14 @@ export function createSettingsContent(): HTMLElement {
     await configStore.load();
     // Reload WT profiles in case they changed
     const wt = await loadAllWtData();
-    setWtThemes(wt.themes);
     configStore.set({ localProfiles: wt.profiles, vsInstalls: wt.vsInstalls });
     updateFontStack(parseFontFamily(configStore.get("fontFamily")));
     refreshAll(root);
     appDirty = false;
-    applyBtn.classList.add("applied");
     syncDirty();
   });
   footer.appendChild(revertBtn);
 
-  // Apply button
-  const applyBtn = document.createElement("button");
-  applyBtn.className = "tt-btn tt-btn-primary";
-  applyBtn.textContent = "Apply";
   applyBtn.addEventListener("click", async () => {
     await applySettings(root);
     // SSH host edits write ~/.ssh/config in the same Apply. On failure the
@@ -173,11 +173,11 @@ export function createSettingsContent(): HTMLElement {
       }
     }
     appDirty = false;
-    applyBtn.classList.add("applied");
     sshDirty = isSshConfigDirty();
     syncDirty();
   });
   footer.appendChild(applyBtn);
+  syncDirty();
 
   body.appendChild(footer);
   root.appendChild(body);
@@ -189,7 +189,6 @@ export function createSettingsContent(): HTMLElement {
   for (const ev of ["input", "change"] as const) {
     root.addEventListener(ev, (e) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) {
-        applyBtn.classList.remove("applied");
         appDirty = true;
         syncDirty();
       }
@@ -230,7 +229,6 @@ export function createSettingsContent(): HTMLElement {
   if (configStore.get("localProfiles").length === 0) {
     void loadAllWtData()
       .then((wt) => {
-        setWtThemes(wt.themes);
         configStore.set({ localProfiles: wt.profiles, vsInstalls: wt.vsInstalls });
         refreshProfilePanel(root);
       })
@@ -246,7 +244,6 @@ export function createSettingsContent(): HTMLElement {
   panelGeneral.addEventListener("tterm-settings-reset", () => {
     refreshAll(root);
     appDirty = false;
-    applyBtn.classList.add("applied");
     syncDirty();
     showToast("All settings cleared", "info");
   });
@@ -254,7 +251,6 @@ export function createSettingsContent(): HTMLElement {
   // Panels with non-native edits (font picker, keybinding capture) signal
   // dirty state with this bubbling event — any panel, one listener.
   root.addEventListener("tterm-settings-changed", () => {
-    applyBtn.classList.remove("applied");
     appDirty = true;
     syncDirty();
   });

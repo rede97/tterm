@@ -1,15 +1,12 @@
-// Windows Terminal profile and theme scheme parsing.
-// Reads WT settings.json and fragment files via Tauri IPC.
+// Windows Terminal profile parsing (shells / VS / WSL). Color schemes
+// are not imported — the Appearance gallery is built-in + custom only.
 
 import { invoke } from "@tauri-apps/api/core";
 import { logError, swallow } from "../core/errorlog";
 import type { LocalProfile, SerialPort, VsInstallation } from "../core/types";
-import type { ThemeDef } from "../util/themes";
-import { parseWtSchemes } from "../util/themes";
 
 export interface WtLoadResult {
   profiles: LocalProfile[];
-  themes: ThemeDef[];
   vsInstalls: VsInstallation[];
 }
 
@@ -89,7 +86,6 @@ export async function loadAllWtData(): Promise<WtLoadResult> {
   }
 
   const localProfiles: LocalProfile[] = [];
-  let themes: ThemeDef[] = [];
   let raw: string | null = null;
 
   try {
@@ -100,7 +96,6 @@ export async function loadAllWtData(): Promise<WtLoadResult> {
       } catch (e) {
         logError("wt.parseProfiles", e);
       }
-      themes = parseWtSchemes(raw);
     }
     const fragments = await invoke<string[]>("read_wt_fragments");
     if (fragments && fragments.length > 0) {
@@ -116,7 +111,7 @@ export async function loadAllWtData(): Promise<WtLoadResult> {
     logError("wt.load", e);
   }
 
-  return { profiles: localProfiles, themes, vsInstalls };
+  return { profiles: localProfiles, vsInstalls };
 }
 
 // ---- Serial port enumeration ----

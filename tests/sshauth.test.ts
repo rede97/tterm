@@ -95,6 +95,7 @@ describe("SSH auth dialogs", () => {
     expect(trustBtn.classList.contains("tt-btn-primary")).toBe(true);
     trustBtn.click();
 
+    expect(invoke).toHaveBeenCalledTimes(1);
     expect(invoke).toHaveBeenCalledWith("ssh_hostkey_response", { reqId: 11, accept: true });
     expect(document.querySelector(".sshauth-overlay")).toBeNull();
   });

@@ -12,7 +12,7 @@ use super::hostkey::known_hosts_path;
 use super::hostkey::SshHandler;
 use super::keys::{normalize_public_key, InstallResult};
 use super::prompter::{FrontendPrompter, Prompter};
-use super::session::authenticate;
+use super::session::{authenticate, connect_client, TCP_CONNECT_TIMEOUT};
 use super::EmbeddedSshSpec;
 use crate::state::AppState;
 
@@ -170,17 +170,14 @@ pub(crate) async fn install_pubkey_with(
         known_hosts,
         forwards: Arc::new(Mutex::new(HashMap::new())),
     };
-    let mut handle = tokio::time::timeout(
-        Duration::from_secs(15),
-        client::connect(
-            Arc::new(config),
-            (spec.hostname.as_str(), spec.port),
-            handler,
-        ),
+    let mut handle = connect_client(
+        Arc::new(config),
+        spec.hostname.as_str(),
+        spec.port,
+        handler,
+        TCP_CONNECT_TIMEOUT,
     )
-    .await
-    .map_err(|_| format!("Connection to {} timed out", spec.hostname))?
-    .map_err(|e| format!("SSH handshake with {} failed: {e}", spec.hostname))?;
+    .await?;
     authenticate(&mut handle, spec, &prompter, &Arc::new(Mutex::new(None))).await?;
 
     // Probe the remote shell: first candidate exiting 0 wins.

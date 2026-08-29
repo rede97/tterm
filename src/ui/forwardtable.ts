@@ -192,6 +192,11 @@ export function createForwardTable(
     remote: blankDraft("remote"),
     dynamic: blankDraft("dynamic"),
   };
+  // Typing updates the draft without a re-render, so lit's last committed
+  // `.value` stays "". Binding "" again after Add is a no-op and the old
+  // text stays in the add-row. Bumping this key remounts that group's
+  // inputs; other groups keep their epoch so half-typed rows survive.
+  const addEpoch: Record<ForwardKind, number> = { local: 0, remote: 0, dynamic: 0 };
   let editing: EditState | null = null;
 
   function rerender(): void {
@@ -412,7 +417,11 @@ export function createForwardTable(
           );
         },
       )}
-      ${addRowTemplate(group)}
+      ${repeat(
+        [addEpoch[group.kind]],
+        (epoch) => epoch,
+        () => addRowTemplate(group),
+      )}
     </div>`;
   }
 
@@ -430,17 +439,19 @@ export function createForwardTable(
           draft.targetPort = fields[2].input.value;
         }
         const row = toRow(draft);
-        if (!opts.onAdd) {
+        const accept = () => {
           data.push(row);
           addDrafts[group.kind] = blankDraft(group.kind);
+          addEpoch[group.kind] += 1;
           rerender();
+        };
+        if (!opts.onAdd) {
+          accept();
           return;
         }
         opts.onAdd(row).then((ok) => {
           if (!ok) return; // inputs stay, the caller toasts why
-          data.push(row);
-          addDrafts[group.kind] = blankDraft(group.kind);
-          rerender();
+          accept();
         });
       },
       null,

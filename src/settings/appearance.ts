@@ -193,7 +193,6 @@ function appearanceTemplate(panel: HTMLElement): TemplateResult {
       html`
         <div class="row-desc" style="margin-bottom:6px">
           Terminal content only — does not recolor Settings or the tab bar.
-          Windows Terminal schemes are imported automatically.
         </div>
         <div id="set-theme-gallery" class="theme-gallery">${galleryTemplate(panel, current)}</div>
       `,
@@ -275,7 +274,7 @@ function themeCard(panel: HTMLElement, t: ThemeDef, current: string): TemplateRe
           )}
         </div>
       </div>
-      <div class="theme-card-name">${t.source === "wt" ? `${t.name} (WT)` : t.name}</div>
+      <div class="theme-card-name">${t.name}</div>
       <div class="theme-card-actions">
         <button
           class="theme-card-action theme-card-action-icon"

@@ -13,6 +13,7 @@ use russh::client::{self, Handle};
 use russh::keys::PrivateKeyWithHashAlg;
 use russh::ChannelWriteHalf;
 use tauri::{Emitter, Manager};
+use tokio::net::TcpStream;
 
 use super::forward::reapply_forwards;
 use super::hostkey::{known_hosts_path, SshHandler};
@@ -110,6 +111,34 @@ pub(crate) fn spawn_upstream_pump(
 }
 
 // ── Connect + session setup ──────────────────────────────────────────
+
+/// DNS + TCP only. Host-key confirmation and the rest of KEX sit outside
+/// this budget — wrapping `client::connect` meant Trust after ~15 s saved
+/// the key (learn ran) then aborted the handshake, so the next attempt
+/// skipped the dialog and looked like "Trust did nothing".
+pub(crate) const TCP_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// TCP (timed) then russh handshake (untimed; the host-key prompt has its
+/// own 300 s cap). `tcp_timeout` is injectable so tests can prove a slow
+/// Trust click is not killed by the TCP budget.
+pub(crate) async fn connect_client(
+    config: Arc<client::Config>,
+    hostname: &str,
+    port: u16,
+    handler: SshHandler,
+    tcp_timeout: Duration,
+) -> Result<Handle<SshHandler>, String> {
+    let tcp = tokio::time::timeout(tcp_timeout, TcpStream::connect((hostname, port)))
+        .await
+        .map_err(|_| format!("Connection to {hostname} timed out"))?
+        .map_err(|e| format!("Connection to {hostname} failed: {e}"))?;
+    if config.nodelay {
+        let _ = tcp.set_nodelay(true);
+    }
+    client::connect_stream(config, tcp, handler)
+        .await
+        .map_err(|e| format!("SSH handshake with {hostname} failed: {e}"))
+}
 
 fn expand_home(path: &str) -> PathBuf {
     if let Some(rest) = path.strip_prefix("~/") {
@@ -276,17 +305,14 @@ pub(crate) async fn connect_session_with(
         forwards: session.forwards.clone(),
     };
 
-    let mut handle = tokio::time::timeout(
-        Duration::from_secs(15),
-        client::connect(
-            Arc::new(config),
-            (spec.hostname.as_str(), spec.port),
-            handler,
-        ),
+    let mut handle = connect_client(
+        Arc::new(config),
+        spec.hostname.as_str(),
+        spec.port,
+        handler,
+        TCP_CONNECT_TIMEOUT,
     )
-    .await
-    .map_err(|_| format!("Connection to {} timed out", spec.hostname))?
-    .map_err(|e| format!("SSH handshake with {} failed: {}", spec.hostname, e))?;
+    .await?;
 
     authenticate(&mut handle, spec, &prompter, &session.cached_password).await?;
 

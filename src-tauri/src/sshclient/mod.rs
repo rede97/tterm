@@ -52,7 +52,7 @@ pub(crate) use keys::{keygen_in, list_keys_in};
 #[cfg(test)]
 pub(crate) use prompter::{HostKeyPrompt, Prompter};
 #[cfg(test)]
-pub(crate) use session::{authenticate, connect_session_with, spawn_upstream_pump};
+pub(crate) use session::{authenticate, connect_client, connect_session_with, spawn_upstream_pump};
 
 pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 

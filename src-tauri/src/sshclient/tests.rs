@@ -898,6 +898,59 @@ fn exec_capture_decodes_split_utf8() {
     });
 }
 
+/// First-contact Trust used to sit inside the 15 s `client::connect`
+/// timeout. A slow click learned the key then aborted KEX, so retry
+/// skipped the dialog. TCP is timed; the host-key wait is not.
+#[test]
+fn hostkey_prompt_is_not_covered_by_tcp_timeout() {
+    struct SlowTrust;
+    impl Prompter for SlowTrust {
+        fn ask_secret(&self, _kind: &str, _prompt: String) -> BoxFuture<Option<String>> {
+            Box::pin(async { Some("pw".to_string()) })
+        }
+        fn confirm_host_key(&self, _info: HostKeyPrompt) -> BoxFuture<bool> {
+            Box::pin(async {
+                tokio::time::sleep(Duration::from_millis(400)).await;
+                true
+            })
+        }
+    }
+
+    tauri::async_runtime::block_on(async {
+        let (port, _state) = spawn_exec_server(ExecSim::Posix, false).await;
+        let spec = test_session(port).spec;
+        let kh = temp_known_hosts("tofu-delay");
+        let _ = std::fs::remove_file(&kh);
+
+        let mut config = client::Config::default();
+        config.inactivity_timeout = None;
+        config.nodelay = true;
+        let handler = SshHandler {
+            host: spec.hostname.clone(),
+            port: spec.port,
+            prompter: Arc::new(SlowTrust),
+            known_hosts: Some(kh.clone()),
+            forwards: Arc::new(Mutex::new(HashMap::new())),
+        };
+        connect_client(
+            Arc::new(config),
+            spec.hostname.as_str(),
+            spec.port,
+            handler,
+            Duration::from_millis(100),
+        )
+        .await
+        .expect("Trust slower than the TCP budget must still finish KEX");
+
+        let learned = std::fs::read_to_string(&kh).expect("known_hosts written");
+        assert!(
+            learned.contains("[127.0.0.1]:"),
+            "host learned after delayed Trust: {learned}"
+        );
+        let _ = std::fs::remove_file(&kh);
+    });
+}
+
 /// L13 regression: with the server not reading (channel window full),
 /// data_bytes parks inside the upstream pump; kill (cancel + close_notify)
 /// must interrupt the blocked send promptly — before the fix, the thread

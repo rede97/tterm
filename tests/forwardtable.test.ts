@@ -61,6 +61,27 @@ describe("forward table — groups", () => {
       },
     ]);
     expect(displayRowsIn(group(t.el, "local"))[0].textContent).toContain("db.internal:5432");
+    const after = addRowIn(group(t.el, "local"));
+    expect(after.listenPort.value).toBe("");
+    expect(after.targetHost!.value).toBe("");
+    expect(after.targetPort!.value).toBe("");
+  });
+
+  it("Add after typing via input events still clears listen / host / port", () => {
+    const t = createForwardTable();
+    document.body.appendChild(t.el);
+    const a = addRowIn(group(t.el, "remote"));
+    a.listenPort.value = "9090";
+    a.listenPort.dispatchEvent(new Event("input"));
+    a.targetHost!.value = "db";
+    a.targetHost!.dispatchEvent(new Event("input"));
+    a.targetPort!.value = "80";
+    a.targetPort!.dispatchEvent(new Event("input"));
+    a.add.click();
+    const after = addRowIn(group(t.el, "remote"));
+    expect(after.listenPort.value).toBe("");
+    expect(after.targetHost!.value).toBe("");
+    expect(after.targetPort!.value).toBe("");
   });
 
   it("Add in the Dynamic group needs only a listen port", () => {
@@ -73,6 +94,7 @@ describe("forward table — groups", () => {
       { kind: "dynamic", listenHost: "127.0.0.1", listenPort: 1080, targetHost: "", targetPort: 0 },
     ]);
     expect(displayRowsIn(group(t.el, "dynamic"))[0].textContent).toContain("SOCKS5");
+    expect(addRowIn(group(t.el, "dynamic")).listenPort.value).toBe("");
   });
 
   it("rule violation blocks the commit and flags the input", () => {
@@ -249,5 +271,32 @@ describe("forward table — lit rendering (migration acceptance)", () => {
 
     expect(displayRowsIn(group(t.el, "local"))[0]).toBe(rowBefore);
     expect(t.rows()).toHaveLength(2);
+  });
+
+  it("async onAdd success clears the add-row; rejection keeps the values", async () => {
+    let accept = true;
+    const t = createForwardTable([], { onAdd: async () => accept });
+    document.body.appendChild(t.el);
+    const local = addRowIn(group(t.el, "local"));
+    local.listenPort.value = "8080";
+    local.targetHost!.value = "a";
+    local.targetPort!.value = "80";
+    local.add.click();
+    await Promise.resolve();
+    const afterOk = addRowIn(group(t.el, "local"));
+    expect(afterOk.listenPort.value).toBe("");
+    expect(afterOk.targetHost!.value).toBe("");
+    expect(afterOk.targetPort!.value).toBe("");
+
+    accept = false;
+    afterOk.listenPort.value = "8081";
+    afterOk.targetHost!.value = "b";
+    afterOk.targetPort!.value = "81";
+    afterOk.add.click();
+    await Promise.resolve();
+    const afterNo = addRowIn(group(t.el, "local"));
+    expect(afterNo.listenPort.value).toBe("8081");
+    expect(afterNo.targetHost!.value).toBe("b");
+    expect(afterNo.targetPort!.value).toBe("81");
   });
 });

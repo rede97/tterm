@@ -84,9 +84,9 @@ describe("settings — Revert", () => {
 
     revertButton(root).click();
     await vi.waitFor(() => {
-      expect(root.querySelector(".settings-footer .tt-btn-primary")?.classList.contains("applied")).toBe(
-        true,
-      );
+      expect(
+        root.querySelector(".settings-footer .tt-btn-primary")?.classList.contains("applied"),
+      ).toBe(true);
     });
 
     // Page chrome survives: sidebar with all six panels, footer buttons.
@@ -150,6 +150,25 @@ describe("settings — footer dirty hint", () => {
     root.querySelector<HTMLButtonElement>(".ssh-btn-delete")!.click();
     expect(hint.classList.contains("on")).toBe(true);
     expect(hint.textContent).toBe("SSH config will be written on Apply");
+    const apply = root.querySelector(".settings-footer .tt-btn-primary");
+    expect(apply?.classList.contains("applied")).toBe(false);
+  });
+
+  it("SSH dirty re-enables Apply after a prior Apply had greyed it", () => {
+    const tab = document.createElement("div");
+    tab.className = "tab";
+    tab.dataset.tabId = "#settings";
+    document.body.appendChild(tab);
+
+    const root = createSettingsContent();
+    document.body.appendChild(root);
+    const apply = root.querySelector<HTMLButtonElement>(".settings-footer .tt-btn-primary")!;
+    expect(apply.classList.contains("applied")).toBe(true);
+    expect(tab.classList.contains("dirty")).toBe(false);
+
+    root.querySelector<HTMLButtonElement>(".ssh-btn-delete")!.click();
+    expect(apply.classList.contains("applied")).toBe(false);
+    expect(tab.classList.contains("dirty")).toBe(true);
   });
 
   it("reflects a dirty state left over from a previous settings visit", () => {
@@ -166,5 +185,8 @@ describe("settings — footer dirty hint", () => {
     const hint = reopened.querySelector<HTMLElement>("#dirty-hint")!;
     expect(hint.classList.contains("on")).toBe(true);
     expect(hint.textContent).toContain("SSH config");
+    expect(
+      reopened.querySelector(".settings-footer .tt-btn-primary")?.classList.contains("applied"),
+    ).toBe(false);
   });
 });

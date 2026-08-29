@@ -15,6 +15,7 @@ use crate::state::AppState;
 // ── Frontend prompt plumbing ─────────────────────────────────────────
 
 #[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HostKeyPrompt {
     pub host: String,
     pub port: u16,
@@ -43,6 +44,22 @@ pub enum PromptAnswer {
 pub type PendingPrompts = Arc<Mutex<HashMap<u64, tokio::sync::oneshot::Sender<PromptAnswer>>>>;
 
 static NEXT_PROMPT: AtomicU64 = AtomicU64::new(1);
+
+/// Holds a slot in `pending` until the park future completes or is
+/// dropped (handshake cancelled). Without this, a timed-out `connect`
+/// leaked the oneshot and a late Trust click had nowhere to go.
+struct PendingSlot {
+    pending: PendingPrompts,
+    id: u64,
+}
+
+impl Drop for PendingSlot {
+    fn drop(&mut self) {
+        if let Ok(mut map) = self.pending.lock() {
+            map.remove(&self.id);
+        }
+    }
+}
 
 // How long a frontend prompt may go unanswered before the handshake gives
 // up: if the frontend dies, parking forever would wedge auth (and in the
@@ -96,6 +113,12 @@ impl FrontendPrompter {
         let sent = self.hub.emit(event, body).is_ok();
         let pending = self.pending.clone();
         Box::pin(async move {
+            // Drop removes the oneshot if the handshake is cancelled
+            // (TCP timeout used to leak it, so a late Trust went nowhere).
+            let _slot = PendingSlot {
+                pending,
+                id: req_id,
+            };
             if !sent {
                 return None;
             }
@@ -105,9 +128,6 @@ impl FrontendPrompter {
                 // into the auth-failure path) instead of parking forever.
                 Err(_) => None,
             };
-            if let Ok(mut map) = pending.lock() {
-                map.remove(&req_id);
-            }
             answer.and_then(wrap)
         })
     }

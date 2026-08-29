@@ -30,7 +30,7 @@ import { mustGetById } from "./ui/dom";
 import { showToast } from "./ui/toast";
 import { initWindowControls } from "./ui/window";
 import { parseFontFamily, setSystemFonts, updateFontStack } from "./util/fontconfig";
-import { applyTerminalBackground, findTheme, setWtThemes } from "./util/themes";
+import { applyTerminalBackground, findTheme } from "./util/themes";
 import {
   initContextMenuWiring,
   initDirMenuWiring,
@@ -249,10 +249,9 @@ configStore
     // Terminal chrome background tracks the active theme from the start.
     applyTerminalBackground(findTheme(configStore.get("themeName")).theme);
 
-    // Load WT profiles + VS installs + themes, plus user custom themes
+    // Load WT profiles + VS installs, plus user custom themes
     // (themes.json — separate from config.json by design).
     const wt = await loadAllWtData();
-    setWtThemes(wt.themes);
     await loadCustomThemes();
     await loadSerialProfiles();
     await loadSshHistory();

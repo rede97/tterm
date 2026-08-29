@@ -4,7 +4,7 @@ export interface ThemeDef {
   name: string;
   label: string;
   theme: ITheme;
-  source: "builtin" | "wt" | "custom";
+  source: "builtin" | "custom";
 }
 
 export const DEFAULT_THEME_NAME = "TTerm Dark";
@@ -14,6 +14,9 @@ function def(name: string, theme: ITheme): ThemeDef {
 }
 
 // Curated popular open-source schemes (Solarized/Dracula/Nord/Gruvbox/OneHalf/Monokai — MIT).
+// Cursor Dark is the current Cursor workbench terminal palette (Anysphere
+// v0.0.3): 8-digit ANSI/selection values are flattened over #141414 so
+// every slot is opaque #rrggbb (xterm + the custom-theme sanitizer).
 export const BUILTIN_THEMES: ThemeDef[] = [
   def("TTerm Dark", {
     background: "#1e1e1e",
@@ -35,6 +38,29 @@ export const BUILTIN_THEMES: ThemeDef[] = [
     brightBlue: "#3b8eea",
     brightMagenta: "#d670d6",
     brightCyan: "#29b8db",
+    brightWhite: "#ffffff",
+  }),
+  def("Cursor Dark", {
+    background: "#141414",
+    foreground: "#f0f0f0",
+    cursor: "#f0f0f0",
+    cursorAccent: "#141414",
+    selectionBackground: "#2e2e2e",
+    black: "#242424",
+    red: "#fc6b83",
+    green: "#3fa266",
+    yellow: "#d2943e",
+    blue: "#81a1c1",
+    magenta: "#b48ead",
+    cyan: "#88c0d0",
+    white: "#f0f0f0",
+    brightBlack: "#989898",
+    brightRed: "#fc6b83",
+    brightGreen: "#70b489",
+    brightYellow: "#f1b467",
+    brightBlue: "#87a6c4",
+    brightMagenta: "#b48ead",
+    brightCyan: "#88c0d0",
     brightWhite: "#ffffff",
   }),
   def("Campbell", {
@@ -281,14 +307,6 @@ export const BUILTIN_THEMES: ThemeDef[] = [
   }),
 ];
 
-// -- Windows Terminal schemes (imported from settings.json) --
-
-let wtThemes: ThemeDef[] = [];
-
-export function setWtThemes(themes: ThemeDef[]) {
-  wtThemes = themes;
-}
-
 // -- Custom themes (user-edited, persisted in themes.json) --
 
 let customThemes: ThemeDef[] = [];
@@ -298,7 +316,7 @@ export function setCustomThemes(themes: ThemeDef[]) {
 }
 
 export function allThemes(): ThemeDef[] {
-  return [...BUILTIN_THEMES, ...wtThemes, ...customThemes];
+  return [...BUILTIN_THEMES, ...customThemes];
 }
 
 export function findTheme(name: string | null | undefined): ThemeDef {
@@ -319,63 +337,4 @@ export function applyTerminalBackground(theme: ITheme): void {
   if (theme.background) {
     document.documentElement.style.setProperty("--term-bg", theme.background);
   }
-}
-
-// WT schemes come from settings.json AND third-party fragment files, and
-// the theme preview builds HTML markup with these colors — only hex
-// colors may pass, anything else is dropped (an unvalidated string could
-// break out of a style attribute).
-const WT_COLOR_RE = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
-const wtColor = (v: unknown): string | undefined =>
-  typeof v === "string" && WT_COLOR_RE.test(v) ? v : undefined;
-
-// Parse the "schemes" array from WT settings.json raw content.
-// WT fields map 1:1 to ITheme except cursorColor -> cursor.
-export function parseWtSchemes(raw: string): ThemeDef[] {
-  let root: unknown;
-  try {
-    root = JSON.parse(raw);
-  } catch {
-    return [];
-  }
-  const schemes: unknown = (root as { schemes?: unknown } | null)?.schemes;
-  if (!Array.isArray(schemes)) return [];
-
-  const result: ThemeDef[] = [];
-  for (const s of schemes as Record<string, unknown>[]) {
-    if (!s || typeof s.name !== "string" || !s.name) continue;
-    const background = wtColor(s.background);
-    const foreground = wtColor(s.foreground);
-    if (!background || !foreground) continue;
-    // Skip schemes that duplicate a built-in name (built-in wins)
-    if (BUILTIN_THEMES.some((b) => b.name === s.name)) continue;
-    result.push({
-      name: s.name,
-      label: s.name,
-      source: "wt",
-      theme: {
-        background,
-        foreground,
-        cursor: wtColor(s.cursorColor),
-        selectionBackground: wtColor(s.selectionBackground),
-        black: wtColor(s.black),
-        red: wtColor(s.red),
-        green: wtColor(s.green),
-        yellow: wtColor(s.yellow),
-        blue: wtColor(s.blue),
-        magenta: wtColor(s.purple ?? s.magenta),
-        cyan: wtColor(s.cyan),
-        white: wtColor(s.white),
-        brightBlack: wtColor(s.brightBlack),
-        brightRed: wtColor(s.brightRed),
-        brightGreen: wtColor(s.brightGreen),
-        brightYellow: wtColor(s.brightYellow),
-        brightBlue: wtColor(s.brightBlue),
-        brightMagenta: wtColor(s.brightPurple ?? s.brightMagenta),
-        brightCyan: wtColor(s.brightCyan),
-        brightWhite: wtColor(s.brightWhite),
-      },
-    });
-  }
-  return result;
 }

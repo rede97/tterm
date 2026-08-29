@@ -2,6 +2,24 @@
 
 Changes
 
+- **SSH Trust & Connect continues the handshake** — the 15 s timer covers
+  DNS+TCP only. Waiting on the host-key dialog used to abort KEX after the
+  key was already learned, so the next attempt skipped Trust and looked
+  like the first click did nothing
+- **Settings Apply follows the yellow dirty mark** — SSH host Add/Edit/
+  Delete/drag light the tab and footer hint, and the Apply button leaves
+  its grey `.applied` state with them (it used to stay muted after a
+  previous Apply)
+- **Port-forward add-row clears after Add** — listen port / target host /
+  target port (and Dynamic's listen port) reset for the next entry; a
+  half-typed row in another group is still kept
+- **Cursor Dark terminal scheme** — second built-in card, matching the
+  current Cursor Dark (Anysphere) terminal palette (`#141414` background,
+  Nord-tinted green / cyan). TTerm Dark stays the default (VS Code Dark+)
+- **Windows Terminal color schemes are not imported** — Appearance lists
+  built-in + custom only. WT still supplies shell profiles (PowerShell,
+  WSL, …)
+
 ## v3.0.0
 
 Changes

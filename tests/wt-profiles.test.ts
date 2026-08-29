@@ -120,7 +120,6 @@ describe("loadAllWtData", () => {
     });
     const result = await loadAllWtData();
     expect(result.profiles).toEqual([]);
-    expect(result.themes).toEqual([]);
   });
 
   it("returns VS installations", async () => {
