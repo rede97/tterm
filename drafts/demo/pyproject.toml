@@ -1,0 +1,9 @@
+# TTerm README demo helpers (filming machine only).
+# stdlib SendInput — no PyPI packages.
+
+[project]
+name = "tterm-demo"
+version = "0.0.0"
+description = "Scene B IME scancode injector for agent.gif"
+requires-python = ">=3.11"
+dependencies = []

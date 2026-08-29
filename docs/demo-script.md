@@ -1,443 +1,307 @@
-# README 演示脚本规划
+# README 演示分镜
 
-> 状态：**草稿，等人修订后再写脚本、再开拍。**  
-> 对应 README 三槽：`docs/images/hero.gif` · `agent.gif` · `share.gif`（只有这三条）。  
-> 中英 README 同一套画面，只换文件，不另拍英文版。
+> 状态：**草稿。** 先改本文，再写 e2e / Python / OBS，再开拍。  
+> 仓库只收三条 GIF：`docs/images/hero.gif` · `agent.gif` · `share.gif`。没有第四条，也没有 `sessions.gif`。  
+> 中英 README 同一套画面，只换文件，不另拍英文版。MP4 母带本地留着，不进 git。单文件尽量 **小于 5 MB**。
 
-本文只定「拍什么、多长、用哪一层驱动」。不写 Python / e2e / OBS 预设。
-
----
-
-## 1. 要交付什么
-
-
-| 槽   | 文件                                              | README 用途                 | 主张                                            | 剧本         |
-| --- | ----------------------------------------------- | ------------------------- | --------------------------------------------- | ---------- |
-| A   | `docs/images/hero.gif`                          | 主视觉，宽约 880px              | **干净简洁的 UI；开箱即用的主题和字体；快速的键盘操作与 VS Code 习惯**   | **已定**（§5） |
-| B   | `docs/images/agent.gif`                        | 与 C 并排，宽约 430px           | **Nerd Font 唯一配置 + 本地 Agent TUI 上的真中文输入**     | **已定**（§6） |
-| C   | `docs/images/share.gif`                         | 与 B 并排，宽约 430px（本条密，可改全宽） | **玻璃下拉 / Quick Panel；便捷串口配置；Share 让 AI 操作设备** | **已定**（§7） |
-
-
-仓库只收 **三条 GIF**（hero / agent / share）。没有第四条，也没有 `sessions.gif`。MP4 母带本地留着，不进 git。单文件尽量 **< 5 MB**。
-
-A 的**第一卖点**是 chrome 本身。B 是 **Agent 现场 + 中文输入**。C 的标题是 **玻璃浮层 + 快捷配置 + AI 管串口**（树莓派 / ESP32 / 彩虹成功字是落地，不是本条名字）。总长 A / B 约 7–8 秒，C 约 **10 秒**（幕 4 只看串口回显并倍速）。
+本文只定「拍什么、多长、用哪一层驱动」。不写实现路径和机位预设。
 
 ---
 
-## 2. 原则
+## 0. 微调入口
 
-1. **A 的核心卖点先于场景。** 干净简洁的 UI、开箱即用的主题和字体、快速的键盘操作（VS Code 习惯）是第一条要让人记住的。树莓派 / 彩虹猫是键盘切过去之后的现场，不是本条标题。
-2. **键盘优先，看见键盘 UI，不展示鼠标。** Ctrl+Tab / Ctrl+P / 下拉 / QP 要在画面上停够读；指针隐藏，观众会脑补「点过」。不要用鼠标轨迹当教程。
-3. **真 IME 才拍 IME。** 合成 `CompositionEvent`、剪贴板、`pyautogui.write("你好")` 都不算。要候选窗和组合串，必须系统输入法 + 扫描码按键。
-4. **Share 不露真 token。** 演示机、一次性会话、或后期遮住 query。链接形态（`127.0.0.1`）要能看出来。
-5. **不拍失败路径。** 指纹告警、断线、关窗确认都不进这三槽。Settings 只作为 A 的静帧开场（主题画廊），不逛六页。
-6. **画面为 GIF 服务。** A / B **关**毛玻璃。C **开** `overlayGlass`：本条就是要看下拉 / Quick Panel / 菜单的霜化。字仍略大。
-7. **不从空桌面开机。** 窗口已开、会话已连；片头就是产品画面。C 从与 A 相同的树莓派 SSH 现场接着拍（不必重播彩虹猫）。
-8. **片中操作自动化，开拍前才动手。** 预置（tmux、ESP32、烧录、开窗）仍是人手；镜头里的点击/快捷键一律脚本。
+已锁定的主张、时长、驱动分层见 §1–§5。**开拍前只需补下面几格**（直接改本文，或按编号回复）。
 
----
+| # | 项 | 现状 | 请填 |
+| --- | --- | --- | --- |
+| **Build** | 拍哪个二进制 | 建议：**真 `tauri build` / 3.0.0 NSIS**。不另做演示 SKU。**不要** `NODE_ENV=demo_script`（见 §2.3）。片中驱动不靠 `__tterm` | 点头 / 改成「debug 但藏调试项」 / Vite `--mode` 拍片变体 |
+| **B-agent** | 本地 Agent 画面 | Working 动画 + Oh My Posh；会话是 Windows 本地 tab | **哪一个 Agent**（Claude Code / Codex / Pi / Kimi / Hermes / 其它：___）；OMP 主题/段长什么样；标签名（如 `agent`） |
+| **C-proto** | 真机夹具协议 | 真 ESP32 + Arduino AT + 本机 Python 服务；产品仓库不成功能 | Python 监听 `127.0.0.1:___`；AT 子集（至少型号 / 关联 Wi‑Fi / 起网络 / TCP 透传）；固件连服务的端口 |
 
-## 3. 拍摄环境（建议，可改）
+可选、拍前再定即可（不定也不挡改剧本）：
 
+| 项 | 默认 | 可改成 |
+| --- | --- | --- |
+| C 导出宽度 | 与 B 并排约 430px（会挤） | 改全宽 |
+| A 时长 | 约 14s（比原 7s 长：palette + 新 SSH + QP） | 剪辑压秒 |
+| C 艺术字 | `Connect Success！`（预写，不要现场现算） | 换文案需同时改固件/服务 |
 
-| 项   | 建议                                 | 备注                                |
-| --- | ---------------------------------- | --------------------------------- |
-| 包   | 本机 3.0.0 NSIS，非 debug              | `TTerm_3.0.0_x64-setup.exe`       |
-| 窗口  | **1280×720**，不要全屏、不要改尺寸            | 三槽同一；导出缩到 880 / 430               |
-| DPI | **100%**                           | 125/150 字糊                        |
-| 皮肤  | **Cursor**（已定）                      | 三槽同一皮肤，不要 VS Code                 |
-| 毛玻璃 | A / B **关**；C **开** `overlayGlass` | C 的下拉和 QP 必须能看出霜化                 |
-| 字体  | 15–16px，CJK 走 Noto / 雅黑栈           | 细笔画会糊                             |
-| 配色  | 深底、对比够                             | 终端方案不要浅色                          |
-| 取景  | **只录 TTerm 窗口**，不要桌面、任务栏、壁纸     | OBS **窗口捕获**，不要显示器捕获              |
-| 指针  | **隐藏系统鼠标**                         | 菜单/QP 自己出现即可，不要光标划过              |
-| 暖机  | 窗口已开、SSH / 真 ESP32 / Agent 已连       | A / C 不拍冷启动；C 需 Arduino 固件 + Python 服务已在跑 |
-| 输入法 | A / C 英文；B 切微软拼音                   | B 用 Python 扫描码，禁止剪贴板上屏            |
-
-
-录制：OBS **窗口捕获 TTerm**（不要显示器/桌面）→ **MP4 母带**（30 fps 够）→ **gifski** 出 GIF（约 12–15 fps）。不要 Game Bar 直接出 GIF。
+改定前 **不写** 录屏编排 / e2e，**不开拍**。Arduino 与 Python 等 **C-proto** 点头再落盘（建议路径 `drafts/demo/`）。
 
 ---
 
-## 4. 驱动怎么分层（改定后再实现）
+## 1. 三条片子
 
-**镜头里不露鼠标。** 下拉、QP、Share、字体 + / 拖链都要发生（观众能看见菜单和列表在动），用 e2e 点元素或发键，系统指针隐藏。人会脑补点击，不必教「往哪指」。
+
+| 槽 | 文件 | README | 时长 | 标题（第一卖点） | 落地（不是标题） |
+| --- | --- | --- | --- | --- | --- |
+| **A** | `hero.gif` ~880px | 主视觉 | **~14s** | 干净 UI；开箱主题/字体；`Ctrl+P` / `Ctrl+Shift+P`；QP 远程端口 | 树莓派 `btop`、ubuntu `nyancat`、Remote 8000 |
+| **B** | `agent.gif` ~430px | 与 C 并排 | **~8s** | 系统 NF 一次配置置顶；本地 Agent TUI 真中文输入 | Oh My Posh 图标、Working 刷新 |
+| **C** | `share.gif` ~430px 或全宽 | 与 B 并排 | **~10s** | 玻璃下拉 / 玻璃 QP；Profile=AT；Share 让 AI 管串口 | 真 ESP32、`Connect Success！` |
+
+
+循环落点：A = QP 里刚加上的 Remote `8000 → 127.0.0.1:8000`（后面 ubuntu 上 `nyancat` 仍在跑）；C = 艺术字 **Connect Success！**。C 幕 4 只看串口回显，后期约 **2×** 倍速。
+
+---
+
+## 2. 通则
+
+### 2.1 原则
+
+1. **卖点先于场景。** 树莓派 / 彩虹猫 / ESP32 是切过去之后的现场，不要写成教程标题。
+2. **键盘优先，不露鼠标。** 切换器、下拉、QP 停够读；指针隐藏，观众会脑补「点过」。
+3. **真 IME 才拍 IME。** 只要 B；系统输入法 + 扫描码。合成 `CompositionEvent`、剪贴板、`pyautogui.write("你好")` 都不算。本条 GIF 不是 IME 验收清单（那仍要人手，见 backlog）。
+4. **Share 不露真 token。** 链接形态（`127.0.0.1`）要能看出来；query 打码或一次性会话。
+5. **不拍失败路径。** 指纹、断线、关窗确认、报错框都不进这三槽。Settings 不逛六页。
+6. **毛玻璃按槽。** A / B **关**；C **开** `overlayGlass`（下拉 / QP / 菜单必须看出霜化）。字略大，细笔画会糊。
+7. **不从空桌面开机。** 窗口已开、会话已连。人提前摆好起始位；C 从与 A 相同的树莓派 SSH 接着拍，不必重播彩虹猫。
+8. **片中脚本，开拍前人手。** 摆窗、烧录、`btop` / `nyancat` 预装、OBS 开录仍是人；镜头里的点击和快捷键一律脚本。指针仍隐藏，QP 的点按由脚本点控件。
+
+### 2.2 拍摄环境（建议）
+
+
+| 项 | 建议 | 备注 |
+| --- | --- | --- |
+| 包 | **真 release**（`tauri build` / 3.0.0 NSIS） | 见 §2.3；不要用 `cargo build --release` 冒充 |
+| 窗口 | **1234×900**，不要全屏、不要改尺寸 | 三槽同一；导出再缩到 880 / 430 |
+| DPI | **100%** | 125/150 字糊 |
+| 皮肤 | **Cursor** | 三槽同一，不要 VS Code |
+| 毛玻璃 | A / B 关；C 开 `overlayGlass` | Appearance 即时生效，不要录开关 |
+| 字体 | 15–16px；CJK 走 Noto / 雅黑栈 | |
+| 配色 | 深底、对比够 | 终端方案不要浅色 |
+| 取景 | **只录 TTerm 窗口** | OBS **窗口捕获**，不要显示器/桌面/任务栏 |
+| 指针 | **隐藏系统鼠标** | 菜单自己展开即可 |
+| 暖机 | SSH / 真 ESP32 / Agent 已连 | A / C 不拍冷启动；C 固件 + Python 服务已在跑 |
+| 输入法 | A / C 英文；B 微软拼音 | B 只发扫描码 |
+
+录制：OBS 窗口捕获 → **MP4 母带**（30 fps 够）→ **gifski**（约 12–15 fps）。不要 Game Bar 直接出 GIF。
+
+### 2.3 驱动分层（改定后再实现）
+
+镜头里不露鼠标。下拉、QP、Share、字体 + / 拖链都要发生（菜单和列表在动），用脚本点元素或发键。
+
+**不要另做「纯演示版」产品。** 仓库里已经有三套二进制，不要再加第四套 SKU：
+
+
+| 二进制 | 前端 | 入画会露出 | `__tterm` | 配置目录 |
+| --- | --- | --- | --- | --- |
+| `tauri dev` / `cargo build` debug | Vite DEV | **Demo TTY / Anime TTY**（profile ▾）；**MOCK-LOOP / MOCK-NL**（串口列） | 有 | `%APPDATA%/…/dev/`（与安装版隔离） |
+| `cargo build --release` + `bun run test:e2e:release` | 仍是 `NODE_ENV=development` 的压缩包 | **仍有 Demo/Anime TTY**（前端 DEV）；MOCK 口没有（后端已 release） | 有 | 安装版目录（会写脏日常配置） |
+| **`tauri build` / NSIS** | `import.meta.env.DEV === false` | 无调试项 | **没有** | 安装版目录 |
+
+
+现有 `e2e/specs/*.e2e.js` **不能**打进 NSIS：几乎每一条都 `waitUntil(window.__tterm)`。  
+WebDriver（tauri-driver → WebView2）**可以**驱动 NSIS 窗口：发真实快捷键、点 CSS/aria。不能 `mgr.switchTo()`，切 tab 用 `Ctrl+Tab` / `Ctrl+P` / 点标签，和镜头里要卖的东西一致。
+
+建议拍 **NSIS**，片中驱动是 `drafts/demo/hero.mjs`：对**已开窗口**走 WebView2 CDP（环境变量开 9222），发快捷键 / 点 `#quick-status`，**不**注入 `__tterm`、**不**用 QA `e2e/specs`。IME 仍走 Python 扫描码，与包无关。
+
+片中分层不变：
+
 
 | 层 | 适合 | 不适合 |
 | --- | --- | --- |
-| **开拍前人手** | 开窗 1280×720、tmux / nyancat 预置、插 ESP32、烧固件、Python 服务、OBS 开录 | 镜头里的任何点击和快捷键 |
-| **JS e2e**（快捷键、点控件、拖字体链、切 tab、Share） | A 全段；B 字体选择器；C 幕 1–3 | **真 IME**；真 ESP32 电波 |
-| **Python `SendInput` 扫描码** | 仅 B：拼音「中文输入法」 | chrome 编排（让 e2e 做） |
+| **开拍前人手** | 开窗 1234×900、摆 Settings 起始、ras 上 `btop`、插 ESP32、烧固件、Python 服务、OBS 开录 | 镜头里的任何点击和快捷键 |
+| **JS（CDP 注入，`drafts/demo/`）** | A 全段；B 字体选择器 + 切 tab；C 幕 1–3 | **真 IME**；真 ESP32 电波 |
+| **Python `SendInput` 扫描码** | 仅 B：拼音「中文输入法」 | chrome 编排 |
 
-`window.__tterm` 只在 **DEV**。若录 3.0.0 安装包，e2e 不能靠 `__tterm`：对正式窗发真实按键/点控件，或用外观等同 release 的 debug 窗（不要把 DEV 调试条录进画面）。
+若改用 debug 仅为了 `__tterm`：开拍前必须藏 Demo TTY、Anime TTY、MOCK 口（C 的 profile ▾ 会拍到）。不要把 `test:e2e:release` 当成「看起来像正式版」——那条路径前端仍是 DEV。
 
-Chrome 用 JS、拼音用 Python，不要混成一个会假打字的页面脚本。  
-**现在先不定实现仓库路径。**
+**`NODE_ENV=demo_script` 不可行。** `NODE_ENV` 只有 `development` / `production` 两档；写成别的值 Vite/依赖行为未定义，且 **管不到** `import.meta.env.DEV`（那是 Vite `mode`），更 **管不到** Rust 的 `debug_assertions`（MOCK 口）。PowerShell 也不能写 `NODE_ENV=… cmd`。
 
----
+若仍想「压缩包 + 有钩子 + 无 Demo/Anime」，正确旋钮是 **`vite build --mode demo_script`** + 显式 `VITE_*`（例如只开 `__tterm`，Demo TTY 仍跟 `DEV`）。这是本机拍片变体，**不能**进 `v*` 发布；还要单独关 updater（它只跳过 `DEV`，生产 mode 会弹更新框）。后端 MOCK 口仍要 release/`--features`，mode 解决不了。默认仍建议 NSIS + 只发键，不走这条。
 
-## 5. 分镜 A — `hero.gif`（UI/UX 展示，已定）
+Chrome 用 JS、拼音用 Python，不要混成一个会假打字的页面脚本。场景 1：`drafts/demo/hero.mjs`。场景 2：`drafts/demo/agent.mjs` + `ime_pinyin.py`（`uv venv`，bun spawn）。说明见 `drafts/demo/README.md`。
 
-**第一卖点（本条标题）：**
+### 2.4 本轮不拍
 
-1. 干净、简洁的 UI
-2. 开箱即用的主题和字体
-3. 快速的键盘操作，习惯对齐 VS Code（`Ctrl+Tab` / `Ctrl+P`）
-
-后面两幕不是「树莓派教程」或「彩虹猫广告」：它们证明这套 chrome **切出去就是能打的终端**，而且快捷键跟手。
-
-**总长：** 约 **7 秒**（1+1+2+1+2）。循环落点：`nyancat` 还在跑。第三幕就用 nyancat，不再备选。
-
-不从空桌面启动。开拍时窗口已在 **Settings → Appearance**，视口里同时能看见：Chrome 皮肤卡、字体行、主题画廊。栏上至少两个已连接的 SSH tab。
-
-
-| 幕       | 秒   | 画面在卖什么              | 操作                          | 驱动      |
-| ------- | --- | ------------------- | --------------------------- | ------- |
-| **1**   | 0–1 | **UI + 主题/字体**      | 静帧，不点不滚                     | 开拍前预置 |
-| **1→2** | 1–2 | **键盘：Ctrl+Tab MRU** | 按 Tab，**松开 Ctrl 才切**；列表要能看清 | e2e 按键 |
-| **2**   | 2–4 | 键盘落地：真 SSH TUI      | Raspi 分屏已在；右窗一条短命令          | 开拍前预置 + e2e 打 `df -h` |
-| **2→3** | 4–5 | **键盘：Ctrl+P 按名跳转**  | 滤出 Linux tab，Enter          | e2e 按键 |
-| **3**   | 5–7 | 还是终端：命令 → 图形        | `nyancat` 回车开跑              | e2e 按键 |
-
-
-**不要：** 冷启动、SSH 握手、指纹框、Settings 其它五页、关窗确认、IME。
-
-### 5.1 幕 1 — Settings Appearance（卖点 1 和 2）
-
-构图要对准「开箱即用」，不是空空的 About 页。**同一帧里**尽量同时看见：
-
-
-| 块                                        | 为什么必须入画        |
-| ---------------------------------------- | -------------- |
-| Chrome Skin 两张卡（Cursor 选中）               | 干净 chrome，皮肤开箱 |
-| 字体行（家族 + 字号， bundled 等宽如 JetBrains Mono） | 字体开箱，不必再配一套    |
-| Color Scheme 画廊至少一整行卡片                   | 主题开箱，不是灰设置页    |
-| 顶栏：Settings 伪标签 + SSH 标签                 | 后面键盘切换才读得懂     |
-
-
-- 侧栏停在 **Appearance**。滚动条停在「皮肤 + 字体 + 画廊第一行」刚好满窗；不要只露画廊、切掉字体。
-- 1 秒只「看」。不点选主题、不打开字体选择器——那会把「简洁」拍成「在设置里钻」。
-- 若字体行和画廊挤不下：在 Appearance **内滚动**到「皮肤 + 字体 + 画廊第一行」刚好满窗，**不要把窗口改成 1280×800**。核心卖点糊了，后面分屏救不回来。
-- 字号可临时调到 15–16px，让画廊标签在 GIF 里还能认。
-
-**Ctrl+Tab 是 MRU，不是标签栏从左到右。** 松开 Ctrl 才跳。这一秒要让人**看见切换器列表**（干净的键盘 UI），不要切得像硬切镜头。建议：按下后停约 0.4s 再松 Ctrl。
-
-要一次就落到树莓派：
-
-1. 先激活树莓派 tab（它进 MRU 顶端）
-2. 再点开另一个垫片 tab（本地或 Linux 均可）
-3. 从垫片打开 Settings
-  → 一次 Ctrl+Tab 的「下一个」就是树莓派，且 `switchTo` 会关掉 Settings。
-
-若开拍时焦点还在树莓派上就进 Settings，Ctrl+Tab 会跳到**上一份**会话，对不上剧本。
-
-### 5.2 幕 2 — 树莓派分屏（键盘落地，不是本条标题）
-
-这一幕回答：快捷键切出去，是真会话，TUI 不糊。**不要把 btop 当成第一卖点。**
-
-分屏用 **tmux**（已定）。开拍前就分好，不要录 `tmux` 启动。
-
-
-| 窗格  | 内容               | 开拍时           |
-| --- | ---------------- | ------------- |
-| 左   | `btop`（或 `htop`） | 已经在刷新 CPU/MEM |
-| 右   | 交互 shell         | 提示符空闲，准备收一条命令 |
-
-
-2 秒里打不下 `df -h` **再** `systemctl status`。用已经印在屏上的状态，现场只敲一条：
-
-```sh
-df -h
-```
-
-`systemctl status`（注意不是 `systemctrl`）预先跑完停在右窗滚动区里，或左窗 btop 已经在讲「系统状态」。两条都要打字就把幕 2 加到 3s。
-
-右窗不要用 pager（`less`）卡住：`systemctl status --no-pager` 或 `df -h` 这种立刻结束的。
-
-### 5.3 幕 3 — Linux 动画（命令跟着键盘走）
-
-**Ctrl+P**（Go to Tab）滤主机名：卖的是「按名跳转」这套习惯，不要再用一次 Ctrl+Tab。列表同样要停够认。滤词要短。
-
-动画是「敲一下就有图形响应」，用来收住「这是终端不是设置页」。**已定 `nyancat`。**
-
-```sh
-# Debian/Ubuntu 演示机预先装好，不要录 apt
-sudo apt-get install -y nyancat
-```
-
-开拍时两种拍法（选一）：
-
-
-| 拍法           | 做法                         | 观感              |
-| ------------ | -------------------------- | --------------- |
-| **回车即开**（推荐） | 提示符上已打好 `nyancat`，Enter 开跑 | 能看见「敲命令 → 图形响应」 |
-| 已在跑          | 切过去猫已经在飞                   | 更稳，少了「是你打的」     |
-
-
-2 秒只够看一波彩虹。结束用 `Ctrl+C` 不必录进 GIF。演示机必须预先装好 `nyancat`，不用其它动画备选。
-
-### 5.4 预置清单（开录前）
-
-- [ ] 窗口 **1280×720**，只录 TTerm；Cursor 皮肤，毛玻璃关；Appearance **皮肤 + 字体行 + 画廊第一行** 同帧可见
-- [ ] SSH：树莓派、Linux 服务器均已登录，标签名能认（如 `pi@raspi` / `lab`）
-- [ ] 树莓派：**tmux** 双窗，左 btop 在跑；右提示符空，或已打好 `df -h` 未回车
-- [ ] Linux：`$PATH` 里有 `nyancat`；提示符上已打好命令，或随时可回车
-- [ ] MRU 已按 §5.1 垫好，一次 Ctrl+Tab 必中树莓派
-- [ ] 输入法英文；通知关掉
-
----
-
-## 6. 分镜 B — 本地 Agent + 中文输入（已定）
-
-**文件：** `docs/images/agent.gif`（并排 430px）。
-
-**主张：**
-
-1. 复杂终端字体（Oh My Posh / Agent TUI 的 NF 图标）**只需这一处配置**：搜索系统字体 → 加入候选 → 拖到第一优先 → Apply。
-2. 同一套字体下，**正在刷新的本地 Agent TUI 里用真输入法打中文**（候选窗贴在输入点，不飞到左上角）。
-
-内置 JetBrains Mono **不是** Nerd Font。本条就是把系统里已经装好的 **JetBrainsMonoNL NF** 塞进回退链并提到最前。不要拍从网上下载字体、不要打开 Nerd Fonts 外链。
-
-**总长：** 约 **8 秒**（2+1+1 字体，点 tab 衔接，3s 输入）。并排槽字要够大；字体选择器里搜索框和 Fallback Chain 必须入画。
-
-
-| 幕      | 秒   | 画面在卖什么            | 操作                                                                   | 驱动         |
-| ------ | --- | ----------------- | -------------------------------------------------------------------- | ---------- |
-| **1a** | 0–2 | 系统 NF 加入候选        | Font Settings 已开；搜 `jet`；在 **System** 列点 **+** 加入 JetBrainsMonoNL NF | e2e（键入 + 点 +，隐藏指针） |
-| **1b** | 2–3 | 第一优先              | Fallback Chain 里把刚加入的 NF **拖到最顶**                                    | e2e 拖拽（隐藏指针，链要能看见在动） |
-| **1c** | 3–4 | 保存                | 点选择器 **Apply**                               | e2e |
-| **衔接** | 4–5 | 配置结束就是干活          | 切到预置好的本地 Agent 标签（不要 Ctrl+Tab；不必露鼠标点）                                  | e2e `switchTo` / 点标签 |
-| **2**  | 5–8 | Agent TUI + 真 IME | Working 动画已在刷新；Python 打 **中文输入法**                                    | Python 扫描码 |
-
-
-**不要：** 装字体过程、Settings 底栏再点一次 Apply、Ctrl+Tab、剪贴板粘贴汉字、合成 CompositionEvent。
-
-### 6.1 幕 1 — 字体选择器（唯一的字体配置）
-
-开拍时 **Font Settings 已打开**（Appearance → Font Family → Configure），光标在 Search。不要把「点 Configure 打开对话框」算进 2 秒。
-
-
-| 注意         | 原因                                                                                                                                |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| 搜 `jet`    | Built-in 会出现普通 **JetBrains Mono**；NF 在 **System** 列。点 System 行的 **+**，不要点 Built-in                                                |
-| 名称以机器为准    | Windows 家族名可能是 `JetBrainsMonoNL Nerd Font` / `JetBrainsMonoNL Nerd Font Mono` / `JetBrainsMonoNL NF`。开录前在 System 列表里确认搜 `jet` 能命中 |
-| 加入后在链尾     | + 是 append；必须再拖到 **Font Fallback Chain 第一行**（第一 = 最高优先，OMP/Agent 图标才走 NF）                                                         |
-| Apply = 保存 | 选择器 Apply 会 `configStore.set` 并关窗。Settings 底栏可能变脏，**不要再点 footer Apply**，直接点 Agent tab。切 tab 只是挂起 Settings，没有未保存确认框                |
-| 预览区        | 对话框下半有终端预览（含 `` 等 NF 样例）。Apply 前可以入画，但不要在预览里打字                                                                                   |
-
-
-演示机预先装好 JetBrainsMonoNL Nerd Font。TTerm **不内嵌** Nerd Fonts。
-
-### 6.2 幕 2 — 本地 OMP Agent + IME
-
-单击标签，不要键盘切——第一条已经卖过 Ctrl+Tab。标签名要一眼能认（如 `agent` / `omp`）。e2e 切过去即可，**不要为了「像人点」而露出指针**。
-
-
-| 项     | 规划                                | 待定                                                |
-| ----- | --------------------------------- | ------------------------------------------------- |
-| 会话    | Windows **本地** profile，不是 SSH     | —                                                 |
-| 提示符   | Oh My Posh（或同类），NF 图标能看出 Apply 生效 | 主题/段内容待你定                                         |
-| Agent | 正在 **Working** 的刷新动画（隐藏光标 TUI）    | **哪一个：** Claude Code / Codex / Pi / Kimi / Hermes |
-| 输入    | 真微软拼音，打完上屏 **中文输入法**              | 见 §6.3                                            |
-
-
-点过去先让 Working 入画 **约 1 秒** 再开始打字。幕 2 的 3 秒里 Python **快打** 打完五字「中文输入法」（一般语速做得到），不要缩成「中文」、不要加到 4s。
-
-Agent 具体画面（任务文案、工具调用、spinner 样式）**内容待定**，你补一句即可。要求只有：持续刷新、光标隐藏或假光标、能打字。
-
-### 6.3 IME 打法（Python，真 TSF）
-
-要上屏的是 **「中文输入法」** 五个字（已定，3 秒，快打），不是剪贴板、不是 Unicode SendInput。
-
-建议两词（微软拼音，空格上屏）：
-
-
-| 顺序  | 扫描码序列                     | 上屏  |
-| --- | ------------------------- | --- |
-| 1   | `z h o n g w e n` → Space | 中文  |
-| 2   | `s h u r u f a` → Space   | 输入法 |
-
-
-- 窗口焦点必须在终端（xterm 隐藏 textarea），系统 IME = 中文。
-- 组词时 **ImeBox 镜像贴在输入点**，候选窗不跳 `(0,0)`——这是相对普通 Windows 终端的差异，Working 动画就是为了把这个拍出来。
-- 扫描码间隔按快打：两词加空格上屏压进 **3 秒**。不要减字、不要加时长。
-
-禁止：`pyautogui.write("中文输入法")`、Ctrl+V、e2e `CompositionEvent`。
-
-### 6.4 预置清单（开录前）
-
-- [ ] 系统已装 JetBrainsMonoNL NF，Font Settings 搜 `jet` 在 System 列看得到
-- [ ] 回退链里 **还没有** 该 NF（否则「加入」拍成打勾）
-- [ ] 本地 Agent tab 已开，OMP + Working 动画在跑；点它之前 Settings 仍盖在上面
-- [ ] 字体选择器已打开、Search 空、Fallback Chain 可见
-- [ ] 微软拼音；Python 脚本只发键
-- [ ] 毛玻璃关（选择器边缘才干净）
-
-### 6.5 Share with AI
-
-已并进 **§7**（串口标签右键 Share）。不再单开第二条。
-
----
-
-## 7. 分镜 C — 玻璃浮层 + 串口快捷配置 + AI（已定）
-
-**文件：** `docs/images/share.gif`（并排约 430px 会挤，可改全宽）。一共三条动画，本条占用原 README 的 Share 文件名。
-
-**第一卖点（本条标题）：**
-
-1. **下拉菜单的 glass**（`+` 旁 profile ▾，霜化、能透过看到后面的树莓派）
-2. **Quick Panel 的 glass**，以及上面把串口切成 AT 的**一步配置**（Profile = AT，不要进 I/O 细项）
-3. **AI 介入串口**：Share with AI 之后，人不用手打 AT；Agent 查型号、配 Wi‑Fi、拉起网络，再落到透传成功
-
-树莓派现场、**真实 ESP32**（Arduino 固件）+ 本机 Python 服务、`Connect Success！` 是落地证明，不要拍成「ESP32 教程」。
-
-**总长：** 约 **10 秒**。幕 4 只拍 **串口回显**（不入画 Agent 窗口），回放 **约 2× 倍速**，把配网挤进整条时长。玻璃浮层仍各停够认（约 0.5–0.8s）。循环落点：艺术字 **Connect Success！**。
-
-开拍前：`overlayGlass` **已开**（Appearance 即时生效，不必录开关）。窗口停在与 A 相同的**树莓派 SSH** tab（不必重播分屏/彩虹猫）。
-
-
-| 幕     | 秒     | 画面在卖什么             | 操作                                                   | 驱动              |
-| ----- | ----- | ------------------ | ---------------------------------------------------- | --------------- |
-| **1** | 0–2.5 | **玻璃下拉** + 一等串口入口  | 树莓派 SSH 上打开 **profile ▾**，停住让人看清霜化，再选定制 ESP32 串口      | e2e（隐藏指针） |
-| **2** | 2.5–5 | **玻璃 QP** + 便捷配置   | 打开 Quick Panel；**Profile → AT**；停住让人看见玻璃和 AT     | e2e |
-| **3** | 5–6.5 | Share 入口           | 关 QP；串口标签打开上下文菜单 **Share with AI**；链接形态可见，**token 打码** | e2e |
-| **4** | 6.5–8.5 | **AI 管串口**（人不打 AT） | 只看串口回显：型号 → Wi‑Fi → 连上 Python 服务；**约 2× 倍速** | 真设备 + 后期倍速 |
-| **5** | 8.5–10 | 成功收束               | 透传日志后，终端打出预先写好的艺术字 `Connect Success！`                | 固件或服务推一帧 |
-| **4** | 6.5–8.5 | **AI 管串口**（人不打 AT） | 只看串口回显：型号 → Wi‑Fi → 连上 Python 服务；**约 2× 倍速** | 串口回显（倍速） |
-| **5** | 8.5–10 | 成功收束               | 透传日志后，终端打出预先写好的艺术字 `Connect Success！`                | 固件或服务推一帧 |
-
-
-**不要：** 录 `overlayGlass` 开关、手打一长串 AT、Wi‑Fi 密码特写、完整 token、MOCK 串口、从零 `pip install`。
-
-### 7.1 幕 1 — 玻璃下拉（从树莓派出发）
-
-借用 A 的 SSH 现场，证明同一窗口里 **SSH 和串口是同一套 chrome**。
-
-- 打开标题栏 **+ 右侧 ▾**（profile 菜单），不是标签栏点选已有 tab。e2e 点按钮即可，**指针隐藏**，菜单自己展开才是卖点。
-- 菜单 **停约 0.6–1s**：必须看出 `--tt-glass-`* 霜化，后面树莓派画面隐约可见。这是相对 A（玻璃关）的差异。
-- Serial 列点定制 ESP32（端口友好名 / 产品名要能认）。新串口 tab 打开。
-- 不要录握手失败、驱动弹窗。
-
-### 7.2 幕 2 — Quick Panel：玻璃 + AT 一键
-
-卖的是 **打开就能配**，不是把波特率表翻一遍。
-
-
-| 做                                             | 不要做                     |
-| --------------------------------------------- | ----------------------- |
-| 打开 QP，整块玻璃入画                                  | 不要先滚到 I/O 去改 Input mode |
-| **Profile** 下拉选内置 **AT**（`line` + Enter CRLF） | 不要逐项改 Frame / newline   |
-| 选完 AT 再停约 0.5s                                | 不要瞬间关掉，玻璃和「AT」字样要能读     |
-
-
-波特率若已是 115200，不必动。Disconnect / Reconnect 不要点。
-
-### 7.3 幕 3 — Share with AI
-
-- 右键 **串口 tab**（不是树莓派）。菜单同样是玻璃，可再停一拍。
-- Share with AI → 标签青色点（overlay，不挤宽）→ `http://127.0.0.1:…/share/…`，token 截断或打码。
-- 这一步的主张：**同一套分享协议打在设备会话上**，远程 ESP32 不用装 Agent。
-
-### 7.4 幕 4 — AI 介入（优势功能）
-
-人不再往串口打字。本机 Agent 通过分享链接发 AT。**画面只留串口 tab**，不切、不叠 Agent 窗口。后期把幕 4 **约 2× 倍速**，整条压到约 10 秒。回显里仍要能扫到结果：
-
-
-| 节       | 串口上应能认出            | 例（固件侧，不必原样）                            |
-| ------- | ------------------ | -------------------------------------- |
-| 状态 / 型号 | 查询回报               | `AT+GMR` → 芯片/版本                       |
-| Wi‑Fi   | 关联成功               | `AT+CWJAP=...` → `WIFI GOT IP`         |
-| 网络服务    | 服务起来               | 按你的固件（HTTP / TCP）                      |
-| 透传      | 连上本机 Python 服务     | 固件 TCP 连上 → 服务端打连接日志               |
-
-
-不要把 curl 或 Agent 窗口打满屏。Share 的青色点已经说明 AI 在连。
-
-Wi‑Fi 配网若仍太长：预先打到「已关联」再开拍幕 4 后半，倍速只留「型号 → GOT IP → CONNECT」三拍。
-
-### 7.5 幕 5 — Connect Success！
-
-真 ESP32 连上本机 Python 服务后：
-
-1. 服务脚本打一行连接日志（短，可同时出现在串口回显里）。
-2. 终端打出**预先写好**的艺术字 `Connect Success！`（固件 banner 或服务端推这一帧）。不要现场现算。
-
-这是收束，不是第四个卖点。字要够大，在 430px 缩小后仍能认。
-
-### 7.6 预置清单（开录前）
-
-- [ ] `overlayGlass` 开；A / B 那套窗口可另存一份关玻璃的配置，C 单独开
-- [ ] 树莓派 SSH 已连，停在能认出的提示符或分屏
-- [ ] **真实 ESP32** 已插上，Arduino 固件已烧录；profile 菜单里端口/产品名可认（不要 MOCK 口）
-- [ ] 本机 **Python 服务**已在听 `127.0.0.1`；固件能连上它
-- [ ] 艺术字 `Connect Success！` 已写进固件或服务脚本
-- [ ] 本机 Agent 已能打开分享链接并发送 AT（**不出镜**，只看串口回显）
-- [ ] 演示 SSID 可用；不要把真实密码定格在画面上
-
-### 7.7 拍摄夹具（真机 + 两份脚本，改定后再写）
-
-只用 **真实 ESP32**。产品仓库里不做成功能，演示机两份脚本配合即可（路径以后放 `drafts/demo/` 或你指定处）：
-
-
-| 件 | 职责 |
-| --- | --- |
-| Arduino 固件 | 串口 AT 命令模式：查型号、配 Wi‑Fi、起网络、TCP 连本机服务 |
-| Python 服务 | 本机监听；打印连接日志；配合打出 `Connect Success！` |
-
-不要 MOCK 串口、不要纯软件冒充设备。固件与服务的协议细节（端口、AT 子集）你补一句即可，开拍前再落盘。
-
----
-
-## 8. IME
-
-B 已定为在刷新中的本地 Agent TUI 里打 **中文输入法**（§6.3）。A / C 不再拍 IME。
-
-真 TSF 不能用 e2e 代替。脚本只发扫描码，不断言候选窗像素。关闭 backlog 里的 IME 项仍要人手验收，本条 GIF 是产品演示，不是验收清单。
-
----
-
-## 9. 明确不拍（本轮）
-
-- Settings 除 A 的 Appearance 静帧、B 的字体选择器以外的其它页
-- 主题滚动挑选、字体选择器里点 Nerd Fonts 外链
-- 在 A / B 里开毛玻璃；C 里录 Settings 开关对比（玻璃应开着就拍浮层）
-- 端口转发编辑、Trust & Connect、密码打在 tab 里
-- 会话死模式 / 重连长等待
-- 托盘、多窗口、Zen / 全屏、桌面或任务栏入画
-- 看得见的鼠标指针 / 点击高亮光圈
-- 失败、报错、确认框
-- 在 QP 里逐项改 I/O（本条只切 Profile = AT）
+Settings 除 A 的 Appearance 静帧、B 的字体选择器以外的其它页；主题滚动挑选；字体选择器里点 Nerd Fonts 外链；A / B 开毛玻璃；C 里录玻璃开关对比；Settings 里编辑转发表（A 只拍 QP 加一条 Remote）；Trust & Connect；密码打在 tab 里；死模式 / 重连长等待；托盘、多窗口、Zen / 全屏；桌面或任务栏入画；看得见的鼠标指针 / 点击高亮；失败、报错、确认框；在 C 的 QP 里逐项改 I/O（只切 Profile = AT）。
 
 这些可以以后做 changelog 或文档插图，不挤 README 三槽。
 
 ---
 
-## 10. 拍完之后
+## 3. 分镜 A — `hero.gif`（已按摆场改定）
 
-1. 文件放到 `docs/images/hero.gif`、`agent.gif`、`share.gif`（只有这三条）。README 注释路径已按此预留。
-2. 取消 `README.md` / `README_EN.md` 里演示动画注释，删掉「制作中」那句和四张占位截图（或只留一张静帧，由你定）。
-3. 不改安装包图标；不把 MP4 推进仓库。
+**窗口 1234×900。** 人提前摆好起始：已在 **Settings → Appearance**；树莓派 SSH 已连，全屏 `btop`（**不用 tmux**，窗不够分）；ubuntu 主机在 `~/.ssh/config` 里，尚未打开。本条不用 `Ctrl+Tab`。
+
+秒数是建议剪辑尺，拍完可压。**SSH 已上传密钥，无密码，选中即可连。** 不要指纹 / Trust & Connect / 密码框；连接闪一下即可，不必为握手加时长。
+
+
+| 幕 | 秒（建议） | 画面在卖什么 | 操作 | 驱动 |
+| --- | --- | --- | --- | --- |
+| **1** | 0–1 | UI + 主题/字体 | 静帧，不点不滚 | 开拍前预置 |
+| **2** | 1–2.5 | `Ctrl+P` 按名跳转 | 搜 `ras`，列表停够认，Enter → 已打开的树莓派 SSH | 发键 |
+| **3** | 2.5–4.5 | 真 SSH TUI | 全屏 `btop` 已在刷，不打字 | 开拍前预置 |
+| **4** | 4.5–7 | `Ctrl+Shift+P` 命令面板 | 打开 palette → **New SSH Tab** → 输入 `ubuntu` → **第一项** 连接 | 发键 |
+| **5** | 7–9.5 | 命令 → 图形 | 打 `nyancat` + Enter，**等 2s** | 发键 |
+| **6** | 9.5–14 | Quick Panel 远程端口 | 点 `#quick-actions` 打开 QP；**Remote (-R)** 添加行：`8000` Tab Tab `8000` → 点 **+** | 点控件 + 发键 |
+
+
+**不要：** 冷启动、指纹框、密码框、Settings 其它五页、关窗确认、IME、tmux、`Ctrl+Tab`。不要把 btop / nyancat 写成这条标题。ubuntu 用 **内嵌 SSH**（QP 转发作 embedded-only）。
+
+### 3.1 幕 1 — Appearance
+
+同一帧里同时看见：Chrome Skin 两张卡（Cursor 选中）、字体行（家族 + 字号，bundled 等宽如 JetBrains Mono）、Color Scheme 画廊至少一整行、顶栏 Settings 伪标签 + 已有 SSH 标签。
+
+侧栏停在 Appearance。滚动条停在「皮肤 + 字体 + 画廊第一行」刚好满窗；挤不下就**页内滚**，**不要改窗口尺寸**。1 秒只看。
+
+### 3.2 幕 2 — Ctrl+P → ras
+
+`Go to Tab…`（`Ctrl+P`）。滤词 **`ras`**，切到已经打开的树莓派会话（会关掉 Settings）。列表要停够认。不要靠 MRU 垫片。
+
+### 3.3 幕 3 — 树莓派 btop
+
+开拍前 `btop` 已在跑，占满终端。不要录 `btop` 启动，不要 tmux 分屏。
+
+### 3.4 幕 4 — Ctrl+Shift+P → New SSH Tab → ubuntu
+
+1. `Ctrl+Shift+P` 打开命令面板（`Show Command Palette…`）
+2. 滤出 **New SSH Tab**，Enter（进入 `SSH hosts` 页）
+3. 输入 **`ubuntu`**，停够认，**选第一项** 连接（密钥已在对方，**无密码**，直接进 shell）
+
+`known_hosts` 里已有该主机，不要 Trust & Connect。
+
+### 3.5 幕 5 — nyancat
+
+ubuntu 提示符空闲后现场打 `nyancat` 回车（每个字母只入一次）。开跑后 **等 2s** 再打开 QP 配端口。演示机预先装好，不录 apt。`Ctrl+C` 不必进 GIF。
+
+### 3.6 幕 6 — QP Remote 8000
+
+焦点已在 ubuntu 内嵌 SSH tab。
+
+1. 点标题栏闪电 `#quick-actions` 打开 Quick Panel（指针隐藏，脚本点）
+2. 滚到 **Port forwards → Remote (-R)** 添加行（Listen port | Target host | Target port | +）
+3. Listen port 打 **`8000`**
+4. **Tab** 到 Target host（空着，提交时默认 `127.0.0.1`）
+5. **Tab** 到 Target port，打 **`8000`**
+6. 点该行 **+**（`Add Remote forward`）
+
+即 Remote `-R`：远端听 8000，转到本机 `127.0.0.1:8000`。不要改 Local / Dynamic，不要进 Settings 转发表。
+
+### 3.7 开录前
+
+- [ ] **1234×900**，只录 TTerm；Cursor 皮肤，毛玻璃关
+- [ ] 用 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222 --remote-allow-origins=*` **之后**再开 TTerm（`bun run demo:hero -- --probe` 能看到 page）
+- [ ] 起始：**Settings → Appearance**（皮肤 + 字体行 + 画廊第一行同帧可见）
+- [ ] 树莓派 SSH **已打开**，标签能被 `ras` 滤到；全屏 `btop` 在跑；**无 tmux**
+- [ ] `~/.ssh/config` 里有 **ubuntu** 主机；开拍时 **未打开** 该 tab；内嵌 russh 已开
+- [ ] 密钥已上传，**无密码可直接连**；`known_hosts` 已信任；ubuntu 上 `$PATH` 有 `nyancat`
+- [ ] QP 转发表是空的（否则「+」拍成重复行）
+- [ ] 输入法英文；通知关掉
 
 ---
 
-## 11. 请你改的清单
+## 4. 分镜 B — `agent.gif`（已定）
 
-直接在本文改，或按条回复编号：
+**总长 ~8s**（2+1+1 字体，1s 切 tab，3s 输入）。并排槽字要够大；搜索框和 Fallback Chain 必须入画。
 
-- [x] **A** 第一卖点 = 干净 UI + 开箱主题/字体 + 键盘习惯；SSH/动画只是落地（§5）
-- [x] **B** 字体选择器加入 NF 并置顶 + 本地 OMP Agent 上真 IME（§6）
-- [x] **C** 玻璃下拉 / 玻璃 QP + Profile=AT + Share 让 AI 打串口（§7）
-- [ ] **B-agent** Working 动画用哪一个 Agent、OMP 主题长什么样
-- [x] **B-ime** 3s 快打「中文输入法」五字（不减字）
-- [x] **B-file** `docs/images/agent.gif`
-- [x] **C-file** `docs/images/share.gif`（只有三条，无 `sessions.gif`）
-- [x] **C-device** 真 ESP32 + Arduino 固件 + Python 服务（§7.7）
-- [x] **C-len / C-ai** 约 10s；幕 4 只串口回显、约 2× 倍速
-- [ ] **C-proto** Arduino / Python 监听端口与 AT 子集
-- [x] **A-mux** 树莓派 **tmux**
-- [x] **A-anim** 第三幕 **nyancat**
-- [x] **皮肤** Cursor（三槽同一）
-- [x] **窗口** 1280×720；**只录 TTerm 窗口**，不要桌面
-- [x] **指针** 隐藏；片中操作 e2e，不教鼠标怎么点
+内置 JetBrains Mono **不是** Nerd Font。本条把系统里已装的 **JetBrainsMonoNL NF** 塞进回退链并提到最前。不拍下载字体、不打开 Nerd Fonts 外链。
 
-改定前 **不写** 录屏编排 / e2e、不开拍。Arduino 固件与 Python 服务等你点头再落盘。
+
+| 幕 | 秒 | 画面在卖什么 | 操作 | 驱动 |
+| --- | --- | --- | --- | --- |
+| **1a** | 0–2 | 系统 NF 加入候选 | Font Settings 已开；搜 `jet`；**System** 列点 **+**（不要点 Built-in） | e2e |
+| **1b** | 2–3 | 第一优先 | Fallback Chain 把刚加入的 NF **拖到最顶**（链要能看见在动） | e2e 拖拽 |
+| **1c** | 3–4 | 保存 | 点选择器 **Apply**（会 `configStore.set` 并关窗） | e2e |
+| **衔接** | 4–5 | 配置结束就是干活 | `Ctrl+P` 搜 `pi`（第一项），Enter 确认（不要点标签、不要 Ctrl+Tab） | 发键 |
+| **2** | 5–8 | Agent TUI + 真 IME | Working 已在刷新；先入画 ~1s，再打 **中文输入法** | Python 扫描码 |
+
+
+**不要：** 装字体过程、Settings 底栏再点一次 Apply、Ctrl+Tab、剪贴板/合成 CompositionEvent。切 tab 只挂起 Settings，没有未保存确认框。
+
+### 4.1 字体选择器
+
+开拍时对话框已打开（Appearance → Font Family → Configure），光标在 Search。不要把「点 Configure」算进 2 秒。
+
+Windows 家族名可能是 `JetBrainsMonoNL Nerd Font` / `… Nerd Font Mono` / `… NF`。开录前确认搜 `jet` 能在 System 列命中。`+` 是 append，必须再拖到链 **第一行**（OMP/Agent 图标才走 NF）。对话框下半预览（含 ``）可以入画，不要在预览里打字。
+
+TTerm **不内嵌** Nerd Fonts。演示机预先装好。
+
+### 4.2 本地 Agent + IME
+
+标签名要能被 `pi` 滤到且是第一项。`Ctrl+P` 打 `pi` 后 **Enter** 确认。切过去先让 Working 入画约 1 秒再打字。幕 2 的 3 秒 **快打** 五字「中文输入法」：拼音打完 **空格上屏**（`zhongwen` 空格、`shurufa` 空格），不要缩成「中文」、不要加到 4s。
+
+要求只有：持续刷新、光标隐藏或假光标、能打字。具体 Agent / OMP 见 **§0 B-agent**。
+
+微软拼音，空格上屏：
+
+
+| 顺序 | 扫描码 | 上屏 |
+| --- | --- | --- |
+| 1 | `z h o n g w e n` → Space | 中文 |
+| 2 | `s h u r u f a` → Space | 输入法 |
+
+
+焦点在终端（xterm 隐藏 textarea）。组词时 **ImeBox 贴在输入点**，候选窗不跳 `(0,0)`——Working 动画就是为了把这个拍出来。禁止 `pyautogui.write`、Ctrl+V、e2e `CompositionEvent`。
+
+### 4.3 开录前
+
+- [ ] 系统已装 JetBrainsMonoNL NF；搜 `jet` 在 System 列看得到
+- [ ] 回退链里 **还没有** 该 NF（否则「加入」拍成打勾）
+- [ ] 字体选择器已打开、Search 空、Fallback Chain 可见；毛玻璃关
+- [ ] 本地 Agent tab 已开，OMP + Working 在跑；点字体 Apply 之前 Settings 仍盖在上面
+- [ ] 微软拼音；Python 只发键（`uv venv` 在 `drafts/demo/`，bun 会 `spawn` `ime_pinyin.py`）
+- [ ] Agent 标签能被 `pi` 滤到且排第一（改 `QUERIES.gotoTab`）
+
+---
+
+## 5. 分镜 C — `share.gif`（已定）
+
+**总长 ~10s**。开拍前 `overlayGlass` **已开**；窗口停在与 A 相同的树莓派 SSH tab。
+
+
+| 幕 | 秒 | 画面在卖什么 | 操作 | 驱动 |
+| --- | --- | --- | --- | --- |
+| **1** | 0–2.5 | 玻璃下拉 + 一等串口入口 | 标题栏 **+ 右侧 ▾**（不是点已有 tab）；停 0.6–1s 看霜化（后面树莓派隐约可见）；Serial 列选定制 ESP32 | e2e |
+| **2** | 2.5–5 | 玻璃 QP + 一步 AT | 打开 Quick Panel；**Profile → AT**（`line` + Enter CRLF）；再停 ~0.5s | e2e |
+| **3** | 5–6.5 | Share 入口 | 关 QP；右键 **串口 tab** → **Share with AI**；链接形态可见，**token 打码**；标签青色点（overlay，不挤宽） | e2e |
+| **4** | 6.5–8.5 | AI 管串口（人不打 AT） | **只留串口 tab**，不叠 Agent 窗口。回显：型号 → Wi‑Fi → 连上 Python 服务；后期 **约 2×** | 真设备 + 后期倍速 |
+| **5** | 8.5–10 | 成功收束 | 透传日志后打出预写艺术字 `Connect Success！` | 固件或服务推一帧 |
+
+
+**不要：** 录玻璃开关、手打一长串 AT、Wi‑Fi 密码特写、完整 token、MOCK 串口、从零 `pip install`。波特率已是 115200 则不动；Disconnect / Reconnect 不要点。
+
+主张：同一窗口里 SSH 和串口是同一套 chrome；同一套分享协议打在设备会话上，远程 ESP32 不用装 Agent。树莓派 / ESP32 / 成功字是落地，不要拍成「ESP32 教程」。
+
+### 5.1 幕 4 回显（仍要能扫到结果）
+
+
+| 节 | 串口上应能认出 | 例（固件侧，不必原样） |
+| --- | --- | --- |
+| 型号 | 查询回报 | `AT+GMR` → 芯片/版本 |
+| Wi‑Fi | 关联成功 | `AT+CWJAP=...` → `WIFI GOT IP` |
+| 网络 | 服务起来 | 按固件（HTTP / TCP） |
+| 透传 | 连上本机 Python | 固件 TCP 连上 → 服务端打连接日志 |
+
+
+配网若仍太长：预先打到「已关联」，倍速只留「型号 → GOT IP → CONNECT」三拍。协议细节见 **§0 C-proto**。
+
+幕 5 是收束不是第四个卖点。字要够大，430px 缩小后仍能认。不要现场现算艺术字。
+
+### 5.2 夹具（改定后再写）
+
+产品仓库里不做成功能。演示机两份脚本即可：
+
+| 件 | 职责 |
+| --- | --- |
+| Arduino 固件 | 串口 AT：查型号、配 Wi‑Fi、起网络、TCP 连本机服务 |
+| Python 服务 | 本机监听；打印连接日志；配合打出 `Connect Success！` |
+
+不要 MOCK 口、不要纯软件冒充设备。本机 Agent 打开分享链接发 AT，**不出镜**。
+
+### 5.3 开录前
+
+- [ ] `overlayGlass` 开（A / B 可另存一份关玻璃的配置）
+- [ ] 树莓派 SSH 已连，停在能认出的 `btop` 或提示符
+- [ ] **真实 ESP32** 已插、固件已烧；profile 菜单里端口/产品名可认
+- [ ] Python 服务已在听 `127.0.0.1`；艺术字已写进固件或服务
+- [ ] 本机 Agent 已能打开分享链接发 AT（不出镜）
+- [ ] 演示 SSID 可用；不要把真实密码定格在画面上
+
+---
+
+## 6. 拍完之后
+
+1. 文件放到 `docs/images/hero.gif`、`agent.gif`、`share.gif`（只有这三条）。README 路径已按此预留。
+2. 取消 `README.md` / `README_EN.md` 里演示动画注释，删掉「制作中」和四张占位截图（或只留一张静帧）。
+3. 不改安装包图标；不把 MP4 推进仓库。
