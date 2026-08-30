@@ -65,7 +65,7 @@ App: [`index.html`](../../../index.html) loads tokens; [`styles.css`](../../styl
 ## Contract
 
 - **Select:** `.tt-select` / `.tt-select-trigger` / `.tt-select-menu` / `.tt-option` / `.tt-optgroup`
-  (`body.tt-glass` frosts the portaled menu via `--tt-glass-*`)
+  (`body.tt-glass` frosts the portaled menu via `--tt-glass-*`; palette / IME share the same tokens)
 - **Toggle:** `.tt-switch` / `.tt-knob`
 - **Buttons:** `.tt-btn` + `.tt-btn-primary|ghost|solid|danger|danger-fill|link`
 - **Settings layout:** `.section` / `.section-title` / `.row` / …
@@ -82,6 +82,6 @@ Do **not** redefine these rules or paste parallel product HTML inside preview ma
 
 - `body[data-skin="cursor"]` — near-black, white CTA, soft radius
 - `body[data-skin="vscode"]` — blue accent, tighter radius
-- `body.tt-glass` — frosted translucency for menus, dropdowns, and the quick panel (`--tt-glass-*`)
+- `body.tt-glass` — frosted translucency for menus, dropdowns, the command palette, the IME mirror, and the quick panel (`--tt-glass-*`)
 
 `--term-bg` is NOT a `--tt-*` token — `applyTerminalBackground()` writes it from the terminal scheme (2px seam).

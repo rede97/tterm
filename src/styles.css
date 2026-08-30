@@ -392,7 +392,8 @@ body {
 }
 
 /* Frosted overlays: tokens in src/ui/tokens.css (`--tt-glass-*`).
-   Menus / dropdowns / quick panel share `overlayGlass` → body.tt-glass. */
+   Menus / dropdowns / quick panel share `overlayGlass` → body.tt-glass.
+   Palette glass lives in kit/palette.css; IME mirror glass is on `.ime-box`. */
 body.tt-glass .quick-panel,
 body.tt-glass .tab-context-menu,
 body.tt-glass .profile-menu,
@@ -1060,6 +1061,22 @@ body[data-skin="cursor"] .tab-close:hover {
 
 .ime-box.fading {
   opacity: 0;
+}
+
+/* Same `overlayGlass` surface as menus / palette. Visible opacity stays 0.8
+   (the original chip); only fill / blur / border switch to `--tt-glass-*`. */
+body.tt-glass .ime-box {
+  -webkit-backdrop-filter: var(--tt-glass-filter);
+  backdrop-filter: var(--tt-glass-filter);
+  background: var(--tt-glass-bg);
+  border: 1px solid var(--tt-glass-border);
+  box-shadow: var(--tt-glass-shine), var(--tt-shadow);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  body.tt-glass .ime-box {
+    background: var(--tt-glass-fallback);
+  }
 }
 
 /* When the mirror owns composition display, suppress xterm's native

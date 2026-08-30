@@ -60,7 +60,7 @@ cd drafts/demo
 uv venv
 ```
 
-摆场：Font Settings 已开、Search 空、回退链里还没有 NF、本地 Agent tab 在跑 Working。`Ctrl+P` 搜 **`pi`** 时第一项就是它（`QUERIES.gotoTab`）。
+摆场：Settings → **Appearance**（字体选择器不要预先打开）、回退链里还没有 NF、本地 Agent tab 在跑 Working。`Ctrl+P` 搜 **`pi`** 时第一项就是它（`QUERIES.gotoTab`）。
 
 ```powershell
 bun run demo:agent -- --probe
@@ -69,9 +69,40 @@ bun run demo:agent
 
 只练字体、不打字：`bun run demo:agent -- --skip-ime`
 
-镜头：搜 `jet` → System 列 **+** → 拖到链顶 → Apply → `Ctrl+P` `pi` Enter → 停 1s → bun 拉起 `ime_pinyin.py`（拼音后 **空格** 上屏）。
+镜头：点 Font Family **Configure** → 搜 `jet` → System 列 **+** → 拖到链顶 → Apply → `Ctrl+P` `pi` Enter → 停 1s → bun 拉起 `ime_pinyin.py`（拼音后 **空格** 上屏）。
 
 秒数和滤词在 `agent.mjs` 的 `TIMINGS` / `QUERIES`。
+
+## 场景 3 / `share.gif`
+
+不关已有 SSH tab。Quick Panel 里 Profile 菜单会停住并高亮 AT，再 Share + Copy，然后关掉 QP，在串口 tab 里打 AT（走 AT profile 的行编辑回显 + CRLF）。每条等新的 `OK`（`AT+CONNECT` 等 `CONNECT`）再发下一条；收到 `ERROR` 立刻退出。已有 URL、只打 AT 时才走 share `/input`。
+
+```powershell
+bun run demo:share
+bun run demo:share -- --url="http://127.0.0.1:<hub>/share/<id>?token=<t>"
+```
+
+## GIF 导出
+
+成片已入库。母带不进 git。裁切、编码宽度、体积上限以 [tterm-readme-gifs](../../.cursor/skills/tterm-readme-gifs/SKILL.md) 为准（`docs/demo-script.md` §6 同步）。
+
+| GIF | 母带 | 入点–出点 | 编码 | 大小 | 仓库路径 |
+| --- | --- | --- | --- | --- | --- |
+| hero | `hero.mp4` | 5s–18s（13s） | 1234×848 · 12 fps | 3.04 MB | `docs/images/hero.gif` |
+| agent | `agent.mp4` | 2s–13s（11s） | 1234×848 · 12 fps | 3.61 MB | `docs/images/agent.gif` |
+| share | `share.mp4` | 5s–28s（23s） | 1234×848 · 12 fps | 1.17 MB | `docs/images/share.gif` |
+
+README 显示仍是 `width="880"` / `"430"`。编码 1234 宽，点开更清晰。
+
+```powershell
+$cap = "C:\Users\rede\Videos\tterm capture"
+$out = "d:\tterm\docs\images"
+$vf1234 = "fps=12,scale=1234:-2:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle"
+
+ffmpeg -y -i "$cap\hero.mp4"  -ss 5 -t 13 -an -vf $vf1234 "$out\hero.gif"
+ffmpeg -y -i "$cap\agent.mp4" -ss 2 -t 11 -an -vf $vf1234 "$out\agent.gif"
+ffmpeg -y -i "$cap\share.mp4" -ss 5 -t 23 -an -vf $vf1234 "$out\share.gif"
+```
 
 ## 注意
 

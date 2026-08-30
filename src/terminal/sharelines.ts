@@ -21,10 +21,12 @@ export interface ShareLineState {
   // trimBase + buf.length sampled at the last read/event — a DROP without a
   // matching trim means clear()/ED3 wiped lines: bump epoch.
   lastTotal: number;
-  // Append log for /lines?since=: one entry per render that GREW the
-  // buffer, {seq at that render, total after}. Content-only renders
-  // (cursor blink, in-place rewrites) leave no entry — `since` answers
-  // "what was appended", rewrites are /screen's job.
+  // Append log for /lines?since=: one entry per render that advanced the
+  // content mark (see contentMark), {seq at that render, mark after}.
+  // Cursor blink and in-place rewrites of already-written rows leave no
+  // entry — `since` answers "what is newly written", not progress-bar
+  // redraws (those stay /screen's job). Empty birth-filler getting its
+  // first characters DOES advance the mark even when buffer.length does not.
   seqLog: { seq: number; total: number }[];
   // False when xterm internals didn't yield an onTrim subscription —
   // absolute addresses can't be trusted; reads degrade to tail-only.
@@ -99,13 +101,35 @@ export function shareLineState(term: Terminal): ShareLineState {
   return st;
 }
 
+/** Exclusive end of written content in absolute line numbers.
+ * Last non-empty buffer row + 1, plus one trailing empty row when present
+ * (the cursor line) so marks match historic length-based totals once real
+ * output has started. Birth-time empty filler below that is not counted:
+ * those rows still receive the first real characters without growing
+ * `buffer.length`, and `since` must still see them. */
+function contentMark(term: Terminal, st: ShareLineState): number {
+  const buf = term.buffer.active;
+  let last = buf.length - 1;
+  while (last >= 0) {
+    const text = buf.getLine(last)?.translateToString(true) ?? "";
+    if (text.length > 0) break;
+    last--;
+  }
+  if (last < 0) return st.trimBase;
+  const end = last + 1;
+  const withCursor = end < buf.length ? end + 1 : end;
+  return st.trimBase + withCursor;
+}
+
 /** Record a render's seq (called from the tab's onRender, AFTER shareSeq++
- * so the ordering question never arises). Only appends — renders that grew
- * the buffer — create log entries. */
+ * so the ordering question never arises). Only renders that advanced the
+ * content mark create log entries — empty first paint stays at the seed
+ * (mark 0), first-screen writes into filler grow the mark, buffer-length
+ * appends grow it in lockstep with `trimBase + length`. */
 export function recordShareSeq(term: Terminal, seq: number): void {
   const st = states.get(term);
   if (!st) return;
-  const total = st.trimBase + term.buffer.active.length;
+  const total = contentMark(term, st);
   const last = st.seqLog[st.seqLog.length - 1];
   if (last && last.total === total) return;
   st.seqLog.push({ seq, total });
@@ -145,8 +169,9 @@ export function readShareLines(term: Terminal, q: ShareLinesQuery): Record<strin
   let to: number;
   let truncated = false;
   if (q.since !== undefined) {
-    // Appends since the client's seq: floor-entry lookup over the append
-    // log (content-only renders never logged, so floor == total at that seq).
+    // Newly written lines since the client's seq: floor-entry lookup over
+    // the content-mark log (empty first paint never leaves an entry, so a
+    // seq taken from that /screen still floors to the seed mark 0).
     let base: number | null = null;
     for (const e of st.seqLog) {
       if (e.seq <= q.since) base = e.total;

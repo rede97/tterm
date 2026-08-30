@@ -150,6 +150,33 @@ describe("share line addressing", () => {
     expect(caught.lines).toEqual([]);
   });
 
+  it("since after an empty first paint returns first-screen writes", async () => {
+    const term = makeTerm();
+    // Birth: buffer.length === rows of empty filler. Recording that paint
+    // must not jump the append log to total=rows, or writes into those
+    // rows are invisible to since=<seq from /screen>.
+    expect(term.buffer.active.length).toBe(ROWS);
+    recordShareSeq(term, 1);
+    await write(term, "AT\r\n\r\n\r\nOK");
+    recordShareSeq(term, 2);
+    const r = readShareLines(term, { since: 1 });
+    expect(r.error).toBeUndefined();
+    expect(r.count).toBeGreaterThan(0);
+    expect(r.lines).toEqual(expect.arrayContaining(["AT", "OK"]));
+  });
+
+  it("since sees later first-screen writes after an earlier filler fill-in", async () => {
+    const term = makeTerm();
+    recordShareSeq(term, 1);
+    await write(term, "AT\r\n");
+    recordShareSeq(term, 2);
+    await write(term, "\r\n\r\nOK");
+    recordShareSeq(term, 3);
+    const r = readShareLines(term, { since: 2 });
+    expect(r.error).toBeUndefined();
+    expect(r.lines).toContain("OK");
+  });
+
   it("since rejects seqs that predate the append log", async () => {
     const term = makeTerm();
     await writeNumbered(term, 3);

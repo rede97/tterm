@@ -22,28 +22,31 @@
   <a href="https://github.com/rede97/tterm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/rede97/tterm" alt="License" /></a>
 </p>
 
-<!-- 演示动画：把 GIF 放到对应路径后取消下面的注释。
-     docs/images/hero.gif   UI：主题/字体 + 键盘
-     docs/images/agent.gif  本地 Agent + 中文输入
-     docs/images/share.gif  玻璃 / 串口 AT / Share with AI
 <p align="center">
-  <img src="docs/images/hero.gif" width="880" alt="TTerm" />
+  <img src="docs/images/hero.gif" width="880" alt="命令面板切换 SSH，Quick Panel 添加远程端口" />
 </p>
 <p align="center">
-  <img src="docs/images/agent.gif" width="430" alt="Local agent and Chinese input" />
-  &nbsp;
-  <img src="docs/images/share.gif" width="430" alt="Share with AI on serial" />
+  <b>多会话 + 远程端口</b><br/>
+  场景：本机和多台 SSH 在同一个窗口里切。<br/>
+  操作：<code>Ctrl+P</code> 跳到已有会话 → <code>Ctrl+Shift+P</code> 再开一台 SSH → Quick Panel 给这条会话加 Remote 转发。
 </p>
--->
 
-<p align="center"><em>演示动画制作中。下列截图为占位，完成后替换为 GIF。</em></p>
-
-| 终端与 Agent | 本地、SSH 与串口 |
-| :---: | :---: |
-| <img src="docs/images/screenshot.png" width="410" alt="TTerm 中运行的 CLI AI Agent" /> | <img src="docs/images/screenshot-profiles.png" width="410" alt="本地 Shell、SSH 主机与串口设备入口" /> |
-| 主题与字体 | 从项目目录开始 |
-| <img src="docs/images/screenshot-themes.png" width="410" alt="TTerm 主题与字体设置" /> | <img src="docs/images/screenshot-browse.png" width="410" alt="选择项目目录或最近使用的目录" /> |
-
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <img src="docs/images/agent.gif" width="430" alt="系统字体置顶后在 Agent TUI 里输入中文" /><br/>
+      <b>Agent TUI + 中文输入</b><br/>
+      场景：本机 Agent 全屏 TUI，要打中文、图标也不能糊。<br/>
+      操作：字体选择器把系统 Nerd Font 置顶并 Apply → <code>Ctrl+P</code> 切到 Agent → 拼音后空格上屏。
+    </td>
+    <td align="center" valign="top" width="50%">
+      <img src="docs/images/share.gif" width="430" alt="串口 Profile 切到 AT 后 Share with AI" /><br/>
+      <b>串口现场 + Share with AI</b><br/>
+      场景：设备挂在串口上，本机 Agent 要看见并操作，设备不用装 Agent。<br/>
+      操作：打开串口 → Quick Panel 把 Profile 换成 AT → 打开 Share → 会话里出现设备回显。
+    </td>
+  </tr>
+</table>
 
 ## 为什么是 TTerm
 

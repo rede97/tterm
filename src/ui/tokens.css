@@ -188,8 +188,9 @@ body[data-skin="vscode"] {
   --tt-tab-seam: var(--tt-term-bg);
 }
 
-/* Frosted overlays — one token set for menus, dropdowns, and the quick panel.
-   Translucency only; skin colors still apply. Window stays opaque. */
+/* Frosted overlays — one token set for menus, dropdowns, palette, IME mirror,
+   and the quick panel. Translucency only; skin colors still apply. Window
+   stays opaque. */
 body.tt-glass {
   --tt-glass-filter: saturate(180%) blur(28px);
   --tt-glass-border: rgba(255, 255, 255, 0.22);

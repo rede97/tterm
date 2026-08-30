@@ -45,10 +45,22 @@ describe("createModal", () => {
     let closes = 0;
     const m = createModal({ className: "m-backdrop", onClose: () => closes++ });
     document.body.appendChild(m.overlay);
+    m.overlay.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     m.overlay.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(m.overlay.isConnected).toBe(false);
     m.close();
     expect(closes).toBe(1);
+  });
+
+  it("releasing a drag from inside the dialog onto the dimmer does not close", () => {
+    const m = createModal({ className: "m-drag" });
+    const inner = document.createElement("div");
+    m.overlay.appendChild(inner);
+    document.body.appendChild(m.overlay);
+    inner.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    m.overlay.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(m.overlay.isConnected).toBe(true);
+    m.close();
   });
 
   it("a closed modal stops answering Escape (stack order heals)", () => {

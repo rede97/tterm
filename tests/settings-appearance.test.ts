@@ -67,4 +67,14 @@ describe("settings — appearance chrome", () => {
     expect(configStore.get("overlayGlass")).toBe(true);
     expect(glassSwitch(root).getAttribute("aria-checked")).toBe("true");
   });
+
+  it("Frosted overlays copy covers palette and the IME mirror", () => {
+    const root = openAppearance();
+    const row = [...root.querySelectorAll(".row")].find((el) =>
+      el.querySelector(".row-title")?.textContent?.includes("Frosted overlays"),
+    );
+    const desc = row?.querySelector(".row-desc")?.textContent ?? "";
+    expect(desc).toMatch(/command palette/i);
+    expect(desc).toMatch(/IME mirror/);
+  });
 });

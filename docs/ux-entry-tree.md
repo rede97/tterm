@@ -22,7 +22,7 @@
 - 同一动作多入口（按钮 / 右键 / 快捷键 / palette）走同一 handler — UX-04
 - Chrome 浮层互斥：tab 右键、终端右键、profile ▾、最近文件夹、下拉、Quick Panel、**Ctrl+P / Ctrl+Shift+P** 不能叠开 — `tests/chrome-popups.test.ts` **L2**
 - 下拉 `position:fixed` + portal `<body>`（glass 含块不吞菜单）— `tests/select.test.ts` **L2**；QP 溢出不挤 148 列 — `tests/overlay-scroll.test.ts` **L2** + `e2e/specs/q8b.e2e.js` **L3**
-- Frosted overlays：`overlayGlass` → `body.tt-glass` → `--tt-glass-*`（菜单 / `.tt-select-menu` / QP）。Settings 触发器保持实心。**L2** store 迁移 + Appearance 开关；视觉 **M**
+- Frosted overlays：`overlayGlass` → `body.tt-glass` → `--tt-glass-*`（菜单 / `.tt-select-menu` / QP / `.pal-panel` / `.ime-box`）。Settings 触发器保持实心。**L2** store 迁移 + Appearance 开关 + CSS 面；视觉 **M**
 - Chrome 中文：Settings / QP / kit 走 `--tt-ui`（Inter → Segoe → YaHei）；tab / profile ▾ / palette 行走 `--tt-mono`（JetBrains → Consolas → Noto SC/JP/KR → YaHei，**不能**先落到泛 `monospace`=SimSun）。栈 **L2** `tests/fontconfig.test.ts`；字形 **M**（happy-dom / e2e 都不渲染真实字体）
 - `#tab-bar` 32px、容器 2px padding、IME CSS 与 `FADE_MS` — 布局 **GAP**（fit 间接 **L2** hysteresis）；IME **M**
 - Apply vs 即时：chromeSkin / overlayGlass 即时；SSH `~/.ssh/config` 与多数 Settings 行走 Apply — **L2** settings-\*
@@ -310,7 +310,7 @@ CJK（上次改完还没在真窗口验过）：
 
 视觉 / 互斥（L2 只钉 DOM，不钉观感）：
 
-- Settings → Appearance → Frosted overlays：tab/终端右键、▾、`.tt-select` 菜单、Quick Panel 同一层雾；Settings 行控件仍实心。
+- Settings → Appearance → Frosted overlays：tab/终端右键、▾、`.tt-select` 菜单、Quick Panel、Ctrl+P / Ctrl+Shift+P、IME 镜像同一层雾；Settings 行控件仍实心。
 - 右键与 QP / 下拉不能叠；Ctrl+P 与 Ctrl+Shift+P 不能叠（多级 palette 仍一个 `.pal-overlay`）。
 - Cursor 皮肤：选中 tab 为 inset 圆角 pill，不是整格填满。VS Code 皮肤仍是深色填满。
 - Ctrl+Shift+P：本地 tab 无 Serial / Port Forward 行；键盘设置里这些命令仍在。

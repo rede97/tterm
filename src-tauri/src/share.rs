@@ -917,7 +917,7 @@ requests will start returning 403 — stop then, do not retry).
 | GET | `{base}/screen?token={token}` | screen snapshot (JSON) |
 | GET | `{base}/screen?token={token}&wait=<seq>&timeout=<s>` | long-poll: returns as soon as the screen changes after `seq` (max 30 s) |
 | GET | `{base}/lines?token={token}&tail=<N>` | history lines, absolute-addressed (see "Line history" below; rate limit: 5/s) |
-| GET | `{base}/lines?token={token}&since=<seq>` | only lines appended since `seq` (pair with long-poll) |
+| GET | `{base}/lines?token={token}&since=<seq>` | lines newly written since `seq` (pair with long-poll; includes first-screen fills) |
 | GET | `{base}/state?token={token}` | session type + live config (serial params, SSH forwards) |
 | POST | `{base}/control?token={token}` | change session config (see "Control" below; write shares only) |
 | GET | `{base}/screenshot?token={token}&scale=<1-4>` | PNG image of the screen (rate limit: 1/s) |
@@ -992,7 +992,7 @@ curl -s "{base}/lines?token={token}&from=100&to=150"       # exact range [100,15
 ### Incremental reads: since
 
 `GET {base}/lines?token={token}&since=<seq>` returns ONLY the lines
-appended after `seq` (a seq you took from any /screen or /lines response).
+newly written after `seq` (a seq you took from any /screen or /lines response).
 Pair it with long-polling for an efficient tracking loop:
 
 ```sh
@@ -1001,8 +1001,10 @@ curl -s "{base}/lines?token={token}&since=<seq>"                          # fetc
 ```
 
 - Answer shape is the same as other /lines forms (`from` = first new line).
-- `since` tracks APPENDS. In-place rewrites (progress bars, prompt
-  editing) are viewport business — watch those with /screen.
+- `since` tracks newly written lines, including the first characters
+  painted into a session's empty birth-filler rows. In-place rewrites of
+  already-written cells (progress bars, prompt editing) are viewport
+  business — watch those with /screen.
 - A seq from before the last epoch bump (or evicted from the 256-entry
   append log) answers `409 {{"error":"unknown_seq", ...}}` — re-anchor
   with `tail`.

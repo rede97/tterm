@@ -2,6 +2,13 @@
 
 Changes
 
+- **Share `/lines?since=` includes first-screen writes** — a new
+  session's empty filler rows no longer consume the append log on the
+  first paint, so AT/OK written into those rows is visible to
+  `since=<seq from /screen>` (progress-bar in-place rewrites still are not)
+- **Frosted overlays cover the palette and IME mirror** — the same
+  Appearance switch (`overlayGlass`) now frosts Ctrl+P / Ctrl+Shift+P and
+  the composition chip, using `--tt-glass-*` like menus and the quick panel
 - **SSH Trust & Connect continues the handshake** — the 15 s timer covers
   DNS+TCP only. Waiting on the host-key dialog used to abort KEX after the
   key was already learned, so the next attempt skipped Trust and looked

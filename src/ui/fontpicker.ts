@@ -208,6 +208,10 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
     fallbackTolerance: 5,
     filter: ".fp-remove-btn",
     preventOnFilter: false,
+    // The chain itself does not scroll; default `scroll` walks up to
+    // `.font-picker-body` and yanks the dialog back to Search.
+    scroll: false,
+    bubbleScroll: false,
     onEnd: () => {
       // Sortable already reordered the DOM; adopt it as the source of truth,
       // then re-render so rows keep their × wiring.
@@ -231,6 +235,7 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
     previewTerminal.reset();
     previewFitAddon.fit();
     previewTerminal.writeln(PREVIEW_CONTENT);
+    previewTerminal.scrollToBottom();
   }
 
   function refreshAll() {
@@ -274,6 +279,7 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
     term.open(previewContainer);
     fitAddon.fit();
     term.writeln(PREVIEW_CONTENT);
+    term.scrollToBottom();
     previewTerminal = term;
     previewFitAddon = fitAddon;
   }
@@ -281,6 +287,10 @@ export function showFontPickerDialog(onApply: (stack: string[]) => void): void {
   // --- buttons --- (Escape/backdrop also close, via createModal)
   overlay.querySelector(".fp-btn-cancel")?.addEventListener("click", modal.close);
   overlay.querySelector(".fp-btn-apply")?.addEventListener("click", () => {
+    selected = [...selectedList.children].flatMap((el) => {
+      const family = (el as HTMLElement).dataset.family;
+      return family ? [family] : [];
+    });
     if (selected.length === 0) return;
     onApply(selected);
     modal.close();

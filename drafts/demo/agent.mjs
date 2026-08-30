@@ -2,14 +2,14 @@
 // Scene 2 / agent.gif injector. CDP for the font picker; uv/Python SendInput
 // for 中文输入法. Does not use window.__tterm.
 //
-// Same WebView2 CDP launch as hero. Arrange: Font Settings open, Search empty,
-// NF not yet in the fallback chain, local Agent tab running Working behind Settings.
+// Same WebView2 CDP launch as hero. Arrange: Settings → Appearance (picker
+// closed), NF not yet in the fallback chain, local Agent tab running Working.
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { cdpDrag, fireCombo, fireKeyOn, listTargets, pickPage, sleep } from "./cdp.mjs";
+import { cdpDrag, cdpEnter, fireCombo, listTargets, pickPage, sleep } from "./cdp.mjs";
 import {
   arg,
   bringTtermForward,
@@ -27,9 +27,12 @@ const log = makeLog("agent");
 
 const TIMINGS = {
   typeDelay: 70,
+  afterOpenPicker: 300,
   afterSearch: 400,
   afterAdd: 400,
-  afterDrag: 350,
+  scrollMs: 1000,
+  dragMs: 1000,
+  afterDrag: 500,
   afterApply: 400,
   palListHold: 400,
   workingHold: 1000,
@@ -79,6 +82,7 @@ async function addSystemFamily(cdp, family) {
     const add = row?.querySelector(".fp-font-add");
     if (!(add instanceof HTMLButtonElement)) throw new Error(`no + for ${fam}`);
     if (add.classList.contains("in-use")) throw new Error(`${fam} already in chain`);
+    row.scrollIntoView({ block: "nearest" });
     add.click();
   }, family);
 }
@@ -89,28 +93,122 @@ async function chainFamilies(cdp) {
   );
 }
 
-async function itemRect(cdp, index) {
-  return cdp.evaluate((i) => {
-    const el = document.querySelectorAll("#fp-selected .fp-selected-item")[i];
-    if (!el) return null;
-    const grip = el.querySelector(".fp-drag-grip") ?? el;
-    const r = grip.getBoundingClientRect();
-    return {
-      x: Math.round(r.left + r.width / 2),
-      y: Math.round(r.top + r.height / 2),
-      h: Math.round(r.height),
-    };
-  }, index);
+/** Jump the picker preview xterm to the last line (Nerd Font glyphs). */
+async function scrollPreviewToBottom(cdp) {
+  await cdp.waitFor(
+    () => Boolean(document.querySelector("#fp-preview .xterm-viewport")),
+    2000,
+    "font preview viewport missing",
+  );
+  await cdp.evaluate(() => {
+    const vp = document.querySelector("#fp-preview .xterm-viewport");
+    if (!(vp instanceof HTMLElement)) throw new Error("font preview viewport missing");
+    vp.scrollTop = vp.scrollHeight;
+  });
 }
 
-async function dragAddedToTop(cdp) {
+/** Scroll the picker body so the newly appended fallback row is on screen. */
+async function scrollChainToBottom(cdp, family) {
+  const plan = await cdp.evaluate((fam) => {
+    const body = document.querySelector(".font-picker-body");
+    const list = document.getElementById("fp-selected");
+    if (!(body instanceof HTMLElement) || !list) throw new Error("picker body/list missing");
+    const row = [...list.children].find(
+      (el) =>
+        el instanceof HTMLElement && (el.dataset.family ?? "").toLowerCase() === fam.toLowerCase(),
+    );
+    if (!(row instanceof HTMLElement)) throw new Error(`${fam} not in chain`);
+    return {
+      start: body.scrollTop,
+      max: Math.max(0, body.scrollHeight - body.clientHeight),
+    };
+  }, family);
+  const steps = 20;
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    await cdp.evaluate(
+      (start, max, frac) => {
+        const body = document.querySelector(".font-picker-body");
+        if (body instanceof HTMLElement) body.scrollTop = start + (max - start) * frac;
+      },
+      plan.start,
+      plan.max,
+      t,
+    );
+    await sleep(TIMINGS.scrollMs / steps);
+  }
+}
+
+async function dragAddedUp(cdp) {
   const fams = await chainFamilies(cdp);
   if (!fams?.length) throw new Error("fallback chain empty after add");
   const last = fams.length - 1;
-  const gLast = await itemRect(cdp, last);
-  const g0 = await itemRect(cdp, 0);
-  if (!gLast || !g0) throw new Error("could not measure fallback rows");
-  await cdpDrag(cdp, { x: gLast.x, y: gLast.y }, { x: g0.x, y: g0.y - Math.round(g0.h / 2) - 4 });
+  if (last === 0) return;
+  const geo = await cdp.evaluate(() => {
+    const body = document.querySelector(".font-picker-body");
+    const list = document.getElementById("fp-selected");
+    const items = [...document.querySelectorAll("#fp-selected .fp-selected-item")];
+    if (!(body instanceof HTMLElement) || !list || items.length < 2) return null;
+    const br = body.getBoundingClientRect();
+    const lr = list.getBoundingClientRect();
+    // Stay inside the visible chain, away from the body clip (Sortable /
+    // Chromium edge-scroll would yank Search back into view).
+    const clip = {
+      l: Math.max(br.left, lr.left) + 12,
+      r: Math.min(br.right, lr.right) - 12,
+      t: Math.max(br.top, lr.top) + 28,
+      b: Math.min(br.bottom, lr.bottom) - 12,
+    };
+    const lastEl = items[items.length - 1];
+    const lastGrip = lastEl.querySelector(".fp-drag-grip") ?? lastEl;
+    const g = lastGrip.getBoundingClientRect();
+    const clamp = (x, y) => ({
+      x: Math.round(Math.min(clip.r, Math.max(clip.l, x))),
+      y: Math.round(Math.min(clip.b, Math.max(clip.t, y))),
+    });
+    return {
+      freeze: body.scrollTop,
+      from: clamp((g.left + g.right) / 2, (g.top + g.bottom) / 2),
+      to: clamp((g.left + g.right) / 2, clip.t),
+    };
+  });
+  if (!geo) throw new Error("could not measure fallback rows");
+  await cdp.evaluate((y) => {
+    const body = document.querySelector(".font-picker-body");
+    if (!(body instanceof HTMLElement)) return;
+    const prev = window.__ttDemoPinScroll;
+    if (typeof prev === "function") body.removeEventListener("scroll", prev);
+    const pin = () => {
+      if (body.scrollTop !== y) body.scrollTop = y;
+    };
+    window.__ttDemoPinScroll = pin;
+    body.addEventListener("scroll", pin);
+  }, geo.freeze);
+  try {
+    await cdpDrag(cdp, geo.from, geo.to, TIMINGS.dragMs);
+  } finally {
+    await cdp.evaluate((y) => {
+      const body = document.querySelector(".font-picker-body");
+      const pin = window.__ttDemoPinScroll;
+      if (body instanceof HTMLElement && typeof pin === "function") {
+        body.removeEventListener("scroll", pin);
+      }
+      window.__ttDemoPinScroll = undefined;
+      if (body instanceof HTMLElement) body.scrollTop = y;
+    }, geo.freeze);
+  }
+}
+
+async function ensureFamilyOnTop(cdp, family) {
+  await cdp.evaluate((fam) => {
+    const list = document.getElementById("fp-selected");
+    if (!list) throw new Error("font picker closed (fallback chain gone)");
+    const row = [...list.children].find(
+      (el) => el instanceof HTMLElement && (el.dataset.family ?? "").toLowerCase() === fam.toLowerCase(),
+    );
+    if (!row) throw new Error(`${fam} not in fallback chain`);
+    if (list.firstElementChild !== row) list.insertBefore(row, list.firstElementChild);
+  }, family);
 }
 
 async function gotoTabPi(cdp, query) {
@@ -122,8 +220,31 @@ async function gotoTabPi(cdp, query) {
   );
   await typeInto(cdp, ".pal-overlay .pal-input", query, TIMINGS.typeDelay);
   await sleep(TIMINGS.palListHold);
-  await fireKeyOn(cdp, ".pal-overlay .pal-input", "Enter", "Enter");
+  await cdpEnter(cdp);
   await cdp.waitFor(() => !document.querySelector(".pal-overlay"), 4000, "Go to Tab did not close");
+}
+
+async function focusAgentTerminal(cdp) {
+  await cdp.waitFor(
+    () => {
+      const page = document.querySelector(".settings-page");
+      const settingsGone = !(page instanceof HTMLElement) || page.style.display === "none";
+      const vis = [...document.querySelectorAll(".terminal-instance")].some(
+        (el) => el instanceof HTMLElement && el.style.display !== "none",
+      );
+      return settingsGone && vis;
+    },
+    4000,
+    "Agent tab did not show (Settings still covering the terminal)",
+  );
+  await cdp.evaluate(() => {
+    const vis = [...document.querySelectorAll(".terminal-instance")].find(
+      (el) => el instanceof HTMLElement && el.style.display !== "none",
+    );
+    const ta = vis?.querySelector(".xterm-helper-textarea");
+    if (!(ta instanceof HTMLTextAreaElement)) throw new Error("visible terminal textarea missing");
+    ta.focus();
+  });
 }
 
 function runIme() {
@@ -135,6 +256,7 @@ function runIme() {
   const r = spawnSync(py, [join(DIR, "ime_pinyin.py")], {
     cwd: DIR,
     stdio: "inherit",
+    windowsHide: true,
   });
   if (r.status !== 0) throw new Error(`ime_pinyin.py exited ${r.status}`);
 }
@@ -167,12 +289,26 @@ async function main() {
     bringTtermForward(log);
     await sleep(200);
 
-    log("1a search jet + System NF");
+    log("open Font Settings");
+    await cdp.waitFor(
+      () => Boolean(document.querySelector("#set-font-config")),
+      4000,
+      "Appearance Font Family Configure missing (#set-font-config)",
+    );
+    await cdp.evaluate(() => {
+      const btn = document.querySelector("#set-font-config");
+      if (!(btn instanceof HTMLElement)) throw new Error("missing #set-font-config");
+      btn.scrollIntoView({ block: "center" });
+      btn.click();
+    });
     await cdp.waitFor(
       () => Boolean(document.querySelector(".font-picker-overlay .fp-search")),
       4000,
-      "Font Settings not open (.fp-search missing)",
+      "Font Settings did not open (.fp-search missing)",
     );
+    await sleep(TIMINGS.afterOpenPicker);
+
+    log("1a search jet + System NF");
     await typeInto(cdp, ".fp-search", QUERIES.fontSearch, TIMINGS.typeDelay);
     await sleep(TIMINGS.afterSearch);
     const family = await pickSystemNf(cdp);
@@ -189,16 +325,27 @@ async function main() {
     );
     await sleep(TIMINGS.afterAdd);
 
-    log("1b drag NF to top");
-    await dragAddedToTop(cdp);
-    await sleep(TIMINGS.afterDrag);
+    log("preview terminal → Nerd Font line");
+    await scrollPreviewToBottom(cdp);
+    log("1b scroll chain to bottom (1s)");
+    await scrollChainToBottom(cdp, family);
+    await scrollPreviewToBottom(cdp);
+    log("1b drag NF up (1s)");
+    await dragAddedUp(cdp);
+    await ensureFamilyOnTop(cdp, family);
     const top = (await chainFamilies(cdp))[0];
     if (top?.toLowerCase() !== family.toLowerCase()) {
-      log(`warning: chain top is ${top}, expected ${family} — continuing`);
+      throw new Error(`chain top is ${top}, expected ${family}`);
     }
+    await sleep(TIMINGS.afterDrag);
 
     log("1c Apply");
-    await click(cdp, ".fp-btn-apply");
+    await cdp.waitFor(
+      () => Boolean(document.querySelector(".font-picker-overlay .fp-btn-apply")),
+      4000,
+      "Apply missing — font picker closed during drag",
+    );
+    await click(cdp, ".font-picker-overlay .fp-btn-apply");
     await cdp.waitFor(
       () => !document.querySelector(".font-picker-overlay"),
       4000,
@@ -208,19 +355,14 @@ async function main() {
 
     log(`Ctrl+P ${QUERIES.gotoTab} + Enter`);
     await gotoTabPi(cdp, QUERIES.gotoTab);
-    await cdp.evaluate(() => {
-      const vis = [...document.querySelectorAll(".terminal-instance")].find(
-        (el) => el instanceof HTMLElement && el.style.display !== "none",
-      );
-      const ta = vis?.querySelector(".xterm-helper-textarea");
-      if (ta instanceof HTMLTextAreaElement) ta.focus();
-    });
+    await focusAgentTerminal(cdp);
     await sleep(TIMINGS.workingHold);
 
     if (hasFlag("skip-ime")) {
       log("skip-ime: chrome done");
       return;
     }
+    await focusAgentTerminal(cdp);
     bringTtermForward(log);
     await sleep(150);
     log("2 Python scancodes 中文输入法");

@@ -20,7 +20,8 @@
     "test:e2e:share": "wdio run e2e/wdio.conf.js --spec e2e/specs/share.e2e.js",
     "test:e2e:release": "wdio run e2e/wdio.release.conf.js",
     "demo:hero": "bun drafts/demo/hero.mjs",
-    "demo:agent": "bun drafts/demo/agent.mjs"
+    "demo:agent": "bun drafts/demo/agent.mjs",
+    "demo:share": "bun drafts/demo/share.mjs"
   },
   "dependencies": {
     "@fontsource/cascadia-mono": "^5.2.3",

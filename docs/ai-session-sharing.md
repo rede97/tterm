@@ -35,7 +35,7 @@ http://127.0.0.1:<port>/share/<session-id>?token=<share-token>
 | GET | `/share/<id>/screen?token=<t>` | 屏幕快照(JSON,见下) |
 | GET | `/share/<id>/screen?token=<t>&wait=<seq>&timeout=<s>` | 长轮询:屏幕 seq 超过 `<seq>` 立即返回,否则至多等 `<s>` 秒(上限 30) |
 | GET | `/share/<id>/lines?token=<t>&tail=<N>` | 历史行读取(绝对行号,三种参数形式,见"行历史"一节;限频 5/s) |
-| GET | `/share/<id>/lines?token=<t>&since=<seq>` | 增量:只回该 seq 之后**追加**的行(与长轮询配套;原地改写请用 /screen) |
+| GET | `/share/<id>/lines?token=<t>&since=<seq>` | 增量:该 seq 之后新写入的行(含写入出生空填充行;与长轮询配套;进度条等原地改写请用 /screen) |
 | GET | `/share/<id>/state?token=<t>` | 会话类型 + 当前配置(串口参数/SSH 映射列表) |
 | POST | `/share/<id>/control?token=<t>` | 改会话配置(串口参数、SSH 映射增删;**仅读写分享**,见"控制面"一节) |
 | GET | `/share/<id>/screenshot?token=<t>&scale=<1-4>` | 屏幕 PNG 截图(限频 1/s;前端按主题色重绘 buffer) |
@@ -97,7 +97,7 @@ curl "…/lines?token=<t>&from=100&to=150"        # 精确半开区间
 
 响应:`{ epoch, total, from, count, lines, alt_screen, viewport_first, addressing }`。**相对进、绝对出**——`tail` 读完用响应里的 `from` 作为下次翻页锚点;同一 epoch 内绝对行号稳定,两次 `tail` 可用 `from` 对账去重。
 
-**增量跟踪**:`since=<seq>` 只回该 seq 之后追加的行(seq 来自任意 /screen 或 /lines 响应),与 `wait=` 长轮询配套构成高效跟踪循环。语义只覆盖**追加**;原地改写(进度条、提示符编辑)属于可视区,用 /screen 观察。epoch 之前的 seq 或已被挤出追加日志(256 条环形)的 seq 返回 `409 unknown_seq`,重新 `tail` 锚定。
+**增量跟踪**:`since=<seq>` 只回该 seq 之后新写入的行(seq 来自任意 /screen 或 /lines 响应),与 `wait=` 长轮询配套构成高效跟踪循环。写入会话出生时的空填充行算新写入(否则串口首屏 AT/`OK` 会漏);进度条、提示符编辑那种原地改写仍属可视区,用 /screen 观察。epoch 之前的 seq 或已被挤出追加日志(256 条环形)的 seq 返回 `409 unknown_seq`,重新 `tail` 锚定。
 
 **epoch 使所有地址失效**:clear / resize(重排)/ 进出全屏 TUI 都会 bump。请求带 `&epoch=<旧值>` 且不匹配时返回 `409 { epoch, total }`,重新 `tail` 锚定即可。超出 scrollback 上限的行永久丢失(`from` 静默上移,与锚点比较可知)。单请求上限 2000 行(`truncated: true` 表示被钳)。`addressing: false` 表示该构建无法保证地址稳定(xterm 内部结构变动),`from`/`total` 仅作参考。实现:前端 `terminal/sharelines.ts`,裁剪计数来自 xterm CircularList 的 `onTrim` 内部事件(与 xterm 自身 SelectionService 同一信号源)。
 

@@ -28,8 +28,8 @@ export interface ConfigState {
   // Chrome skin for Settings / menus / quick panel / tab bar ("cursor" | "vscode").
   // Terminal color schemes stay independent.
   chromeSkin: string;
-  // Frosted translucency for floating chrome (menus, dropdowns, quick panel).
-  // Window itself stays opaque.
+  // Frosted translucency for floating chrome (menus, dropdowns, palette,
+  // IME composition mirror, quick panel). Window itself stays opaque.
   overlayGlass: boolean;
   renderer: string;
   terminalBell: boolean;

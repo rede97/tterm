@@ -154,7 +154,7 @@ function appearanceTemplate(panel: HTMLElement): TemplateResult {
         </div>
         ${itemRow(
           "Frosted overlays",
-          "Blur the terminal behind menus, dropdowns, and the quick panel — the window stays opaque.",
+          "Blur the terminal behind menus, dropdowns, the command palette, the IME mirror, and the quick panel — the window stays opaque.",
           toggle(configStore.get("overlayGlass"), (on) => {
             configStore.set({ overlayGlass: on });
           }),

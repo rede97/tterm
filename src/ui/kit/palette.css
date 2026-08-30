@@ -241,3 +241,44 @@
   font-size: var(--tt-fs-caption);
   color: var(--tt-muted);
 }
+
+/* Frosted overlays — same `--tt-glass-*` as menus / QP (`overlayGlass`). */
+body.tt-glass .pal-panel {
+  -webkit-backdrop-filter: var(--tt-glass-filter);
+  backdrop-filter: var(--tt-glass-filter);
+  background: var(--tt-glass-bg);
+  border-color: var(--tt-glass-border);
+  box-shadow: var(--tt-glass-shine), var(--tt-shadow);
+}
+
+body.tt-glass .pal-input-wrap,
+body.tt-glass .pal-input {
+  background: var(--tt-glass-inset);
+  border-bottom-color: var(--tt-glass-line-strong);
+}
+
+body.tt-glass .pal-input-wrap .pal-input {
+  background: transparent;
+}
+
+body.tt-glass .pal-row:hover {
+  background: var(--tt-glass-hover);
+}
+
+body.tt-glass .pal-row.selected {
+  background: var(--tt-selected);
+}
+
+body.tt-glass .pal-footer {
+  border-top-color: var(--tt-glass-line);
+}
+
+body.tt-glass .pal-badge {
+  background: var(--tt-glass-ctrl);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  body.tt-glass .pal-panel {
+    background: var(--tt-glass-fallback);
+  }
+}

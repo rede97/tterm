@@ -203,22 +203,29 @@ export async function cdpTab(cdp) {
 }
 
 export async function cdpEnter(cdp) {
+  // keyDown already makes xterm onData("\r"). A following char "\r" submits
+  // a second empty line — AT line-mode echoes another blank row.
   await cdpKey(cdp, { type: "keyDown", key: "Enter", code: "Enter", vk: VK.Enter });
-  await cdpKey(cdp, { type: "char", key: "Enter", code: "Enter", vk: VK.Enter, text: "\r" });
   await cdpKey(cdp, { type: "keyUp", key: "Enter", code: "Enter", vk: VK.Enter });
 }
 
 export async function cdpType(cdp, text, delayMs) {
   for (const ch of text) {
-    const upper = ch.toUpperCase();
-    const isLetter = ch >= "a" && ch <= "z";
-    const code = isLetter ? `Key${upper}` : ch === " " ? "Space" : `Digit${ch}`;
-    const vk = isLetter ? upper.charCodeAt(0) : ch.charCodeAt(0);
-    // rawKeyDown does not insert; `char` does. text on both keyDown+char
-    // produced "nnyyaannccaatt" in WebView2/xterm.
-    await cdpKey(cdp, { type: "rawKeyDown", key: ch, code, vk });
-    await cdpKey(cdp, { type: "char", key: ch, code, vk, text: ch });
-    await cdpKey(cdp, { type: "keyUp", key: ch, code, vk });
+    // ASCII of " - . collides with VK_NEXT / VK_INSERT / VK_DELETE — xterm
+    // then emits CSI and line-mode echoes [6~ [2~ [3~. Only letters/digits
+    // have ASCII == VK. Everything else is insertText.
+    if (/[a-zA-Z0-9 ]/.test(ch)) {
+      const upper = ch.toUpperCase();
+      const isLetter = /[a-zA-Z]/.test(ch);
+      const isDigit = ch >= "0" && ch <= "9";
+      const code = isLetter ? `Key${upper}` : isDigit ? `Digit${ch}` : "Space";
+      const vk = ch === " " ? 32 : upper.charCodeAt(0);
+      await cdpKey(cdp, { type: "rawKeyDown", key: ch, code, vk });
+      await cdpKey(cdp, { type: "char", key: ch, code, vk, text: ch });
+      await cdpKey(cdp, { type: "keyUp", key: ch, code, vk });
+    } else {
+      await cdp.send("Input.insertText", { text: ch });
+    }
     if (delayMs) await sleep(delayMs);
   }
 }
@@ -234,7 +241,7 @@ export async function cdpMove(cdp, x, y, buttons = 0) {
 }
 
 export async function cdpDrag(cdp, from, to, durationMs = 280) {
-  const steps = 14;
+  const steps = Math.max(12, Math.round(durationMs / 50));
   await cdpMove(cdp, from.x, from.y);
   await sleep(40);
   await cdp.send("Input.dispatchMouseEvent", {

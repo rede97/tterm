@@ -61,3 +61,12 @@ v2.2.5-beta.1 已上线保守修复的细节：`docs/ime-anchor-stability.md`。
 ## 其他（占位）
 
 串口 / SSH / 产品交互等新挂账写在本节下方；不要把已定稿设计再抄一遍。
+
+### Share `/lines?since=` 吃不到首屏写入
+
+- [x] 新会话（尤其串口）xterm 一出生 `buffer.length === rows`（全是空填充行）。第一帧 `recordShareSeq` 就把 append log 从 seed `total:0` 推到 `total:rows`。之后 AT/`OK` 写进这些空行，`total` 不变，`since` 认为无追加。
+- 实锤：`/screen` 已是 `["AT","","","OK",…]`，同一 `seq` 的 `GET /lines?since=<该 seq>` 返回 `{ from: rows, count: 0, lines: [] }`。官方 prompt 让 agent 用 `/screen` 的 seq 配 `since=`，首屏会漏光。
+- `since=0` 仍能读到（seed），所以不是「完全没记录」，是「用 /screen seq 跟踪」这条文档路径断了。
+- 文档把「只覆盖追加、原地改写看 /screen」写进了 `docs/ai-session-sharing.md`；空填充行被写成字不是进度条那种改写，agent 会漏。
+- **已修**：`src/terminal/sharelines.ts` 用内容水位（最后非空行 + 光标空行）记 append log，空首帧不再从 0 跳到 `rows`；写入空填充行会推高水位。`tests/sharelines.test.ts` 覆盖空首帧 `since=1` 与交错填入。
+- 演示脚本 `drafts/demo/share.mjs` 已改盯 `/screen` 新 `OK`，不依赖 `since`。

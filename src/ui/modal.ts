@@ -67,8 +67,18 @@ export function createModal(options: ModalOptions): ModalHandle {
   if (options.singleton !== false) openModals.set(className, handle);
   modalStack.push(handle);
   document.addEventListener("keydown", onKeydown, true);
+  // Close on dimmer click only when the press started on the overlay
+  // itself. A drag that begins inside the dialog and is released on the
+  // dimmer (Sortable / font fallback chain) must not dismiss.
+  let pressOnBackdrop = false;
+  overlay.addEventListener("pointerdown", (e) => {
+    pressOnBackdrop = e.target === overlay;
+  });
+  overlay.addEventListener("mousedown", (e) => {
+    pressOnBackdrop = e.target === overlay;
+  });
   overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) handle.close();
+    if (e.target === overlay && pressOnBackdrop) handle.close();
   });
   return handle;
 }

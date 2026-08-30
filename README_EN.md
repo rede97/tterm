@@ -22,27 +22,31 @@
   <a href="https://github.com/rede97/tterm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/rede97/tterm" alt="License" /></a>
 </p>
 
-<!-- Demo clips: drop GIFs at these paths, then uncomment.
-     docs/images/hero.gif   UI: themes/fonts + keyboard
-     docs/images/agent.gif  local agent + Chinese input
-     docs/images/share.gif  glass / serial AT / Share with AI
 <p align="center">
-  <img src="docs/images/hero.gif" width="880" alt="TTerm" />
+  <img src="docs/images/hero.gif" width="880" alt="Command palette switching SSH, Quick Panel adding a remote forward" />
 </p>
 <p align="center">
-  <img src="docs/images/agent.gif" width="430" alt="Local agent and Chinese input" />
-  &nbsp;
-  <img src="docs/images/share.gif" width="430" alt="Share with AI on serial" />
+  <b>Multi-session + remote port</b><br/>
+  Scene: local and several SSH sessions in one window.<br/>
+  Flow: <code>Ctrl+P</code> jump to a live session → <code>Ctrl+Shift+P</code> open another SSH → Quick Panel adds a Remote forward on that session.
 </p>
--->
 
-<p align="center"><em>Demo GIFs coming. Screenshots below are placeholders until those clips land.</em></p>
-
-| Terminal and agent | Local, SSH, and serial |
-| :---: | :---: |
-| <img src="docs/images/screenshot.png" width="410" alt="CLI AI agent running in TTerm" /> | <img src="docs/images/screenshot-profiles.png" width="410" alt="Local shells, SSH hosts, and serial devices" /> |
-| Themes and fonts | Start from a project directory |
-| <img src="docs/images/screenshot-themes.png" width="410" alt="TTerm theme and font settings" /> | <img src="docs/images/screenshot-browse.png" width="410" alt="Choose a project or recent directory" /> |
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <img src="docs/images/agent.gif" width="430" alt="Pin a system Nerd Font, then type Chinese in an agent TUI" /><br/>
+      <b>Agent TUI + Chinese input</b><br/>
+      Scene: a local agent fullscreen TUI — Chinese typing plus glyphs that must stay sharp.<br/>
+      Flow: font picker pins a system Nerd Font and Apply → <code>Ctrl+P</code> to the agent tab → Pinyin, then Space to commit.
+    </td>
+    <td align="center" valign="top" width="50%">
+      <img src="docs/images/share.gif" width="430" alt="Serial profile set to AT, then Share with AI" /><br/>
+      <b>Live serial + Share with AI</b><br/>
+      Scene: a device on serial; a local agent should see and type, with nothing installed on the device.<br/>
+      Flow: open the port → Quick Panel Profile = AT → turn on Share → device replies land in the session.
+    </td>
+  </tr>
+</table>
 
 ## Why TTerm
 

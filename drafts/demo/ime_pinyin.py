@@ -30,6 +30,33 @@ user32.MapVirtualKeyW.argtypes = [wintypes.UINT, wintypes.UINT]
 user32.MapVirtualKeyW.restype = wintypes.UINT
 user32.SendInput.argtypes = [wintypes.UINT, ctypes.c_void_p, ctypes.c_int]
 user32.SendInput.restype = wintypes.UINT
+user32.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
+user32.FindWindowW.restype = wintypes.HWND
+user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+user32.SetForegroundWindow.restype = wintypes.BOOL
+user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+user32.ShowWindow.restype = wintypes.BOOL
+user32.keybd_event.argtypes = [
+    ctypes.c_byte,
+    ctypes.c_byte,
+    wintypes.DWORD,
+    ULONG_PTR,
+]
+
+VK_MENU = 0x12
+SW_RESTORE = 9
+
+
+def focus_tterm() -> None:
+    hwnd = user32.FindWindowW(None, "TTerm")
+    if not hwnd:
+        sys.stderr.write("ime: FindWindow TTerm missed\n")
+        return
+    user32.ShowWindow(hwnd, SW_RESTORE)
+    # Alt down/up lets a background process pass the foreground lock.
+    user32.keybd_event(VK_MENU, 0, 0, 0)
+    user32.SetForegroundWindow(hwnd)
+    user32.keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0)
 
 
 class KEYBDINPUT(ctypes.Structure):
@@ -109,6 +136,7 @@ def main() -> int:
     args = p.parse_args()
     gap = args.delay_ms / 1000.0
     word_pause = args.word_pause_ms / 1000.0
+    focus_tterm()
     time.sleep(args.warmup_ms / 1000.0)
     # 中文
     type_letters("zhongwen", gap)

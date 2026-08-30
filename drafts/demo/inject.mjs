@@ -25,12 +25,16 @@ public static class Native {
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
   [DllImport("user32.dll")] public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+  [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 }
 "@
 $h = [Native]::FindWindow($null, "TTerm")
 if ($h -eq [IntPtr]::Zero) { Write-Output "not-found"; exit 0 }
 [Native]::ShowWindow($h, 9) | Out-Null
+# Alt down/up lets a background process pass the foreground lock.
+[Native]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero)
 [Native]::SetForegroundWindow($h) | Out-Null
+[Native]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
 Write-Output "ok"
 `;
   const r = spawnSync("powershell", ["-NoProfile", "-Command", ps], {
@@ -39,6 +43,27 @@ Write-Output "ok"
   if (r.stdout?.includes("not-found")) {
     log("warning: FindWindow TTerm missed (still injecting via CDP)");
   }
+}
+
+/** Put `text` on the OS clipboard and read it back. Throws if the round-trip fails. */
+export function writeSystemClipboard(text) {
+  const want = String(text);
+  if (process.platform === "win32") {
+    const r = spawnSync(
+      "powershell",
+      ["-NoProfile", "-Command", "$t = [Console]::In.ReadToEnd(); Set-Clipboard -Value $t; Get-Clipboard"],
+      { input: want, encoding: "utf8" },
+    );
+    if (r.status !== 0) {
+      throw new Error(`Set-Clipboard failed: ${(r.stderr || r.stdout || "").trim()}`);
+    }
+    const got = String(r.stdout ?? "").replace(/\r\n$/, "\n").trimEnd();
+    if (got !== want && got !== want.replace(/\r\n/g, "\n")) {
+      throw new Error("system clipboard round-trip mismatch");
+    }
+    return;
+  }
+  throw new Error(`writeSystemClipboard: unsupported platform ${process.platform}`);
 }
 
 export async function hideCursor(cdp) {

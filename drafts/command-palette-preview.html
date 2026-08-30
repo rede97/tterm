@@ -75,6 +75,11 @@
     color: var(--tt-text);
     white-space: pre-wrap;
     overflow: auto;
+    /* Colorful wash so frosted glass has something to blur. */
+    background:
+      radial-gradient(ellipse 60% 50% at 70% 20%, rgba(55, 148, 255, 0.22), transparent 55%),
+      radial-gradient(ellipse 50% 40% at 15% 70%, rgba(78, 201, 176, 0.16), transparent 50%),
+      radial-gradient(ellipse 40% 35% at 85% 80%, rgba(181, 134, 216, 0.14), transparent 50%);
   }
   .term .dim { color: var(--tt-faint); }
 
@@ -204,7 +209,7 @@
   .toast-info { border-left-color: var(--tt-bolt); }
 </style>
 </head>
-<body data-skin="cursor">
+<body data-skin="cursor" class="tt-glass">
 <nav class="draft-nav" aria-label="Design drafts">
   <a class="brand" href="/">Drafts</a>
   <a href="/">Overview</a>
@@ -237,6 +242,10 @@ Type &gt; inside Ctrl+P to flip into commands (VS Code).</span></div>
       <button type="button" aria-pressed="true" data-skin="cursor">Cursor Mono</button>
       <button type="button" aria-pressed="false" data-skin="vscode">VS Code Dark</button>
     </div>
+    <div class="picker" id="glass-picker">
+      <button type="button" aria-pressed="false" data-glass="off">Opaque</button>
+      <button type="button" aria-pressed="true" data-glass="on">Frosted overlays</button>
+    </div>
 
     <div class="demo-actions">
       <button type="button" id="demo-quick">Go to Tab… <span class="combo">Ctrl+P</span></button>
@@ -254,6 +263,7 @@ Type &gt; inside Ctrl+P to flip into commands (VS Code).</span></div>
       <li><strong>Coverage</strong>: New Window / New Local·SSH·Serial·SSH Temporary Tab, Quick Panel, Share, Temporary SSH as a root Tab command (<code>ssh-history.json</code>, not <code>~/.ssh/config</code>), <strong>SSH: Port Forwarding…</strong> (one-line spec), Serial Profile · baud · flow.</li>
       <li><strong>SSH Port Forwards</strong>: palette lists one hub command. Type <code>L 8080:localhost:3000</code> / <code>R 2222:127.0.0.1:22</code> / <code>D 1080</code> in the same input as Temporary SSH. Enter adds and stays open; Tab fills an existing spec back; Del removes (empty input). Esc returns to commands. <strong>Embedded client only</strong> — system <code>ssh</code> / local / serial get the same toast as the app. Grammar lives in <code>src/ui/forwardspec.ts</code> (app + this draft).</li>
       <li><strong>App landing</strong>: shared <code>tabswitcher.ts</code> chrome; command registry SSOT is <code>src/core/commands.ts</code>; unbound commands are palette-only.</li>
+      <li><strong>Frosted overlays</strong>: same <code>overlayGlass</code> / <code>--tt-glass-*</code> as menus and the quick panel. Toggle above; the window stays opaque.</li>
     </ol>
 
     <div class="hint">
@@ -1258,6 +1268,16 @@ document.getElementById("skin-picker").addEventListener("click", (e) => {
   if (!btn) return;
   document.body.dataset.skin = btn.dataset.skin;
   document.querySelectorAll("#skin-picker button").forEach((b) => {
+    b.setAttribute("aria-pressed", b === btn ? "true" : "false");
+  });
+});
+
+document.getElementById("glass-picker").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-glass]");
+  if (!btn) return;
+  const on = btn.dataset.glass === "on";
+  document.body.classList.toggle("tt-glass", on);
+  document.querySelectorAll("#glass-picker button").forEach((b) => {
     b.setAttribute("aria-pressed", b === btn ? "true" : "false");
   });
 });

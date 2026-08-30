@@ -4,6 +4,7 @@
 
 # Binary files — never line-ending-convert these.
 *.png binary
+*.gif binary
 *.ico binary
 *.icns binary
 *.exe binary
