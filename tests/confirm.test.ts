@@ -46,6 +46,9 @@ describe("confirmDialog", () => {
 
     const p2 = confirmDialog({ title: "t", message: "m" });
     const overlay = document.querySelector<HTMLElement>(".cf-overlay")!;
+    // Dimmer close requires the press to start on the overlay (drag-off
+    // the dialog must not dismiss). A lone click event never sets that.
+    overlay.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     overlay.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await expect(p2).resolves.toBe(false);
   });
