@@ -2,13 +2,16 @@
 
 Changes
 
-- **Share `/lines?since=` includes first-screen writes** — a new
-  session's empty filler rows no longer consume the append log on the
-  first paint, so AT/OK written into those rows is visible to
-  `since=<seq from /screen>` (progress-bar in-place rewrites still are not)
+## v3.0.0
+
+Changes
+
+- **Share incremental line reads include the first screen** — a brand-new
+  session no longer looks empty to Share with AI after the first AT/OK
+  (progress bars and in-place rewrites still use the screen snapshot)
 - **Frosted overlays cover the palette and IME mirror** — the same
   Appearance switch (`overlayGlass`) now frosts Ctrl+P / Ctrl+Shift+P and
-  the composition chip, using `--tt-glass-*` like menus and the quick panel
+  the composition chip
 - **SSH Trust & Connect continues the handshake** — the 15 s timer covers
   DNS+TCP only. Waiting on the host-key dialog used to abort KEX after the
   key was already learned, so the next attempt skipped Trust and looked
@@ -21,16 +24,11 @@ Changes
   target port (and Dynamic's listen port) reset for the next entry; a
   half-typed row in another group is still kept
 - **Cursor Dark terminal scheme** — second built-in card, matching the
-  current Cursor Dark (Anysphere) terminal palette (`#141414` background,
-  Nord-tinted green / cyan). TTerm Dark stays the default (VS Code Dark+)
+  current Cursor Dark (Anysphere) terminal palette. TTerm Dark stays the
+  default
 - **Windows Terminal color schemes are not imported** — Appearance lists
   built-in + custom only. WT still supplies shell profiles (PowerShell,
   WSL, …)
-
-## v3.0.0
-
-Changes
-
 - **Settings checkmarks use a Fluent-style stroke ✓** — masked SVG inset
   in the 14px box, not a rotated CSS L that sat on the top or bottom edge
 - **Share / dirty tab dots overlay the chrome** — they no longer sit in
