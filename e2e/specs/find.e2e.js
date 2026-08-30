@@ -42,8 +42,7 @@ describe("TTerm find bar", () => {
         browser.execute(() => {
           const menu = document.getElementById("tab-context-menu");
           return (
-            !!menu &&
-            [...menu.querySelectorAll(".menu-item")].some((i) => i.textContent === "Find")
+            !!menu && [...menu.querySelectorAll(".menu-item")].some((i) => i.textContent === "Find")
           );
         }),
       { timeout: 5000, timeoutMsg: "context menu with Find did not open" },

@@ -254,9 +254,7 @@ function showHostkeyDialog(payload: SshHostkeyRequest): void {
   rejectBtn.type = "button";
   rejectBtn.textContent = "Reject";
   const trustBtn = document.createElement("button");
-  trustBtn.className = payload.mismatch
-    ? "tt-btn tt-btn-danger-fill"
-    : "tt-btn tt-btn-primary";
+  trustBtn.className = payload.mismatch ? "tt-btn tt-btn-danger-fill" : "tt-btn tt-btn-primary";
   trustBtn.type = "button";
   trustBtn.textContent = "Trust & Connect";
   footer.appendChild(rejectBtn);

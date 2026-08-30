@@ -287,9 +287,7 @@ describe("command palette — two-level flows", () => {
     ];
     try {
       openPaletteFlow("newLocal");
-      await vi.waitFor(() =>
-        expect(rowTexts()).toContain("Developer Command Prompt for VS 2022"),
-      );
+      await vi.waitFor(() => expect(rowTexts()).toContain("Developer Command Prompt for VS 2022"));
       const row = [...document.querySelectorAll<HTMLElement>(".pal-row")].find((r) =>
         r.querySelector(".pal-label")?.textContent?.includes("VS 2022"),
       );

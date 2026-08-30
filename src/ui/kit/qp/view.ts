@@ -169,11 +169,7 @@ function sshSection(m: QpPanelModel, a: QpPanelActions): TemplateResult {
 }
 
 function forwardsSection(): TemplateResult {
-  return sectionTemplate(
-    "Port forwards",
-    "forwards",
-    html`<div class="qp-fwd-slot"></div>`,
-  );
+  return sectionTemplate("Port forwards", "forwards", html`<div class="qp-fwd-slot"></div>`);
 }
 
 function serialSessionSection(m: QpPanelModel, a: QpPanelActions): TemplateResult {

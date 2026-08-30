@@ -66,12 +66,15 @@ function renderProfilePanel(panel: HTMLElement): void {
             Checkbox on the left — shown in the new-tab menu when checked (same
             pattern as SSH hosts). Pending until Apply.
           </div>
-          ${localProfiles.length === 0
-            ? html`<div class="row-desc">No Windows Terminal profiles found yet.</div>`
-            : repeat(
-                localProfiles,
-                (p) => p.name,
-                (p) => html`<div class="check-row ${hiddenProfiles.includes(p.name) ? "is-off" : ""}">
+          ${
+            localProfiles.length === 0
+              ? html`<div class="row-desc">No Windows Terminal profiles found yet.</div>`
+              : repeat(
+                  localProfiles,
+                  (p) => p.name,
+                  (
+                    p,
+                  ) => html`<div class="check-row ${hiddenProfiles.includes(p.name) ? "is-off" : ""}">
                   <label class="check-hit">
                     <input
                       type="checkbox"
@@ -90,7 +93,8 @@ function renderProfilePanel(panel: HTMLElement): void {
                     </div>
                   </label>
                 </div>`,
-              )}
+                )
+          }
         `,
       )}
     `,

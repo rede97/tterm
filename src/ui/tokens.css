@@ -103,9 +103,9 @@ body[data-skin="cursor"] {
      same CJK fallbacks as the default terminal stack — never generic
      `monospace` first (that is SimSun on zh-CN). */
   --tt-ui: Inter, "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
-  --tt-mono: "JetBrains Mono", Consolas, "Noto Sans SC", "Noto Sans JP",
-    "Noto Sans KR", "Microsoft YaHei UI", "Microsoft YaHei", ui-monospace,
-    monospace;
+  --tt-mono:
+    "JetBrains Mono", Consolas, "Noto Sans SC", "Noto Sans JP", "Noto Sans KR",
+    "Microsoft YaHei UI", "Microsoft YaHei", ui-monospace, monospace;
 
   /* ---- Scroll ---- */
   /* ---- Scroll (colors only — chrome via .tt-scroll / styles.css unified block) ---- */

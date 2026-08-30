@@ -1,12 +1,7 @@
 // Runtime constants and utility functions — separated from types.ts
 // to keep type definitions pure.
 
-import type {
-  SerialEnterNewline,
-  SerialFrame,
-  SerialOutputNewline,
-  SshHost,
-} from "./types";
+import type { SerialEnterNewline, SerialFrame, SerialOutputNewline, SshHost } from "./types";
 
 // ---- Constants ----
 
