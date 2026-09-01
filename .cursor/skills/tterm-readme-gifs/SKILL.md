@@ -30,15 +30,15 @@ OBS window-capture of the 1234×900 app window is **1452×998 @ 30 fps** (chrome
 
 ## Display vs encode
 
-README HTML stays `width="880"` (hero) and `width="430"` (agent + share, side by side). Encode **wider** so GitHub/click-through look sharp.
+README HTML stays `width="880"` for hero, agent, and share (stacked, not side by side). Encode **wider** so GitHub/click-through look sharp.
 
 Current encode: **scale width 1234** → **1234×848**, 12 fps. Budget **< 5 MB** each.
 
 | GIF | README `width=` | Encode width | Last size |
 | --- | --- | --- | --- |
 | hero | 880 | 1234 | 3.04 MB |
-| agent | 430 | 1234 | 3.61 MB |
-| share | 430 | 1234 | 1.17 MB |
+| agent | 880 | 1234 | 3.61 MB |
+| share | 880 | 1234 | 1.17 MB |
 
 ## Pipeline
 

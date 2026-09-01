@@ -28,7 +28,7 @@
 | **B-agent** | 本地 Agent | **Pi**（标签能被 `pi` 滤到，片中为 `pi on windows`）；Working 刷新 + 真微软拼音「中文输入法」 |
 | **C-proto** | 真机夹具 | 专用测试环境，不在本仓库；片中是真实串口 tab（Profile = AT）+ Share |
 
-C 与 B 并排 **430px**。A 成片 13s；C 成片 23s（AT 回显比剧本 ~10s 长，未另加后期倍速）。
+A / B / C 都是单独全宽 **880px**。A 成片 13s；C 成片 23s（AT 回显比剧本 ~10s 长，未另加后期倍速）。
 
 ---
 
@@ -38,8 +38,8 @@ C 与 B 并排 **430px**。A 成片 13s；C 成片 23s（AT 回显比剧本 ~10s
 | 槽 | 文件 | README | 时长（剧本 → 成片） | 标题（第一卖点） | 落地（不是标题） |
 | --- | --- | --- | --- | --- | --- |
 | **A** | `hero.gif` 880px | 主视觉 | ~14s → **13s**（母带 5s–18s） | 干净 UI；开箱主题/字体；`Ctrl+P` / `Ctrl+Shift+P`；QP 远程端口 | 树莓派 `btop`、ubuntu `nyancat`、Remote 8000 |
-| **B** | `agent.gif` 430px | 与 C 并排 | ~8s → **11s**（母带 2s–13s） | 系统 NF 一次配置置顶；本地 Agent TUI 真中文输入 | Pi Working、拼音「中文输入法」 |
-| **C** | `share.gif` 430px | 与 B 并排 | ~10s → **23s**（母带 5s–28s） | 玻璃下拉 / 玻璃 QP；Profile=AT；Share 让 AI 管串口 | 真串口、AT 回显 |
+| **B** | `agent.gif` 880px | 第二条，单独全宽 | ~8s → **11s**（母带 2s–13s） | 系统 NF 一次配置置顶；本地 Agent TUI 真中文输入 | Pi Working、拼音「中文输入法」 |
+| **C** | `share.gif` 880px | 第三条，单独全宽 | ~10s → **23s**（母带 5s–28s） | 玻璃下拉 / 玻璃 QP；Profile=AT；Share 让 AI 管串口 | 真串口、AT 回显 |
 
 
 循环落点：**成片 A** = QP 里刚加上的 Remote `8000 → 127.0.0.1:8000`（ubuntu 上 `nyancat` 仍在跑）。**成片 C** = 串口 AT 回显（Profile=AT + Share）；5s–28s 未切到艺术字、未做 2× 倍速。
@@ -65,7 +65,7 @@ C 与 B 并排 **430px**。A 成片 13s；C 成片 23s（AT 回显比剧本 ~10s
 | 项 | 建议 | 备注 |
 | --- | --- | --- |
 | 包 | **真 release**（`tauri build` / 3.0.0 NSIS） | 见 §2.3；不要用 `cargo build --release` 冒充 |
-| 窗口 | **1234×900**，不要全屏、不要改尺寸 | 三槽同一；OBS 成片约 1452×998；GIF 导出 1234 宽（README 仍显示 880 / 430） |
+| 窗口 | **1234×900**，不要全屏、不要改尺寸 | 三槽同一；OBS 成片约 1452×998；GIF 导出 1234 宽（README 显示 880） |
 | DPI | **100%** | 125/150 字糊 |
 | 皮肤 | **Cursor** | 三槽同一，不要 VS Code |
 | 毛玻璃 | A / B 关；C 开 `overlayGlass` | Appearance 即时生效，不要录开关 |
@@ -195,7 +195,7 @@ ubuntu 提示符空闲后现场打 `nyancat` 回车（每个字母只入一次�
 
 ## 4. 分镜 B — `agent.gif`（已定）
 
-**成片 11s**（母带 2s–13s；剧本曾写 ~8s）。并排槽字要够大；搜索框和 Fallback Chain 必须入画。
+**成片 11s**（母带 2s–13s；剧本曾写 ~8s）。字要够大；搜索框和 Fallback Chain 必须入画。
 
 内置 JetBrains Mono **不是** Nerd Font。本条把系统里已装的 **JetBrainsMonoNL NF** 塞进回退链并提到最前。不拍下载字体、不打开 Nerd Fonts 外链。
 
@@ -276,7 +276,7 @@ TTerm **不内嵌** Nerd Fonts。演示机预先装好。
 | 透传 | 对端有下行 | 串口出现对端内容 |
 
 
-幕 5 是收束不是第四个卖点。字要够大，430px 缩小后仍能认。不要现场现算艺术字。不要把密码定格进画面。
+幕 5 是收束不是第四个卖点。字要够大，880px 下仍能认。不要现场现算艺术字。不要把密码定格进画面。
 
 ### 5.2 夹具
 
@@ -306,7 +306,7 @@ TTerm **不内嵌** Nerd Fonts。演示机预先装好。
 | `agent.gif` | `agent.mp4` | **2s–13s**（11s） |
 | `share.gif` | `share.mp4` | **5s–28s**（23s） |
 
-`-ss` 放在 `-i` 之后，按输出时间轴裁（帧准）。**编码宽度 1234**（贴近母带 1452，README 仍 `width="880"` / `"430"`）。`fps=12`。单文件 **< 5 MB**；超了先降宽 1200 → 880，不改裁切。完整约定：`.cursor/skills/tterm-readme-gifs/SKILL.md`。
+`-ss` 放在 `-i` 之后，按输出时间轴裁（帧准）。**编码宽度 1234**（贴近母带 1452，README 仍 `width="880"`）。`fps=12`。单文件 **< 5 MB**；超了先降宽 1200 → 880，不改裁切。完整约定：`.cursor/skills/tterm-readme-gifs/SKILL.md`。
 
 ### 6.2 ffmpeg（palette）
 
