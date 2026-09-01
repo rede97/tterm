@@ -17,10 +17,12 @@ import type {
   TabType,
 } from "../core/types";
 import { reattachDelayForAttempt, shouldAutoReattach } from "../util/disconnect";
-import { cursorPixelPos, imeAnchorCell } from "../util/imeanchor";
+import type { ImeAnchorDump } from "../util/imeanchor";
+import { cursorPixelPos, describeImeAnchor, imeAnchorCell } from "../util/imeanchor";
 import { getImeDebugFlags, ImeBox, imeMirrorActiveFor } from "../util/imebox";
 import { CursorPositionFilter } from "../util/imefilter";
 import { type FreezeHandle, patchImeFreeze } from "../util/imefreeze";
+import { imeAnchorPolicy } from "../util/imepolicy";
 import { applyProgressToTabElement, parseOsc9Progress } from "../util/osc";
 import { createSerialInputHandler } from "../util/serialinput";
 import { SizeHint } from "../util/sizehint";
@@ -213,8 +215,14 @@ export class TerminalTab {
     if (textarea) {
       this.imeBox.attach(
         textarea,
-        () => cursorPixelPos(this.terminal, this.cursorFilter),
-        () => imeMirrorActiveFor(this._isCursorHidden()),
+        () =>
+          cursorPixelPos(
+            this.terminal,
+            this.cursorFilter,
+            this._isCursorHidden(),
+            imeAnchorPolicy(),
+          ),
+        () => imeMirrorActiveFor(this._imeLooksLikeAgentTui()),
       );
     }
 
@@ -235,8 +243,8 @@ export class TerminalTab {
   //    on — double display, used for real-IME bisection)
   // Called on every render and on mirror-mode changes.
   refreshImeClasses(): void {
-    const hidden = this._isCursorHidden();
-    this.element.classList.toggle("cursor-hidden", hidden);
+    const dump = this.imeDump();
+    this.element.classList.toggle("cursor-hidden", dump.cursorHidden);
     // Display ownership is locked while a composition is in flight: Agent
     // TUIs flicker the hardware cursor around input fields, and flipping
     // the suppression class mid-composition makes the visible path
@@ -244,8 +252,16 @@ export class TerminalTab {
     // intermittent "native IME box / mirror vanished" symptom. Ownership
     // decided at compositionstart stands until compositionend.
     if (this.imeBox.isComposing) return;
-    const active = imeMirrorActiveFor(hidden) && getImeDebugFlags().suppress;
+    // Win10 ConPTY often never reports DECTCEM; a unique fake caret is the
+    // same "agent TUI" signal as a hidden hardware cursor.
+    const tui = dump.cursorHidden || dump.why !== "fallback";
+    const active = imeMirrorActiveFor(tui) && getImeDebugFlags().suppress;
     this.element.classList.toggle("ime-mirror-on", active);
+  }
+
+  private _imeLooksLikeAgentTui(): boolean {
+    const dump = this.imeDump();
+    return dump.cursorHidden || dump.why !== "fallback";
   }
 
   // Attach (or re-attach) the session WebSocket. Disposes any previous addon.
@@ -484,7 +500,21 @@ export class TerminalTab {
   }
 
   fakeCursorCell(): { x: number; y: number } {
-    return imeAnchorCell(this.terminal, this.cursorFilter);
+    return imeAnchorCell(
+      this.terminal,
+      this.cursorFilter,
+      this._isCursorHidden(),
+      imeAnchorPolicy(),
+    );
+  }
+
+  imeDump(): ImeAnchorDump {
+    return describeImeAnchor(
+      this.terminal,
+      this.cursorFilter,
+      this._isCursorHidden(),
+      imeAnchorPolicy(),
+    );
   }
 
   // Character-level screen snapshot for AI session sharing (the xterm

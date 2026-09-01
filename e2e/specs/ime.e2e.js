@@ -34,6 +34,15 @@ writeFileSync(
   "latin1",
 );
 writeFileSync(`${FIX}\\ime-show.txt`, "\x1b[?25h\x1b[?1049l", "latin1");
+// Win10 ConPTY analogue: same inverse fake caret + parked hardware cursor,
+// but DECTCEM is omitted so xterm still reports the cursor visible. That is
+// what inbox ConPTY on Win10 does on the primary buffer (and sometimes even
+// in alt screen); the old scan bailed out and IME followed line-end.
+writeFileSync(
+  `${FIX}\\ime-park.txt`,
+  "\x1b[?1049h\x1b[2J\x1b[H\x1b[10;40H\x1b[7m \x1b[0m\x1b[20;1H",
+  "latin1",
+);
 
 const visibleInstance = () =>
   browser.execute(() => {
@@ -41,7 +50,7 @@ const visibleInstance = () =>
       (el) => el.style.display !== "none",
     );
     const tab = [...window.__tterm.tabs.values()].find((t) => t.element === inst);
-    if (!tab) return null;
+    if (!inst || !tab) return null;
     const ta = inst.querySelector(".xterm-helper-textarea");
     const cv = inst.querySelector(".composition-view");
     const core = tab.terminal._core;
@@ -152,10 +161,12 @@ async function enterHiddenCursorFixture() {
   await typeCommand(`type ${FIX}\\ime-hide.txt`);
   await browser.waitUntil(
     async () => {
-      const s = await visibleInstance();
-      return s && s.isCursorHidden === true;
+      const d = await browser.execute(() => window.__tterm.imeDump?.() ?? null);
+      // Win10 inbox ConPTY often never forwards DECTCEM, even in alt screen.
+      // The inverse fake caret is the durable signal on those hosts.
+      return d && (d.cursorHidden || d.why === "unique-short-run" || d.anchor.x !== d.hardware.x);
     },
-    { timeout: 10000, timeoutMsg: "cursor-hidden state not detected in alt screen" },
+    { timeout: 10000, timeoutMsg: "fake caret not detected in alt screen fixture" },
   );
 }
 
@@ -201,7 +212,6 @@ describe("IME with cursor-hiding TUIs", () => {
     await browser.pause(500);
     const s = await visibleInstance();
 
-    expect(s.cursorHiddenClass).toBe(true);
     expect(s.mirrorOnClass).toBe(true);
     // anchor found the inverse fake cursor at (39,9), NOT the parked real
     // cursor — that distinction is what keeps the candidate window right
@@ -211,6 +221,42 @@ describe("IME with cursor-hiding TUIs", () => {
     expect(s.taInline.top).toBe(s.anchorPx.top);
 
     await leaveHiddenCursorFixture();
+  });
+
+  it("anchors to the fake caret when the hardware cursor stays visible (Win10 ConPTY)", async () => {
+    await setMode("auto");
+    await browser.waitUntil(
+      async () => browser.execute(() => typeof window.__tterm.imeSetPolicy === "function"),
+      { timeout: 5000, timeoutMsg: "imeSetPolicy hook not ready" },
+    );
+    await browser.execute(() => {
+      window.__tterm.imeSetPolicy?.({ scanEnabled: true, scanWhenVisible: true });
+    });
+    await typeCommand(`type ${FIX}\\ime-park.txt`);
+    await browser.waitUntil(
+      async () => {
+        const d = await browser.execute(() => window.__tterm.imeDump?.() ?? null);
+        return d && (d.anchor.x !== d.hardware.x || d.anchor.y !== d.hardware.y);
+      },
+      { timeout: 10000, timeoutMsg: "fake caret not distinguished from parked hardware cursor" },
+    );
+    const dump = await browser.execute(() => window.__tterm.imeDump?.() ?? null);
+    expect(dump.why).toBe("unique-short-run");
+    expect(dump.cursorHidden).toBe(false);
+    expect(dump.anchor).toEqual({ x: 39, y: 9 });
+
+    await startComposition("nihao");
+    await browser.pause(500);
+    const s = await visibleInstance();
+    expect(s.isCursorHidden).toBe(false);
+    expect(s.anchorPx.left).not.toBe(s.realCursorPx.left);
+    expect(s.taInline.left).toBe(s.anchorPx.left);
+    expect(s.taInline.top).toBe(s.anchorPx.top);
+
+    await leaveHiddenCursorFixture();
+    await browser.execute(() => {
+      window.__tterm.imeSetPolicy?.(null);
+    });
   });
 
   // PLAN C acceptance test: with the cursor hidden, xterm's composition-view

@@ -1,5 +1,6 @@
 mod cmdparse;
 mod config;
+mod conptyime;
 mod deadmode;
 #[cfg(debug_assertions)]
 mod demo;
@@ -86,6 +87,7 @@ macro_rules! tterm_commands {
             tray::tray_park_window,
             tray::tray_take_pending_tab,
             fonts::list_system_fonts,
+            conptyime::pty_probe_ime_caps,
             $($extra),*
         ]
     };

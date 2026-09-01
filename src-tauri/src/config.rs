@@ -49,17 +49,18 @@ mod tests {
 
 // All app config lives in per-topic JSON files under the app config dir
 // (config.json / themes.json / serial-profiles.json / keybindings.json /
-// ssh-history.json — the last is Temporary Connect MRU, never ~/.ssh/config).
+// ssh-history.json / conpty-ime.json).
 //
 // Rust does RAW I/O only — parsing, merging, validation, and migration are
 // all frontend concerns. The whitelist keeps this from becoming an
 // arbitrary-file read/write primitive.
-const CONFIG_FILES: [&str; 5] = [
+const CONFIG_FILES: [&str; 6] = [
     "config",
     "themes",
     "serial-profiles",
     "keybindings",
     "ssh-history",
+    "conpty-ime",
 ];
 
 fn config_path(app: &tauri::AppHandle, name: &str) -> Result<std::path::PathBuf, String> {

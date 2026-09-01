@@ -9,7 +9,8 @@ import type { Terminal } from "@xterm/xterm";
 import { imeAnchorCell } from "./imeanchor";
 import { getImeDebugFlags } from "./imebox";
 import type { CursorPositionFilter } from "./imefilter";
-import { cellDimensions, terminalTextarea } from "./xterm-internals";
+import { imeAnchorPolicy } from "./imepolicy";
+import { cellDimensions, cursorIsHidden, terminalTextarea } from "./xterm-internals";
 
 export interface FreezeHandle {
   dispose(): void;
@@ -50,7 +51,7 @@ export function patchImeFreeze(
     // seen when composing in actively-refreshing TUIs.
     if (!cellDims || cellDims.width <= 0 || cellDims.height <= 0) return null;
     if (element.clientWidth <= 0 || element.clientHeight <= 0) return null;
-    const cell = imeAnchorCell(terminal, filter);
+    const cell = imeAnchorCell(terminal, filter, cursorIsHidden(terminal), imeAnchorPolicy());
     const maxX = Math.max(0, element.clientWidth - cellDims.width - SAFE_RIGHT);
     const maxY = Math.max(0, element.clientHeight - cellDims.height);
     return {

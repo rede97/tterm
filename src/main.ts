@@ -11,6 +11,7 @@ import "@fontsource/source-code-pro";
 import "@fontsource/ibm-plex-mono";
 import "@fontsource/roboto-mono";
 import "@fontsource/ubuntu-mono";
+import { refreshConptyImeCaps } from "./config/conpty-ime";
 import { loadCustomThemes } from "./config/custom-themes";
 import { loadSerialProfiles } from "./config/serial-profiles";
 import { loadSshHosts } from "./config/ssh-config";
@@ -112,6 +113,9 @@ configStore.subscribe((keys) => {
   if (keys.includes("chromeSkin") || keys.includes("overlayGlass")) {
     applyChromeSkin();
   }
+  if (keys.includes("imeFakeCursorScan")) {
+    for (const tab of tabManager.tabs.values()) tab.refreshImeClasses();
+  }
   if (keys.some((k) => ["fontFamily", "fontSize", "scrollback", "themeName"].includes(k))) {
     const theme = findTheme(configStore.get("themeName")).theme;
     // The whole terminal chrome (active tab, container frame, xterm edge
@@ -151,6 +155,7 @@ if (import.meta.env.DEV) {
     },
     mgr: tabManager,
     config: configStore,
+    imeDump: () => tabManager.activeTab?.imeDump() ?? null,
   };
   import("./util/imebox").then((m) => {
     if (!window.__tterm) return;
@@ -165,6 +170,13 @@ if (import.meta.env.DEV) {
       m.setImeDebugFlags(f);
       for (const t of tabManager.tabs.values()) t.refreshImeClasses();
     };
+    import("./util/imepolicy").then((p) => {
+      if (!window.__tterm) return;
+      window.__tterm.imeSetPolicy = (policy) => {
+        p.setImeAnchorPolicyOverride(policy);
+        for (const t of tabManager.tabs.values()) t.refreshImeClasses();
+      };
+    });
   });
 }
 
@@ -263,6 +275,14 @@ configStore
     const p = tabManager.defaultLocalProfile();
     if (p) await tabManager.createLocalTab(p.command, p.name);
     else await tabManager.createLocalTab();
+
+    // Win10 ConPTY adapter: separate conpty-ime.json, re-probed on version change.
+    getVersion()
+      .then(async (v) => {
+        await refreshConptyImeCaps(v);
+        for (const t of tabManager.tabs.values()) t.refreshImeClasses();
+      })
+      .catch(logCatch("ime.conptyProbe"));
   })
   .catch((e) => {
     // load() never rejects — this is a downstream failure (WT data, themes,

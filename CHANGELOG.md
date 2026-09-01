@@ -2,7 +2,16 @@
 
 Changes
 
-## v3.0.0
+## v3.0.1
+
+Changes
+
+- **IME follows the drawn caret in agent TUIs on Windows 10** — pi / Cursor /
+  Claude hide the real cursor and paint their own; on Windows 10 the IME still
+  jumped to the end of the line. A background check on first launch (and after
+  each TTerm update) turns on the extra scan only on those hosts. Settings →
+  General → IME fake-cursor scan (on by default) turns it off
+
 
 Changes
 

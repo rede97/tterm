@@ -6,6 +6,7 @@
 
 import type { TerminalTab } from "../terminal/tab";
 import type { TabManager } from "../terminal/tabmanager";
+import type { ImeAnchorDump, ImeAnchorPolicy } from "../util/imeanchor";
 import type { ConfigStore } from "./store";
 
 export interface TtermDevHooks {
@@ -16,6 +17,8 @@ export interface TtermDevHooks {
   getImeMirrorMode?: () => string;
   imeTrace?: (on: boolean) => void;
   imeDebug?: (flags: { suppress?: boolean; reanchor?: boolean }) => void;
+  imeDump?: () => ImeAnchorDump | null;
+  imeSetPolicy?: (policy: ImeAnchorPolicy | null) => void;
 }
 
 declare global {

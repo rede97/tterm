@@ -32,6 +32,7 @@ interface GeneralPanelState {
   pasteTrim: boolean;
   confirmCloseWindow: boolean;
   confirmCloseTab: boolean;
+  imeFakeCursorScan: boolean;
 }
 
 const panelStates = new WeakMap<HTMLElement, GeneralPanelState>();
@@ -47,6 +48,7 @@ function readStore() {
     pasteTrim: configStore.get("pasteTrim"),
     confirmCloseWindow: configStore.get("confirmCloseWindow"),
     confirmCloseTab: configStore.get("confirmCloseTab"),
+    imeFakeCursorScan: configStore.get("imeFakeCursorScan"),
   };
 }
 
@@ -187,6 +189,13 @@ function generalTemplate(panel: HTMLElement, st: GeneralPanelState) {
           "Play a system sound when the terminal bell rings (BEL character).",
           toggle(st.bell, (v) => (st.bell = v), { id: "set-bell" }),
         )}
+        ${itemRow(
+          "IME fake-cursor scan",
+          "In agent TUIs (pi, Cursor, Claude) put the IME at the drawn caret. Off = follow the real cursor.",
+          toggle(st.imeFakeCursorScan, (v) => (st.imeFakeCursorScan = v), {
+            id: "set-ime-fake-cursor",
+          }),
+        )}
       `,
     )}
     ${section(
@@ -276,5 +285,7 @@ export function collectGeneralSettings(root: HTMLElement): Partial<ConfigState> 
     partial.scrollback = Math.max(100, Math.min(100000, parseInt(scrollbackEl.value, 10) || 1000));
   const autoUpdateEl = root.querySelector("#set-auto-update") as HTMLInputElement;
   if (autoUpdateEl) partial.autoCheckUpdates = autoUpdateEl.getAttribute("aria-checked") === "true";
+  const imeFakeEl = root.querySelector("#set-ime-fake-cursor") as HTMLInputElement;
+  if (imeFakeEl) partial.imeFakeCursorScan = imeFakeEl.getAttribute("aria-checked") === "true";
   return partial;
 }

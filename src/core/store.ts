@@ -53,6 +53,9 @@ export interface ConfigState {
   // User keybinding overrides: command id → combo ("ctrl+shift+p"), "" = unbound.
   // Merged over the defaults in core/keymap.ts; ids not in the registry are ignored.
   keybindings: Record<string, string>;
+  // Find the drawn caret in agent TUIs and park the IME there. Off = always
+  // follow the hardware cursor. Win10 ConPTY adapter is separate (conpty-ime.json).
+  imeFakeCursorScan: boolean;
   // Runtime flag
   loaded: boolean;
 }
@@ -114,6 +117,7 @@ const SCHEMA = {
   sshEmbedded: { default: true, validate: isBoolean },
   recentDirectories: { default: [] as string[], validate: isArray<string> },
   keybindings: { default: {} as Record<string, string>, validate: isStringRecord },
+  imeFakeCursorScan: { default: true, validate: isBoolean },
   loaded: { default: false, validate: isBoolean },
 } satisfies Record<string, SchemaEntry<unknown>>;
 
