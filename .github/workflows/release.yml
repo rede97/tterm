@@ -36,18 +36,29 @@ jobs:
         id: notes
         shell: pwsh
         run: |
+          $tag = "${{ github.ref_name }}"
           $changelog = Get-Content CHANGELOG.md -Raw
           $inSection = $false
           $lines = @()
+          $heading = [regex]::Escape($tag)
           foreach ($line in ($changelog -split "`n")) {
-            if ($line -match '^## v') {
+            if ($line -match '^## ') {
               if ($inSection) { break }
-              $inSection = $true
+              # "## v3.0.1" or "## v3.0.1 (beta)" — not the first ## v in the file.
+              if ($line -match "^## ${heading}(\s|$)") {
+                $inSection = $true
+              }
               continue
             }
             if ($inSection) { $lines += $line }
           }
+          if (-not $inSection) {
+            throw "CHANGELOG.md has no '$tag' section"
+          }
           $body = ($lines -join "`n").Trim()
+          if (-not $body) {
+            throw "CHANGELOG.md section '$tag' is empty"
+          }
           echo "body<<EOF" >> $env:GITHUB_OUTPUT
           echo $body >> $env:GITHUB_OUTPUT
           echo "EOF" >> $env:GITHUB_OUTPUT

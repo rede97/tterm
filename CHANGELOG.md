@@ -12,6 +12,7 @@ Changes
   each TTerm update) turns on the extra scan only on those hosts. Settings →
   General → IME fake-cursor scan (on by default) turns it off
 
+## v3.0.0
 
 Changes
 
