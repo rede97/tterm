@@ -31,22 +31,23 @@
   Flow: <code>Ctrl+P</code> jump to a live session → <code>Ctrl+Shift+P</code> open another SSH → Quick Panel adds a Remote forward on that session.
 </p>
 
-<table>
-  <tr>
-    <td align="center" valign="top" width="50%">
-      <img src="docs/images/agent.gif" width="430" alt="Pin a system Nerd Font, then type Chinese in an agent TUI" /><br/>
-      <b>Agent TUI + Chinese input</b><br/>
-      Scene: a local agent fullscreen TUI — Chinese typing plus glyphs that must stay sharp.<br/>
-      Flow: font picker pins a system Nerd Font and Apply → <code>Ctrl+P</code> to the agent tab → Pinyin, then Space to commit.
-    </td>
-    <td align="center" valign="top" width="50%">
-      <img src="docs/images/share.gif" width="430" alt="Serial profile set to AT, then Share with AI" /><br/>
-      <b>Live serial + Share with AI</b><br/>
-      Scene: a device on serial; a local agent should see and type, with nothing installed on the device.<br/>
-      Flow: open the port → Quick Panel Profile = AT → turn on Share → device replies land in the session.
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <img src="docs/images/agent.gif" width="880" alt="Pin a system Nerd Font, then type Chinese in an agent TUI" />
+</p>
+<p align="center">
+  <b>Agent TUI + Chinese input</b><br/>
+  Scene: a local agent fullscreen TUI — Chinese typing plus glyphs that must stay sharp.<br/>
+  Flow: font picker pins a system Nerd Font and Apply → <code>Ctrl+P</code> to the agent tab → Pinyin, then Space to commit.
+</p>
+
+<p align="center">
+  <img src="docs/images/share.gif" width="880" alt="Serial profile set to AT, then Share with AI" />
+</p>
+<p align="center">
+  <b>Live serial + Share with AI</b><br/>
+  Scene: a device on serial; a local agent should see and type, with nothing installed on the device.<br/>
+  Flow: open the port → Quick Panel Profile = AT → turn on Share → device replies land in the session.
+</p>
 
 ## Why TTerm
 

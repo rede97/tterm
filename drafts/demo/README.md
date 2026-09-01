@@ -92,7 +92,7 @@ bun run demo:share -- --url="http://127.0.0.1:<hub>/share/<id>?token=<t>"
 | agent | `agent.mp4` | 2s–13s（11s） | 1234×848 · 12 fps | 3.61 MB | `docs/images/agent.gif` |
 | share | `share.mp4` | 5s–28s（23s） | 1234×848 · 12 fps | 1.17 MB | `docs/images/share.gif` |
 
-README 显示仍是 `width="880"` / `"430"`。编码 1234 宽，点开更清晰。
+README 显示仍是 `width="880"`。编码 1234 宽，点开更清晰。
 
 ```powershell
 $cap = "C:\Users\rede\Videos\tterm capture"

@@ -31,22 +31,23 @@
   操作：<code>Ctrl+P</code> 跳到已有会话 → <code>Ctrl+Shift+P</code> 再开一台 SSH → Quick Panel 给这条会话加 Remote 转发。
 </p>
 
-<table>
-  <tr>
-    <td align="center" valign="top" width="50%">
-      <img src="docs/images/agent.gif" width="430" alt="系统字体置顶后在 Agent TUI 里输入中文" /><br/>
-      <b>Agent TUI + 中文输入</b><br/>
-      场景：本机 Agent 全屏 TUI，要打中文、图标也不能糊。<br/>
-      操作：字体选择器把系统 Nerd Font 置顶并 Apply → <code>Ctrl+P</code> 切到 Agent → 拼音后空格上屏。
-    </td>
-    <td align="center" valign="top" width="50%">
-      <img src="docs/images/share.gif" width="430" alt="串口 Profile 切到 AT 后 Share with AI" /><br/>
-      <b>串口现场 + Share with AI</b><br/>
-      场景：设备挂在串口上，本机 Agent 要看见并操作，设备不用装 Agent。<br/>
-      操作：打开串口 → Quick Panel 把 Profile 换成 AT → 打开 Share → 会话里出现设备回显。
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <img src="docs/images/agent.gif" width="880" alt="系统字体置顶后在 Agent TUI 里输入中文" />
+</p>
+<p align="center">
+  <b>Agent TUI + 中文输入</b><br/>
+  场景：本机 Agent 全屏 TUI，要打中文、图标也不能糊。<br/>
+  操作：字体选择器把系统 Nerd Font 置顶并 Apply → <code>Ctrl+P</code> 切到 Agent → 拼音后空格上屏。
+</p>
+
+<p align="center">
+  <img src="docs/images/share.gif" width="880" alt="串口 Profile 切到 AT 后 Share with AI" />
+</p>
+<p align="center">
+  <b>串口现场 + Share with AI</b><br/>
+  场景：设备挂在串口上，本机 Agent 要看见并操作，设备不用装 Agent。<br/>
+  操作：打开串口 → Quick Panel 把 Profile 换成 AT → 打开 Share → 会话里出现设备回显。
+</p>
 
 ## 为什么是 TTerm
 
