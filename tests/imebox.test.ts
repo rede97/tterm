@@ -110,6 +110,28 @@ describe("ImeBox", () => {
     vi.advanceTimersByTime(1);
     expect(box.isVisible).toBe(false);
   });
+  it("window blur (OS defocus) hides the mirror immediately, no defer tick", () => {
+    const { textarea, box } = setup();
+    box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }));
+    composition(textarea, "compositionstart");
+    composition(textarea, "compositionupdate", "ni");
+    expect(box.isVisible).toBe(true);
+    // Unlike a textarea blur (candidate click), a window blur cannot come
+    // from the IME UI — there is no same-turn focus return to wait for.
+    window.dispatchEvent(new FocusEvent("blur"));
+    expect(box.isVisible).toBe(false);
+    expect(box.isComposing).toBe(false);
+    box.destroy();
+  });
+
+  it("window blur after destroy is a no-op (listener removed, no leak)", () => {
+    const { textarea, box } = setup();
+    box.attach(textarea, () => ({ x: 10, y: 20, cellH: 16 }));
+    composition(textarea, "compositionstart");
+    box.destroy();
+    window.dispatchEvent(new FocusEvent("blur"));
+    expect(box.isComposing).toBe(false);
+  });
 
   it("hides while the composition string is empty, reappears on new input", () => {
     const { textarea, box } = setup();

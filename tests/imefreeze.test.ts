@@ -140,4 +140,28 @@ describe("imefreeze geometry guards", () => {
     expect(fakeTa.style.left).toBe("42px");
     handle.dispose();
   });
+  it("window blur (OS defocus) clears the freeze immediately, without the defer tick", () => {
+    const element = sizedElement(800, 600);
+    const handle = patchImeFreeze(terminal, element, { position: () => null });
+    compositionStart();
+    fakeTa.el.style.left = "999px";
+    expect(fakeTa.style.left).toBe("80px");
+    // WebView2 may never deliver the textarea's blur on OS defocus with a
+    // live TSF composition — the window-level signal must clear at once so
+    // the 200ms re-anchor pump cannot write into a background window.
+    window.dispatchEvent(new FocusEvent("blur"));
+    fakeTa.el.style.left = "42px";
+    expect(fakeTa.style.left).toBe("42px");
+    handle.dispose();
+  });
+
+  it("window blur outside composition is a no-op (freeze stays engaged)", () => {
+    const element = sizedElement(800, 600);
+    const handle = patchImeFreeze(terminal, element, { position: () => null });
+    window.dispatchEvent(new FocusEvent("blur"));
+    compositionStart();
+    fakeTa.el.style.left = "999px";
+    expect(fakeTa.style.left).toBe("80px");
+    handle.dispose();
+  });
 });

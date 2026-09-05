@@ -32,7 +32,7 @@ v2.2.5-beta.1 已上线保守修复的细节：`docs/ime-anchor-stability.md`。
 - [ ] 反色扫描置信度：多反色格 / 扫描失败时保持上一锚点，避免误选 spinner。
 - [ ] 重审 200ms re-anchor 默认策略（是否回到 compositionstart 单次锚定）。
 - [ ] 远端 SSH / 多窗口场景的额外回归矩阵。
-- [x] 组词中途失焦时强制隐藏镜像（textarea `blur` / composition 取消路径）— 代码已合，待真人 IME 勾选确认。
+- [x] 组词中途失焦时强制隐藏镜像（textarea `blur` / composition 取消路径 + OS 窗口级 `blur` 立即清理冻结与镜像）— 代码已合，待真人 IME 勾选确认。
 
 ### 专项测试清单（关闭本项前勾完）
 

@@ -1,6 +1,16 @@
 ## Unreleased
 
 Changes
+## v3.0.2
+
+Changes
+
+- **IME state clears when the window loses focus** — Alt+Tab or clicking a
+  second TTerm window mid-composition used to leave the frozen caret anchor
+  and its re-anchor timer pinned in the background window, so the candidate
+  window could end up at the screen corner. An OS-level window blur now drops
+  the freeze and hides the composition mirror immediately (clicking IME
+  candidates never triggers it — candidate windows are non-activating)
 
 ## v3.0.1
 

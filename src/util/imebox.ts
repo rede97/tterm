@@ -105,6 +105,7 @@ export class ImeBox {
   private fadeTimer: number | null = null;
   private placeRaf: number | null = null;
   private blurHideTimer: number | null = null;
+  private windowBlurHandler: (() => void) | null = null;
 
   constructor(
     private parent: HTMLElement,
@@ -126,6 +127,19 @@ export class ImeBox {
     getPos: () => CursorPos,
     shouldMirror: () => boolean = () => true,
   ): void {
+    // OS-level window defocus (Alt+Tab, another TTerm window): with a live
+    // TSF composition WebView2 may never deliver the textarea's blur, which
+    // would strand the mirror in a background window. Window blur never
+    // fires for IME candidate clicks (non-activating top-level), so hide
+    // immediately — no defer tick. Removed in destroy(): a window listener
+    // would otherwise leak the whole tab past its lifetime.
+    this.windowBlurHandler = () => {
+      if (!this.active) return;
+      trace("window blur — hiding mirror");
+      this._cancelTimers();
+      this._hide();
+    };
+    window.addEventListener("blur", this.windowBlurHandler);
     textarea.addEventListener("focus", () => {
       trace("textarea focus");
       // Focus returned before a deferred blur-hide ran (e.g. IME candidate
@@ -256,6 +270,11 @@ export class ImeBox {
 
   destroy(): void {
     this._cancelTimers();
+    this._hide(); // a destroyed box is inert: no composing/visible state
+    if (this.windowBlurHandler) {
+      window.removeEventListener("blur", this.windowBlurHandler);
+      this.windowBlurHandler = null;
+    }
     this.el.remove();
   }
 

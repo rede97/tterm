@@ -185,6 +185,16 @@ export function patchImeFreeze(
   document.addEventListener("compositionstart", onCompStart, true);
   document.addEventListener("compositionend", onCompEnd, true);
   ta.addEventListener("blur", onBlur);
+  // OS-level window defocus (Alt+Tab, clicking another TTerm window):
+  // WebView2 can hold a live TSF composition without delivering the
+  // textarea's blur, leaving the freeze — and its 200ms re-anchor pump —
+  // pinned to a stale anchor in a background window. Window blur is
+  // unambiguous: IME candidate windows are non-activating top-levels, so
+  // unlike textarea blur this clears immediately, with no defer tick.
+  const onWindowBlur = () => {
+    if (left !== null || top !== null) clearFreeze();
+  };
+  window.addEventListener("blur", onWindowBlur);
 
   return {
     dispose() {
@@ -196,6 +206,7 @@ export function patchImeFreeze(
       document.removeEventListener("compositionstart", onCompStart, true);
       document.removeEventListener("compositionend", onCompEnd, true);
       ta.removeEventListener("blur", onBlur);
+      window.removeEventListener("blur", onWindowBlur);
     },
   };
 }
