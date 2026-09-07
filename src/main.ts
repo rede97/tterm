@@ -11,6 +11,7 @@ import "@fontsource/source-code-pro";
 import "@fontsource/ibm-plex-mono";
 import "@fontsource/roboto-mono";
 import "@fontsource/ubuntu-mono";
+import "@fontsource-variable/martian-mono";
 import { refreshConptyImeCaps } from "./config/conpty-ime";
 import { loadCustomThemes } from "./config/custom-themes";
 import { loadSerialProfiles } from "./config/serial-profiles";

@@ -17,6 +17,7 @@ export const BUILTIN_FONTS: FontDef[] = [
   { family: "IBM Plex Mono", label: "IBM Plex Mono", source: "builtin" },
   { family: "Roboto Mono", label: "Roboto Mono", source: "builtin" },
   { family: "Ubuntu Mono", label: "Ubuntu Mono", source: "builtin" },
+  { family: "Martian Mono Variable", label: "Martian Mono", source: "builtin" },
 ];
 
 export function allBuiltinFonts(): FontDef[] {

@@ -24,6 +24,7 @@
     "demo:share": "bun drafts/demo/share.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/martian-mono": "^5.3.0",
     "@fontsource/cascadia-mono": "^5.2.3",
     "@fontsource/fira-mono": "^5.2.7",
     "@fontsource/ibm-plex-mono": "^5.2.7",
