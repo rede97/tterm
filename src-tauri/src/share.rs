@@ -1581,7 +1581,7 @@ Content-Length: 35
         ws.get_mut()
             .set_read_timeout(Some(Duration::from_secs(5)))
             .unwrap();
-        ws.send(tungstenite::Message::Binary(b"ping".to_vec()))
+        ws.send(tungstenite::Message::Binary(b"ping".to_vec().into()))
             .unwrap();
     }
 }

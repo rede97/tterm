@@ -80,7 +80,13 @@ pub struct SshHandler {
 impl client::Handler for SshHandler {
     type Error = russh::Error;
 
-    async fn check_server_key(&mut self, key: &ssh_key::PublicKey) -> Result<bool, Self::Error> {
+    async fn check_server_key(
+        &mut self,
+        server_public_key: &russh::keys::PublicKeyOrCertificate,
+    ) -> Result<bool, Self::Error> {
+        // russh 0.64 hands us a key or a certificate; known_hosts matches the
+        // raw public key (the certificate's subject key, when present).
+        let key = server_public_key.public_key();
         let path = match &self.known_hosts {
             Some(p) => p.clone(),
             None => return Ok(false), // no home dir — refuse rather than trust blindly
@@ -94,7 +100,7 @@ impl client::Handler for SshHandler {
             fingerprint: fingerprint.clone(),
             mismatch,
         };
-        match russh::keys::known_hosts::check_known_hosts_path(&self.host, self.port, key, &path) {
+        match russh::keys::known_hosts::check_known_hosts_path(&self.host, self.port, &key, &path) {
             Ok(true) => Ok(true),
             Ok(false) => {
                 // First contact (or key type not yet recorded): TOFU dialog.
@@ -105,7 +111,7 @@ impl client::Handler for SshHandler {
                     let _ = crate::ssh::ensure_ssh_dir_at(dir);
                 }
                 Ok(russh::keys::known_hosts::learn_known_hosts_path(
-                    &self.host, self.port, key, &path,
+                    &self.host, self.port, &key, &path,
                 )
                 .is_ok())
             }
@@ -120,7 +126,7 @@ impl client::Handler for SshHandler {
                     let _ = crate::ssh::ensure_ssh_dir_at(dir);
                 }
                 Ok(russh::keys::known_hosts::learn_known_hosts_path(
-                    &self.host, self.port, key, &path,
+                    &self.host, self.port, &key, &path,
                 )
                 .is_ok())
             }

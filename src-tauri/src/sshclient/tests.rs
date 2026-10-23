@@ -651,12 +651,12 @@ fn ssh_flood_delivers_entire_omp_stream() {
                 replies_sent = true;
                 // DA + DECRP answers, ~130 bytes total, as xterm emits them.
                 for _ in 0..7 {
-                    ws.send(tungstenite::Message::Binary(b"\x1b[?1;2c".to_vec()))
+                    ws.send(tungstenite::Message::Binary(b"\x1b[?1;2c".to_vec().into()))
                         .unwrap();
                 }
                 for mode in [2026u32, 2031, 2048, 1010, 1011] {
                     ws.send(tungstenite::Message::Binary(
-                        format!("\x1b[?{};0$y", mode).into_bytes(),
+                        format!("\x1b[?{};0$y", mode).into_bytes().into(),
                     ))
                     .unwrap();
                 }

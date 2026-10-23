@@ -6,6 +6,10 @@ Changes
   to master build `991857a` (`@xterm/xterm` 6.1.0-beta.315). Closing a tab
   while an IME composition is still open no longer crashes the renderer.
   JS and Rust dependencies are otherwise at their latest compatible releases
+- **SSH stack, terminal relay, and local PTY moved to current majors** —
+  russh 0.64 (host-key checks accept a raw key or a certificate), the
+  WebSocket relay on tokio-tungstenite 0.30, and local shells on
+  portable-pty 0.9. Session behavior is unchanged
 
 ## v3.0.2
 

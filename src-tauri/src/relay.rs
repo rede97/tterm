@@ -296,7 +296,7 @@ async fn handle_ws(hub: Arc<WsHub>, stream: tokio::net::TcpStream) {
                 data = rx.recv() => {
                     match data {
                         Some(d) => {
-                            if ws_sink.send(WsMessage::Binary(d)).await.is_err() {
+                            if ws_sink.send(WsMessage::Binary(d.into())).await.is_err() {
                                 break;
                             }
                         }
@@ -324,8 +324,8 @@ async fn handle_ws(hub: Arc<WsHub>, stream: tokio::net::TcpStream) {
     // Task B: WS stream → session writer (keystrokes).
     while let Some(Ok(msg)) = ws_stream.next().await {
         let data = match msg {
-            WsMessage::Binary(d) => d,
-            WsMessage::Text(t) => t.into_bytes(),
+            WsMessage::Binary(d) => d.to_vec(),
+            WsMessage::Text(t) => t.as_str().as_bytes().to_vec(),
             WsMessage::Close(_) => break,
             _ => continue,
         };
@@ -764,7 +764,7 @@ mod tests {
         ws.get_mut()
             .set_read_timeout(Some(Duration::from_secs(5)))
             .unwrap();
-        ws.send(tungstenite::Message::Binary(b"ping".to_vec()))
+        ws.send(tungstenite::Message::Binary(b"ping".to_vec().into()))
             .unwrap();
         let msg = ws.read().expect("echo reply");
         assert_eq!(msg.into_data(), b"ping".to_vec());
@@ -772,7 +772,7 @@ mod tests {
         // Shell exit: the echo thread drops its end -> read loop EOF ->
         // entry cleanup -> channel closes -> client receives a Close frame
         // (the frontend's disconnect signal).
-        ws.send(tungstenite::Message::Binary(b"quit".to_vec()))
+        ws.send(tungstenite::Message::Binary(b"quit".to_vec().into()))
             .unwrap();
         let close = ws.read().expect("close frame");
         assert!(close.is_close(), "expected Close, got {:?}", close);
@@ -825,7 +825,7 @@ mod tests {
         // Client 1: sanity roundtrip, then an abnormal drop (no Close
         // handshake — dropping the socket mid-stream, like an OS sleep).
         let mut ws1 = connect();
-        ws1.send(tungstenite::Message::Binary(b"a".to_vec()))
+        ws1.send(tungstenite::Message::Binary(b"a".to_vec().into()))
             .unwrap();
         let mut buf = [0u8; 16];
         let n = shell_side.read(&mut buf).unwrap();
@@ -844,7 +844,7 @@ mod tests {
         assert_eq!(msg.into_data(), b"while-away".to_vec());
 
         // …and the upstream direction works again (keystrokes reach the shell).
-        ws2.send(tungstenite::Message::Binary(b"b".to_vec()))
+        ws2.send(tungstenite::Message::Binary(b"b".to_vec().into()))
             .unwrap();
         let n = shell_side.read(&mut buf).unwrap();
         assert_eq!(&buf[..n], b"b");
@@ -1007,27 +1007,27 @@ mod tests {
             .unwrap();
 
         // Kill the shell: EOF -> dead mode -> the notice arrives in-band…
-        ws.send(tungstenite::Message::Binary(b"quit".to_vec()))
+        ws.send(tungstenite::Message::Binary(b"quit".to_vec().into()))
             .unwrap();
         let notice = ws.read().expect("dead-mode notice");
         assert_eq!(notice.into_data(), b"\r\n[dead] press enter\r\n".to_vec());
         // …and the socket stays OPEN (no Close frame).
 
         // Non-Enter input is swallowed: no respawn, nothing downstream.
-        ws.send(tungstenite::Message::Binary(b"x".to_vec()))
+        ws.send(tungstenite::Message::Binary(b"x".to_vec().into()))
             .unwrap();
         std::thread::sleep(Duration::from_millis(300));
         assert_eq!(respawns.load(Ordering::Relaxed), 0);
 
         // Enter respawns in place; the same socket talks to the new shell.
-        ws.send(tungstenite::Message::Binary(b"\r".to_vec()))
+        ws.send(tungstenite::Message::Binary(b"\r".to_vec().into()))
             .unwrap();
         std::thread::sleep(Duration::from_millis(300));
         assert_eq!(respawns.load(Ordering::Relaxed), 1);
         // Pre-resume bytes arrive BEFORE the new stream's output.
         let scroll = ws.read().expect("pre-resume scroll");
         assert_eq!(scroll.into_data(), b"[scroll]".to_vec());
-        ws.send(tungstenite::Message::Binary(b"ping".to_vec()))
+        ws.send(tungstenite::Message::Binary(b"ping".to_vec().into()))
             .unwrap();
         let echo = ws.read().expect("echo from respawned shell");
         assert_eq!(echo.into_data(), b"ping".to_vec());
@@ -1036,7 +1036,7 @@ mod tests {
         assert_eq!(&*states.lock().unwrap(), &[false, true]);
 
         // Second death + failed respawn: failure line, still dead, retry works.
-        ws.send(tungstenite::Message::Binary(b"quit".to_vec()))
+        ws.send(tungstenite::Message::Binary(b"quit".to_vec().into()))
             .unwrap();
         let notice2 = ws.read().expect("second notice");
         assert_eq!(notice2.into_data(), b"\r\n[dead] press enter\r\n".to_vec());
@@ -1182,7 +1182,7 @@ mod tests {
 
         // Within ~2 retry windows the pump must have retried silently
         // (attempt 1 failed without printing) and then respawned.
-        ws.send(tungstenite::Message::Binary(b"ping".to_vec()))
+        ws.send(tungstenite::Message::Binary(b"ping".to_vec().into()))
             .unwrap();
         let mut echoed = false;
         let deadline = std::time::Instant::now() + Duration::from_secs(10);
@@ -1194,7 +1194,7 @@ mod tests {
                         echoed = true;
                         break;
                     }
-                    let _ = ws.send(tungstenite::Message::Binary(b"ping".to_vec()));
+                    let _ = ws.send(tungstenite::Message::Binary(b"ping".to_vec().into()));
                 }
                 Err(_) => break,
             }
