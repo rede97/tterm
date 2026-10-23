@@ -69,7 +69,9 @@ const visibleInstance = () =>
       },
       taInline: { left: ta.style.left, top: ta.style.top },
       cvDisplay: getComputedStyle(cv).display,
-      cvText: cv.textContent,
+      // xterm wraps the composition string in U+200E so the inline view
+      // stays left-to-right. The marks are not part of the composed text.
+      cvText: cv.textContent.replace(/[\u200e\u200f]/g, ""),
     };
   });
 

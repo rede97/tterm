@@ -39,16 +39,20 @@ describe("q8b overlay scrollbar", () => {
       { timeout: 8000 },
     );
 
-    const flowRight = () =>
-      browser.execute(() =>
-        document
+    // Inset from the panel's right edge, not the viewport. Shrinking the
+    // window can nudge its width by a pixel (DPI rounding) and slide this
+    // right-anchored panel; the column inside the panel is what must not move.
+    const flowInset = () =>
+      browser.execute(() => {
+        const panel = document.querySelector(".quick-panel").getBoundingClientRect();
+        const trigger = document
           .querySelector('.tt-select[aria-label="Flow control"] .tt-select-trigger')
-          .getBoundingClientRect()
-          .right.toFixed(1),
-      );
+          .getBoundingClientRect();
+        return (panel.right - trigger.right).toFixed(1);
+      });
 
     // Fits: no overflow.
-    const before = await flowRight();
+    const before = await flowInset();
     expect(await browser.execute(() => !!document.querySelector(".quick-panel .ov-sb.on"))).toBe(
       false,
     );
@@ -71,7 +75,7 @@ describe("q8b overlay scrollbar", () => {
     expect(overflowState.thumbOn).toBe(true);
     expect(overflowState.classicBar).toBe(false);
 
-    const after = await flowRight();
+    const after = await flowInset();
     expect(after).toBe(before); // the 148px column did not shift
 
     // Scroll to the bottom: thumb tracks, still no gutter.
@@ -81,7 +85,7 @@ describe("q8b overlay scrollbar", () => {
       p.dispatchEvent(new Event("scroll"));
     });
     await browser.pause(200);
-    expect(await flowRight()).toBe(before);
+    expect(await flowInset()).toBe(before);
 
     await browser.setWindowSize(size.width, size.height);
   });

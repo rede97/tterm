@@ -125,11 +125,14 @@ describe("custom themes", () => {
       timeoutMsg: "container background did not follow the light theme",
     });
 
-    // Terminal area follows the theme; tab chrome stays dark (a white tab
-    // title on a light tab would be unreadable). Active tab is one step
-    // LIGHTER than the bar (#2d2d2d + top highlight) since the redesign.
+    // Terminal area follows the theme; tab chrome does not (a white tab
+    // title on a light tab would be unreadable). Cursor skin paints the
+    // selected pill with --tt-selected; VS Code skin uses a darker tile.
     const chrome = await chromeBgs();
-    expect(chrome.activeTab).toBe("rgb(45, 45, 45)"); // stays #2d2d2d
+    const expectedTab = await browser.execute(() =>
+      document.body.dataset.skin === "vscode" ? "rgb(30, 30, 30)" : "rgba(255, 255, 255, 0.1)",
+    );
+    expect(chrome.activeTab).toBe(expectedTab);
     expect(chrome.container).toBe("rgb(253, 246, 227)");
     expect(chrome.body).toBe("rgb(253, 246, 227)");
     const settingsPadding = await browser.execute(
