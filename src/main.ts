@@ -114,7 +114,7 @@ configStore.subscribe((keys) => {
   if (keys.includes("chromeSkin") || keys.includes("overlayGlass")) {
     applyChromeSkin();
   }
-  if (keys.includes("imeFakeCursorScan")) {
+  if (keys.includes("imeFakeCursorScan") || keys.includes("imePinCorner")) {
     for (const tab of tabManager.tabs.values()) tab.refreshImeClasses();
   }
   if (keys.some((k) => ["fontFamily", "fontSize", "scrollback", "themeName"].includes(k))) {

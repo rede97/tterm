@@ -23,6 +23,7 @@ vi.mock("../src/util/imeanchor", () => ({
   cursorPixelPos: () => ({ x: 80, y: 80, cellH: 16 }),
 }));
 
+import { configStore } from "../src/core/store";
 import { patchImeFreeze } from "../src/util/imefreeze";
 
 // Fake textarea: real EventTarget (composition events) + plain style bag.
@@ -57,6 +58,7 @@ beforeEach(() => {
   document.body.appendChild(fakeTa.el);
   cellDimensionsMock.mockReturnValue({ width: 8, height: 16 });
   anchorCellMock.mockReturnValue({ x: 10, y: 5 });
+  configStore.set({ imePinCorner: false });
 });
 
 afterEach(() => {
@@ -152,6 +154,24 @@ describe("imefreeze geometry guards", () => {
     window.dispatchEvent(new FocusEvent("blur"));
     fakeTa.el.style.left = "42px";
     expect(fakeTa.style.left).toBe("42px");
+    handle.dispose();
+  });
+
+  it("fixed input box pins the textarea to the bottom-left and does not scan", () => {
+    configStore.set({ imePinCorner: true });
+    const element = sizedElement(800, 600);
+    const handle = patchImeFreeze(terminal, element, { position: () => null });
+    compositionStart();
+    fakeTa.el.style.left = "999px";
+    fakeTa.el.style.top = "999px";
+    expect(anchorCellMock).not.toHaveBeenCalled();
+    expect(fakeTa.style.left).toBe("8px");
+    expect(fakeTa.style.top).toBe("576px"); // 600 - 16 - 8
+
+    Object.defineProperty(element, "clientHeight", { value: 400 });
+    vi.advanceTimersByTime(250);
+    expect(anchorCellMock).not.toHaveBeenCalled();
+    expect(fakeTa.style.top).toBe("376px"); // 400 - 16 - 8
     handle.dispose();
   });
 

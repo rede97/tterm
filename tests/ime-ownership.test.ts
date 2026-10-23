@@ -42,7 +42,7 @@ function composition(target: HTMLElement, type: string, data = "") {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  configStore.set({ renderer: "dom" });
+  configStore.set({ renderer: "dom", imePinCorner: false });
   document.body.innerHTML = "";
   // The repo default is "always" (testing phase); ownership semantics are
   // exercised in "auto" — mirror only while the TUI hides the cursor.
@@ -79,6 +79,29 @@ describe("IME display ownership lock", () => {
     composition(ta, "compositionend", "你");
     tab.refreshImeClasses();
     expect(tab.element.classList.contains("ime-mirror-on")).toBe(false);
+    tab.destroy();
+  });
+
+  it("fixed input box forces the mirror on and pins it to the bottom-left", () => {
+    configStore.set({ imePinCorner: true });
+    setImeMirrorMode("off");
+    cursorIsHiddenMock.mockReturnValue(false);
+    const tab = makeTab();
+    Object.defineProperty(tab.element, "clientWidth", { value: 800, configurable: true });
+    Object.defineProperty(tab.element, "clientHeight", { value: 600, configurable: true });
+    tab.refreshImeClasses();
+    expect(tab.element.classList.contains("ime-mirror-on")).toBe(true);
+
+    const ta = textareaOf(tab);
+    composition(ta, "compositionstart");
+    composition(ta, "compositionupdate", "ni");
+    const box = tab.element.querySelector<HTMLElement>(".ime-box");
+    expect(box).toBeTruthy();
+    expect(parseFloat(box?.style.left ?? "0")).toBeLessThan(20);
+    expect(parseFloat(box?.style.top ?? "0")).toBeGreaterThan(500);
+    // End the composition before dispose so xterm's 0ms composition timer
+    // does not touch a torn-down renderer.
+    composition(ta, "compositionend", "你");
     tab.destroy();
   });
 });

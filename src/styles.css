@@ -1367,6 +1367,9 @@ body.tt-glass .ime-box {
   contain: layout style paint;
   overflow: hidden;
   outline: none;
+  /* Swipes scroll in touchscroll.ts. none keeps the browser from stealing
+     the pointer for a native pan, so a cancelled finger can start again. */
+  touch-action: none;
 }
 
 /* -- xterm built-in scrollbar (VS Code style, always visible) --- */

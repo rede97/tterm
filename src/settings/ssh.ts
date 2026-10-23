@@ -9,6 +9,7 @@
 // is bound to panel state, not rescued from doomed DOM.
 
 import { invoke } from "@tauri-apps/api/core";
+import { Copy, createElement } from "lucide";
 import Sortable from "sortablejs";
 import { generateSshConfig, loadSshHosts } from "../config/ssh-config";
 import { hostProp } from "../core/common";
@@ -325,6 +326,13 @@ function hostRow(panel: HTMLElement, h: SshHost, hidden: string[]) {
       </div>
       <button
         type="button"
+        class="icon-tiny ssh-btn-copy"
+        title="Duplicate"
+        aria-label="Duplicate"
+        @click=${() => duplicateSshHost(panel, h)}
+      >${createElement(Copy, { stroke: "currentColor", width: 14, height: 14 })}</button>
+      <button
+        type="button"
         class="icon-tiny ssh-btn-edit"
         title="Edit"
         @click=${() => showSshHostEditor({ base: h, onSaved: saveHost(panel) })}
@@ -370,6 +378,31 @@ function keyList(st: SshPanelState) {
 }
 
 // ---- Actions -----------------------------------------------------------
+
+/// Next free alias for a duplicated host. Single token, no spaces.
+function sshHostCopyName(name: string, taken: ReadonlySet<string>): string {
+  const stem = name.replace(/-copy(?:-\d+)?$/, "");
+  const base = `${stem}-copy`;
+  if (!taken.has(base)) return base;
+  for (let i = 2; ; i++) {
+    const candidate = `${base}-${i}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+}
+
+/// Insert a full copy of `host` just after it. Pending until Apply.
+function duplicateSshHost(panel: HTMLElement, host: SshHost): void {
+  const hosts = configStore.get("sshHosts");
+  const idx = hosts.findIndex((h) => h.name === host.name);
+  if (idx < 0) return;
+  const taken = new Set(hosts.map((h) => h.name));
+  const copy: SshHost = { ...host, name: sshHostCopyName(host.name, taken) };
+  const next = hosts.slice();
+  next.splice(idx + 1, 0, copy);
+  configStore.set({ sshHosts: next });
+  setSshConfigDirty(true, panel);
+  renderSshPanel(panel);
+}
 
 /// Add/Edit result lands in the working copy (pending until the shell's Apply).
 function saveHost(panel: HTMLElement) {

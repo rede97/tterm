@@ -33,6 +33,7 @@ interface GeneralPanelState {
   confirmCloseWindow: boolean;
   confirmCloseTab: boolean;
   imeFakeCursorScan: boolean;
+  imePinCorner: boolean;
 }
 
 const panelStates = new WeakMap<HTMLElement, GeneralPanelState>();
@@ -49,6 +50,7 @@ function readStore() {
     confirmCloseWindow: configStore.get("confirmCloseWindow"),
     confirmCloseTab: configStore.get("confirmCloseTab"),
     imeFakeCursorScan: configStore.get("imeFakeCursorScan"),
+    imePinCorner: configStore.get("imePinCorner"),
   };
 }
 
@@ -196,6 +198,11 @@ function generalTemplate(panel: HTMLElement, st: GeneralPanelState) {
             id: "set-ime-fake-cursor",
           }),
         )}
+        ${itemRow(
+          "Fixed input box",
+          "Pin the composition mirror and the IME to the bottom-left corner of the window. Off = follow the caret.",
+          toggle(st.imePinCorner, (v) => (st.imePinCorner = v), { id: "set-ime-pin-corner" }),
+        )}
       `,
     )}
     ${section(
@@ -287,5 +294,7 @@ export function collectGeneralSettings(root: HTMLElement): Partial<ConfigState> 
   if (autoUpdateEl) partial.autoCheckUpdates = autoUpdateEl.getAttribute("aria-checked") === "true";
   const imeFakeEl = root.querySelector("#set-ime-fake-cursor") as HTMLInputElement;
   if (imeFakeEl) partial.imeFakeCursorScan = imeFakeEl.getAttribute("aria-checked") === "true";
+  const imePinEl = root.querySelector("#set-ime-pin-corner") as HTMLInputElement;
+  if (imePinEl) partial.imePinCorner = imePinEl.getAttribute("aria-checked") === "true";
   return partial;
 }

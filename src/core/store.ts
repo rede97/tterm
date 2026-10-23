@@ -56,6 +56,9 @@ export interface ConfigState {
   // Find the drawn caret in agent TUIs and park the IME there. Off = always
   // follow the hardware cursor. Win10 ConPTY adapter is separate (conpty-ime.json).
   imeFakeCursorScan: boolean;
+  // Pin the composition mirror and the OS IME to the window's bottom-left.
+  // On = no cursor / fake-caret inference.
+  imePinCorner: boolean;
   // Runtime flag
   loaded: boolean;
 }
@@ -118,6 +121,7 @@ const SCHEMA = {
   recentDirectories: { default: [] as string[], validate: isArray<string> },
   keybindings: { default: {} as Record<string, string>, validate: isStringRecord },
   imeFakeCursorScan: { default: true, validate: isBoolean },
+  imePinCorner: { default: false, validate: isBoolean },
   loaded: { default: false, validate: isBoolean },
 } satisfies Record<string, SchemaEntry<unknown>>;
 

@@ -22,17 +22,19 @@ import { cursorPixelPos, describeImeAnchor, imeAnchorCell } from "../util/imeanc
 import { getImeDebugFlags, ImeBox, imeMirrorActiveFor } from "../util/imebox";
 import { CursorPositionFilter } from "../util/imefilter";
 import { type FreezeHandle, patchImeFreeze } from "../util/imefreeze";
+import { IME_PIN_PAD, imePinnedOrigin, isImePinned } from "../util/imepin";
 import { imeAnchorPolicy } from "../util/imepolicy";
 import { applyProgressToTabElement, parseOsc9Progress } from "../util/osc";
 import { createSerialInputHandler } from "../util/serialinput";
 import { SizeHint } from "../util/sizehint";
-import { cursorIsHidden } from "../util/xterm-internals";
+import { cellDimensions, cursorIsHidden } from "../util/xterm-internals";
 import { BatchAttachAddon } from "./batchattach";
 import { computeGrid } from "./fit";
 import { pasteIntoTerminal } from "./paste";
 import { recordShareSeq } from "./sharelines";
 import { buildShareScreenshot, buildShareSnapshot } from "./sharescreen";
 import { TitleModel } from "./title";
+import { attachTouchScroll } from "./touchscroll";
 import { createXterm } from "./xtermfactory";
 
 export class TerminalTab {
@@ -98,6 +100,7 @@ export class TerminalTab {
   private inputMuted = false;
   // IME freeze proxy handle (see util/imefreeze.ts) — disposed on destroy.
   private _imeFreeze?: FreezeHandle;
+  private _detachTouchScroll?: () => void;
 
   constructor(id: string, type: TabType, label: string, container: HTMLElement) {
     this.id = id;
@@ -208,21 +211,23 @@ export class TerminalTab {
     // Drive the native IME candidate window with the filtered cursor position.
     this._imeFreeze = patchImeFreeze(this.terminal, this.element, this.cursorFilter);
 
+    // Finger swipes scroll the buffer. A cancelled or second touch drops the
+    // gesture so the next swipe is not stuck to the interrupted one.
+    this._detachTouchScroll = attachTouchScroll(this.element, this.terminal, () => {
+      const h = cellDimensions(this.terminal)?.height ?? 0;
+      return h > 0 ? h : 16;
+    });
+
     // Floating IME composition mirror (Plan C): pure display, never touches
     // the input path. shouldMirror gates activation per composition so a
-    // cursor-state change mid-session takes effect immediately.
+    // cursor-state change mid-session takes effect immediately. Fixed input
+    // box forces the mirror on and pins it — no caret inference.
     const textarea = this.element.querySelector(".xterm-helper-textarea") as HTMLElement | null;
     if (textarea) {
       this.imeBox.attach(
         textarea,
-        () =>
-          cursorPixelPos(
-            this.terminal,
-            this.cursorFilter,
-            this._isCursorHidden(),
-            imeAnchorPolicy(),
-          ),
-        () => imeMirrorActiveFor(this._imeLooksLikeAgentTui()),
+        () => this._imeOrigin(),
+        () => isImePinned() || imeMirrorActiveFor(this._imeLooksLikeAgentTui()),
       );
     }
 
@@ -243,6 +248,13 @@ export class TerminalTab {
   //    on — double display, used for real-IME bisection)
   // Called on every render and on mirror-mode changes.
   refreshImeClasses(): void {
+    // Pinned: the mirror always owns composition display. Skip the caret
+    // scan — position comes from the window corner, not the buffer.
+    if (isImePinned()) {
+      if (this.imeBox.isComposing) return;
+      this.element.classList.toggle("ime-mirror-on", getImeDebugFlags().suppress);
+      return;
+    }
     const dump = this.imeDump();
     this.element.classList.toggle("cursor-hidden", dump.cursorHidden);
     // Display ownership is locked while a composition is in flight: Agent
@@ -257,6 +269,26 @@ export class TerminalTab {
     const tui = dump.cursorHidden || dump.why !== "fallback";
     const active = imeMirrorActiveFor(tui) && getImeDebugFlags().suppress;
     this.element.classList.toggle("ime-mirror-on", active);
+  }
+
+  private _imeOrigin(): { x: number; y: number; cellH: number } {
+    if (isImePinned()) {
+      const dims = cellDimensions(this.terminal);
+      const origin = imePinnedOrigin(
+        this.element.clientWidth,
+        this.element.clientHeight,
+        dims?.width ?? 0,
+        dims?.height ?? 0,
+      );
+      if (origin) return origin;
+      return { x: IME_PIN_PAD, y: IME_PIN_PAD, cellH: 16 };
+    }
+    return cursorPixelPos(
+      this.terminal,
+      this.cursorFilter,
+      this._isCursorHidden(),
+      imeAnchorPolicy(),
+    );
   }
 
   private _imeLooksLikeAgentTui(): boolean {
@@ -548,6 +580,8 @@ export class TerminalTab {
     this.serialSocket = undefined;
     this.socket?.close();
     this.socket = undefined;
+    this._detachTouchScroll?.();
+    this._detachTouchScroll = undefined;
     this._imeFreeze?.dispose();
     this.sizeHint.destroy();
     this.imeBox.destroy();

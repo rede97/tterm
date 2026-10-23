@@ -37,6 +37,7 @@ describe("ConfigStore — set/get", () => {
     expect(configStore.get("fontSize")).toBe(14);
     expect(configStore.get("serialBaud")).toBe(115200);
     expect(configStore.get("imeFakeCursorScan")).toBe(true);
+    expect(configStore.get("imePinCorner")).toBe(false);
     expect(configStore.get("loaded")).toBe(false);
   });
 

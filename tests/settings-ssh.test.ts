@@ -150,6 +150,48 @@ describe("settings — SSH host editor modal", () => {
     ]);
   });
 
+  it("Duplicate inserts a full copy with a free alias", () => {
+    configStore.set({
+      sshHosts: [
+        {
+          name: "web",
+          HostName: "10.0.0.1",
+          User: "root",
+          IdentityFile: "~/.ssh/id_ed25519",
+        },
+      ],
+    });
+    const panel = openPanel();
+    panel.querySelector<HTMLButtonElement>(".ssh-btn-copy")!.click();
+    expect(isSshConfigDirty()).toBe(true);
+    expect(configStore.get("sshHosts")).toEqual([
+      {
+        name: "web",
+        HostName: "10.0.0.1",
+        User: "root",
+        IdentityFile: "~/.ssh/id_ed25519",
+      },
+      {
+        name: "web-copy",
+        HostName: "10.0.0.1",
+        User: "root",
+        IdentityFile: "~/.ssh/id_ed25519",
+      },
+    ]);
+    // The new row is visible (its alias is not in the hidden list).
+    const boxes = [...panel.querySelectorAll<HTMLInputElement>(".ssh-host-vis")];
+    expect(boxes.map((b) => [b.value, b.checked])).toEqual([
+      ["web", true],
+      ["web-copy", true],
+    ]);
+    panel.querySelector<HTMLButtonElement>(".ssh-btn-copy")!.click();
+    expect(configStore.get("sshHosts").map((h) => h.name)).toEqual([
+      "web",
+      "web-copy-2",
+      "web-copy",
+    ]);
+  });
+
   it("Cancel closes the modal without touching the host list", () => {
     const panel = openPanel();
     panel.querySelector<HTMLButtonElement>("#set-add-ssh-host")!.click();

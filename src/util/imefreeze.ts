@@ -9,6 +9,7 @@ import type { Terminal } from "@xterm/xterm";
 import { imeAnchorCell } from "./imeanchor";
 import { getImeDebugFlags } from "./imebox";
 import type { CursorPositionFilter } from "./imefilter";
+import { imePinnedOrigin, isImePinned } from "./imepin";
 import { imeAnchorPolicy } from "./imepolicy";
 import { cellDimensions, cursorIsHidden, terminalTextarea } from "./xterm-internals";
 
@@ -44,13 +45,22 @@ export function patchImeFreeze(
   // cursor sat on the bottom row.
   const SAFE_RIGHT = 220; // typical single-row candidate window width
   const pxPos = (): { x: number; y: number } | null => {
-    const cellDims = cellDimensions(terminal);
-    // Transient invalid geometry (renderer rebuild, layout churn, hidden
-    // tab): skip this tick entirely. Clamping a 0 measurement would pin the
-    // textarea — and with it the OS candidate window — to (0,0), the bug
-    // seen when composing in actively-refreshing TUIs.
-    if (!cellDims || cellDims.width <= 0 || cellDims.height <= 0) return null;
+    // Hidden tab / layout churn: skip the tick. A 0 measurement must not
+    // write (0,0) — that parks the OS candidate window in the corner.
     if (element.clientWidth <= 0 || element.clientHeight <= 0) return null;
+    const cellDims = cellDimensions(terminal);
+    // Fixed input box: bottom-left of the window, no caret inference.
+    if (isImePinned()) {
+      const origin = imePinnedOrigin(
+        element.clientWidth,
+        element.clientHeight,
+        cellDims?.width ?? 0,
+        cellDims?.height ?? 0,
+      );
+      return origin ? { x: origin.x, y: origin.y } : null;
+    }
+    // Transient invalid geometry (renderer rebuild): skip this tick entirely.
+    if (!cellDims || cellDims.width <= 0 || cellDims.height <= 0) return null;
     const cell = imeAnchorCell(terminal, filter, cursorIsHidden(terminal), imeAnchorPolicy());
     const maxX = Math.max(0, element.clientWidth - cellDims.width - SAFE_RIGHT);
     const maxY = Math.max(0, element.clientHeight - cellDims.height);
