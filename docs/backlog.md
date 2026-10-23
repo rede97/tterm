@@ -62,6 +62,23 @@ v2.2.5-beta.1 已上线保守修复的细节：`docs/ime-anchor-stability.md`。
 
 串口 / SSH / 产品交互等新挂账写在本节下方；不要把已定稿设计再抄一遍。
 
+### 最大化后重开：只还原了尺寸，没还原最大化状态
+
+**现象**（2026-10-23 用户实测）：把窗口最大化 → 关闭 → 再次打开，窗口只是被 resize 到最大化的尺寸（普通态，占据全屏大小），而不是真正处于最大化状态（WS_MAXIMIZE）。
+
+**初步判断**：更像**插件 × 无框窗口的已知交互问题**，但也可能叠加我们自己的还原时序，待复现实锤：
+
+- 本窗口是无框窗口（`tauri.conf.json` `decorations: false`）；window-state 插件 `StateFlags::all() & !FULLSCREEN`（含 MAXIMIZED），理论上保存了 maximized 标志。
+- 插件还原路径用 `SetWindowPos`（PhysicalSize）写位置/尺寸，**绕过 WM_GETMINMAXINFO**；`window.rs` 头部注释已记录过「undecorated 上 set_min_size/set_size 与 WS_MAXIMIZE 互搏」的前科。
+- 疑似时序：还原先 `maximize()` 又被随后的 SetWindowPos 尺寸写回打回普通态，或 maximize 在窗口 show 之前被吞（无框窗口在 Windows 上对 SW_MAXIMIZE 的处理依赖 WM_GETMINMAXINFO 自绘边框计算）。
+- 升级窗口期值得顺带验证：本次依赖更新把 `@tauri-apps/plugin-window-state` 2.4.1 → 2.5.0（JS 侧已升；Rust crate 待 cargo update 后同步），先确认新版本是否已修。
+
+**待办**
+
+- [ ] 复现并抓 `.window-state.json`：关闭前确认 `maximized: true` 是否写入；重开后窗口 `is_maximized()` 的实际值。
+- [ ] 查 tauri-plugin-window-state / tao 上游 issue（undecorated + maximized restore）。
+- [ ] 若上游未修：在 `window.rs` 还原完成后按保存的 maximized 标志补一次 `maximize()`（注意避开 Resized 钩子，只在启动一次性执行）。
+
 ### Share `/lines?since=` 吃不到首屏写入
 
 - [x] 新会话（尤其串口）xterm 一出生 `buffer.length === rows`（全是空填充行）。第一帧 `recordShareSeq` 就把 append log 从 seed `total:0` 推到 `total:rows`。之后 AT/`OK` 写进这些空行，`total` 不变，`since` 认为无追加。

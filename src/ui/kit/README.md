@@ -8,18 +8,18 @@ Settings preview markup is still static HTML (not a shared lit view). Layout/but
 
 ## Single source of truth
 
-| Concern | Path | Rule |
-|---------|------|------|
-| Tokens | [`../tokens.css`](../tokens.css) | `--tt-*` only; change skins here |
-| Controls | [`controls.css`](./controls.css) | Select / toggle / buttons / stepper |
-| Palette surface | [`palette.css`](./palette.css) | `.pal-*` overlay / panel / rows |
-| Confirm surface | [`confirm.css`](./confirm.css) | `.cf-*` overlay / dialog |
-| Forward table | [`forwardtable.css`](./forwardtable.css) | `.ft-*` port-forward groups / rows / + |
-| Fixed chrome (HTML) | [`shell.ts`](./shell.ts) | `createPaletteShell` / `createConfirm*Dialog` |
-| Quick panel DOM | [`qp/view.ts`](./qp/view.ts) | Pure lit `qpPanelView(model, actions)` |
-| Command list | [`../../core/commands.ts`](../../core/commands.ts) | Palette + Settings keyboard titles / order / groups / defaults |
-| Modal behavior | [`../modal.ts`](../modal.ts) | Escape / backdrop / singleton — empty overlay only |
-| DOM invariants | [`../../../tests/ui-contracts/`](../../../tests/ui-contracts/) | Assert against app + view fixtures |
+| Concern             | Path                                                           | Rule                                                           |
+| ------------------- | -------------------------------------------------------------- | -------------------------------------------------------------- |
+| Tokens              | [`../tokens.css`](../tokens.css)                               | `--tt-*` only; change skins here                               |
+| Controls            | [`controls.css`](./controls.css)                               | Select / toggle / buttons / stepper                            |
+| Palette surface     | [`palette.css`](./palette.css)                                 | `.pal-*` overlay / panel / rows                                |
+| Confirm surface     | [`confirm.css`](./confirm.css)                                 | `.cf-*` overlay / dialog                                       |
+| Forward table       | [`forwardtable.css`](./forwardtable.css)                       | `.ft-*` port-forward groups / rows / +                         |
+| Fixed chrome (HTML) | [`shell.ts`](./shell.ts)                                       | `createPaletteShell` / `createConfirm*Dialog`                  |
+| Quick panel DOM     | [`qp/view.ts`](./qp/view.ts)                                   | Pure lit `qpPanelView(model, actions)`                         |
+| Command list        | [`../../core/commands.ts`](../../core/commands.ts)             | Palette + Settings keyboard titles / order / groups / defaults |
+| Modal behavior      | [`../modal.ts`](../modal.ts)                                   | Escape / backdrop / singleton — empty overlay only             |
+| DOM invariants      | [`../../../tests/ui-contracts/`](../../../tests/ui-contracts/) | Assert against app + view fixtures                             |
 
 Previews **must** `<link>` / `import` these files. Never redefine `.pal-*`, `.cf-*`, `.ft-*`, `.tt-*`, or paste parallel product markup (`.qp-section` trees, confirm dialogs, palette shells, `.ft` tables).
 

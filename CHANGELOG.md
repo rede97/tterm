@@ -1,6 +1,12 @@
 ## Unreleased
 
 Changes
+
+- **xterm.js follows upstream master** — the terminal and its addons are pinned
+  to master build `991857a` (`@xterm/xterm` 6.1.0-beta.315). Closing a tab
+  while an IME composition is still open no longer crashes the renderer.
+  JS and Rust dependencies are otherwise at their latest compatible releases
+
 ## v3.0.2
 
 Changes

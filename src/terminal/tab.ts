@@ -567,6 +567,8 @@ export class TerminalTab {
 
   destroy(): void {
     this._destroyed = true;
+    // imeBox.destroy() clears this — capture before any teardown.
+    const wasComposing = this.imeBox.isComposing;
     // Stop pending re-attach retries and stale socket callbacks.
     this.socketGen++;
     this._clearReattachTimer();
@@ -588,6 +590,13 @@ export class TerminalTab {
     this.onRenderDisposable?.dispose();
     this.element.remove();
     this.tabElement.remove();
+    // xterm master (6.1.0-beta) crashes if dispose() lands mid-composition:
+    // a queued render callback fires CompositionHelper.updateCompositionElements
+    // after the renderer is torn down (_renderer.value undefined). Ending the
+    // composition first flips _isComposing off so the callback no-ops.
+    if (wasComposing) {
+      this.terminal.textarea?.dispatchEvent(new CompositionEvent("compositionend", { data: "" }));
+    }
     this.terminal.dispose();
   }
 
