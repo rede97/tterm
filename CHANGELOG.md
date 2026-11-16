@@ -2,6 +2,22 @@
 
 Changes
 
+## v3.0.3
+
+Changes
+
+- **Fixed input box** — Settings → General pins the composition mirror and
+  the IME candidate window to the bottom-left of the terminal. Off follows
+  the caret, same as before
+- **Touch swipes scroll the buffer** — a vertical finger drag moves scrollback
+  and a fast lift coasts. A second touch, or a cancelled gesture, stops the
+  coast so the next swipe is not stuck to the interrupted one
+- **SSH hosts can be duplicated** — the host row copies the host (as
+  `<name>-copy`) into the working config; it lands in `~/.ssh/config` on
+  Apply, same as Add/Edit
+- **Martian Mono Variable is a built-in font** — bundled with the app
+  (latin / latin-ext / cyrillic, weight axis 100–800), selectable in
+  Appearance without a system install
 - **xterm.js follows upstream master** — the terminal and its addons are pinned
   to master build `991857a` (`@xterm/xterm` 6.1.0-beta.315). Closing a tab
   while an IME composition is still open no longer crashes the renderer.
