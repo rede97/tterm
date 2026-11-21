@@ -2,6 +2,18 @@
 
 Changes
 
+## v3.0.4
+
+Changes
+
+- **Fixed the app failing to start on Windows** — 3.0.3 crashed instantly
+  with `0xC0000005` in `vertdll.dll` on launch. The serial-port enumerator's
+  `windows` 0.29 import library redirected std's `WaitOnAddress` to
+  `vertdll.dll` under Rust 1.100 (rust-lang/rust#165915), so the first thread
+  that parked took an access violation. The enumerator now builds on
+  `windows` 0.52, whose import library binds the symbol to
+  `api-ms-win-core-synch-l1-2-0`, and the app starts normally
+
 ## v3.0.3
 
 Changes
